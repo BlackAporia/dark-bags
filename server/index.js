@@ -90,9 +90,8 @@ const server = http.createServer((req, res) => {
   }
   if (req.url === '/api/stats') {
     const totals = Object.fromEntries([...lobby.rooms].map(([k, r]) => [k, r.totals]));
-    res
-      .writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' })
-      .end(JSON.stringify({ online: sockets.size, tables: lobby.tables(), totals }));
+    const body = JSON.stringify({ online: sockets.size, tables: lobby.tables(), totals }, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+    res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(body);
     return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {

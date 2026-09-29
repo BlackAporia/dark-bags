@@ -12,7 +12,7 @@ const OUTLINE = 'rgba(4, 6, 10, 0.75)';
 
 // Weapon line art in a local frame: x along the barrel, y down. [x1, y1, x2, y2, width]
 const ART = {
-  knife: { lines: [[-4, 0, 2, 0, 3], [2, -2.6, 2, 2.6, 1.6], [2, 0, 14, 0, 1.8], [14, 0, 11, -1.8, 1.4]], length: 14, support: 0, kick: 0 },
+  knife: { lines: [[-6, 0, 2, 0, 3.6], [2, -3.6, 2, 3.6, 2.2], [2, -0.6, 19, -0.6, 3.2], [19, -0.6, 15, -3, 2.2], [4, 1, 17, 1, 1.2]], length: 19, support: 0, kick: 0 },
   pistol: { lines: [[0, 0, -2, 5.5, 2.6], [-2, -1.6, 10, -1.6, 2.6]], length: 10, support: 0, kick: 3 },
   shotgun: { lines: [[-8, 1.5, 0, 0, 2.8], [0, -1, 24, -1, 2.4], [8, 1.4, 15, 1.4, 2.8]], length: 24, support: 11, kick: 7 },
   smg: { lines: [[-5, 0.5, 0, 0, 2.4], [0, -1, 14, -1, 3], [5, 0, 6, 7, 2.2], [14, -1, 18, -1, 1.8]], length: 18, support: 9, kick: 2 },

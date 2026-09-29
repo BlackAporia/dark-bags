@@ -5,6 +5,7 @@ import { Sfx } from './sfx.js';
 import { GameClient, Attract, fmt, mmss, esc } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { store } from './store.js';
+import { PriceBook, formatUnits } from '../shared/assets.js';
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -66,7 +67,10 @@ const app = {
   transport: null,
   status: 'connecting',
   token: null,
-  balance: null,
+  balances: null, // { asset: units string } — private pool balances (test tokens in test mode)
+  assets: [],
+  prices: new PriceBook([]),
+  asset: store.get('darkbags.asset', 'SATS'),
   tables: [],
   stake: CFG.TIERS.includes(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
   name: store.get('darkbags.name', ''),
@@ -105,6 +109,59 @@ function toast(msg) {
   t.hidden = false;
   clearTimeout(toastT);
   toastT = setTimeout(() => (t.hidden = true), 3500);
+}
+
+// ----------------------------------------------------------------- tokens
+const units = (a) => BigInt(app.balances?.[a] ?? '0');
+const assetInfo = (a) => app.prices.get(a) ?? { id: a, symbol: a.slice(0, 8), decimals: 18, color: '#8d93a6' };
+function totalSats() {
+  let t = 0;
+  for (const [a, u] of Object.entries(app.balances ?? {})) t += app.prices.value(a, BigInt(u));
+  return t;
+}
+function quote(stake = app.stake, a = app.asset) {
+  return app.prices.quote(a, stake);
+}
+function tokenAmount(a, u) {
+  const info = assetInfo(a);
+  return `${formatUnits(u, info.decimals, info.decimals > 8 ? 4 : info.decimals)} ${info.symbol}`;
+}
+function pickUsableAsset() {
+  if (app.prices.has(app.asset) && units(app.asset) >= (quote() ?? 0n) && units(app.asset) > 0n) return;
+  const ok = app.assets.find((a) => app.prices.has(a.id) && units(a.id) >= quote(app.stake, a.id));
+  if (ok) app.asset = ok.id;
+}
+
+function renderAssets() {
+  const list = $('assets');
+  const ids = [...new Set([...app.assets.map((a) => a.id), ...Object.keys(app.balances ?? {})])];
+  list.replaceChildren(
+    ...ids.map((id) => {
+      const info = assetInfo(id);
+      const u = units(id);
+      const priced = app.prices.has(id);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'asset';
+      b.disabled = !priced || u === 0n;
+      b.setAttribute('aria-pressed', String(id === app.asset));
+      b.title = priced ? '' : 'No price for this token yet';
+      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}</span><span class="amt">${esc(formatUnits(u, info.decimals, 4))}${priced ? ` · ≈${fmt(app.prices.value(id, u))} sats` : ''}</span>`;
+      b.addEventListener('click', () => {
+        app.asset = id;
+        store.set('darkbags.asset', id);
+        renderLobby();
+      });
+      return b;
+    }),
+  );
+  const q = quote();
+  const qEl = $('quote');
+  if (q === null) qEl.textContent = 'Pick a token with a price to stake.';
+  else {
+    const short = units(app.asset) < q;
+    qEl.innerHTML = `A ${fmt(app.stake)} sats stake is <b>${esc(tokenAmount(app.asset, q))}</b> right now${short ? ` · <span style="color:var(--blood)">not enough ${esc(assetInfo(app.asset).symbol)}</span>` : ''}. Payouts come back in the same token at the same rate.`;
+  }
 }
 
 // ------------------------------------------------------------------ lobby
@@ -178,8 +235,10 @@ function renderLobby() {
   for (const s of skins.children) s.setAttribute('aria-checked', String(s.dataset.skin === app.skin));
   $('gore').checked = app.gore;
 
-  $('balance').textContent = app.balance === null ? '—' : fmt(app.balance);
-  $('faucet').hidden = !(app.balance !== null && app.balance < Math.min(...CFG.TIERS));
+  pickUsableAsset();
+  renderAssets();
+  $('balance').textContent = app.balances === null ? '—' : `≈${fmt(totalSats())}`;
+  $('faucet').hidden = !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
   const play = $('play');
   play.disabled = app.status !== 'open';
   play.textContent = `Go to the ${fmt(app.stake)} sats table`;
@@ -244,15 +303,16 @@ function renderPrep() {
   $('pot').textContent = fmt(p.pot);
   const ready = $('ready');
   const me = p.me ?? {};
-  if (me.ready) {
-    ready.textContent = `Cancel · refund ${fmt(p.stake)}`;
+  const q = quote(p.stake);
+  if (me.ready && me.escrow) {
+    ready.textContent = `Cancel · refund ${tokenAmount(me.escrow.asset, me.escrow.units)}`;
     ready.classList.add('armed');
   } else {
-    ready.textContent = `Stake ${fmt(p.stake)} & ready`;
+    ready.textContent = q === null ? 'Pick a token in the lobby' : `Stake ${tokenAmount(app.asset, q)} & ready`;
     ready.classList.remove('armed');
   }
-  ready.disabled = !me.ready && p.balance < p.stake;
-  $('prep-balance').textContent = `Balance ${fmt(p.balance)} test sats`;
+  ready.disabled = !me.ready && (q === null || units(app.asset) < q);
+  $('prep-balance').textContent = `${assetInfo(app.asset).symbol} balance ${formatUnits(units(app.asset), assetInfo(app.asset).decimals, 4)} · ${fmt(p.stake)} sats stake`;
 }
 
 // ------------------------------------------------------------- transport
@@ -261,7 +321,7 @@ function setMode(mode) {
   if (app.transport) app.transport.close();
   app.mode = mode;
   app.tables = [];
-  app.balance = null;
+  app.balances = null;
   app.status = 'connecting';
   app.inRoom = false;
   store.set('darkbags.mode', mode);
@@ -289,22 +349,24 @@ function onMessage(m) {
     case 'welcome':
       app.token = m.token;
       if (app.mode === 'online') store.set('darkbags.token', m.token);
-      app.balance = m.balance;
+      app.assets = m.assets ?? [];
+      app.prices = new PriceBook(app.assets);
+      app.balances = m.balances ?? {};
       app.tables = m.tables;
       renderLobby();
       break;
     case 'tables':
       app.tables = m.tables;
-      app.balance = m.balance;
+      app.balances = m.balances ?? app.balances;
       if (app.screen === 'lobby') renderLobby();
       break;
     case 'balance':
-      app.balance = m.balance;
+      app.balances = m.balances ?? app.balances;
       renderLobby();
       break;
     case 'prep': {
       app.prep = m;
-      app.balance = m.balance;
+      app.balances = m.balances ?? app.balances;
       const wasReady = app.wasReady;
       app.wasReady = m.me?.ready;
       if (m.me?.ready && !wasReady) sfx.play('ready');
@@ -312,7 +374,7 @@ function onMessage(m) {
       break;
     }
     case 'start':
-      app.balance = m.balance;
+      app.balances = m.balances ?? app.balances;
       attract.stop();
       sfx.play('beep', { f: 1320, dur: 0.3 });
       game.begin(m, app.skin, app.gore);
@@ -326,7 +388,7 @@ function onMessage(m) {
       if (game.active) game.onEvents(m.l);
       break;
     case 'result':
-      app.balance = m.balance;
+      app.balances = m.balances ?? app.balances;
       showResult(m);
       break;
     case 'err':
@@ -351,7 +413,8 @@ function showResult(m) {
     k.className = 'res-kicker win';
     amt.textContent = `${fmt(m.payout)} sats`;
     amt.className = 'res-amount win';
-    det.innerHTML = `Out with <b>${fmt(m.payout)}</b> on a <b>${fmt(m.stake)}</b> stake: <b>${pnl >= 0 ? '+' : '−'}${fmt(Math.abs(pnl))} (${pct >= 0 ? '+' : '−'}${Math.abs(pct)}%)</b>. ${inside}. Balance ${fmt(m.balance)}.`;
+    const paid = m.asset && m.asset !== 'SATS' ? ` Paid out <b>${esc(tokenAmount(m.asset, m.payoutUnits ?? '0'))}</b> at your entry rate.` : '';
+    det.innerHTML = `Out with <b>${fmt(m.payout)}</b> sats on a <b>${fmt(m.stake)}</b> stake: <b>${pnl >= 0 ? '+' : '−'}${fmt(Math.abs(pnl))} (${pct >= 0 ? '+' : '−'}${Math.abs(pct)}%)</b>.${paid} ${inside}.`;
     if (pnl > 0) {
       const text = `Walked out of the dark with ${fmt(m.payout)} sats on a ${fmt(m.stake)} stake (+${pct}%). Nobody saw what I was carrying. #DARKBAGS`;
       const url = !IN_ARTIFACT && /^https?:$/.test(location.protocol) ? `&url=${encodeURIComponent(location.origin + location.pathname)}` : '';
@@ -373,8 +436,9 @@ function showResult(m) {
     amt.className = 'res-amount';
     det.innerHTML = `The raid closed with you still in it. Your <b>${fmt(m.lost)} sats</b> rolled into the next raid's loot. ${inside}.`;
   }
-  $('res-again').textContent = `Ready for the next raid · ${fmt(m.stake)} sats`;
-  $('res-again').disabled = m.balance < m.stake;
+  const q = quote(m.stake);
+  $('res-again').textContent = q === null ? 'Ready for the next raid' : `Ready for the next raid · ${tokenAmount(app.asset, q)}`;
+  $('res-again').disabled = q === null || units(app.asset) < q;
   showScreen('result');
 }
 
@@ -391,7 +455,7 @@ function goToTable() {
 function toggleReady() {
   sfx.unlock();
   if (app.prep?.me?.ready) send({ t: 'unready' });
-  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin });
+  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset });
 }
 
 $('name').value = app.name;
@@ -414,7 +478,7 @@ $('prep-back').addEventListener('click', () => {
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
-  send({ t: 'ready', name: app.name || 'runner', skin: app.skin });
+  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset });
   showScreen('prep');
 });
 $('res-tables').addEventListener('click', () => {

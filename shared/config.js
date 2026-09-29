@@ -24,6 +24,7 @@ export const CFG = {
   DASH_TIME: 0.15,
   DASH_CD: 2.4,
   HP: 100,
+  BOT_TRUCE: 30,          // seconds at the start when bots leave each other alone and loot
   MULTI_WINDOW: 4,        // seconds between kills to chain a double/triple/... kill
   SPAWN_SHIELD: 3,        // seconds of spawn protection; firing drops it early
   REGEN_DELAY: 4,         // seconds without damage before regen starts
@@ -53,7 +54,6 @@ export const CFG = {
   BAG_SHARE: 0.5,         // share of the net stake you carry in; the rest is scattered as loot
   GOLDEN_EVERY: 4,        // every Nth raid in a room is a sponsored golden raid
   GOLDEN_BONUS: 3,        // sponsor adds this × stake to the golden raid's loot pool
-  START_BALANCE: 100000,  // test-mode faucet
 
   // population
   BOT_FILL: 10,           // bots keep the raid at roughly this many runners

@@ -153,7 +153,12 @@ export class BotBrain {
       tl < this.leaveAt || p.bag >= p.stake * this.greed || (p.hp < 40 && p.bag >= p.stake * 0.6);
 
     // perception
-    const foes = w.visibleEnemies(p).filter((f) => f.shield <= 0);
+    // Bots mostly leave each other alone: an early truce for everyone, then only the
+    // hunters (about a third) go after other bots. Anyone who attacks a bot gets a reply.
+    // Humans are always fair game.
+    const truce = w.time < CFG.BOT_TRUCE;
+    const hunter = this.brave > 0.68;
+    const foes = w.visibleEnemies(p).filter((f) => f.shield <= 0 && (!f.isBot || p.lastAttacker === f.id || (!truce && hunter)));
     let foe = null;
     let fd = Infinity;
     for (const f of foes) {

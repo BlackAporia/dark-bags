@@ -13,9 +13,11 @@ export const WEAPONS = [
 export const XP_PER_LEVEL = 100;
 export const XP = {
   kill: 100, // one kill = one weapon up
+  botOnBot: 35, // bots farming each other climb three times slower
+  botOnBotDamage: 0.4, // multiplier on damage xp when a bot hits a bot
   damage: 0.4, // per hp of damage dealt
-  loot: [3, 8, 25], // per orb tier picked up
-  bag: 30, // opening someone's dropped bag
+  loot: [1, 3, 12], // per orb tier picked up (small: kills are what climb the ladder)
+  bag: 20, // opening someone's dropped bag
 };
 
 // Engagement distance bots try to hold with each weapon.

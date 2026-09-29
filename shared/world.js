@@ -356,7 +356,11 @@ export class World {
 
   damage(v, shooter, amount) {
     if (v.shield > 0) return;
-    if (shooter && shooter !== v) this.addXp(shooter, Math.min(amount, Math.max(0, v.hp)) * XP.damage);
+    if (shooter && shooter !== v) {
+      const k = shooter.isBot && v.isBot ? XP.botOnBotDamage : 1;
+      this.addXp(shooter, Math.min(amount, Math.max(0, v.hp)) * XP.damage * k);
+      v.lastAttacker = shooter.id;
+    }
     v.hp -= amount;
     v.lastHit = this.time;
     v.ext = 0;
@@ -379,7 +383,7 @@ export class World {
     v.bag = 0;
     if (killer) {
       killer.kills++;
-      this.addXp(killer, XP.kill);
+      this.addXp(killer, killer.isBot && v.isBot ? XP.botOnBot : XP.kill);
       this.streak(killer);
     }
     // public feed: names only, never amounts

@@ -91,3 +91,16 @@ test('first blood goes to everyone; chained kills climb the multi-kill ladder', 
   }
   assert.deepEqual(tiers, [[1, 'all'], [2, 'me'], [3, 'me'], [4, 'me'], [5, 'me'], [5, 'me']]);
 });
+
+test('bots climb slower on each other and leave each other alone early on', () => {
+  const w = new World({ stake: 1000, seed: 9, bots: false });
+  const b1 = w.addPlayer({ name: 'b1', skin: '#fff', isBot: true });
+  const b2 = w.addPlayer({ name: 'b2', skin: '#fff', isBot: true });
+  const h = w.addPlayer({ name: 'human', skin: '#fff' });
+  w.step();
+  w.kill(b2, b1);
+  assert.equal(b1.w, 0, 'one bot kill is not a weapon');
+  assert.ok(b1.xp > 0 && b1.xp < XP_PER_LEVEL);
+  w.kill(h, b1);
+  assert.equal(b1.w, 1, 'killing a human is');
+});

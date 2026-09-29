@@ -640,3 +640,29 @@ body.touch-on .banner { top: 27%; font-size: 20px; }
   .streak.go .st-title, .streak.go .st-fx::before, .streak.go .st-fx::after, .slot.lit, .prep-count.tick { animation: fade-out 2.6s steps(1, end) reverse both !important; }
   .streak .coin-rain { display: none; }
 }
+
+/* --------------------------------------------------------------- tokens */
+.assets { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.assets legend { padding: 0; margin-bottom: 8px; }
+.asset-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 6px; }
+.asset {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--tarp);
+  text-align: left;
+  min-width: 0;
+}
+.asset .dot { grid-row: 1 / 3; width: 12px; height: 12px; border-radius: 50%; }
+.asset .sym { font-weight: 600; font-size: 14px; }
+.asset .amt { font: 500 11px/1.3 var(--f-num); color: var(--dust); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset[aria-pressed='true'] { border-color: var(--sats); box-shadow: inset 0 0 0 1px var(--sats); }
+.asset:disabled { opacity: 0.4; cursor: not-allowed; }
+.quote { margin: 0; font-size: 13px; color: var(--dust); }
+.quote b { color: var(--paper); font-family: var(--f-num); font-weight: 500; }
+.cashier { display: flex; flex-direction: column; gap: 6px; }

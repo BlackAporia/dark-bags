@@ -2,6 +2,7 @@ import { CFG, SKINS } from './config.js';
 import { World } from './world.js';
 import { cleanName } from './wallet.js';
 import { botName } from './bot.js';
+import { PriceBook, unitsAtEntryRate } from './assets.js';
 
 /**
  * A table at one stake level.
@@ -15,15 +16,16 @@ import { botName } from './bot.js';
  * Transport-agnostic: the server plugs in WebSockets, offline mode a direct callback.
  */
 export class RoomCore {
-  constructor({ stake, wallet, send, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
+  constructor({ stake, wallet, send, prices = new PriceBook(), bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
     this.stake = stake;
     this.wallet = wallet;
+    this.prices = prices;
     this.send = send;
     this.bots = bots;
     this.roundSeconds = roundSeconds;
     this.prepSeconds = prepSeconds;
     this.clients = new Map();
-    this.pidToken = new Map();
+    this.accounts = new Map(); // pid -> { token, asset, units, sats }: who paid what, at which rate
     this.world = null;
     this.state = 'idle';
     this.countT = null; // seconds left on the ready-room countdown; null = waiting for a first Ready
@@ -32,13 +34,13 @@ export class RoomCore {
     this.roundNo = 0;
     this.rollover = 0;
     this.tickN = 0;
-    this.totals = { raids: 0, rake: 0, stakesIn: 0, paidOut: 0, sponsorIn: 0 };
+    this.totals = { raids: 0, rake: 0, stakesIn: 0, paidOut: 0, sponsorIn: 0, byAsset: {} };
   }
 
   // --------------------------------------------------------------- clients
 
   addClient(cid, { token, name, skin }) {
-    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: 0, reported: true });
+    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true });
     if (this.state === 'idle') this.openPrep();
     this.broadcastPrep();
   }
@@ -79,7 +81,7 @@ export class RoomCore {
       case 'ready':
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
-        this.ready(c);
+        this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'SATS');
         break;
       case 'unready':
         this.unready(c);
@@ -96,14 +98,21 @@ export class RoomCore {
 
   // ------------------------------------------------------------ ready room
 
-  ready(c) {
+  // Ready: quote the sats stake in the chosen token and escrow it at that rate.
+  ready(c, asset) {
     if (c.ready || this.inRaid(c)) return;
-    if (!this.wallet.debit(c.token, this.stake)) {
-      this.send(c.cid, { t: 'err', msg: 'Not enough sats for this table.' });
+    const units = this.prices.quote(asset, this.stake);
+    if (units === null) {
+      this.send(c.cid, { t: 'err', msg: 'That token has no price right now, so it cannot be staked.' });
+      return;
+    }
+    if (!this.wallet.debit(c.token, asset, units)) {
+      const sym = this.prices.get(asset)?.symbol ?? asset;
+      this.send(c.cid, { t: 'err', msg: `Not enough ${sym} for this table.` });
       return;
     }
     c.ready = true;
-    c.escrow = this.stake;
+    c.escrow = { asset, units, sats: this.stake };
     if (this.state === 'idle') this.openPrep();
     if (this.state === 'prep' && this.countT === null) this.countT = this.prepSeconds;
     this.hurry();
@@ -118,9 +127,14 @@ export class RoomCore {
   }
 
   refund(c) {
-    if (c.escrow) this.wallet.credit(c.token, c.escrow);
-    c.escrow = 0;
+    if (c.escrow) this.wallet.credit(c.token, c.escrow.asset, c.escrow.units);
+    c.escrow = null;
     c.ready = false;
+  }
+
+  book(asset, key, units) {
+    const t = (this.totals.byAsset[asset] ??= { in: 0n, out: 0n });
+    t[key] += BigInt(units);
   }
 
   // everyone in the room is ready (and there are at least two humans): don't make them wait
@@ -170,7 +184,7 @@ export class RoomCore {
     });
     this.world = w;
     this.rollover = 0;
-    this.pidToken.clear();
+    this.accounts.clear();
     this.state = 'live';
     this.countT = null;
     for (const c of this.clients.values()) {
@@ -179,10 +193,11 @@ export class RoomCore {
     }
     for (const c of ready) {
       const p = w.addPlayer({ name: c.name, skin: c.skin });
-      this.pidToken.set(p.id, c.token);
+      this.accounts.set(p.id, { token: c.token, ...c.escrow });
+      this.book(c.escrow.asset, 'in', c.escrow.units);
       c.pid = p.id;
       c.ready = false;
-      c.escrow = 0; // the stake is in the raid's ledger now
+      c.escrow = null; // the stake is in the raid's ledger now
       c.reported = false;
       this.totals.stakesIn += this.stake;
       this.send(c.cid, {
@@ -195,7 +210,8 @@ export class RoomCore {
         golden: w.golden,
         duration: w.duration,
         time: w.time,
-        balance: this.wallet.balance(c.token),
+        asset: this.accounts.get(p.id).asset,
+        balances: this.wallet.balances(c.token),
       });
     }
     this.broadcastPrep();
@@ -282,8 +298,8 @@ export class RoomCore {
       this.send(c.cid, {
         ...base,
         slots: ready.map((r) => ({ n: r.name, c: r.skin, me: r === c ? 1 : 0 })),
-        me: { ready: c.ready, inRaid: this.inRaid(c) },
-        balance: this.wallet.balance(c.token),
+        me: { ready: c.ready, inRaid: this.inRaid(c), escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
+        balances: this.wallet.balances(c.token),
       });
     }
   }
@@ -302,8 +318,14 @@ export class RoomCore {
     for (const c of this.clients.values()) if (c.pid) byPid.set(c.pid, c);
     for (const ev of w.events) {
       if (ev.k === 'payout') {
-        const token = this.pidToken.get(ev.pid);
-        if (token) this.wallet.credit(token, ev.amount);
+        // pay out in the token they entered with, at their entry rate
+        const acct = this.accounts.get(ev.pid);
+        if (acct) {
+          const units = unitsAtEntryRate(acct, ev.amount);
+          acct.paidUnits = units;
+          this.wallet.credit(acct.token, acct.asset, units);
+          this.book(acct.asset, 'out', units);
+        }
       }
       if (ev.to) {
         for (const pid of ev.to) {
@@ -335,7 +357,10 @@ export class RoomCore {
         secs: Math.round((p.endedAt ?? w.time) - p.joinedAt),
         killer: p.killerName,
         cause: p.cause,
-        balance: this.wallet.balance(c.token),
+        asset: this.accounts.get(p.id)?.asset,
+        stakeUnits: this.accounts.get(p.id)?.units?.toString(),
+        payoutUnits: (this.accounts.get(p.id)?.paidUnits ?? 0n).toString(),
+        balances: this.wallet.balances(c.token),
         round: this.roundNo,
       });
     }

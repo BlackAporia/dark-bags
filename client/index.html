@@ -86,6 +86,16 @@
       <div id="tables" class="table-list"></div>
     </fieldset>
 
+    <fieldset class="assets">
+      <legend class="eyebrow">Pay with · tokens in your private pool</legend>
+      <div id="assets" class="asset-list"></div>
+      <p id="quote" class="quote"></p>
+      <div id="cashier" class="cashier" hidden>
+        <button id="connect" class="ghost" type="button">Connect STRK20 wallet</button>
+        <p id="cashier-status" class="fine"></p>
+      </div>
+    </fieldset>
+
     <div class="who">
       <label for="name" class="eyebrow">Runner name</label>
       <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="runner">
@@ -95,7 +105,7 @@
     <label class="gore" for="gore"><input id="gore" type="checkbox"> <span><b>18+ mode.</b> Limbs come off as health drops, heads pop, blood stays on the floor.</span></label>
 
     <button id="play" class="cta" type="button">Go to the table</button>
-    <p class="balance"><span class="eyebrow">Balance</span> <b id="balance" class="num">—</b> <span class="unit">test sats</span> <button id="faucet" class="link" type="button" hidden>Refill to 100,000</button></p>
+    <p class="balance"><span class="eyebrow">Balance</span> <b id="balance" class="num">—</b> <span id="balance-unit" class="unit">sats across your tokens</span> <button id="faucet" class="link" type="button" hidden>Refill test tokens</button></p>
 
     <details class="how">
       <summary>How a raid works</summary>
@@ -108,7 +118,7 @@
       </ul>
       <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> bag look · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
     </details>
-    <p class="fine">Test build. Sats here are play money: no deposits, no withdrawals.</p>
+    <p id="fine" class="fine">Test build. Tokens here are play money with fixed test prices: no deposits, no withdrawals.</p>
   </div>
 </section>
 

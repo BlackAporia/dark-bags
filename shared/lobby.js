@@ -1,6 +1,7 @@
 import { CFG } from './config.js';
 import { RoomCore } from './room.js';
 import { cleanName } from './wallet.js';
+import { PriceBook } from './assets.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -10,12 +11,13 @@ import { cleanName } from './wallet.js';
  *   in {s, mx, my, a, f, d}  bluff {v}  ping {c}
  */
 export class Lobby {
-  constructor({ wallet, send, newToken, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS }) {
+  constructor({ wallet, send, newToken, prices = new PriceBook(), bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS }) {
     this.wallet = wallet;
+    this.prices = prices;
     this.send = send;
     this.newToken = newToken;
     this.sessions = new Map();
-    this.rooms = new Map(tiers.map((stake) => [stake, new RoomCore({ stake, wallet, send, bots, roundSeconds, prepSeconds })]));
+    this.rooms = new Map(tiers.map((stake) => [stake, new RoomCore({ stake, wallet, send, prices, bots, roundSeconds, prepSeconds })]));
     this.roundSeconds = roundSeconds;
   }
 
@@ -44,8 +46,9 @@ export class Lobby {
       this.send(cid, {
         t: 'welcome',
         token: s.token,
-        balance: this.wallet.balance(s.token),
+        balances: this.wallet.balances(s.token),
         tables: this.tables(),
+        assets: this.prices.list(),
         cfg: {
           ROUND_SECONDS: this.roundSeconds,
           RAKE: CFG.RAKE,
@@ -62,11 +65,11 @@ export class Lobby {
         this.send(cid, { t: 'pong', c: msg.c });
         return;
       case 'tables':
-        this.send(cid, { t: 'tables', tables: this.tables(), balance: this.wallet.balance(s.token) });
+        this.send(cid, { t: 'tables', tables: this.tables(), balances: this.wallet.balances(s.token) });
         return;
       case 'faucet':
         this.wallet.faucet(s.token);
-        this.send(cid, { t: 'balance', balance: this.wallet.balance(s.token) });
+        this.send(cid, { t: 'balance', balances: this.wallet.balances(s.token) });
         return;
       case 'join': {
         const room = this.rooms.get(Number(msg.stake));
@@ -84,7 +87,7 @@ export class Lobby {
       case 'leave':
         if (s.room) s.room.removeClient(cid);
         s.room = null;
-        this.send(cid, { t: 'tables', tables: this.tables(), balance: this.wallet.balance(s.token) });
+        this.send(cid, { t: 'tables', tables: this.tables(), balances: this.wallet.balances(s.token) });
         return;
       default:
         if (s.room) s.room.handle(cid, msg);
@@ -99,7 +102,7 @@ export class Lobby {
   broadcastTables() {
     const t = this.tables();
     for (const [cid, s] of this.sessions) {
-      if (s.token && !s.room) this.send(cid, { t: 'tables', tables: t, balance: this.wallet.balance(s.token) });
+      if (s.token && !s.room) this.send(cid, { t: 'tables', tables: t, balances: this.wallet.balances(s.token) });
     }
   }
 }

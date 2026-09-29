@@ -1,13 +1,20 @@
-import { CFG } from './config.js';
+import { TEST_ASSETS } from './assets.js';
 
 /**
- * Test-mode wallet: fake sats in memory. Real deployments swap this for an
- * adapter with the same four methods (Lightning, Starknet BTC, ...), see README.
+ * Test-mode wallet: fake balances in several tokens, kept in memory.
+ * A real deployment swaps this for an adapter with the same methods
+ * (see server/strk20/cashier.js): balances are per player, per asset, in
+ * BigInt base units.
  */
 export class MemoryWallet {
-  constructor({ start = CFG.START_BALANCE, data = {}, onChange = null } = {}) {
-    this.start = start;
-    this.accounts = new Map(Object.entries(data));
+  constructor({ faucet = TEST_ASSETS, data = {}, onChange = null } = {}) {
+    this.faucetBasket = Object.fromEntries(faucet.filter((a) => a.faucet).map((a) => [a.id, BigInt(a.faucet)]));
+    this.accounts = new Map();
+    for (const [token, bal] of Object.entries(data)) {
+      // old single-number save files become a SATS balance
+      const m = typeof bal === 'object' && bal ? bal : { SATS: String(bal) };
+      this.accounts.set(token, new Map(Object.entries(m).map(([k, v]) => [k, BigInt(v)])));
+    }
     this.onChange = onChange;
   }
 
@@ -17,39 +24,65 @@ export class MemoryWallet {
 
   ensure(token) {
     if (!this.accounts.has(token)) {
-      this.accounts.set(token, this.start);
+      this.accounts.set(token, new Map(Object.entries(this.faucetBasket)));
       this.changed();
+      return;
     }
+    // accounts from before a token existed get that token's starting amount once
+    const acct = this.accounts.get(token);
+    let added = false;
+    for (const [k, v] of Object.entries(this.faucetBasket)) {
+      if (!acct.has(k)) {
+        acct.set(k, v);
+        added = true;
+      }
+    }
+    if (added) this.changed();
   }
 
-  balance(token) {
-    return this.accounts.get(token) ?? 0;
+  balance(token, asset) {
+    return this.accounts.get(token)?.get(asset) ?? 0n;
   }
 
-  debit(token, amount) {
-    const b = this.balance(token);
-    if (!Number.isInteger(amount) || amount <= 0 || b < amount) return false;
-    this.accounts.set(token, b - amount);
+  // { asset: "units" } for the wire
+  balances(token) {
+    const out = {};
+    for (const [k, v] of this.accounts.get(token) ?? []) if (v > 0n) out[k] = v.toString();
+    return out;
+  }
+
+  debit(token, asset, units) {
+    units = BigInt(units);
+    const acct = this.accounts.get(token);
+    const b = acct?.get(asset) ?? 0n;
+    if (units <= 0n || b < units) return false;
+    acct.set(asset, b - units);
     this.changed();
     return true;
   }
 
-  credit(token, amount) {
-    if (!Number.isInteger(amount) || amount < 0) return;
-    this.accounts.set(token, this.balance(token) + amount);
+  credit(token, asset, units) {
+    units = BigInt(units);
+    if (units < 0n) return;
+    if (!this.accounts.has(token)) this.accounts.set(token, new Map());
+    const acct = this.accounts.get(token);
+    acct.set(asset, (acct.get(asset) ?? 0n) + units);
     this.changed();
   }
 
-  // test faucet: top back up when you can't afford the smallest table
+  // test faucet: top every test token back up
   faucet(token) {
-    if (this.balance(token) >= Math.min(...CFG.TIERS)) return false;
-    this.accounts.set(token, this.start);
+    const acct = this.accounts.get(token) ?? new Map();
+    for (const [k, v] of Object.entries(this.faucetBasket)) if ((acct.get(k) ?? 0n) < v) acct.set(k, v);
+    this.accounts.set(token, acct);
     this.changed();
     return true;
   }
 
   toJSON() {
-    return Object.fromEntries(this.accounts);
+    const out = {};
+    for (const [token, m] of this.accounts) out[token] = Object.fromEntries([...m].map(([k, v]) => [k, v.toString()]));
+    return out;
   }
 }
 
