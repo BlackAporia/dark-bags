@@ -8,8 +8,10 @@ export const CFG = {
 
   // match flow
   ROUND_SECONDS: 180,     // one raid = 3 minutes
-  JOIN_CUTOFF: 100,       // entering is closed when fewer seconds remain (the storm is already moving)
-  INTERMISSION: 8,        // pause between raids
+  INTERMISSION: 8,        // results screen between raids
+  PREP_SECONDS: 20,       // ready-room countdown, starts at the first Ready
+  PREP_ALL_READY: 5,      // countdown drops to this once every human in the room is ready
+  BOT_REVEAL: 5,          // bots light up in the ready room during the last N seconds
 
   // map
   MAP_W: 2400,

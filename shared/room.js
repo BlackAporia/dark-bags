@@ -1,62 +1,70 @@
 import { CFG, SKINS } from './config.js';
 import { World } from './world.js';
 import { cleanName } from './wallet.js';
+import { botName } from './bot.js';
 
 /**
- * A table at one stake level. Runs raids back to back, moves sats between the
- * wallet and the raid, and routes snapshots/events to connected clients.
- * Transport-agnostic: the server plugs in WebSockets, offline mode plugs in
- * a direct callback.
+ * A table at one stake level.
+ *
+ *   idle ──first visitor──▶ prep ──countdown hits 0──▶ live ──raid ends──▶ results ──▶ prep …
+ *
+ * prep is the MOBA-style ready room: pressing Ready escrows the stake and lights up
+ * your icon; the first Ready starts the countdown; bots light up in the last seconds.
+ * Everyone who is ready enters together, equal, at the same moment. No mid-raid joins.
+ *
+ * Transport-agnostic: the server plugs in WebSockets, offline mode a direct callback.
  */
 export class RoomCore {
-  constructor({ stake, wallet, send, bots = true, roundSeconds = CFG.ROUND_SECONDS }) {
+  constructor({ stake, wallet, send, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
     this.stake = stake;
     this.wallet = wallet;
     this.send = send;
     this.bots = bots;
     this.roundSeconds = roundSeconds;
+    this.prepSeconds = prepSeconds;
     this.clients = new Map();
     this.pidToken = new Map();
     this.world = null;
     this.state = 'idle';
+    this.countT = null; // seconds left on the ready-room countdown; null = waiting for a first Ready
+    this.resT = 0;
+    this.roster = [];
     this.roundNo = 0;
     this.rollover = 0;
-    this.interT = 0;
     this.tickN = 0;
     this.totals = { raids: 0, rake: 0, stakesIn: 0, paidOut: 0, sponsorIn: 0 };
   }
 
+  // --------------------------------------------------------------- clients
+
   addClient(cid, { token, name, skin }) {
-    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, queued: false, reported: true });
-    this.sendRoom(this.clients.get(cid));
+    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: 0, reported: true });
+    if (this.state === 'idle') this.openPrep();
+    this.broadcastPrep();
   }
 
   removeClient(cid) {
     const c = this.clients.get(cid);
     if (!c) return;
-    if (c.pid && this.world) this.world.freeze(c.pid);
+    if (c.ready) this.refund(c);
+    if (c.pid && this.world && this.state === 'live') this.world.freeze(c.pid); // the body stays in the raid
     this.clients.delete(cid);
+    if (this.state === 'prep' && !this.readyList().length) this.countT = null;
+    if (!this.clients.size && this.state === 'prep') this.state = 'idle';
+    this.broadcastPrep();
   }
 
   pickSkin(s) {
     return SKINS.includes(s) ? s : SKINS[Math.floor(Math.random() * SKINS.length)];
   }
 
-  info() {
-    const w = this.world;
-    let humans = 0;
-    if (w && this.state === 'live') for (const p of w.players.values()) if (!p.isBot && p.status === 'alive') humans++;
-    return {
-      stake: this.stake,
-      state: this.state,
-      tl: w && this.state === 'live' ? Math.round(w.timeLeft) : 0,
-      canJoin: this.state !== 'live' || w.canJoin(),
-      humans,
-      watching: this.clients.size,
-      round: this.roundNo,
-      golden: !!(w && this.state === 'live' && w.golden),
-      nextGolden: CFG.GOLDEN_EVERY > 0 && (this.roundNo + 1) % CFG.GOLDEN_EVERY === 0,
-    };
+  readyList() {
+    return [...this.clients.values()].filter((c) => c.ready);
+  }
+
+  inRaid(c) {
+    const p = c.pid && this.world && this.state === 'live' ? this.world.players.get(c.pid) : null;
+    return !!p && p.status === 'alive';
   }
 
   handle(cid, msg) {
@@ -66,94 +74,148 @@ export class RoomCore {
       case 'join':
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
-        this.join(c);
+        this.broadcastPrep();
+        break;
+      case 'ready':
+        if (msg.name) c.name = cleanName(msg.name);
+        if (msg.skin) c.skin = this.pickSkin(msg.skin);
+        this.ready(c);
+        break;
+      case 'unready':
+        this.unready(c);
         break;
       case 'in':
-        if (c.pid && this.world) this.world.queueInput(c.pid, msg);
+        if (c.pid && this.world && this.state === 'live') this.world.queueInput(c.pid, msg);
         break;
       case 'bluff':
-        if (c.pid && this.world) this.world.setBluff(c.pid, msg.v);
-        break;
-      case 'unqueue':
-        c.queued = false;
-        this.sendRoom(c);
+        if (c.pid && this.world && this.state === 'live') this.world.setBluff(c.pid, msg.v);
         break;
       default:
     }
   }
 
-  inRaid(c) {
-    const p = c.pid && this.world ? this.world.players.get(c.pid) : null;
-    return !!p && p.status === 'alive';
-  }
+  // ------------------------------------------------------------ ready room
 
-  join(c) {
-    if (this.inRaid(c)) return;
-    if (this.state === 'idle') this.startRound(false);
-    if (this.state === 'live' && this.world.canJoin()) {
-      this.enter(c);
-      return;
-    }
-    if (this.wallet.balance(c.token) < this.stake) {
-      this.send(c.cid, { t: 'err', msg: 'Not enough sats for this table.' });
-      return;
-    }
-    c.queued = true;
-    this.sendRoom(c);
-  }
-
-  enter(c) {
+  ready(c) {
+    if (c.ready || this.inRaid(c)) return;
     if (!this.wallet.debit(c.token, this.stake)) {
-      c.queued = false;
       this.send(c.cid, { t: 'err', msg: 'Not enough sats for this table.' });
-      return false;
+      return;
     }
-    const w = this.world;
-    const p = w.addPlayer({ name: c.name, skin: c.skin });
-    this.pidToken.set(p.id, c.token);
-    c.pid = p.id;
-    c.queued = false;
-    c.reported = false;
-    this.totals.stakesIn += this.stake;
-    this.send(c.cid, {
-      t: 'start',
-      pid: p.id,
-      map: w.map,
-      zone: w.zonePlan,
-      stake: this.stake,
-      round: this.roundNo,
-      golden: w.golden,
-      duration: w.duration,
-      time: w.time,
-      balance: this.wallet.balance(c.token),
-    });
-    return true;
+    c.ready = true;
+    c.escrow = this.stake;
+    if (this.state === 'idle') this.openPrep();
+    if (this.state === 'prep' && this.countT === null) this.countT = this.prepSeconds;
+    this.hurry();
+    this.broadcastPrep();
   }
 
-  startRound(joinQueued = true) {
+  unready(c) {
+    if (!c.ready) return;
+    this.refund(c);
+    if (this.state === 'prep' && !this.readyList().length) this.countT = null;
+    this.broadcastPrep();
+  }
+
+  refund(c) {
+    if (c.escrow) this.wallet.credit(c.token, c.escrow);
+    c.escrow = 0;
+    c.ready = false;
+  }
+
+  // everyone in the room is ready (and there are at least two humans): don't make them wait
+  hurry() {
+    if (this.state !== 'prep' || this.countT === null) return;
+    const all = [...this.clients.values()];
+    const ready = all.filter((c) => c.ready);
+    if (ready.length >= 2 && ready.length === all.length) this.countT = Math.min(this.countT, CFG.PREP_ALL_READY);
+  }
+
+  openPrep() {
+    this.state = 'prep';
+    this.countT = this.readyList().length ? this.prepSeconds : null;
+    // bots for the next raid are rolled now so their icons can light up by name
+    const taken = new Set();
+    this.roster = [];
+    for (let i = 0; i < CFG.BOT_FILL; i++) {
+      const n = botName(Math.random, taken);
+      taken.add(n);
+      this.roster.push({ name: n, skin: SKINS[Math.floor(Math.random() * SKINS.length)] });
+    }
+    this.hurry();
+  }
+
+  botsNeeded() {
+    return this.bots ? Math.max(0, CFG.BOT_FILL - this.readyList().length) : 0;
+  }
+
+  botsShown() {
+    if (this.state !== 'prep' || this.countT === null) return 0;
+    const k = Math.min(1, Math.max(0, (CFG.BOT_REVEAL - this.countT) / CFG.BOT_REVEAL));
+    return Math.floor(this.botsNeeded() * k);
+  }
+
+  startRaid() {
+    const ready = this.readyList();
     this.roundNo++;
     const golden = CFG.GOLDEN_EVERY > 0 && this.roundNo % CFG.GOLDEN_EVERY === 0;
-    this.world = new World({
+    const w = new World({
       stake: this.stake,
       roundNo: this.roundNo,
       rolloverIn: this.rollover,
       golden,
       bots: this.bots,
+      botRoster: this.roster,
       roundSeconds: this.roundSeconds,
     });
+    this.world = w;
     this.rollover = 0;
     this.pidToken.clear();
     this.state = 'live';
+    this.countT = null;
     for (const c of this.clients.values()) {
       c.pid = null;
       c.reported = true;
-      if (joinQueued && c.queued) this.enter(c);
     }
+    for (const c of ready) {
+      const p = w.addPlayer({ name: c.name, skin: c.skin });
+      this.pidToken.set(p.id, c.token);
+      c.pid = p.id;
+      c.ready = false;
+      c.escrow = 0; // the stake is in the raid's ledger now
+      c.reported = false;
+      this.totals.stakesIn += this.stake;
+      this.send(c.cid, {
+        t: 'start',
+        pid: p.id,
+        map: w.map,
+        zone: w.zonePlan,
+        stake: this.stake,
+        round: this.roundNo,
+        golden: w.golden,
+        duration: w.duration,
+        time: w.time,
+        balance: this.wallet.balance(c.token),
+      });
+    }
+    this.broadcastPrep();
   }
+
+  // ------------------------------------------------------------------ tick
 
   tick() {
     this.tickN++;
-    if (this.state === 'live') {
+    const dt = 1 / CFG.TICK_RATE;
+    if (this.state === 'prep') {
+      if (this.countT !== null) {
+        this.countT -= dt;
+        if (this.countT <= 0) {
+          if (this.readyList().length) this.startRaid();
+          else this.countT = null;
+        }
+      }
+      if (this.tickN % 6 === 0) this.broadcastPrep();
+    } else if (this.state === 'live') {
       const w = this.world;
       w.step();
       this.flushEvents();
@@ -165,33 +227,68 @@ export class RoomCore {
         this.totals.rake += w.ledger.rake;
         this.totals.paidOut += w.ledger.paidOut;
         this.totals.sponsorIn += w.ledger.sponsorIn;
-        this.state = 'intermission';
-        this.interT = CFG.INTERMISSION;
-        for (const c of this.clients.values()) this.sendRoom(c);
-      }
-    } else if (this.state === 'intermission') {
-      this.interT -= 1 / CFG.TICK_RATE;
-      if (this.interT <= 0) {
-        const anyQueued = [...this.clients.values()].some((c) => c.queued);
-        if (anyQueued) this.startRound(true);
+        this.state = 'results';
+        this.resT = CFG.INTERMISSION;
+        this.broadcastPrep();
+      } else if (this.tickN % CFG.TICK_RATE === 0) this.broadcastPrep(true);
+    } else if (this.state === 'results') {
+      this.resT -= dt;
+      if (this.resT <= 0) {
+        if (this.clients.size) this.openPrep();
         else this.state = 'idle';
+        this.broadcastPrep();
       }
-    }
-    if (this.tickN % CFG.TICK_RATE === 0) {
-      for (const c of this.clients.values()) if (!this.inRaid(c)) this.sendRoom(c);
     }
   }
 
-  sendRoom(c) {
-    const i = this.info();
-    this.send(c.cid, {
-      t: 'room',
-      ...i,
-      interT: this.state === 'intermission' ? Math.ceil(this.interT) : 0,
-      queued: c.queued,
-      balance: this.wallet.balance(c.token),
-    });
+  info() {
+    const w = this.world;
+    let humans = 0;
+    if (w && this.state === 'live') for (const p of w.players.values()) if (!p.isBot && p.status === 'alive') humans++;
+    return {
+      stake: this.stake,
+      state: this.state,
+      tl: w && this.state === 'live' ? Math.round(w.timeLeft) : 0,
+      count: this.countT === null ? null : Math.max(0, Math.ceil(this.countT)),
+      ready: this.readyList().length,
+      humans,
+      watching: this.clients.size,
+      round: this.roundNo,
+      golden: !!(w && this.state === 'live' && w.golden),
+      nextGolden: CFG.GOLDEN_EVERY > 0 && (this.roundNo + 1) % CFG.GOLDEN_EVERY === 0,
+    };
   }
+
+  // The ready room view. onlyIdle: skip clients who are busy inside the raid.
+  broadcastPrep(onlyIdle = false) {
+    const ready = this.readyList();
+    const shown = this.botsShown();
+    const bots = this.roster.slice(0, shown).map((b) => ({ n: b.name, c: b.skin, bot: 1 }));
+    const base = {
+      t: 'prep',
+      state: this.state,
+      stake: this.stake,
+      round: this.roundNo + (this.state === 'live' || this.state === 'results' ? 1 : 1),
+      golden: CFG.GOLDEN_EVERY > 0 && (this.roundNo + 1) % CFG.GOLDEN_EVERY === 0,
+      count: this.countT === null ? null : Math.max(0, Math.round(this.countT * 10) / 10),
+      tl: this.world && this.state === 'live' ? Math.round(this.world.timeLeft) : 0,
+      resT: this.state === 'results' ? Math.ceil(this.resT) : 0,
+      slotsTotal: Math.max(CFG.BOT_FILL, ready.length),
+      bots,
+      pot: (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,
+    };
+    for (const c of this.clients.values()) {
+      if (onlyIdle && this.inRaid(c)) continue;
+      this.send(c.cid, {
+        ...base,
+        slots: ready.map((r) => ({ n: r.name, c: r.skin, me: r === c ? 1 : 0 })),
+        me: { ready: c.ready, inRaid: this.inRaid(c) },
+        balance: this.wallet.balance(c.token),
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- output
 
   flushEvents() {
     const w = this.world;
@@ -239,7 +336,6 @@ export class RoomCore {
         killer: p.killerName,
         cause: p.cause,
         balance: this.wallet.balance(c.token),
-        canRejoin: w.canJoin(),
         round: this.roundNo,
       });
     }

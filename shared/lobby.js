@@ -5,8 +5,9 @@ import { cleanName } from './wallet.js';
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
  * Message protocol (client → lobby):
- *   hello {token?, name}  tables  faucet  join {stake, name, skin}  leave
- *   in {s, mx, my, a, f, d}  bluff {v}  unqueue  ping {c}
+ *   hello {token?, name}  tables  faucet  join {stake, name, skin} (enter a table's ready room)
+ *   ready {name, skin} (escrow the stake)  unready  leave
+ *   in {s, mx, my, a, f, d}  bluff {v}  ping {c}
  */
 export class Lobby {
   constructor({ wallet, send, newToken, bots = true, roundSeconds = CFG.ROUND_SECONDS, tiers = CFG.TIERS }) {
@@ -47,7 +48,6 @@ export class Lobby {
         tables: this.tables(),
         cfg: {
           ROUND_SECONDS: this.roundSeconds,
-          JOIN_CUTOFF: CFG.JOIN_CUTOFF,
           RAKE: CFG.RAKE,
           BAG_SHARE: CFG.BAG_SHARE,
           TIERS: [...this.rooms.keys()],
@@ -78,8 +78,7 @@ export class Lobby {
         if (!s.room) {
           room.addClient(cid, { token: s.token, name: msg.name || s.name, skin: msg.skin });
           s.room = room;
-        }
-        room.handle(cid, msg);
+        } else room.handle(cid, msg);
         return;
       }
       case 'leave':

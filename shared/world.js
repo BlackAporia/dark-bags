@@ -28,8 +28,10 @@ export class World {
     rolloverIn = 0,
     golden = false,
     bots = true,
+    botRoster = null,
     roundSeconds = CFG.ROUND_SECONDS,
   }) {
+    this.botRoster = botRoster ? botRoster.slice() : null;
     this.stake = stake;
     this.seed = seed;
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
@@ -79,8 +81,9 @@ export class World {
     return n;
   }
 
+  // Everyone enters together, before the first tick. No mid-raid joins.
   canJoin() {
-    return this.phase === 'live' && this.timeLeft > CFG.JOIN_CUTOFF && this.aliveCount() < CFG.MAX_PLAYERS;
+    return this.phase === 'live' && this.tick === 0 && this.aliveCount() < CFG.MAX_PLAYERS;
   }
 
   emit(ev) {
@@ -178,7 +181,7 @@ export class World {
   step() {
     if (this.phase !== 'live') return;
     if (this.tick === 0) {
-      this.fillBots(true);
+      this.fillBots();
       this.openingBurst();
     }
     this.tick++;
@@ -249,7 +252,6 @@ export class World {
     this.stepBullets();
     this.pickups();
     this.spawnLoot();
-    this.fillBots(false);
     this.announce();
     if (this.time >= this.duration - 1e-9) this.end();
   }
@@ -490,22 +492,19 @@ export class World {
     }
   }
 
-  fillBots(initial) {
+  // Bots only enter at the start, alongside the humans: everyone begins together.
+  fillBots() {
     if (!this.botsEnabled || !this.canJoin()) return;
-    const alive = this.aliveCount();
-    if (initial) {
-      for (let i = alive; i < CFG.BOT_FILL; i++) this.addBot();
-      return;
-    }
-    this.botJoinT -= DT;
-    if (this.botJoinT <= 0) {
-      this.botJoinT = 5 + this.rnd() * 6;
-      if (alive < CFG.BOT_FILL - 1) this.addBot();
-    }
+    for (let i = this.aliveCount(); i < CFG.BOT_FILL; i++) this.addBot();
   }
 
   addBot() {
     const taken = new Set([...this.players.values()].map((p) => p.name));
+    const pre = this.botRoster?.find((b) => !taken.has(b.name));
+    if (pre) {
+      this.botRoster.splice(this.botRoster.indexOf(pre), 1);
+      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true });
+    }
     const skin = SKINS[Math.floor(this.rnd() * SKINS.length)];
     return this.addPlayer({ name: botName(this.rnd, taken), skin, isBot: true });
   }
@@ -517,7 +516,6 @@ export class World {
       this.warned[key] = true;
       this.emit({ k: 'warn', text });
     };
-    if (tl <= CFG.JOIN_CUTOFF) say('cutoff', 'Entry closed · no new runners');
     if (tl <= 30) say('30', '30s · reach an open exit');
     if (tl <= 10) say('10', '10s · extract or lose it all');
   }

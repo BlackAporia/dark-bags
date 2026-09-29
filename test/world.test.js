@@ -154,12 +154,12 @@ test('spawn shield blocks damage until the runner fires', () => {
   assert.equal(p.hp, CFG.HP - 20);
 });
 
-test('entry closes at JOIN_CUTOFF and the raid seals at 0:00', () => {
-  const w = humanWorld({ roundSeconds: CFG.JOIN_CUTOFF + 2 });
+test('entry closes once the raid is running, and the raid seals at 0:00', () => {
+  const w = humanWorld({ roundSeconds: 20 });
   const p = w.addPlayer({ name: 'a', skin: '#fff' });
   setBag(w, p, 500);
   p.hp = 1e9; // idle runner: survive the storm so the seal is what gets them
-  for (let i = 0; i < 3 * CFG.TICK_RATE; i++) w.step();
+  w.step();
   assert.equal(w.canJoin(), false);
   assert.throws(() => w.addPlayer({ name: 'late', skin: '#fff' }));
   while (w.phase === 'live') w.step();

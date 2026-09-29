@@ -4,7 +4,7 @@ import { CFG } from '../shared/config.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
 
-function setup({ roundSeconds = 120 } = {}) {
+function setup({ roundSeconds = 120, bots = false } = {}) {
   const inbox = new Map();
   const wallet = new MemoryWallet();
   const lobby = new Lobby({
@@ -14,82 +14,149 @@ function setup({ roundSeconds = 120 } = {}) {
       inbox.get(cid).push(m);
     },
     newToken: () => `tok${Math.random().toString(36).slice(2, 12)}`,
-    bots: false,
+    bots,
     roundSeconds,
   });
   const client = (cid, name = 'runner') => {
     lobby.connect(cid);
     lobby.handle(cid, { t: 'hello', name });
     const welcome = inbox.get(cid).find((m) => m.t === 'welcome');
-    return { cid, token: welcome.token, msgs: () => inbox.get(cid) ?? [], last: (t) => [...(inbox.get(cid) ?? [])].reverse().find((m) => m.t === t) };
+    return {
+      cid,
+      token: welcome.token,
+      last: (t) => [...(inbox.get(cid) ?? [])].reverse().find((m) => m.t === t),
+    };
   };
-  return { lobby, wallet, client, inbox };
+  const ticks = (seconds) => {
+    for (let i = 0; i < Math.ceil(seconds * CFG.TICK_RATE); i++) lobby.tick();
+  };
+  return { lobby, wallet, client, ticks };
 }
 
-test('joining debits the stake and starts a raid', () => {
+test('entering a table is free; Ready escrows the stake and lights your icon', () => {
+  const { lobby, wallet, client } = setup();
+  const c = client(1, 'vy');
+  lobby.handle(1, { t: 'join', stake: 1000 });
+  assert.equal(wallet.balance(c.token), CFG.START_BALANCE);
+  assert.equal(c.last('prep').state, 'prep');
+  assert.equal(c.last('prep').count, null, 'no countdown until someone is ready');
+  lobby.handle(1, { t: 'ready' });
+  assert.equal(wallet.balance(c.token), CFG.START_BALANCE - 1000);
+  const prep = c.last('prep');
+  assert.equal(prep.slots.length, 1);
+  assert.equal(prep.slots[0].n, 'vy');
+  assert.equal(prep.slots[0].me, 1);
+  assert.equal(prep.count, CFG.PREP_SECONDS);
+});
+
+test('Unready refunds the stake and stops the countdown', () => {
   const { lobby, wallet, client } = setup();
   const c = client(1);
+  lobby.handle(1, { t: 'join', stake: 100 });
+  lobby.handle(1, { t: 'ready' });
+  lobby.handle(1, { t: 'unready' });
   assert.equal(wallet.balance(c.token), CFG.START_BALANCE);
-  lobby.handle(1, { t: 'join', stake: 1000, name: 'vy' });
-  const start = c.last('start');
-  assert.ok(start, 'got a start message');
-  assert.equal(start.stake, 1000);
-  assert.equal(wallet.balance(c.token), CFG.START_BALANCE - 1000);
-  assert.ok(Array.isArray(start.map.walls) && start.map.extracts.length === 3);
+  assert.equal(c.last('prep').count, null);
+});
+
+test('the countdown starts the raid for everyone who is ready, at once', () => {
+  const { lobby, client, ticks } = setup({ bots: true });
+  const a = client(1, 'a');
+  const b = client(2, 'b');
+  const watcher = client(3, 'w');
+  for (const cid of [1, 2, 3]) lobby.handle(cid, { t: 'join', stake: 1000 });
+  lobby.handle(1, { t: 'ready' });
+  ticks(3);
+  lobby.handle(2, { t: 'ready' });
+  ticks(CFG.PREP_SECONDS - CFG.BOT_REVEAL + 1);
+  assert.ok(a.last('prep').bots.length > 0, 'bots light up near the end');
+  ticks(CFG.BOT_REVEAL);
+  assert.ok(a.last('start') && b.last('start'), 'both ready runners entered');
+  assert.equal(watcher.last('start'), undefined, 'the one who never readied did not');
+  const w = lobby.rooms.get(1000).world;
+  lobby.tick();
+  assert.equal(w.players.size, CFG.BOT_FILL, 'bots fill the raid to size');
+  const names = [...w.players.values()].filter((p) => p.isBot).map((p) => p.name);
+  const shown = a.last('prep').bots?.map((x) => x.n) ?? [];
+  for (const n of shown) assert.ok(names.includes(n), `bot ${n} shown in the ready room is in the raid`);
+});
+
+test('when every human in the room is ready, the countdown hurries', () => {
+  const { lobby, client } = setup();
+  const a = client(1);
+  client(2);
+  lobby.handle(1, { t: 'join', stake: 100 });
+  lobby.handle(2, { t: 'join', stake: 100 });
+  lobby.handle(1, { t: 'ready' });
+  assert.equal(a.last('prep').count, CFG.PREP_SECONDS);
+  lobby.handle(2, { t: 'ready' });
+  assert.equal(a.last('prep').count, CFG.PREP_ALL_READY);
 });
 
 test('extracting credits the wallet with the bag', () => {
-  const { lobby, wallet, client } = setup();
+  const { lobby, wallet, client, ticks } = setup();
   const c = client(1);
   lobby.handle(1, { t: 'join', stake: 1000 });
+  lobby.handle(1, { t: 'ready' });
+  ticks(CFG.PREP_SECONDS + 0.1);
   const room = lobby.rooms.get(1000);
   const p = room.world.players.get(c.last('start').pid);
-  const e = room.world.map.extracts[0];
+  const e = room.world.map.extracts.find((x) => x.id === room.world.zonePlan.finalExit);
+  const extra = 2500 - p.bag;
+  room.world.ledger.sponsorIn += extra; // test scenario: bag of 2,500
   Object.assign(p, { x: e.x, y: e.y, bag: 2500 });
-  for (let i = 0; i < CFG.TICK_RATE * (CFG.EXTRACT_TIME + 1); i++) lobby.tick();
+  ticks(CFG.EXTRACT_TIME + 1);
   const res = c.last('result');
   assert.equal(res.status, 'extracted');
   assert.equal(res.payout, 2500);
   assert.equal(wallet.balance(c.token), CFG.START_BALANCE - 1000 + 2500);
-  assert.equal(res.balance, wallet.balance(c.token));
+  assert.ok(room.world.audit().ok);
 });
 
-test('a sealed raid queues you for the next one', () => {
-  const { lobby, wallet, client } = setup({ roundSeconds: CFG.JOIN_CUTOFF + 1 });
+test('Ready during a live raid carries you into the next one', () => {
+  const { lobby, wallet, client, ticks } = setup({ roundSeconds: 30 });
   const a = client(1, 'first');
   lobby.handle(1, { t: 'join', stake: 100 });
-  lobby.rooms.get(100).world.players.get(a.last('start').pid).hp = 1e9; // outlive the storm
-  for (let i = 0; i < CFG.TICK_RATE * 2; i++) lobby.tick();
+  lobby.handle(1, { t: 'ready' });
+  ticks(CFG.PREP_SECONDS + 0.1);
+  assert.ok(a.last('start'));
   const b = client(2, 'late');
   lobby.handle(2, { t: 'join', stake: 100 });
-  assert.equal(b.last('start'), undefined, 'no entry into a sealed raid');
-  assert.equal(b.last('room').queued, true);
-  assert.equal(wallet.balance(b.token), CFG.START_BALANCE, 'queued runners are not charged yet');
-  // run out the raid and the intermission
-  for (let i = 0; i < CFG.TICK_RATE * (CFG.JOIN_CUTOFF + CFG.INTERMISSION + 2); i++) lobby.tick();
-  assert.ok(b.last('start'), 'late runner entered the next raid');
-  assert.equal(wallet.balance(b.token), CFG.START_BALANCE - 100);
-  assert.equal(a.last('result').status, 'mia', 'first runner never extracted');
+  assert.equal(b.last('prep').state, 'live');
+  lobby.handle(2, { t: 'ready' });
+  assert.equal(wallet.balance(b.token), CFG.START_BALANCE - 100, 'escrowed');
+  assert.equal(b.last('start'), undefined, 'no mid-raid entry');
+  ticks(30 + CFG.INTERMISSION + CFG.PREP_SECONDS + 1);
+  assert.ok(b.last('start'), 'entered the next raid');
 });
 
-test('cannot join a table you cannot afford', () => {
+test('cannot ready up without the sats; the test faucet refills', () => {
   const { lobby, wallet, client } = setup();
   const c = client(1);
   wallet.accounts.set(c.token, 50);
   lobby.handle(1, { t: 'join', stake: 100 });
-  assert.equal(c.last('start'), undefined);
+  lobby.handle(1, { t: 'ready' });
   assert.ok(c.last('err'));
+  assert.equal(c.last('prep').slots.length, 0);
   lobby.handle(1, { t: 'faucet' });
   assert.equal(wallet.balance(c.token), CFG.START_BALANCE);
 });
 
-test('a disconnected runner stays in the raid and can still be looted', () => {
-  const { lobby, client } = setup();
-  const c = client(1);
+test('leaving the ready room refunds; leaving a raid leaves the body behind', () => {
+  const { lobby, wallet, client, ticks } = setup();
+  const a = client(1);
   lobby.handle(1, { t: 'join', stake: 1000 });
-  const room = lobby.rooms.get(1000);
-  const pid = c.last('start').pid;
+  lobby.handle(1, { t: 'ready' });
   lobby.disconnect(1);
+  assert.equal(wallet.balance(a.token), CFG.START_BALANCE);
+
+  const b = client(2);
+  lobby.handle(2, { t: 'join', stake: 1000 });
+  lobby.handle(2, { t: 'ready' });
+  ticks(CFG.PREP_SECONDS + 0.1);
+  const room = lobby.rooms.get(1000);
+  const pid = b.last('start').pid;
+  lobby.disconnect(2);
   assert.equal(room.world.players.get(pid).status, 'alive');
   lobby.tick();
   assert.ok(room.world.audit().ok);
