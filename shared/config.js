@@ -8,7 +8,7 @@ export const CFG = {
 
   // match flow
   ROUND_SECONDS: 180,     // one raid = 3 minutes
-  JOIN_CUTOFF: 60,        // entering is closed when fewer seconds remain
+  JOIN_CUTOFF: 100,       // entering is closed when fewer seconds remain (the storm is already moving)
   INTERMISSION: 8,        // pause between raids
 
   // map
@@ -27,11 +27,7 @@ export const CFG = {
   REGEN_RATE: 8,          // hp per second
   VISION: 520,            // you only see this far (and not through walls)
 
-  // weapon
-  FIRE_CD: 0.3,
-  BULLET_SPEED: 950,
-  BULLET_RANGE: 560,
-  BULLET_DMG: 20,
+  // weapons live in weapons.js (Arms Race ladder)
 
   // extraction
   EXTRACT_R: 80,

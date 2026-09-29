@@ -28,6 +28,10 @@ for (let r = 1; r <= rounds; r++) {
       `| in=${a.inflow} rake=${w.ledger.rake} out=${w.ledger.botPaidOut + w.ledger.paidOut} rollover=${w.ledger.rolloverOut} ` +
       `| audit=${a.ok ? 'OK' : 'FAIL'} ${bad ? JSON.stringify(bad) : ''} | ${ms.toFixed(0)}ms for ${ticks} ticks (${(ms / ticks).toFixed(2)}ms/tick)`,
   );
+  const storm = ps.filter((p) => p.cause === 'storm').length;
+  const exits = ps.filter((p) => p.status === 'extracted').map((p) => Math.round(p.endedAt));
+  const lastExit = ps.filter((p) => p.status === 'extracted' && p.extId === w.zonePlan.finalExit).length;
+  console.log(`   storm deaths=${storm} · extraction times=[${exits.sort((a, b) => a - b).join(',')}]s · via last exit=${lastExit}`);
   const best = ps.filter((p) => p.status === 'extracted').sort((a, b) => b.payout - a.payout)[0];
   if (best) console.log(`   best exit: ${best.name} ${best.payout} sats on ${best.stake} stake, kills=${best.kills}`);
   rollover = w.ledger.rolloverOut;

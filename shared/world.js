@@ -3,6 +3,8 @@ import { mulberry32, hasLOS, segWalls, segCircle } from './geom.js';
 import { generateMap, findSpawn, randomLootPoint } from './map.js';
 import { stepMovement, sanitizeInput } from './movement.js';
 import { BotBrain, botName } from './bot.js';
+import { planZone, zoneAt, exitState, outsideZone } from './zone.js';
+import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 
 const DT = 1 / CFG.TICK_RATE;
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -36,6 +38,9 @@ export class World {
     this.roundNo = roundNo;
     this.golden = golden;
     this.duration = roundSeconds;
+    this.zonePlan = planZone(this.map, this.rnd, roundSeconds);
+    this.zone = zoneAt(this.zonePlan, 0);
+    this.exitStates = this.map.extracts.map((e) => exitState(this.zonePlan, this.zone, e));
     this.time = 0;
     this.tick = 0;
     this.phase = 'live';
@@ -97,7 +102,7 @@ export class World {
     this.lootPool += loot;
 
     const others = [...this.players.values()].filter((o) => o.status === 'alive');
-    const pos = findSpawn(this.map, this.rnd, others);
+    const pos = findSpawn(this.map, this.rnd, others, this.zone);
     const p = {
       id: this.nextId++,
       name,
@@ -118,6 +123,10 @@ export class World {
       startBag: bag,
       stake,
       fireCd: 0,
+      w: 0, // weapon index: everyone starts with the knife
+      xp: 0,
+      prestige: 0,
+      fc: 0, // attack counter, lets clients animate and play other runners' shots
       lastHit: -99,
       ext: 0,
       extId: -1,
@@ -131,6 +140,8 @@ export class World {
       endedAt: null,
       killer: null,
       killerName: null,
+      cause: null,
+      inStorm: false,
       lostBag: 0,
       payout: 0,
     };
@@ -172,6 +183,7 @@ export class World {
     }
     this.tick++;
     this.time += DT;
+    this.updateZone();
 
     for (const [id, brain] of this.brains) {
       const p = this.players.get(id);
@@ -203,12 +215,22 @@ export class World {
         this.fire(p);
       }
 
-      if (p.hp < CFG.HP && this.time - p.lastHit > CFG.REGEN_DELAY) {
+      // the storm: damage outside the circle, and no regen while you're in it
+      p.inStorm = outsideZone(this.zone, p.x, p.y);
+      if (p.inStorm) {
+        p.hp -= this.zone.dps * DT;
+        p.lastHit = this.time;
+        if (p.hp <= 0) {
+          this.kill(p, null, 'storm');
+          continue;
+        }
+      } else if (p.hp < CFG.HP && this.time - p.lastHit > CFG.REGEN_DELAY) {
         p.hp = Math.min(CFG.HP, p.hp + CFG.REGEN_RATE * DT);
       }
 
       let zone = null;
       for (const e of this.map.extracts) {
+        if (this.exitStates[e.id] === 'closed') continue;
         if (Math.hypot(e.x - p.x, e.y - p.y) < e.r) zone = e;
       }
       if (zone) {
@@ -232,15 +254,70 @@ export class World {
     if (this.time >= this.duration - 1e-9) this.end();
   }
 
+  updateZone() {
+    const before = this.zone;
+    this.zone = zoneAt(this.zonePlan, this.time);
+    const z = this.zone;
+    if (z.shrinking && !before.shrinking) this.emit({ k: 'storm', text: z.stage === this.zonePlan.times.length ? 'Final collapse · last exit only' : 'The storm is closing in' });
+    if (!z.shrinking && !z.final && z.until <= 5 && !this.warned[`storm${z.stage}`]) {
+      this.warned[`storm${z.stage}`] = true;
+      this.emit({ k: 'storm', text: 'Storm moves in 5s' });
+    }
+    for (const e of this.map.extracts) {
+      const s = exitState(this.zonePlan, z, e);
+      if (s === 'closed' && this.exitStates[e.id] !== 'closed') this.emit({ k: 'exitClosed', name: e.name, id: e.id });
+      this.exitStates[e.id] = s;
+    }
+  }
+
   fire(p) {
-    p.fireCd = CFG.FIRE_CD;
-    const c = Math.cos(p.aim);
-    const s = Math.sin(p.aim);
-    const sx = p.x + c * (CFG.PLAYER_R + 4);
-    const sy = p.y + s * (CFG.PLAYER_R + 4);
+    const wp = WEAPONS[p.w];
+    p.fireCd = wp.cd;
+    p.fc = (p.fc + 1) % 1000;
+    if (wp.melee) return this.slash(p, wp);
+    const muzzle = CFG.PLAYER_R + 10;
+    const sx = p.x + Math.cos(p.aim) * muzzle;
+    const sy = p.y + Math.sin(p.aim) * muzzle;
     if (segWalls(p.x, p.y, sx, sy, this.map.walls) >= 0) return;
-    const b = { id: this.nextId++, owner: p.id, x: sx, y: sy, vx: c * CFG.BULLET_SPEED, vy: s * CFG.BULLET_SPEED, dist: 0 };
-    this.bullets.set(b.id, b);
+    for (let i = 0; i < wp.pellets; i++) {
+      const a = p.aim + (this.rnd() - 0.5) * wp.spread * (wp.pellets > 1 ? 1 : 2);
+      const b = {
+        id: this.nextId++,
+        owner: p.id,
+        x: sx,
+        y: sy,
+        vx: Math.cos(a) * wp.speed,
+        vy: Math.sin(a) * wp.speed,
+        speed: wp.speed,
+        range: wp.range,
+        dmg: wp.dmg,
+        dist: 0,
+      };
+      this.bullets.set(b.id, b);
+    }
+  }
+
+  // Knife: hits the closest runner in front of you, within reach and not through walls.
+  slash(p, wp) {
+    let best = null;
+    let bd = Infinity;
+    for (const q of this.players.values()) {
+      if (q === p || q.status !== 'alive') continue;
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      const d = Math.hypot(dx, dy);
+      if (d > wp.reach + CFG.PLAYER_R * 2) continue;
+      let da = Math.atan2(dy, dx) - p.aim;
+      while (da > Math.PI) da -= Math.PI * 2;
+      while (da < -Math.PI) da += Math.PI * 2;
+      if (Math.abs(da) > wp.arc / 2) continue;
+      if (!hasLOS(p.x, p.y, q.x, q.y, this.map.walls)) continue;
+      if (d < bd) {
+        bd = d;
+        best = q;
+      }
+    }
+    if (best) this.damage(best, p, wp.dmg);
   }
 
   stepBullets() {
@@ -261,7 +338,7 @@ export class World {
       }
       if (victim) {
         this.bullets.delete(b.id);
-        this.damage(victim, this.players.get(b.owner));
+        this.damage(victim, this.players.get(b.owner), b.dmg);
         continue;
       }
       if (tWall >= 0) {
@@ -270,25 +347,27 @@ export class World {
       }
       b.x = nx;
       b.y = ny;
-      b.dist += CFG.BULLET_SPEED * DT;
-      if (b.dist > CFG.BULLET_RANGE || nx < 0 || ny < 0 || nx > this.map.w || ny > this.map.h) this.bullets.delete(b.id);
+      b.dist += b.speed * DT;
+      if (b.dist > b.range || nx < 0 || ny < 0 || nx > this.map.w || ny > this.map.h) this.bullets.delete(b.id);
     }
   }
 
-  damage(v, shooter) {
+  damage(v, shooter, amount) {
     if (v.shield > 0) return;
-    v.hp -= CFG.BULLET_DMG;
+    if (shooter && shooter !== v) this.addXp(shooter, Math.min(amount, Math.max(0, v.hp)) * XP.damage);
+    v.hp -= amount;
     v.lastHit = this.time;
     v.ext = 0;
     this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y) });
     if (v.hp <= 0) this.kill(v, shooter);
   }
 
-  kill(v, killer) {
+  kill(v, killer, cause = 'shot') {
     v.hp = 0;
     v.status = 'dead';
     v.endedAt = this.time;
     v.lostBag = v.bag;
+    v.cause = cause;
     v.killer = killer?.id ?? null;
     v.killerName = killer?.name ?? null;
     if (v.bag > 0) {
@@ -296,9 +375,27 @@ export class World {
       this.drops.set(d.id, d);
     }
     v.bag = 0;
-    if (killer) killer.kills++;
+    if (killer) {
+      killer.kills++;
+      this.addXp(killer, XP.kill);
+    }
     // public feed: names only, never amounts
-    this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id });
+    this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id, cause });
+  }
+
+  addXp(p, amount) {
+    if (p.status !== 'alive' || amount <= 0) return;
+    p.xp += amount;
+    while (p.xp >= XP_PER_LEVEL) {
+      p.xp -= XP_PER_LEVEL;
+      p.w = (p.w + 1) % WEAPONS.length;
+      p.fireCd = Math.min(p.fireCd, 0.15);
+      if (p.w === 0) {
+        p.prestige++;
+        this.emit({ k: 'arsenal', name: p.name, pid: p.id });
+      }
+      this.emit({ k: 'level', to: [p.id], w: p.w, prestige: p.prestige });
+    }
   }
 
   extract(p) {
@@ -320,6 +417,7 @@ export class World {
         if (Math.abs(o.x - p.x) > r || Math.abs(o.y - p.y) > r) continue;
         if ((o.x - p.x) ** 2 + (o.y - p.y) ** 2 < r * r) {
           p.bag += o.v;
+          this.addXp(p, XP.loot[o.t] ?? 0);
           this.orbs.delete(o.id);
           this.emit({ k: 'pickup', to: [p.id], v: o.v, t: o.t, x: r1(o.x), y: r1(o.y) });
         }
@@ -327,6 +425,7 @@ export class World {
       for (const d of this.drops.values()) {
         if ((d.x - p.x) ** 2 + (d.y - p.y) ** 2 < (CFG.PLAYER_R + 14) ** 2) {
           p.bag += d.v;
+          this.addXp(p, XP.bag);
           this.drops.delete(d.id);
           // only the looter learns what was inside
           this.emit({ k: 'loot', to: [p.id], v: d.v, x: r1(d.x), y: r1(d.y) });
@@ -348,13 +447,20 @@ export class World {
     return 0;
   }
 
-  spawnOrb() {
+  // circle: where new loot may land. Opening loot uses the current circle,
+  // everything after lands inside the circle the storm is heading to.
+  spawnOrb(circle = this.zone.next) {
     if (this.lootPool <= 0 || this.orbs.size >= CFG.MAX_ORBS) return 0;
     let t = this.pickTier();
     const nominal = Math.max(1, Math.round(this.stake * CFG.ORB_TIERS[t].pct));
     const v = Math.min(nominal, this.lootPool);
     while (t > 0 && v < Math.round(this.stake * CFG.ORB_TIERS[t].pct) * 0.5) t--;
-    const pos = randomLootPoint(this.map, this.rnd, t === CFG.ORB_TIERS.length - 1);
+    const chest = CFG.ORB_TIERS.length - 1;
+    let pos = randomLootPoint(this.map, this.rnd, t === chest, circle);
+    if (!pos && t === chest) {
+      t = chest - 1; // no vault inside the circle: drop it as a stack instead
+      pos = randomLootPoint(this.map, this.rnd, false, circle);
+    }
     if (!pos) return 0;
     const o = { id: this.nextId++, x: pos.x, y: pos.y, v, t };
     this.orbs.set(o.id, o);
@@ -366,7 +472,7 @@ export class World {
     const target = Math.floor(this.lootPool * CFG.OPENING_BURST);
     let spent = 0;
     while (spent < target) {
-      const v = this.spawnOrb();
+      const v = this.spawnOrb(this.zone);
       if (!v) break;
       spent += v;
     }
@@ -411,8 +517,8 @@ export class World {
       this.warned[key] = true;
       this.emit({ k: 'warn', text });
     };
-    if (tl <= CFG.JOIN_CUTOFF) say('cutoff', `${CFG.JOIN_CUTOFF}s left · raid sealed`);
-    if (tl <= 30) say('30', '30s · get to an exit');
+    if (tl <= CFG.JOIN_CUTOFF) say('cutoff', 'Entry closed · no new runners');
+    if (tl <= 30) say('30', '30s · reach an open exit');
     if (tl <= 10) say('10', '10s · extract or lose it all');
   }
 
@@ -513,6 +619,9 @@ export class World {
         e: p.ext > 0 ? r2(p.ext) : 0,
         d: p.dashT > 0 ? 1 : 0,
         s: p.shield > 0 ? 1 : 0,
+        w: p.w,
+        fc: p.fc,
+        pr: p.prestige,
       });
     }
     const orbs = [];
@@ -539,6 +648,11 @@ export class World {
         dashDy: me.dashDy,
         hp: Math.ceil(me.hp),
         shield: r2(me.shield),
+        storm: me.inStorm && me.status === 'alive' ? 1 : 0,
+        w: me.w,
+        xp: Math.floor(me.xp),
+        pr: me.prestige,
+        fc: me.fc,
         bag: me.bag,
         stake: me.stake,
         st: me.status,

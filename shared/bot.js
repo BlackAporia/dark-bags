@@ -1,5 +1,6 @@
 import { CFG } from './config.js';
 import { NavGrid } from './nav.js';
+import { WEAPONS, BOT_RANGE } from './weapons.js';
 
 const NAMES = [
   'hodl_rat', 'wagmi_wolf', 'rekt_ronin', 'sat_stacker', 'moon_mole', 'bag_goblin', 'fud_fox', 'ape_42',
@@ -68,17 +69,29 @@ export class BotBrain {
     return { mx: dx / d, my: dy / d };
   }
 
+  // nearest exit that will still be open when we get there
   nearestExit() {
+    const w = this.w;
     let best = null;
     let bd = Infinity;
-    for (const e of this.w.map.extracts) {
+    for (const e of w.map.extracts) {
+      const st = w.exitStates[e.id];
+      if (st === 'closed') continue;
       const d = dist(e, this.p);
+      if (st === 'closing' && (w.zone.shrinking || d / CFG.SPEED > w.zone.until)) continue;
       if (d < bd) {
         bd = d;
         best = e;
       }
     }
     return best;
+  }
+
+  // is a point safe from the storm for a while?
+  safe(x, y, pad = 40) {
+    const z = this.w.zone;
+    const c = z.shrinking || z.until < 10 ? z.next : z;
+    return Math.hypot(x - c.x, y - c.y) < c.r - pad;
   }
 
   pickLoot() {
@@ -88,7 +101,7 @@ export class BotBrain {
     const R2 = (CFG.VISION + 150) ** 2;
     for (const d of this.w.drops.values()) {
       const d2 = (d.x - p.x) ** 2 + (d.y - p.y) ** 2;
-      if (d2 > R2) continue;
+      if (d2 > R2 || !this.safe(d.x, d.y, 0)) continue;
       const s = (this.p.stake * 0.6) / (Math.sqrt(d2) + 80);
       if (s > score) {
         score = s;
@@ -97,7 +110,7 @@ export class BotBrain {
     }
     for (const o of this.w.orbs.values()) {
       const d2 = (o.x - p.x) ** 2 + (o.y - p.y) ** 2;
-      if (d2 > R2) continue;
+      if (d2 > R2 || !this.safe(o.x, o.y)) continue;
       const s = o.v / (Math.sqrt(d2) + 80);
       if (s > score) {
         score = s;
@@ -110,11 +123,20 @@ export class BotBrain {
   pickWander() {
     const w = this.w;
     const m = w.map;
-    if (m.vaults.length && this.rnd() < 0.35 + this.brave * 0.3) {
-      const v = m.vaults[Math.floor(this.rnd() * m.vaults.length)];
+    const vaults = m.vaults.filter((v) => this.safe(v.x + v.w / 2, v.y + v.h / 2, 80));
+    if (vaults.length && this.rnd() < 0.35 + this.brave * 0.3) {
+      const v = vaults[Math.floor(this.rnd() * vaults.length)];
       return { x: v.x + v.w / 2, y: v.y + v.h / 2 };
     }
-    return { x: 150 + this.rnd() * (m.w - 300), y: 150 + this.rnd() * (m.h - 300) };
+    const c = w.zone.next;
+    for (let i = 0; i < 10; i++) {
+      const a = this.rnd() * Math.PI * 2;
+      const d = Math.sqrt(this.rnd()) * (c.r - 60);
+      const x = c.x + Math.cos(a) * d;
+      const y = c.y + Math.sin(a) * d;
+      if (x > 100 && y > 100 && x < m.w - 100 && y < m.h - 100) return { x, y };
+    }
+    return { x: c.x, y: c.y };
   }
 
   think(dt) {
@@ -147,21 +169,34 @@ export class BotBrain {
     let move = { mx: 0, my: 0 };
     let aim = null;
 
+    // storm first: anyone near the edge (or outside it) heads for the next circle
+    const z = w.zone;
+    const edge = z.r - Math.hypot(p.x - z.x, p.y - z.y);
+    const stormBound = edge < 70 && !inZone && !(wantOut && exit && this.safe(exit.x, exit.y, 0));
+    if (stormBound) {
+      move = this.goTo(z.next.x, z.next.y);
+      if (edge < 0 && p.dashCd <= 0 && this.rnd() < 0.1) inp.d = true;
+    }
+
     if (foe) {
+      const wp = WEAPONS[p.w];
       const reaction = 0.18 + (1 - this.skill) * 0.35;
       const seenFor = w.time - this.seenFoe.get(foe.id);
-      const t = fd / CFG.BULLET_SPEED;
+      const t = wp.melee ? 0 : fd / wp.speed;
       const lead = 0.4 + this.skill * 0.6;
       const tx = foe.x + foe.vx * t * lead;
       const ty = foe.y + foe.vy * t * lead;
       this.aimErr += (this.rnd() - 0.5) * 0.12;
-      const maxErr = (1 - this.skill) * 0.4 + 0.05;
+      const maxErr = ((1 - this.skill) * 0.4 + 0.05) * (wp.laser ? 0.35 : 1);
       this.aimErr = Math.max(-maxErr, Math.min(maxErr, this.aimErr));
       aim = Math.atan2(ty - p.y, tx - p.x) + this.aimErr;
-      if (seenFor > reaction && fd < CFG.BULLET_RANGE * 0.95) inp.f = true;
+      const reach = wp.melee ? wp.reach + CFG.PLAYER_R * 2 - 4 : wp.range * 0.9;
+      if (seenFor > reaction && fd < reach) inp.f = true;
 
       const lowHp = p.hp < 25 + this.brave * 25;
-      if (lowHp && !inZone) {
+      if (stormBound) {
+        // keep running inward, shooting on the move
+      } else if (lowHp && !inZone) {
         // break contact: run for the exit if it's worth it, else away from the threat
         if (wantOut && exit) move = this.goTo(exit.x, exit.y);
         else {
@@ -182,16 +217,20 @@ export class BotBrain {
         const d = Math.hypot(dx, dy) || 1;
         const ux = dx / d;
         const uy = dy / d;
-        const want = 250 + (1 - this.brave) * 90;
-        const radial = fd > want + 60 ? 1 : fd < want - 60 ? -1 : 0;
-        let mx = ux * radial + -uy * this.strafe * 0.9;
-        let my = uy * radial + ux * this.strafe * 0.9;
-        const l = Math.hypot(mx, my) || 1;
-        mx /= l;
-        my /= l;
-        move = { mx, my };
+        const want = BOT_RANGE[wp.id] + (wp.melee ? 0 : (1 - this.brave) * 60);
+        const band = wp.melee ? 10 : 60;
+        const radial = fd > want + band ? 1 : fd < want - band ? -1 : 0;
+        // knife: rush straight in (and dash to close the gap); sniper: plant and shoot
+        const side = wp.melee ? 0.25 : wp.laser && inp.f ? 0 : 0.9;
+        let mx = ux * radial + -uy * this.strafe * side;
+        let my = uy * radial + ux * this.strafe * side;
+        if (wp.melee && fd < 200 && fd > 70 && p.dashCd <= 0 && this.rnd() < 0.12) inp.d = true;
+        const l = Math.hypot(mx, my);
+        move = l > 0.01 ? { mx: mx / l, my: my / l } : { mx: 0, my: 0 };
         if (w.time - p.lastHit < 0.15 && p.dashCd <= 0 && this.rnd() < 0.35) inp.d = true;
       }
+    } else if (stormBound) {
+      // already moving inward
     } else if (wantOut && exit) {
       move = inZone ? { mx: 0, my: 0 } : this.goTo(exit.x, exit.y);
     } else {

@@ -59,7 +59,7 @@ test("snapshots never contain another runner's bag", () => {
   b.bag = 987654;
   const snap = w.snapshotFor(a.id);
   assert.equal(snap.players.length, 1, 'bob is in view');
-  assert.deepEqual(Object.keys(snap.players[0]).sort(), ['a', 'b', 'c', 'd', 'e', 'h', 'i', 'n', 's', 'x', 'y'].sort());
+  assert.deepEqual(Object.keys(snap.players[0]).sort(), ['a', 'b', 'c', 'd', 'e', 'fc', 'h', 'i', 'n', 'pr', 's', 'w', 'x', 'y'].sort());
   assert.ok(!JSON.stringify(snap).includes('987654'), "bob's bag leaked into alice's snapshot");
   assert.equal(snap.you.bag, a.bag, 'you do see your own bag');
 });
@@ -106,7 +106,7 @@ test('a hit resets extraction progress', () => {
   Object.assign(p, { x: e.x, y: e.y, shield: 0 });
   for (let i = 0; i < 45; i++) w.step();
   assert.ok(p.ext > 0.4);
-  w.damage(p, null);
+  w.damage(p, null, 10);
   assert.equal(p.ext, 0);
 });
 
@@ -115,7 +115,7 @@ test('death drops the whole bag; only the looter learns the amount', () => {
   const a = w.addPlayer({ name: 'shooter', skin: '#fff' });
   const b = w.addPlayer({ name: 'target', skin: '#fff' });
   w.map.walls = [];
-  Object.assign(a, { x: 800, y: 800, shield: 0 });
+  Object.assign(a, { x: 800, y: 800, shield: 0, w: 1 }); // pistol
   Object.assign(b, { x: 950, y: 800, shield: 0 });
   setBag(w, b, 3210);
   let s = 0;
@@ -145,19 +145,20 @@ test('death drops the whole bag; only the looter learns the amount', () => {
 test('spawn shield blocks damage until the runner fires', () => {
   const w = humanWorld();
   const p = w.addPlayer({ name: 'a', skin: '#fff' });
-  w.damage(p, null);
+  w.damage(p, null, 20);
   assert.equal(p.hp, CFG.HP);
   w.queueInput(p.id, { s: 1, mx: 0, my: 0, a: 0, f: true, d: false });
   w.step();
   assert.equal(p.shield, 0);
-  w.damage(p, null);
-  assert.equal(p.hp, CFG.HP - CFG.BULLET_DMG);
+  w.damage(p, null, 20);
+  assert.equal(p.hp, CFG.HP - 20);
 });
 
 test('entry closes at JOIN_CUTOFF and the raid seals at 0:00', () => {
   const w = humanWorld({ roundSeconds: CFG.JOIN_CUTOFF + 2 });
   const p = w.addPlayer({ name: 'a', skin: '#fff' });
   setBag(w, p, 500);
+  p.hp = 1e9; // idle runner: survive the storm so the seal is what gets them
   for (let i = 0; i < 3 * CFG.TICK_RATE; i++) w.step();
   assert.equal(w.canJoin(), false);
   assert.throws(() => w.addPlayer({ name: 'late', skin: '#fff' }));

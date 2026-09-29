@@ -58,6 +58,7 @@ test('a sealed raid queues you for the next one', () => {
   const { lobby, wallet, client } = setup({ roundSeconds: CFG.JOIN_CUTOFF + 1 });
   const a = client(1, 'first');
   lobby.handle(1, { t: 'join', stake: 100 });
+  lobby.rooms.get(100).world.players.get(a.last('start').pid).hp = 1e9; // outlive the storm
   for (let i = 0; i < CFG.TICK_RATE * 2; i++) lobby.tick();
   const b = client(2, 'late');
   lobby.handle(2, { t: 'join', stake: 100 });

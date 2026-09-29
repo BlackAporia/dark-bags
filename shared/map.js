@@ -101,18 +101,28 @@ export function inVault(map, x, y, pad = 0) {
   return map.vaults.some((v) => x > v.x - pad && x < v.x + v.w + pad && y > v.y - pad && y < v.y + v.h + pad);
 }
 
-// Pick a spawn away from exits, vaults and other runners.
-export function findSpawn(map, rnd, others) {
+// Pick a spawn away from exits, vaults and other runners, inside the safe circle.
+export function findSpawn(map, rnd, others, circle = null) {
   const r = CFG.PLAYER_R + 6;
   let best = null;
   let bestScore = -1;
-  for (let i = 0; i < 80; i++) {
-    const x = 90 + rnd() * (map.w - 180);
-    const y = 90 + rnd() * (map.h - 180);
+  for (let i = 0; i < 120; i++) {
+    let x;
+    let y;
+    if (circle) {
+      const a = rnd() * Math.PI * 2;
+      const d = Math.sqrt(rnd()) * circle.r * 0.8;
+      x = circle.x + Math.cos(a) * d;
+      y = circle.y + Math.sin(a) * d;
+    } else {
+      x = 90 + rnd() * (map.w - 180);
+      y = 90 + rnd() * (map.h - 180);
+    }
+    if (x < 90 || y < 90 || x > map.w - 90 || y > map.h - 90) continue;
     if (!pointFree(map, x, y, r) || inVault(map, x, y, 40)) continue;
     let dExit = Infinity;
     for (const e of map.extracts) dExit = Math.min(dExit, Math.hypot(e.x - x, e.y - y));
-    if (dExit < 450) continue;
+    if (dExit < 400) continue;
     let dOther = 2000;
     for (const o of others) dOther = Math.min(dOther, Math.hypot(o.x - x, o.y - y));
     if (dOther > 420) return { x, y };
@@ -121,17 +131,25 @@ export function findSpawn(map, rnd, others) {
       best = { x, y };
     }
   }
-  return best || { x: map.w / 2, y: map.h / 2 };
+  return best || { x: circle ? circle.x : map.w / 2, y: circle ? circle.y : map.h / 2 };
 }
 
-export function randomLootPoint(map, rnd, chest) {
+// circle: loot only lands inside it (the storm's next circle)
+export function randomLootPoint(map, rnd, chest, circle = null) {
+  const vaults = circle ? map.vaults.filter((v) => Math.hypot(v.x + v.w / 2 - circle.x, v.y + v.h / 2 - circle.y) < circle.r - 60) : map.vaults;
+  if (chest && !vaults.length) return null;
   for (let i = 0; i < 60; i++) {
     let x;
     let y;
-    if (chest && map.vaults.length) {
-      const v = map.vaults[Math.floor(rnd() * map.vaults.length)];
+    if (chest) {
+      const v = vaults[Math.floor(rnd() * vaults.length)];
       x = v.x + 50 + rnd() * (v.w - 100);
       y = v.y + 50 + rnd() * (v.h - 100);
+    } else if (circle) {
+      const a = rnd() * Math.PI * 2;
+      const d = Math.sqrt(rnd()) * (circle.r - 30);
+      x = circle.x + Math.cos(a) * d;
+      y = circle.y + Math.sin(a) * d;
     } else {
       x = 60 + rnd() * (map.w - 120);
       y = 60 + rnd() * (map.h - 120);
