@@ -16,7 +16,7 @@ npm start            # http://localhost:8080
 The lobby has two modes:
 
 - **Online**: humans on the same server share raids; bots fill each raid to ~10 runners.
-- **Practice vs bots**: the same game code running entirely in your browser tab. Works with no server.
+- **Practice vs bots**: the same game code running entirely in your browser tab. Works with no server. Every bot is for itself (they fight each other from the first second), they are softer (slower to react, sloppier aim, bursts with pauses, half damage on you) and the raid ends the moment you die or get out.
 
 Other commands:
 
@@ -29,7 +29,7 @@ npm run dev          # server with auto-restart
 npm run house -- status   # operator console for real-token mode
 ```
 
-Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (20, the ready-room countdown), `BOTS` (`0` to disable), `WALLET_FILE` (path to persist test balances as JSON; in-memory otherwise), and `CHAIN` plus the cashier settings under [Real tokens](#real-tokens).
+Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (20, the ready-room countdown), `BOTS` (`0` to disable), `WALLET_FILE` (path to persist test balances as JSON; in-memory otherwise), `RANKS_FILE` (path to persist career ranks), and `CHAIN` plus the cashier settings under [Real tokens](#real-tokens).
 
 ## A raid
 
@@ -46,6 +46,8 @@ Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (2
 | **Extract** | Stand in an open exit for 3 s. Any hit resets the timer. You cash out your whole bag. Still inside at 0:00, you lose it to the next raid's pot. |
 | **Streaks** | First blood (announced to everyone), then double kill, triple kill, rampage, godlike for kills chained within 4 s. Each has its own animation, sting and announcer line. |
 | **Golden raid** | Every 4th raid at a table gets a sponsor bonus (3× stake) in extra loot. |
+| **Bots** | Nobody gets piled on: bots leave humans alone for the first 8 s, then at most two press one human at a time (unless you start it), and they hit humans for 75% damage online, 50% in practice. Online they keep a truce with each other for 30 s so they don't farm guns off each other. |
+| **Rank** | Every raid pays career rank XP, win or lose: 40 for showing up, 50 a kill, damage, time alive, first blood, multi-kills, a full arsenal lap, and 120 plus a profit bonus for extracting (practice pays half). 90 ranks from Lance Corporal I to Legend, each with its own insignia drawn in code; rank 2 takes one raid, Legend about 1.8 M XP. Your badge sits on your name tag, in the ready room and on the result card. |
 
 Controls: `WASD` move · mouse aim · click attack · `Space` dash · `Q` bag look · `M` sound · `N` music. On phones: left thumb moves, right thumb aims and fires.
 
@@ -147,6 +149,7 @@ shared/            runs identically on server and in the browser
   config.js        every tunable number
   world.js         one raid: movement, weapons, loot, storm, extraction, streaks, ledger, per-player snapshots
   weapons.js       the Arms Race ladder and experience values
+  ranks.js         career ranks 1-90, the XP curve, what a raid is worth
   zone.js          the storm plan: nested circles collapsing onto the last exit
   movement.js      deterministic movement, shared with client prediction
   bot.js, nav.js   bots (vision-limited, A* on a grid) that farm, fight, flee and extract
@@ -160,7 +163,7 @@ server/cashier/    real tokens: cashier.js (ledger, sign-in, deposits, payouts),
                    strk20.js (private pool), privy.js, prices.js, config.js, index.js (journal, HTTP)
 client/            canvas renderer, stick figures, fx (blood, graves, sparks), textures + chunked map layer,
                    synthesized sfx and music, prediction/interpolation, HUD, touch controls,
-                   cashier.js (sign-in and cashier UI)
+                   cashier.js (sign-in and cashier UI), rankbadge.js (rank insignia as SVG)
 client/chain/      wallet layer (get-starknet, Starkzap, Cartridge, Privy) → client/vendor/wallets.js
 test/              node:test suites
 scripts/           headless sim, single-file build, wallet bundle, house console

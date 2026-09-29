@@ -1,6 +1,7 @@
 import { CFG } from '../shared/config.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
+import { RankBook } from '../shared/ranks.js';
 import { store } from './store.js';
 
 // Online: talks to the Node server over WebSocket. Reconnects on drop.
@@ -65,8 +66,11 @@ export class LocalTransport {
   constructor(onMessage, onStatus) {
     const KEY = 'darkbags.practiceWallet';
     this.wallet = new MemoryWallet({ data: store.get(KEY, {}), onChange: (w) => store.set(KEY, w.toJSON()) });
+    const RANKS = 'darkbags.practiceRank';
     this.lobby = new Lobby({
       wallet: this.wallet,
+      ranks: new RankBook({ data: store.get(RANKS, {}), onChange: (r) => store.set(RANKS, r.toJSON()) }),
+      practice: true, // every bot for itself, softer bots, the raid ends when you're out
       send: (_cid, msg) => queueMicrotask(() => !this.closed && onMessage(msg)),
       newToken: () => 'practice',
       bots: true,

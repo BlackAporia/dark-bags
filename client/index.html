@@ -105,6 +105,7 @@
       <label for="name" class="eyebrow">Runner name</label>
       <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="runner">
       <div id="skins" class="skins" role="radiogroup" aria-label="Colour"></div>
+      <div id="rank-card" class="rank-card" hidden></div>
     </div>
 
     <label class="gore" for="gore"><input id="gore" type="checkbox"> <span><b>18+ mode.</b> Limbs come off as health drops, heads pop, blood stays on the floor.</span></label>
@@ -120,6 +121,7 @@
         <li><b>Storm.</b> The circle shrinks four times and collapses onto one exit. Exits it swallows close for good.</li>
         <li><b>Bluff.</b> Your bag's look is a choice (<kbd>Q</kbd>). Look broke and slip out, or look fat and bait a fight.</li>
         <li><b>Extract.</b> Stand in an open exit for 3 seconds. You cash out whatever you carry. Still inside at 0:00, you lose it.</li>
+        <li><b>Rank.</b> Every raid pays rank XP, more for kills and for getting out. 90 ranks, Lance Corporal to Legend.</li>
       </ul>
       <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> bag look · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
     </details>
@@ -151,6 +153,7 @@
     <p id="res-kicker" class="res-kicker">Extracted</p>
     <p id="res-amount" class="res-amount">+0</p>
     <p id="res-detail" class="res-detail"></p>
+    <div id="res-rank" class="res-rank" hidden></div>
     <div class="res-actions">
       <button id="res-again" class="cta" type="button">Ready for the next raid</button>
       <button id="res-tables" class="ghost" type="button">Tables</button>

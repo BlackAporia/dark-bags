@@ -1,4 +1,5 @@
 import { CFG } from '../shared/config.js';
+import { rankImage } from './rankbadge.js';
 import { segWalls } from '../shared/geom.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { MapLayer } from './mapLayer.js';
@@ -414,7 +415,17 @@ export class Renderer {
       ctx.fillStyle = 'rgba(235, 229, 214, 0.9)';
       ctx.font = `600 11px ${F_UI}`;
       ctx.textAlign = 'center';
-      ctx.fillText(`${f.name}${f.pr ? ` ${'★'.repeat(Math.min(3, f.pr))}` : ''}`, p.head.x, top - 5);
+      const label = `${f.name}${f.pr ? ` ${'★'.repeat(Math.min(3, f.pr))}` : ''}`;
+      const badge = f.rk ? rankImage(f.rk) : null;
+      if (badge) {
+        // rank insignia to the left of the name, the pair centred over the head
+        const tw = ctx.measureText(label).width;
+        const x0 = p.head.x - (tw + 16) / 2;
+        ctx.drawImage(badge, x0, top - 17, 14, 14);
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x0 + 16, top - 5);
+        ctx.textAlign = 'center';
+      } else ctx.fillText(label, p.head.x, top - 5);
     }
   }
 

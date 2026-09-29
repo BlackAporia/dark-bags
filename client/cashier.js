@@ -354,6 +354,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         }
         store.set('darkbags.walletKind', cs.kind);
         if (m.balances) app.balances = m.balances;
+        app.rank = m.rank ?? null;
         if (m.account) {
           $('dlg-connect').close();
           toast(`Signed in as ${short(m.account)}.`);

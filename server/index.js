@@ -10,6 +10,7 @@ import { CFG } from '../shared/config.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
 import { createCashier } from './cashier/index.js';
+import { RankBook } from '../shared/ranks.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -17,6 +18,7 @@ const ROUND_SECONDS = Number(process.env.ROUND_SECONDS || CFG.ROUND_SECONDS);
 const PREP_SECONDS = Number(process.env.PREP_SECONDS || CFG.PREP_SECONDS);
 const BOTS = process.env.BOTS !== '0';
 const WALLET_FILE = process.env.WALLET_FILE || '';
+const RANKS_FILE = process.env.RANKS_FILE || '';
 
 // ------------------------------------------------------------------ wallet
 // CHAIN=sepolia|mainnet: real tokens through the cashier (server/cashier). Otherwise test tokens.
@@ -37,6 +39,20 @@ const wallet = new MemoryWallet({
   },
 });
 
+// ------------------------------------------------------------------- ranks
+// Career rank XP per player key (session token, or Starknet address with a cashier).
+let rankTimer = null;
+const ranks = new RankBook({
+  data: RANKS_FILE && existsSync(RANKS_FILE) ? JSON.parse(readFileSync(RANKS_FILE, 'utf8')) : {},
+  onChange: (r) => {
+    if (!RANKS_FILE || rankTimer) return;
+    rankTimer = setTimeout(async () => {
+      rankTimer = null;
+      await writeFile(RANKS_FILE, JSON.stringify(r.toJSON())).catch((e) => console.error('ranks save failed', e));
+    }, 2000);
+  },
+});
+
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
 const send = (cid, msg) => {
@@ -48,6 +64,7 @@ const send = (cid, msg) => {
 const lobby = new Lobby({
   wallet,
   cashier: real?.cashier ?? null,
+  ranks,
   send,
   bots: BOTS,
   roundSeconds: ROUND_SECONDS,
@@ -189,6 +206,7 @@ server.listen(PORT, () => {
 });
 
 const shutdown = async () => {
+  if (RANKS_FILE) await writeFile(RANKS_FILE, JSON.stringify(ranks.toJSON())).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await writeFile(WALLET_FILE, JSON.stringify(wallet.toJSON())).catch(() => {});
   process.exit(0);

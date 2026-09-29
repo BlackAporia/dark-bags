@@ -3,6 +3,7 @@ import { mulberry32, hasLOS, segWalls, segCircle } from './geom.js';
 import { generateMap, findSpawn, randomLootPoint } from './map.js';
 import { stepMovement, sanitizeInput } from './movement.js';
 import { BotBrain, botName } from './bot.js';
+import { botRank } from './ranks.js';
 import { planZone, zoneAt, exitState, outsideZone } from './zone.js';
 import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 
@@ -20,6 +21,12 @@ const r2 = (v) => Math.round(v * 100) / 100;
  *   Raid ends → everything still inside (bags of runners who didn't make it,
  *   loot on the floor, unspawned pool) rolls into the next raid.
  */
+// bots hit humans for this share of their weapon damage: bots react and aim like
+// machines, so a straight trade would be unfair; practice is softer still
+const BOT_DAMAGE = 0.75;
+const PRACTICE_BOT_DAMAGE = 0.5;
+const PRACTICE_SPAWN_SHIELD = 5; // seconds; firing still drops it early
+
 export class World {
   constructor({
     stake,
@@ -30,7 +37,11 @@ export class World {
     bots = true,
     botRoster = null,
     roundSeconds = CFG.ROUND_SECONDS,
+    practice = false,
   }) {
+    // practice (offline, vs bots): every bot for itself, softer bots, and the raid
+    // ends the moment the last human is out (dead or extracted)
+    this.practice = practice;
     this.botRoster = botRoster ? botRoster.slice() : null;
     this.stake = stake;
     this.seed = seed;
@@ -75,6 +86,11 @@ export class World {
     return Math.max(0, this.duration - this.time);
   }
 
+  humansInside() {
+    for (const p of this.players.values()) if (!p.isBot && p.status === 'alive') return true;
+    return false;
+  }
+
   aliveCount() {
     let n = 0;
     for (const p of this.players.values()) if (p.status === 'alive') n++;
@@ -92,7 +108,7 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false }) {
+  addPlayer({ name, skin, isBot = false, rank = 1 }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
     const rake = Math.floor(stake * CFG.RAKE);
@@ -111,6 +127,7 @@ export class World {
       name,
       skin,
       isBot,
+      rank, // career rank, shown on the name tag
       x: pos.x,
       y: pos.y,
       vx: 0,
@@ -121,7 +138,7 @@ export class World {
       dashDy: 0,
       aim: 0,
       hp: CFG.HP,
-      shield: CFG.SPAWN_SHIELD,
+      shield: this.practice && !isBot ? PRACTICE_SPAWN_SHIELD : CFG.SPAWN_SHIELD,
       bag,
       startBag: bag,
       stake,
@@ -135,6 +152,9 @@ export class World {
       extId: -1,
       status: 'alive',
       kills: 0,
+      dmgDealt: 0,
+      bestMulti: 0,
+      firstBlood: false,
       bluff: 1,
       ack: 0,
       queue: [],
@@ -181,6 +201,7 @@ export class World {
   step() {
     if (this.phase !== 'live') return;
     if (this.tick === 0) {
+      this.hadHumans = [...this.players.values()].some((p) => !p.isBot);
       this.fillBots();
       this.openingBurst();
     }
@@ -254,6 +275,7 @@ export class World {
     this.spawnLoot();
     this.announce();
     if (this.time >= this.duration - 1e-9) this.end();
+    else if (this.practice && this.hadHumans && !this.humansInside()) this.end();
   }
 
   updateZone() {
@@ -356,7 +378,9 @@ export class World {
 
   damage(v, shooter, amount) {
     if (v.shield > 0) return;
+    if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE : BOT_DAMAGE;
     if (shooter && shooter !== v) {
+      shooter.dmgDealt += Math.min(amount, Math.max(0, v.hp));
       const k = shooter.isBot && v.isBot ? XP.botOnBotDamage : 1;
       this.addXp(shooter, Math.min(amount, Math.max(0, v.hp)) * XP.damage * k);
       v.lastAttacker = shooter.id;
@@ -394,10 +418,12 @@ export class World {
   streak(k) {
     if (!this.firstBlood) {
       this.firstBlood = true;
+      k.firstBlood = true;
       this.emit({ k: 'streak', tier: 1, name: k.name, pid: k.id });
     }
     k.multi = this.time - (k.lastKillT ?? -99) <= CFG.MULTI_WINDOW ? (k.multi ?? 1) + 1 : 1;
     k.lastKillT = this.time;
+    k.bestMulti = Math.max(k.bestMulti, k.multi);
     if (k.multi >= 2) {
       const tier = Math.min(5, k.multi);
       this.emit({ k: 'streak', tier, to: [k.id], name: k.name, pid: k.id });
@@ -523,10 +549,10 @@ export class World {
     const pre = this.botRoster?.find((b) => !taken.has(b.name));
     if (pre) {
       this.botRoster.splice(this.botRoster.indexOf(pre), 1);
-      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true });
+      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true, rank: pre.rank ?? botRank(this.rnd) });
     }
     const skin = SKINS[Math.floor(this.rnd() * SKINS.length)];
-    return this.addPlayer({ name: botName(this.rnd, taken), skin, isBot: true });
+    return this.addPlayer({ name: botName(this.rnd, taken), skin, isBot: true, rank: botRank(this.rnd) });
   }
 
   announce() {
@@ -640,6 +666,7 @@ export class World {
         w: p.w,
         fc: p.fc,
         pr: p.prestige,
+        rk: p.rank,
       });
     }
     const orbs = [];

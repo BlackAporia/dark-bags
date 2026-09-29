@@ -59,7 +59,7 @@ test("snapshots never contain another runner's bag", () => {
   b.bag = 987654;
   const snap = w.snapshotFor(a.id);
   assert.equal(snap.players.length, 1, 'bob is in view');
-  assert.deepEqual(Object.keys(snap.players[0]).sort(), ['a', 'b', 'c', 'd', 'e', 'fc', 'h', 'i', 'n', 'pr', 's', 'w', 'x', 'y'].sort());
+  assert.deepEqual(Object.keys(snap.players[0]).sort(), ['a', 'b', 'c', 'd', 'e', 'fc', 'h', 'i', 'n', 'pr', 'rk', 's', 'w', 'x', 'y'].sort());
   assert.ok(!JSON.stringify(snap).includes('987654'), "bob's bag leaked into alice's snapshot");
   assert.equal(snap.you.bag, a.bag, 'you do see your own bag');
 });

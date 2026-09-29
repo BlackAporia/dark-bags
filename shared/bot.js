@@ -17,6 +17,7 @@ export function botName(rnd, taken) {
 }
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const HUMAN_HUNTERS = 2;
 
 /**
  * Simple raid bot. It only uses what a real runner could perceive
@@ -27,7 +28,12 @@ export class BotBrain {
     this.w = world;
     this.p = p;
     this.rnd = rnd;
-    this.skill = 0.25 + rnd() * 0.5; // tuned so a new player survives first contact more often than not
+    // practice bots are softer: slower to react, sloppier aim, shorter bursts
+    this.easy = !!world.practice;
+    this.skill = this.easy ? 0.05 + rnd() * 0.3 : 0.15 + rnd() * 0.4; // online: a new player survives first contact more often than not
+    this.burstT = 0; // practice: bots fire in bursts with pauses in between
+    this.burstOn = true;
+    this.target = null; // who this bot is fighting right now (id)
     this.greed = 1.05 + rnd() * 1.6; // heads out once bag >= stake * greed
     this.leaveAt = 16 + rnd() * 40; // or when this many seconds remain
     this.brave = rnd();
@@ -45,6 +51,13 @@ export class BotBrain {
     this.lastX = p.x;
     this.lastY = p.y;
     p.botInput = { s: 0, mx: 0, my: 0, a: 0, f: false, d: false };
+  }
+
+  // other live bots currently fighting this runner
+  huntersOn(id) {
+    let n = 0;
+    for (const [bid, b] of this.w.brains) if (b !== this && b.target === id && this.w.players.get(bid)?.status === 'alive') n++;
+    return n;
   }
 
   nav() {
@@ -153,21 +166,33 @@ export class BotBrain {
       tl < this.leaveAt || p.bag >= p.stake * this.greed || (p.hp < 40 && p.bag >= p.stake * 0.6);
 
     // perception
-    // Bots mostly leave each other alone: an early truce for everyone, then only the
-    // hunters (about a third) go after other bots. Anyone who attacks a bot gets a reply.
-    // Humans are always fair game.
+    // Online, bots mostly leave each other alone: an early truce for everyone, then only
+    // the hunters (about a third) go after other bots. Anyone who attacks a bot gets a
+    // reply, and humans are always fair game.
+    // Practice is every runner for themselves: bots fight whoever is closest, bot or human.
+    // Either way, humans get HUMAN_GRACE seconds to find their feet, and then at most
+    // HUMAN_HUNTERS bots press one human at a time (unless that human started it):
+    // a lone player gets fights, not a pile-on.
     const truce = w.time < CFG.BOT_TRUCE;
     const hunter = this.brave > 0.68;
-    const foes = w.visibleEnemies(p).filter((f) => f.shield <= 0 && (!f.isBot || p.lastAttacker === f.id || (!truce && hunter)));
+    const foes = w
+      .visibleEnemies(p)
+      .filter((f) => f.shield <= 0 && (this.easy || !f.isBot || p.lastAttacker === f.id || (!truce && hunter)))
+      .filter((f) => f.isBot || p.lastAttacker === f.id || (w.time >= CFG.HUMAN_GRACE && (this.target === f.id || this.huntersOn(f.id) < HUMAN_HUNTERS)));
     let foe = null;
     let fd = Infinity;
+    let best = Infinity;
     for (const f of foes) {
       const d = dist(f, p);
-      if (d < fd) {
+      // practice bots pick fights with each other first: a human counts as 1.5× farther away
+      const score = this.easy && !f.isBot ? d * 1.5 : d;
+      if (score < best) {
+        best = score;
         fd = d;
         foe = f;
       }
     }
+    this.target = foe?.id ?? null;
     for (const id of this.seenFoe.keys()) if (!foes.some((f) => f.id === id)) this.seenFoe.delete(id);
     if (foe && !this.seenFoe.has(foe.id)) this.seenFoe.set(foe.id, w.time);
 
@@ -185,18 +210,25 @@ export class BotBrain {
 
     if (foe) {
       const wp = WEAPONS[p.w];
-      const reaction = 0.18 + (1 - this.skill) * 0.35;
+      const reaction = this.easy ? 0.45 + (1 - this.skill) * 0.5 : 0.3 + (1 - this.skill) * 0.4;
       const seenFor = w.time - this.seenFoe.get(foe.id);
       const t = wp.melee ? 0 : fd / wp.speed;
       const lead = 0.4 + this.skill * 0.6;
       const tx = foe.x + foe.vx * t * lead;
       const ty = foe.y + foe.vy * t * lead;
       this.aimErr += (this.rnd() - 0.5) * 0.12;
-      const maxErr = ((1 - this.skill) * 0.4 + 0.05) * (wp.laser ? 0.35 : 1);
+      const maxErr = ((1 - this.skill) * 0.4 + 0.05) * (wp.laser ? 0.35 : 1) * (this.easy ? 1.5 : 1);
       this.aimErr = Math.max(-maxErr, Math.min(maxErr, this.aimErr));
       aim = Math.atan2(ty - p.y, tx - p.x) + this.aimErr;
       const reach = wp.melee ? wp.reach + CFG.PLAYER_R * 2 - 4 : wp.range * 0.9;
-      if (seenFor > reaction && fd < reach) inp.f = true;
+      if (this.easy) {
+        this.burstT -= dt;
+        if (this.burstT <= 0) {
+          this.burstOn = !this.burstOn;
+          this.burstT = this.burstOn ? 0.5 + this.rnd() * 0.7 : 0.5 + this.rnd() * 0.8;
+        }
+      }
+      if (seenFor > reaction && fd < reach && (!this.easy || this.burstOn)) inp.f = true;
 
       const lowHp = p.hp < 25 + this.brave * 25;
       if (stormBound) {
@@ -229,10 +261,10 @@ export class BotBrain {
         const side = wp.melee ? 0.25 : wp.laser && inp.f ? 0 : 0.9;
         let mx = ux * radial + -uy * this.strafe * side;
         let my = uy * radial + ux * this.strafe * side;
-        if (wp.melee && fd < 200 && fd > 70 && p.dashCd <= 0 && this.rnd() < 0.12) inp.d = true;
+        if (wp.melee && fd < 200 && fd > 70 && p.dashCd <= 0 && this.rnd() < (this.easy ? 0.03 : 0.12)) inp.d = true;
         const l = Math.hypot(mx, my);
         move = l > 0.01 ? { mx: mx / l, my: my / l } : { mx: 0, my: 0 };
-        if (w.time - p.lastHit < 0.15 && p.dashCd <= 0 && this.rnd() < 0.35) inp.d = true;
+        if (w.time - p.lastHit < 0.15 && p.dashCd <= 0 && this.rnd() < (this.easy ? 0.1 : 0.35)) inp.d = true;
       }
     } else if (stormBound) {
       // already moving inward
