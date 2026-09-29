@@ -9,6 +9,7 @@ import { WebSocketServer } from 'ws';
 import { CFG } from '../shared/config.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
+import { createCashier } from './cashier/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -18,7 +19,11 @@ const BOTS = process.env.BOTS !== '0';
 const WALLET_FILE = process.env.WALLET_FILE || '';
 
 // ------------------------------------------------------------------ wallet
-// Test sats only. Swap MemoryWallet for a real adapter before any money moves.
+// CHAIN=sepolia|mainnet: real tokens through the cashier (server/cashier). Otherwise test tokens.
+const real = await createCashier().catch((e) => {
+  console.error(`cashier failed to start: ${e?.message ?? e}`);
+  process.exit(1);
+});
 let saveTimer = null;
 const initial = WALLET_FILE && existsSync(WALLET_FILE) ? JSON.parse(readFileSync(WALLET_FILE, 'utf8')) : {};
 const wallet = new MemoryWallet({
@@ -42,6 +47,7 @@ const send = (cid, msg) => {
 };
 const lobby = new Lobby({
   wallet,
+  cashier: real?.cashier ?? null,
   send,
   bots: BOTS,
   roundSeconds: ROUND_SECONDS,
@@ -58,6 +64,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm',
 };
 
 async function serveStatic(req, res) {
@@ -94,6 +101,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(body);
     return;
   }
+  const route = real?.routes[`${req.method} ${req.url.split('?')[0]}`];
+  if (route) {
+    route(req, res).catch((e) => {
+      console.error('route failed', e);
+      if (!res.headersSent) res.writeHead(500).end();
+    });
+    return;
+  }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405).end();
     return;
@@ -102,7 +117,7 @@ const server = http.createServer((req, res) => {
 });
 
 // --------------------------------------------------------------- websocket
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16384 });
 let nextCid = 1;
 
 wss.on('connection', (ws) => {
@@ -158,11 +173,13 @@ loop();
 setInterval(() => lobby.broadcastTables(), 2000);
 
 server.listen(PORT, () => {
-  console.log(`DARK BAGS on http://localhost:${PORT}  (bots ${BOTS ? 'on' : 'off'}, raid ${ROUND_SECONDS}s)`);
+  console.log(`DARK BAGS on http://localhost:${PORT}  (bots ${BOTS ? 'on' : 'off'}, raid ${ROUND_SECONDS}s, ${real ? `${real.cfg.network} tokens` : 'test tokens'})`);
+  real?.start();
 });
 
 const shutdown = async () => {
-  if (WALLET_FILE) await writeFile(WALLET_FILE, JSON.stringify(wallet.toJSON())).catch(() => {});
+  if (real) await real.stop().catch(() => {});
+  else if (WALLET_FILE) await writeFile(WALLET_FILE, JSON.stringify(wallet.toJSON())).catch(() => {});
   process.exit(0);
 };
 process.on('SIGINT', shutdown);
