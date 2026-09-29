@@ -99,6 +99,14 @@ test('public deposits credit the sender once, pending ones are retried', async (
   assert.ok(cashier.history(ALICE).deposits.some((d) => d.unsupported));
 });
 
+test('pending deposits are capped per account', async () => {
+  const { cashier } = setup();
+  for (let i = 1; i <= 5; i++) assert.equal((await cashier.depositPublic(ALICE, `0x${i}`)).status, 'pending');
+  await assert.rejects(cashier.depositPublic(ALICE, '0x6'), /Too many/);
+  assert.equal((await cashier.depositPublic(ALICE, '0x1')).status, 'pending', 'a known hash is fine');
+  assert.equal((await cashier.depositPublic(BOB, '0x7')).status, 'pending');
+});
+
 test('a deposit is credited to whoever sent it, never to whoever reports it', async () => {
   const { chain, cashier } = setup();
   chain.receipts.set(normAddr('0xbeef'), { status: 'ok', transfers: [{ id: '0xbeef:0', token: USDC, from: BOB, amount: 50_000_000n }] });
@@ -116,8 +124,12 @@ test('private notes are attributed by sender and deduplicated across scans', asy
     { id: 'n1', token: STRK, from: ALICE, amount: 3n * E18 },
     { id: 'n2', token: STRK, from: BOB, amount: 1n * E18 },
   ];
-  await cashier.scanPrivate();
-  await cashier.scanPrivate();
+  let scans = 0;
+  const inner = chain.scanPrivateDeposits;
+  chain.scanPrivateDeposits = () => (scans++, inner());
+  await Promise.all([cashier.scanPrivate(), cashier.scanPrivate()]); // one scan serves both
+  assert.equal(scans, 1);
+  await cashier.scanOnce();
   assert.equal(cashier.ledger.balance(ALICE, STRK), 3n * E18);
   assert.equal(cashier.ledger.balance(BOB, STRK), 1n * E18);
   assert.deepEqual(pushed, [ALICE, BOB]);

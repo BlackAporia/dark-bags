@@ -101,7 +101,18 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(body);
     return;
   }
-  const route = real?.routes[`${req.method} ${req.url.split('?')[0]}`];
+  const pathOnly = req.url.split('?')[0];
+  // the static single-file build may live on another origin: let it reach the API and the wallet bundle
+  if (pathOnly.startsWith('/api/') || pathOnly.startsWith('/vendor/')) {
+    res.setHeader('access-control-allow-origin', '*');
+    res.setHeader('access-control-allow-headers', 'content-type, authorization, x-darkbags-session');
+    res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204).end();
+      return;
+    }
+  }
+  const route = real?.routes[`${req.method} ${pathOnly}`];
   if (route) {
     route(req, res).catch((e) => {
       console.error('route failed', e);

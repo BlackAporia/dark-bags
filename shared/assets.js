@@ -76,3 +76,12 @@ export function formatUnits(units, decimals, maxFrac = 4) {
   const w = whole.toLocaleString('en-US');
   return `${neg ? '−' : ''}${w}${frac ? `.${frac}` : ''}`;
 }
+
+// "1.5" → 1500000 for 6 decimals; null for anything that is not a plain positive decimal
+export function parseUnits(text, decimals) {
+  const m = /^\s*(\d*)(?:[.,](\d*))?\s*$/.exec(String(text ?? ''));
+  if (!m || (!m[1] && !m[2])) return null;
+  const frac = (m[2] ?? '').replace(/0+$/, '');
+  if (frac.length > decimals) return null;
+  return BigInt(m[1] || '0') * 10n ** BigInt(decimals) + BigInt((frac || '0').padEnd(decimals, '0'));
+}

@@ -6,6 +6,7 @@ import { GameClient, Attract, fmt, mmss, esc } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { store } from './store.js';
 import { PriceBook, formatUnits } from '../shared/assets.js';
+import { createCashierUi } from './cashier.js';
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -83,6 +84,8 @@ const app = {
 };
 const send = (m) => app.transport?.send(m);
 const game = new GameClient({ renderer, input, sfx, send, el });
+// real-token mode (server started with CHAIN=…): sign-in, deposits, cash-outs
+const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: () => renderLobby(), base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href });
 const attract = new Attract(renderer);
 
 // ---------------------------------------------------------------- screens
@@ -237,11 +240,14 @@ function renderLobby() {
 
   pickUsableAsset();
   renderAssets();
+  cashier.render();
+  const real = cashier.active;
   $('balance').textContent = app.balances === null ? '—' : `≈${fmt(totalSats())}`;
-  $('faucet').hidden = !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
+  $('faucet').hidden = real || !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
   const play = $('play');
-  play.disabled = app.status !== 'open';
-  play.textContent = `Go to the ${fmt(app.stake)} sats table`;
+  const needSignIn = real && !cashier.signedIn;
+  play.disabled = app.status !== 'open' || needSignIn;
+  play.textContent = needSignIn ? 'Sign in to play' : `Go to the ${fmt(app.stake)} sats table`;
 }
 
 // ------------------------------------------------------------- ready room
@@ -324,6 +330,8 @@ function setMode(mode) {
   app.balances = null;
   app.status = 'connecting';
   app.inRoom = false;
+  cashier.reset();
+  if (mode === 'practice') $('fine').textContent = 'Test build. Tokens here are play money with fixed test prices: no deposits, no withdrawals.';
   store.set('darkbags.mode', mode);
   app.transport = mode === 'online' ? new WsTransport(SERVER, onMessage, onStatus) : new LocalTransport(onMessage, onStatus);
   if (app.screen !== 'lobby') showScreen('lobby');
@@ -345,6 +353,7 @@ function onStatus(st) {
 }
 
 function onMessage(m) {
+  if (cashier.onMessage(m) && m.t !== 'welcome') return;
   switch (m.t) {
     case 'welcome':
       app.token = m.token;
@@ -358,6 +367,10 @@ function onMessage(m) {
     case 'tables':
       app.tables = m.tables;
       app.balances = m.balances ?? app.balances;
+      if (m.assets) {
+        app.assets = m.assets; // live prices in real-token mode
+        app.prices = new PriceBook(m.assets);
+      }
       if (app.screen === 'lobby') renderLobby();
       break;
     case 'balance':
@@ -530,7 +543,7 @@ function loop(now) {
 }
 
 // handle for automated smoke tests and console poking
-globalThis.__darkbags = { app, game, input, renderer, sfx };
+globalThis.__darkbags = { app, game, input, renderer, sfx, cashier };
 
 attract.start();
 showScreen('lobby');

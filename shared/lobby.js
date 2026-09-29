@@ -76,6 +76,7 @@ export class Lobby {
         assets: this.prices.list(),
         chain: this.cashier ? this.cashier.info() : null,
         account: s.account,
+        privy: this.cashier?.privyFor(s.token) ?? null,
         cfg: {
           ROUND_SECONDS: this.roundSeconds,
           RAKE: CFG.RAKE,

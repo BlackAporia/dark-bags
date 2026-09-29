@@ -1,8 +1,10 @@
 node_modules
 dist
 test
-scripts
+client/vendor
 .git
 .github
 *.log
 wallet*.json
+cashier*.json
+.strk20-cache

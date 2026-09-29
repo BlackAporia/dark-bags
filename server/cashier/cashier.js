@@ -32,6 +32,9 @@ const MAX_FELT = 2n ** 251n;
 const LOGIN_TTL_MS = 5 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 const PENDING_TTL_MS = 15 * 60 * 1000;
+const PENDING_PER_ACCOUNT = 5;
+const PENDING_TOTAL = 1000;
+const SCAN_EVERY_MS = 10 * 1000;
 
 export function normAddr(x) {
   let v;
@@ -174,6 +177,13 @@ export class Cashier {
     return { account: w.account, wallet: { walletId: w.walletId, publicKey: w.publicKey } };
   }
 
+  // the Privy wallet behind a session, so the browser can drive it again after a reload
+  privyFor(session) {
+    const s = session && this.sessions.get(session);
+    const w = s?.privy ? this.privyWallets[s.privy] : null;
+    return w ? { walletId: w.walletId, publicKey: w.publicKey } : null;
+  }
+
   privyWalletOf(userId) {
     return this.privyWallets[userId] ?? null;
   }
@@ -211,7 +221,12 @@ export class Cashier {
     if (!hash) throw new CashierError('That is not a transaction hash.');
     const r = await this.chain.readPublicDeposit(hash);
     if (r.status === 'pending') {
-      if (!this.pending.has(hash)) this.pending.set(hash, { account, at: this.now() });
+      if (!this.pending.has(hash)) {
+        // bounded: every pending hash costs an RPC call per poll
+        const mine = [...this.pending.values()].filter((p) => p.account === account).length;
+        if (mine >= PENDING_PER_ACCOUNT || this.pending.size >= PENDING_TOTAL) throw new CashierError('Too many deposits waiting for Starknet. Try again in a few minutes.');
+        this.pending.set(hash, { account, at: this.now() });
+      }
       return { status: 'pending', credited: [] };
     }
     this.pending.delete(hash);
@@ -225,7 +240,20 @@ export class Cashier {
   }
 
   // Private transfers into the house's STRK20 notes, attributed by note sender.
-  async scanPrivate() {
+  // Concurrent callers share one scan, and scans run at most every SCAN_EVERY_MS.
+  scanPrivate() {
+    if (this.scanning) return this.scanning;
+    const wait = Math.max(0, (this.lastScan ?? -Infinity) + SCAN_EVERY_MS - this.now());
+    this.scanning = new Promise((r) => (wait ? setTimeout(r, wait) : r()))
+      .then(() => this.scanOnce())
+      .finally(() => {
+        this.lastScan = this.now();
+        this.scanning = null;
+      });
+    return this.scanning;
+  }
+
+  async scanOnce() {
     const found = await this.chain.scanPrivateDeposits();
     const credited = [];
     for (const n of found) {
