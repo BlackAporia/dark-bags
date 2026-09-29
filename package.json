@@ -13,12 +13,24 @@
     "dev": "node --watch server/index.js",
     "test": "node --test test/*.test.js",
     "build": "node scripts/build.js",
-    "sim": "node scripts/sim.js"
+    "build:wallets": "node scripts/build-wallets.js",
+    "sim": "node scripts/sim.js",
+    "house": "node scripts/house.js"
   },
   "dependencies": {
+    "@fatsolutions/tongo-sdk": "^1.5.0",
+    "@privy-io/node": "^0.35.0",
+    "starknet": "^10.8.0",
+    "starkzap": "^4.0.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {
+    "@cartridge/controller": "^0.13.16",
+    "@privy-io/js-sdk-core": "^0.77.0",
+    "@starknet-io/get-starknet-core": "^6.0.1",
     "esbuild": "^0.28.2"
+  },
+  "optionalDependencies": {
+    "strk20-discovery": "^0.1.7"
   }
 }

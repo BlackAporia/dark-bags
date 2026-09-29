@@ -87,11 +87,16 @@
     </fieldset>
 
     <fieldset class="assets">
-      <legend class="eyebrow">Pay with · tokens in your private pool</legend>
+      <legend class="eyebrow">Pay with · your balance by token</legend>
       <div id="assets" class="asset-list"></div>
       <p id="quote" class="quote"></p>
       <div id="cashier" class="cashier" hidden>
-        <button id="connect" class="ghost" type="button">Connect STRK20 wallet</button>
+        <div class="acct">
+          <span id="acct-label" class="acct-label">Not signed in</span>
+          <button id="connect" class="ghost" type="button">Sign in</button>
+          <button id="open-cashier" class="ghost" type="button" hidden>Deposit · cash out</button>
+          <button id="logout" class="link" type="button" hidden>Sign out</button>
+        </div>
         <p id="cashier-status" class="fine"></p>
       </div>
     </fieldset>
@@ -100,6 +105,7 @@
       <label for="name" class="eyebrow">Runner name</label>
       <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="runner">
       <div id="skins" class="skins" role="radiogroup" aria-label="Colour"></div>
+      <div id="rank-card" class="rank-card" hidden></div>
     </div>
 
     <label class="gore" for="gore"><input id="gore" type="checkbox"> <span><b>18+ mode.</b> Limbs come off as health drops, heads pop, blood stays on the floor.</span></label>
@@ -115,6 +121,7 @@
         <li><b>Storm.</b> The circle shrinks four times and collapses onto one exit. Exits it swallows close for good.</li>
         <li><b>Bluff.</b> Your bag's look is a choice (<kbd>Q</kbd>). Look broke and slip out, or look fat and bait a fight.</li>
         <li><b>Extract.</b> Stand in an open exit for 3 seconds. You cash out whatever you carry. Still inside at 0:00, you lose it.</li>
+        <li><b>Rank.</b> Every raid pays rank XP, more for kills and for getting out. 90 ranks, Lance Corporal to Legend.</li>
       </ul>
       <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> bag look · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
     </details>
@@ -146,6 +153,7 @@
     <p id="res-kicker" class="res-kicker">Extracted</p>
     <p id="res-amount" class="res-amount">+0</p>
     <p id="res-detail" class="res-detail"></p>
+    <div id="res-rank" class="res-rank" hidden></div>
     <div class="res-actions">
       <button id="res-again" class="cta" type="button">Ready for the next raid</button>
       <button id="res-tables" class="ghost" type="button">Tables</button>
@@ -153,6 +161,63 @@
     </div>
   </div>
 </section>
+
+<!-- real-token mode: sign in -->
+<dialog id="dlg-connect" class="dlg" aria-labelledby="dlg-connect-title">
+  <div class="dlg-inner">
+    <header class="dlg-head"><h2 id="dlg-connect-title">Sign in to play for tokens</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <section class="opt-group">
+      <p class="eyebrow">Starknet wallet</p>
+      <div id="wallet-list" class="wallet-list"><p class="fine">Looking for wallets…</p></div>
+      <p class="fine">Privacy wallets (Ready, Xverse) can deposit and cash out privately through the STRK20 pool.</p>
+    </section>
+    <section id="login-cartridge" class="opt-group" hidden>
+      <p class="eyebrow">No wallet · Cartridge</p>
+      <button type="button" id="btn-cartridge" class="opt"><span class="opt-name">Cartridge Controller</span><span class="opt-sub">passkey or social login, gasless</span></button>
+    </section>
+    <section id="login-privy" class="opt-group" hidden>
+      <p class="eyebrow">Email or social · Privy</p>
+      <div class="row"><input id="privy-email" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email"><button type="button" id="privy-send" class="ghost">Send code</button></div>
+      <div id="privy-code-row" class="row" hidden><input id="privy-code" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" aria-label="Code"><button type="button" id="privy-verify" class="ghost">Sign in</button></div>
+      <div class="row socials">
+        <button type="button" class="ghost sm" data-oauth="google">Google</button>
+        <button type="button" class="ghost sm" data-oauth="twitter">X</button>
+        <button type="button" class="ghost sm" data-oauth="discord">Discord</button>
+        <button type="button" class="ghost sm" data-oauth="apple">Apple</button>
+      </div>
+    </section>
+    <p id="connect-status" class="dlg-status" role="status"></p>
+  </div>
+</dialog>
+
+<!-- real-token mode: cashier -->
+<dialog id="dlg-cashier" class="dlg" aria-labelledby="dlg-cashier-title">
+  <div class="dlg-inner">
+    <header class="dlg-head"><h2 id="dlg-cashier-title">Cashier</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <p id="cash-acct" class="fine"></p>
+    <div class="mode" role="tablist" aria-label="Cashier">
+      <button type="button" class="seg" role="tab" data-tab="deposit">Deposit</button>
+      <button type="button" class="seg" role="tab" data-tab="withdraw">Cash out</button>
+      <button type="button" class="seg" role="tab" data-tab="history">History</button>
+    </div>
+    <section data-pane="deposit" class="pane">
+      <div class="row"><select id="dep-token" aria-label="Token"></select><input id="dep-amount" inputmode="decimal" placeholder="Amount" aria-label="Amount"></div>
+      <div id="dep-route" class="route" role="radiogroup" aria-label="How"></div>
+      <p id="dep-hint" class="fine"></p>
+      <button type="button" id="dep-go" class="cta">Deposit</button>
+    </section>
+    <section data-pane="withdraw" class="pane" hidden>
+      <div class="row"><select id="wd-token" aria-label="Token"></select><input id="wd-amount" inputmode="decimal" placeholder="Amount" aria-label="Amount"><button type="button" id="wd-max" class="link">Max</button></div>
+      <div id="wd-route" class="route" role="radiogroup" aria-label="How"></div>
+      <p id="wd-hint" class="fine"></p>
+      <button type="button" id="wd-go" class="cta">Cash out</button>
+    </section>
+    <section data-pane="history" class="pane" hidden>
+      <ul id="hist" class="hist"></ul>
+    </section>
+    <p id="cash-status" class="dlg-status" role="status"></p>
+  </div>
+</dialog>
 
 <div id="toast" class="toast" role="status" hidden></div>
 <script type="module" src="main.js"></script>

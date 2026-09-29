@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run sim -- 2 1000
+      - run: npm run build:wallets
       - run: npm run build
         env:
           DARK_BAGS_SERVER: ${{ vars.DARK_BAGS_SERVER }}

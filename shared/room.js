@@ -3,6 +3,7 @@ import { World } from './world.js';
 import { cleanName } from './wallet.js';
 import { botName } from './bot.js';
 import { PriceBook, unitsAtEntryRate } from './assets.js';
+import { RankBook, botRank, raidXp } from './ranks.js';
 
 /**
  * A table at one stake level.
@@ -16,8 +17,10 @@ import { PriceBook, unitsAtEntryRate } from './assets.js';
  * Transport-agnostic: the server plugs in WebSockets, offline mode a direct callback.
  */
 export class RoomCore {
-  constructor({ stake, wallet, send, prices = new PriceBook(), bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
+  constructor({ stake, wallet, send, prices = new PriceBook(), ranks = new RankBook(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
     this.stake = stake;
+    this.ranks = ranks;
+    this.practice = practice;
     this.wallet = wallet;
     this.prices = prices;
     this.send = send;
@@ -154,7 +157,7 @@ export class RoomCore {
     for (let i = 0; i < CFG.BOT_FILL; i++) {
       const n = botName(Math.random, taken);
       taken.add(n);
-      this.roster.push({ name: n, skin: SKINS[Math.floor(Math.random() * SKINS.length)] });
+      this.roster.push({ name: n, skin: SKINS[Math.floor(Math.random() * SKINS.length)], rank: botRank(Math.random) });
     }
     this.hurry();
   }
@@ -181,6 +184,7 @@ export class RoomCore {
       bots: this.bots,
       botRoster: this.roster,
       roundSeconds: this.roundSeconds,
+      practice: this.practice,
     });
     this.world = w;
     this.rollover = 0;
@@ -192,7 +196,7 @@ export class RoomCore {
       c.reported = true;
     }
     for (const c of ready) {
-      const p = w.addPlayer({ name: c.name, skin: c.skin });
+      const p = w.addPlayer({ name: c.name, skin: c.skin, rank: this.ranks.get(c.token).rank });
       this.accounts.set(p.id, { token: c.token, ...c.escrow });
       this.book(c.escrow.asset, 'in', c.escrow.units);
       c.pid = p.id;
@@ -279,7 +283,7 @@ export class RoomCore {
   broadcastPrep(onlyIdle = false) {
     const ready = this.readyList();
     const shown = this.botsShown();
-    const bots = this.roster.slice(0, shown).map((b) => ({ n: b.name, c: b.skin, bot: 1 }));
+    const bots = this.roster.slice(0, shown).map((b) => ({ n: b.name, c: b.skin, rk: b.rank, bot: 1 }));
     const base = {
       t: 'prep',
       state: this.state,
@@ -297,7 +301,7 @@ export class RoomCore {
       if (onlyIdle && this.inRaid(c)) continue;
       this.send(c.cid, {
         ...base,
-        slots: ready.map((r) => ({ n: r.name, c: r.skin, me: r === c ? 1 : 0 })),
+        slots: ready.map((r) => ({ n: r.name, c: r.skin, rk: this.ranks.get(r.token).rank, me: r === c ? 1 : 0 })),
         me: { ready: c.ready, inRaid: this.inRaid(c), escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
         balances: this.wallet.balances(c.token),
       });
@@ -347,8 +351,12 @@ export class RoomCore {
       const p = w.players.get(c.pid);
       if (!p || p.status === 'alive') continue;
       c.reported = true;
+      // career rank: every raid pays, win or lose
+      const earned = raidXp(p, { practice: this.practice });
+      const { before, after } = this.ranks.add(c.token, earned.total);
       this.send(c.cid, {
         t: 'result',
+        rank: { gained: earned.total, parts: earned.parts, before, after },
         status: p.status,
         payout: p.payout,
         lost: p.lostBag,

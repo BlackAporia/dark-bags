@@ -5,13 +5,17 @@ services:
     name: dark-bags
     runtime: node
     plan: free
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci && npm run build:wallets
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: "24"
       - key: ROUND_SECONDS
         value: "180"
       - key: BOTS
         value: "1"
+      # Real tokens: set CHAIN=sepolia (or mainnet) plus HOUSE_ADDRESS, HOUSE_PRIVATE_KEY and
+      # CASHIER_FILE on a persistent disk. See "Real tokens" in the README for the rest.
+      - key: CHAIN
+        value: "off"

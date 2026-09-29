@@ -24,7 +24,8 @@ export const CFG = {
   DASH_TIME: 0.15,
   DASH_CD: 2.4,
   HP: 100,
-  BOT_TRUCE: 30,          // seconds at the start when bots leave each other alone and loot
+  BOT_TRUCE: 30,          // seconds at the start when bots leave each other alone and loot (online)
+  HUMAN_GRACE: 8,         // seconds at the start when bots leave humans alone (unless attacked)
   MULTI_WINDOW: 4,        // seconds between kills to chain a double/triple/... kill
   SPAWN_SHIELD: 3,        // seconds of spawn protection; firing drops it early
   REGEN_DELAY: 4,         // seconds without damage before regen starts

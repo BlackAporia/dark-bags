@@ -6,6 +6,8 @@ import { GameClient, Attract, fmt, mmss, esc } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { store } from './store.js';
 import { PriceBook, formatUnits } from '../shared/assets.js';
+import { createCashierUi } from './cashier.js';
+import { rankBadgeSvg } from './rankbadge.js';
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -78,11 +80,14 @@ const app = {
   gore: store.get('darkbags.gore', false),
   screen: 'lobby',
   prep: null,
+  rank: null, // { rank, name, xp, into, need, toNext, max } for this mode (practice ranks live in the browser)
   lastCount: null,
   inRoom: false,
 };
 const send = (m) => app.transport?.send(m);
 const game = new GameClient({ renderer, input, sfx, send, el });
+// real-token mode (server started with CHAIN=…): sign-in, deposits, cash-outs
+const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: () => renderLobby(), base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href });
 const attract = new Attract(renderer);
 
 // ---------------------------------------------------------------- screens
@@ -237,11 +242,55 @@ function renderLobby() {
 
   pickUsableAsset();
   renderAssets();
+  renderRankCard();
+  cashier.render();
+  const real = cashier.active;
   $('balance').textContent = app.balances === null ? '—' : `≈${fmt(totalSats())}`;
-  $('faucet').hidden = !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
+  $('faucet').hidden = real || !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
   const play = $('play');
-  play.disabled = app.status !== 'open';
-  play.textContent = `Go to the ${fmt(app.stake)} sats table`;
+  const needSignIn = real && !cashier.signedIn;
+  play.disabled = app.status !== 'open' || needSignIn;
+  play.textContent = needSignIn ? 'Sign in to play' : `Go to the ${fmt(app.stake)} sats table`;
+}
+
+// ------------------------------------------------------------------ rank
+const pct = (r) => (r.max ? 100 : Math.max(0, Math.min(100, (r.into / r.need) * 100)));
+
+function renderRankCard() {
+  const el = $('rank-card');
+  const r = app.rank;
+  el.hidden = !r;
+  if (!r) return;
+  const whose = app.mode === 'practice' ? 'Practice rank' : 'Rank';
+  el.innerHTML = `${rankBadgeSvg(r.rank, 44)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">${whose} ${r.rank}</span> <b>${esc(r.name)}</b></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div><p class="fine">${r.max ? 'Top rank. Nothing left to climb.' : `${fmt(r.into)} / ${fmt(r.need)} XP · ${fmt(r.toNext)} to rank ${r.rank + 1}`}</p></div>`;
+}
+
+// the result card: XP earned, what for, and the bar filling (twice on a rank-up)
+function renderRankResult(res) {
+  const el = $('res-rank');
+  if (!res) {
+    el.hidden = true;
+    return;
+  }
+  const { before, after, gained, parts } = res;
+  const up = after.rank > before.rank;
+  el.hidden = false;
+  el.classList.toggle('up', up);
+  el.innerHTML = `<div class="rr-head">${rankBadgeSvg(before.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">Rank ${before.rank}</span> <b>${esc(before.name)}</b></p><div class="rk-bar"><i style="width:${pct(before)}%"></i></div><p class="rr-gain"><b>+${fmt(gained)}</b> rank XP</p></div></div>
+    <ul class="rr-parts">${parts.map((p) => `<li><span>${esc(p.label)}</span><b>${p.xp >= 0 ? '+' : '−'}${fmt(Math.abs(p.xp))}</b></li>`).join('')}</ul>`;
+  const bar = el.querySelector('.rk-bar i');
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      bar.style.width = up ? '100%' : `${pct(after)}%`;
+      if (!up) return;
+      setTimeout(() => {
+        el.querySelector('.rr-head').innerHTML = `${rankBadgeSvg(after.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow rr-up">Rank up · ${after.rank}</span> <b>${esc(after.name)}</b></p><div class="rk-bar"><i style="width:0%"></i></div><p class="rr-gain"><b>+${fmt(gained)}</b> rank XP</p></div>`;
+        sfx.play('beep', { f: 1480, dur: 0.25 });
+        const b2 = el.querySelector('.rk-bar i');
+        requestAnimationFrame(() => requestAnimationFrame(() => (b2.style.width = `${pct(after)}%`)));
+      }, 900);
+    }),
+  );
 }
 
 // ------------------------------------------------------------- ready room
@@ -295,7 +344,7 @@ function renderPrep() {
         d.className = `slot lit ${s.kind === 'me' ? 'me' : ''} ${s.kind === 'bot' ? 'bot' : ''}`;
         d.style.color = s.c;
         d.dataset.key = `${s.kind}:${s.n}`;
-        d.innerHTML = `${figureSvg(s.c)}<span class="sn">${esc(s.n)}</span>`;
+        d.innerHTML = `${figureSvg(s.c)}<span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>`;
         return d;
       }),
     );
@@ -322,8 +371,11 @@ function setMode(mode) {
   app.mode = mode;
   app.tables = [];
   app.balances = null;
+  app.rank = null;
   app.status = 'connecting';
   app.inRoom = false;
+  cashier.reset();
+  if (mode === 'practice') $('fine').textContent = 'Test build. Tokens here are play money with fixed test prices: no deposits, no withdrawals.';
   store.set('darkbags.mode', mode);
   app.transport = mode === 'online' ? new WsTransport(SERVER, onMessage, onStatus) : new LocalTransport(onMessage, onStatus);
   if (app.screen !== 'lobby') showScreen('lobby');
@@ -345,6 +397,7 @@ function onStatus(st) {
 }
 
 function onMessage(m) {
+  if (cashier.onMessage(m) && m.t !== 'welcome') return;
   switch (m.t) {
     case 'welcome':
       app.token = m.token;
@@ -353,11 +406,16 @@ function onMessage(m) {
       app.prices = new PriceBook(app.assets);
       app.balances = m.balances ?? {};
       app.tables = m.tables;
+      app.rank = m.rank ?? null;
       renderLobby();
       break;
     case 'tables':
       app.tables = m.tables;
       app.balances = m.balances ?? app.balances;
+      if (m.assets) {
+        app.assets = m.assets; // live prices in real-token mode
+        app.prices = new PriceBook(m.assets);
+      }
       if (app.screen === 'lobby') renderLobby();
       break;
     case 'balance':
@@ -389,6 +447,7 @@ function onMessage(m) {
       break;
     case 'result':
       app.balances = m.balances ?? app.balances;
+      if (m.rank) app.rank = m.rank.after;
       showResult(m);
       break;
     case 'err':
@@ -436,6 +495,7 @@ function showResult(m) {
     amt.className = 'res-amount';
     det.innerHTML = `The raid closed with you still in it. Your <b>${fmt(m.lost)} sats</b> rolled into the next raid's loot. ${inside}.`;
   }
+  renderRankResult(m.rank);
   const q = quote(m.stake);
   $('res-again').textContent = q === null ? 'Ready for the next raid' : `Ready for the next raid · ${tokenAmount(app.asset, q)}`;
   $('res-again').disabled = q === null || units(app.asset) < q;
@@ -530,7 +590,7 @@ function loop(now) {
 }
 
 // handle for automated smoke tests and console poking
-globalThis.__darkbags = { app, game, input, renderer, sfx };
+globalThis.__darkbags = { app, game, input, renderer, sfx, cashier };
 
 attract.start();
 showScreen('lobby');

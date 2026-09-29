@@ -3,3 +3,6 @@ dist/
 *.log
 wallet*.json
 .DS_Store
+client/vendor/
+.strk20-cache/
+cashier*.json

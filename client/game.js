@@ -501,7 +501,7 @@ export class GameClient {
       const aim = q ? lerpAngle(q.a, p.a, t) : p.a;
       const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c });
       this.woundCheck(an, p.h, now);
-      figures.push({ a: an, color: p.c, name: p.n, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, laser: WEAPONS[p.w]?.laser });
+      figures.push({ a: an, color: p.c, name: p.n, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
     this.anims.prune(now);
     const ba = new Map(a.bullets.map((x) => [x.i, x]));
@@ -725,11 +725,11 @@ export class Attract {
     this.cam.x += (p.x - this.cam.x) * 0.08;
     this.cam.y += (p.y - this.cam.y) * 0.08;
     const figures = [];
-    for (const q of [{ i: p.id, n: p.name, c: p.skin, x: p.x, y: p.y, a: p.aim, h: Math.ceil(p.hp), b: p.bluff, e: p.ext, s: 0, w: p.w, fc: p.fc, pr: p.prestige }, ...s.players]) {
+    for (const q of [{ i: p.id, n: p.name, c: p.skin, x: p.x, y: p.y, a: p.aim, h: Math.ceil(p.hp), b: p.bluff, e: p.ext, s: 0, w: p.w, fc: p.fc, pr: p.prestige, rk: p.rank }, ...s.players]) {
       const a = this.anims.update(q.i, q.x, q.y, q.a, dt, now, { w: q.w, bluff: q.b, color: q.c });
       if (this.fcs.get(q.i) !== undefined && this.fcs.get(q.i) !== q.fc) a.attackT = now;
       this.fcs.set(q.i, q.fc);
-      figures.push({ a, color: q.c, name: q.n, hp: q.h, isMe: false, flash: false, shield: 0, ext: q.e, pr: q.pr, laser: WEAPONS[q.w]?.laser });
+      figures.push({ a, color: q.c, name: q.n, hp: q.h, isMe: false, flash: false, shield: 0, ext: q.e, pr: q.pr, rk: q.rk, laser: WEAPONS[q.w]?.laser });
     }
     this.anims.prune(now);
     this.fx.update(dt, now);
