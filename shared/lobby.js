@@ -10,12 +10,12 @@ import { cleanName } from './wallet.js';
  *   in {s, mx, my, a, f, d}  bluff {v}  ping {c}
  */
 export class Lobby {
-  constructor({ wallet, send, newToken, bots = true, roundSeconds = CFG.ROUND_SECONDS, tiers = CFG.TIERS }) {
+  constructor({ wallet, send, newToken, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS }) {
     this.wallet = wallet;
     this.send = send;
     this.newToken = newToken;
     this.sessions = new Map();
-    this.rooms = new Map(tiers.map((stake) => [stake, new RoomCore({ stake, wallet, send, bots, roundSeconds })]));
+    this.rooms = new Map(tiers.map((stake) => [stake, new RoomCore({ stake, wallet, send, bots, roundSeconds, prepSeconds })]));
     this.roundSeconds = roundSeconds;
   }
 

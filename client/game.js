@@ -1,10 +1,22 @@
 import { CFG } from '../shared/config.js';
 import { stepMovement, sanitizeInput } from '../shared/movement.js';
 import { World } from '../shared/world.js';
+import { WEAPONS, XP_PER_LEVEL } from '../shared/weapons.js';
+import { zoneAt, exitState } from '../shared/zone.js';
+import { segWalls } from '../shared/geom.js';
+import { pose, legPiece, FEET, hpColor } from './stickman.js';
+import { Fx } from './fx.js';
 
 const DT = 1 / CFG.TICK_RATE;
 const INTERP_MS = 110;
 const BLUFF = ['small', 'medium', 'fat'];
+const STREAKS = {
+  1: { title: 'First blood', voice: 'First blood', cls: 's1' },
+  2: { title: 'Double kill', voice: 'Double kill', cls: 's2' },
+  3: { title: 'Triple kill', voice: 'Triple kill', cls: 's3' },
+  4: { title: 'Rampage', voice: 'Rampage!', cls: 's4' },
+  5: { title: 'Godlike', voice: 'Godlike!', cls: 's5' },
+};
 
 export const fmt = (n) => Math.round(n).toLocaleString('en-US');
 export const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -18,9 +30,54 @@ function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
+// ------------------------------------------------------------ animation book
+
+/** Keeps a walk cycle, facing and wound state per runner from their positions. */
+export class AnimBook {
+  constructor() {
+    this.map = new Map();
+  }
+
+  get(id) {
+    return this.map.get(id);
+  }
+
+  update(id, x, y, aim, dt, now, extra) {
+    let a = this.map.get(id);
+    if (!a) {
+      a = { id, x, y, vx: 0, vy: 0, aim, facing: Math.cos(aim) >= 0 ? 1 : -1, phase: Math.random() * 6, moveK: 0, wounds: 0, minHp: 100, seen: now, hitT: -1e9, attackT: -1e9, dashT: -1e9, w: 0, bluff: 1 };
+      this.map.set(id, a);
+    }
+    const dx = x - a.x;
+    const dy = y - a.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 150) {
+      a.vx = a.vy = 0;
+    } else if (dt > 0) {
+      a.vx = dx / dt;
+      a.vy = dy / dt;
+      const sp = dist / dt;
+      a.moveK += ((sp > 20 ? Math.min(1, sp / 230) : 0) - a.moveK) * Math.min(1, dt * 12);
+      a.phase += dist * 0.12;
+    }
+    a.x = x;
+    a.y = y;
+    a.aim = aim;
+    a.facing = Math.cos(aim) >= 0 ? 1 : -1;
+    a.seen = now;
+    Object.assign(a, extra);
+    return a;
+  }
+
+  prune(now, ms = 1000) {
+    for (const [id, a] of this.map) if (now - a.seen > ms) this.map.delete(id);
+  }
+}
+
 /**
- * Client side of one raid: predicts your own movement from your inputs,
- * interpolates everyone else ~110 ms in the past, and drives the HUD.
+ * Client side of one raid: predicts your own movement, interpolates everyone else
+ * ~110 ms in the past, turns snapshots and events into animation, effects, sound
+ * and music, and drives the HUD.
  */
 export class GameClient {
   constructor({ renderer, input, sfx, send, el }) {
@@ -31,11 +88,16 @@ export class GameClient {
     this.el = el;
     this.active = false;
     this.bannerT = null;
+    this.fx = new Fx();
+    this.anims = new AnimBook();
+    this.gore = false;
   }
 
-  begin(start, skin) {
+  begin(start, skin, gore) {
     this.active = true;
+    this.gore = gore;
     this.map = start.map;
+    this.plan = start.zone;
     this.pid = start.pid;
     this.stake = start.stake;
     this.golden = start.golden;
@@ -47,7 +109,6 @@ export class GameClient {
     this.corr = { x: 0, y: 0 };
     this.you = null;
     this.offset = null;
-    this.fx = [];
     this.acc = 0;
     this.aim = 0;
     this.localFireCd = 0;
@@ -57,7 +118,18 @@ export class GameClient {
     this.lastHud = 0;
     this.lastTick = -1;
     this.cam = null;
+    this.look = { x: 0, y: 0 };
+    this.lastFrame = performance.now();
+    this.stepPhase = 0;
+    this.heartT = 0;
+    this.riserStage = -1;
+    this.lastStage = 0;
+    this.prevBullets = new Map();
+    this.meAnim = null;
+    this.dead = false;
     this.recvTl = { tl: start.duration - start.time, at: performance.now() };
+    this.fx.clear();
+    this.anims = new AnimBook();
     this.renderer.setMap(start.map);
     const el = this.el;
     el.hud.hidden = false;
@@ -66,13 +138,16 @@ export class GameClient {
     el.spect.hidden = true;
     el.extract.hidden = true;
     this.updateBluffChip();
+    this.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
     if (start.golden) this.banner('Golden raid · sponsor loot inside', 'gold', 3000);
-    else this.banner('Grab the orange · reach a green exit', 'money', 2600);
+    else this.banner('Knife up · grab the orange · find an exit', 'money', 2600);
   }
 
   stop() {
     this.active = false;
     this.el.hud.hidden = true;
+    this.el.streak.hidden = true;
+    this.sfx.setStorm(0);
   }
 
   // ------------------------------------------------------------ network in
@@ -82,10 +157,12 @@ export class GameClient {
     const off = s.time - now;
     if (this.offset === null || off > this.offset) this.offset = off;
     else this.offset += (off - this.offset) * 0.02;
+    const prev = this.snaps[this.snaps.length - 1];
     this.snaps.push(s);
     if (this.snaps.length > 30) this.snaps.shift();
     this.recvTl = { tl: s.tl, at: now };
     const you = s.you;
+    const wasAlive = this.you?.st === 'alive';
     this.you = you;
     if (you.st === 'alive') {
       this.pending = this.pending.filter((i) => i.s > you.ack);
@@ -103,50 +180,177 @@ export class GameClient {
       this.pred = np;
     } else {
       this.pred = null;
+      if (wasAlive && you.st === 'extracted') this.sfx.play('extract');
+    }
+    this.diffSnap(prev, s, now);
+  }
+
+  // Effects other runners cause that we only learn about from snapshots.
+  diffSnap(prev, s, now) {
+    if (!prev) return;
+    const before = new Map(prev.players.map((p) => [p.i, p]));
+    for (const p of s.players) {
+      const q = before.get(p.i);
+      const a = this.anims.get(p.i);
+      if (!q || !a) continue;
+      if (p.fc !== q.fc) this.attackFx(a, p.w, now, false);
+      if (p.h < q.h - 0.5) this.hitFx(a, now, q.h - p.h);
+      if (p.d && !q.d) a.dashT = now;
+    }
+    // bullets that vanished next to a wall: sparks and a ricochet
+    const cur = new Set(s.bullets.map((b) => b.i));
+    for (const b of prev.bullets) {
+      if (cur.has(b.i)) continue;
+      const nx = b.x + b.vx * 0.05;
+      const ny = b.y + b.vy * 0.05;
+      if (segWalls(b.x, b.y, nx, ny, this.map.walls) < 0) continue;
+      const near = s.players.some((p) => Math.hypot(p.x - b.x, p.y - b.y) < 40);
+      if (near) continue;
+      this.fx.sparks(b.x + b.vx * 0.02, b.y + b.vy * 0.02, 18, 6);
+      this.fx.dust(b.x, b.y, 2, 'rgba(180,180,190,0.3)');
+      if (Math.random() < 0.6) this.sfx.play('impact', { x: b.x, y: b.y });
     }
   }
 
+  attackFx(a, w, now, mine) {
+    a.attackT = now;
+    const wp = WEAPONS[w];
+    const p = pose(a, now + 30, this.gore);
+    const opts = mine ? {} : { x: a.x, y: a.y };
+    this.sfx.play(wp.id, opts);
+    if (wp.melee) {
+      this.fx.slash(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.aim, a.facing);
+      return;
+    }
+    this.fx.muzzle(p.muzzle.x, a.y + FEET, a.y + FEET - p.muzzle.y, p.aim, wp.id === 'shotgun' || wp.id === 'sniper', now);
+    this.fx.casing(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.facing);
+    if (mine) this.shake = Math.max(this.shake, wp.id === 'sniper' ? 9 : wp.id === 'shotgun' ? 7 : 2.5);
+  }
+
+  hitFx(a, now, dmg) {
+    a.hitT = now;
+    const z = 26;
+    const dx = Math.cos(a.aim + Math.PI);
+    const dy = Math.sin(a.aim + Math.PI);
+    if (this.gore) {
+      this.fx.blood(a.x, a.y + FEET, z, dx, dy, Math.min(22, 6 + dmg * 0.4));
+      this.sfx.play('flesh', { x: a.x, y: a.y });
+    } else {
+      this.fx.sparks(a.x, a.y + FEET, z, 7, '#e8f0ff');
+      this.fx.chips(a.x, a.y + FEET, z, 3);
+      this.sfx.play('armor', { x: a.x, y: a.y });
+    }
+  }
+
+  // 18+: legs come off as health drops (the lowest health reached this life counts)
+  woundCheck(a, hp, now) {
+    a.minHp = Math.min(a.minHp, hp);
+    const want = a.minHp <= 30 ? 2 : a.minHp <= 60 ? 1 : 0;
+    if (!this.gore || want <= a.wounds) {
+      if (!this.gore) a.wounds = 0;
+      return;
+    }
+    const p = pose(a, now, true);
+    for (let wnd = a.wounds + 1; wnd <= want; wnd++) {
+      const leg = wnd === 1 ? 1 : 0;
+      this.fx.limb(legPiece(p, leg), a.color ?? '#ebe5d6', -a.facing);
+      this.fx.blood(p.legs[leg].hip.x, a.y + FEET, FEET + 4, -a.facing, 0, 14);
+      this.sfx.play('bone', { x: a.x, y: a.y });
+    }
+    a.wounds = want;
+  }
+
+  deathFx(a, color, now) {
+    if (this.gore) {
+      const p = pose(a, now, true);
+      this.fx.head(p.head.x, a.y + FEET, a.y + FEET - p.head.y, color, a.facing);
+      this.fx.blood(p.neck.x, a.y + FEET, a.y + FEET - p.neck.y, 0, -1, 26);
+      this.sfx.play('pop', { x: a.x, y: a.y });
+    }
+    this.fx.grave(a, { color, headless: this.gore, gore: this.gore }, now);
+    this.sfx.play('grave', { x: a.x, y: a.y });
+  }
+
   onEvents(list) {
+    const now = performance.now();
     for (const ev of list) {
       switch (ev.k) {
         case 'pickup':
-          this.floater(ev.x, ev.y, `+${fmt(ev.v)}`, this.golden ? '#ffd166' : '#f7931a', 15 + ev.t * 4, 900);
-          this.sfx.play('pickup', ev.t);
+          this.fx.floater(ev.x, ev.y, `+${fmt(ev.v)}`, this.golden ? '#ffd166' : '#f7931a', 15 + ev.t * 4, 0.9);
+          this.fx.ring(ev.x, ev.y, '#f7931a');
+          this.sfx.play('coin', { tier: ev.t });
           break;
         case 'loot':
-          this.floater(ev.x, ev.y, `+${fmt(ev.v)} sats`, '#ffd166', 24, 1800);
-          this.fx.push({ kind: 'ring', x: ev.x, y: ev.y, color: '#ffd166', born: performance.now(), life: 700 });
+          this.fx.floater(ev.x, ev.y, `+${fmt(ev.v)} sats`, '#ffd166', 24, 1.8);
+          this.fx.ring(ev.x, ev.y, '#ffd166');
           this.banner(`Bag opened · +${fmt(ev.v)} sats`, 'money', 2000);
-          this.sfx.play('loot');
+          this.sfx.play('bag');
           break;
         case 'hit':
           if (ev.vid === this.pid) {
             this.hurt = 1;
-            this.shake = 12;
+            this.shake = Math.max(this.shake, 12);
             this.sfx.play('hurt');
+            if (this.meAnim) this.hitFx(this.meAnim, now, 20);
           } else if (ev.sid === this.pid) {
-            this.fx.push({ kind: 'hitmark', x: ev.x, y: ev.y, born: performance.now(), life: 260 });
-            this.sfx.play('hit');
+            this.fx.floater(ev.x, ev.y, '✕', '#ebe5d6', 14, 0.25);
+            this.sfx.play('hitmark');
           }
           break;
-        case 'kill':
-          if (ev.kid === this.pid) {
-            this.feed(`You dropped <b>${esc(ev.victim)}</b>`, 'me');
-            this.banner('Runner down · their bag is on the floor', 'money', 1600);
-            this.sfx.play('kill');
-          } else if (ev.vid === this.pid) {
-            this.feed(`<b>${esc(ev.killer ?? 'The dark')}</b> dropped you`, 'me');
+        case 'kill': {
+          if (ev.vid === this.pid && this.meAnim && !this.dead) {
+            this.dead = true;
+            this.deathFx(this.meAnim, this.skin, now);
             this.sfx.play('death');
-          } else if (ev.killer) this.feed(`<b>${esc(ev.killer)}</b> dropped <b>${esc(ev.victim)}</b>`);
+          } else {
+            const a = this.anims.get(ev.vid);
+            if (a && now - a.seen < 400) {
+              this.deathFx(a, a.color, now);
+              this.anims.map.delete(ev.vid);
+            }
+          }
+          const how = ev.cause === 'storm' ? 'was eaten by the storm' : null;
+          if (ev.kid === this.pid) this.feed(`You dropped <b>${esc(ev.victim)}</b>`, 'me');
+          else if (ev.vid === this.pid) this.feed(how ? `The storm took you` : `<b>${esc(ev.killer ?? 'The dark')}</b> dropped you`, 'me');
+          else if (how) this.feed(`<b>${esc(ev.victim)}</b> ${how}`);
+          else if (ev.killer) this.feed(`<b>${esc(ev.killer)}</b> dropped <b>${esc(ev.victim)}</b>`);
           else this.feed(`<b>${esc(ev.victim)}</b> went down`);
           break;
-        case 'extract':
-          if (ev.pid === this.pid) this.sfx.play('extract');
-          else this.feed(`<b>${esc(ev.name)}</b> extracted`, 'exit');
+        }
+        case 'extract': {
+          const a = this.anims.get(ev.pid);
+          if (a && now - a.seen < 400) {
+            this.fx.ring(a.x, a.y + FEET, '#3ddc97');
+            this.fx.dust(a.x, a.y + FEET, 8, 'rgba(61,220,151,0.35)');
+          }
+          if (ev.pid !== this.pid) this.feed(`<b>${esc(ev.name)}</b> extracted`, 'exit');
           break;
+        }
         case 'warn':
           this.banner(ev.text, 'warn', 2400);
-          this.sfx.play('tick');
+          this.sfx.play('beep', { f: 660 });
+          break;
+        case 'storm':
+          this.banner(ev.text, 'warn', 2600);
+          this.sfx.play('storm');
+          break;
+        case 'exitClosed':
+          this.feed(`Exit <b>${esc(ev.name)}</b> is closed`, 'warnline');
+          break;
+        case 'level': {
+          const wp = WEAPONS[ev.w];
+          this.banner(ev.w === 0 ? `Arsenal complete · back to the knife ★` : `${wp.name} unlocked`, 'gold', 1800);
+          this.sfx.play('level');
+          break;
+        }
+        case 'arsenal':
+          if (ev.pid !== this.pid) this.feed(`<b>${esc(ev.name)}</b> finished the arsenal ★`, 'warnline');
+          break;
+        case 'streak':
+          if (ev.tier === 1 || ev.pid === this.pid) this.showStreak(ev.tier, ev.pid === this.pid ? null : ev.name);
+          break;
+        case 'streakFeed':
+          if (ev.pid !== this.pid) this.feed(`<b>${esc(ev.name)}</b> is on a ${STREAKS[ev.tier].title.toLowerCase()}`, 'warnline');
           break;
         default:
       }
@@ -155,8 +359,32 @@ export class GameClient {
 
   // ------------------------------------------------------------- local ui
 
-  floater(x, y, text, color, size, life) {
-    this.fx.push({ kind: 'text', x, y, text, color, size, born: performance.now(), life });
+  showStreak(tier, who) {
+    const s = STREAKS[tier];
+    const el = this.el.streak;
+    this.el.banner.hidden = true; // the streak owns the centre of the screen
+    el.hidden = false;
+    el.className = `streak ${s.cls}`;
+    el.querySelector('.st-title').textContent = s.title;
+    el.querySelector('.st-sub').textContent = who ? who : tier === 1 ? 'You drew first blood' : '';
+    for (const c of el.querySelectorAll('.coin-rain')) c.remove();
+    if (tier === 5) {
+      for (let i = 0; i < 28; i++) {
+        const c = document.createElement('span');
+        c.className = 'coin-rain';
+        c.textContent = '₿';
+        c.style.left = `${Math.random() * 100}%`;
+        c.style.animationDelay = `${Math.random() * 0.9}s`;
+        el.append(c);
+      }
+    }
+    void el.offsetWidth; // restart the CSS animation
+    el.classList.add('go');
+    clearTimeout(this.streakT);
+    this.streakT = setTimeout(() => (el.hidden = true), 2600);
+    this.sfx.sting?.(tier);
+    this.sfx.say?.(who ? `${who}, ${s.voice}` : s.voice, tier);
+    if (tier >= 4) this.shake = Math.max(this.shake, 10);
   }
 
   feed(html, cls = '') {
@@ -196,7 +424,8 @@ export class GameClient {
   sampleInput() {
     if (!this.you || this.you.st !== 'alive' || !this.pred) return;
     const mv = this.input.moveVector();
-    const sp = this.renderer.toScreen(this.pred.x + this.corr.x, this.pred.y + this.corr.y);
+    // aim from the gun, not the feet: figures stand upright
+    const sp = this.renderer.toScreen(this.pred.x + this.corr.x, this.pred.y + this.corr.y - 18);
     const a = this.input.aimAngle(sp.x, sp.y);
     const f = this.input.firing();
     const d = this.input.takeDash();
@@ -205,16 +434,18 @@ export class GameClient {
     const inp = sanitizeInput(msg);
     const cdBefore = this.pred.dashCd;
     stepMovement(this.pred, inp, DT, this.map);
-    if (d && cdBefore <= 0 && this.pred.dashT > 0) this.sfx.play('dash');
+    if (d && cdBefore <= 0 && this.pred.dashT > 0) {
+      this.sfx.play('dash');
+      if (this.meAnim) this.meAnim.dashT = performance.now();
+    }
     this.pending.push(inp);
     if (this.pending.length > 90) this.pending.shift();
     this.aim = inp.a;
     this.localFireCd = Math.max(0, this.localFireCd - DT);
+    const wp = WEAPONS[this.you.w ?? 0];
     if (f && this.localFireCd <= 0) {
-      this.localFireCd = CFG.FIRE_CD;
-      this.sfx.play('shoot');
-      const r = CFG.PLAYER_R + 14;
-      this.fx.push({ kind: 'flash', x: this.pred.x + Math.cos(a) * r, y: this.pred.y + Math.sin(a) * r, born: performance.now(), life: 70 });
+      this.localFireCd = wp.cd;
+      if (this.meAnim) this.attackFx(this.meAnim, this.you.w ?? 0, performance.now(), true);
     }
   }
 
@@ -230,16 +461,18 @@ export class GameClient {
     this.corr.y *= k;
     this.hurt = Math.max(0, this.hurt - dt * 2.2);
     this.shake = Math.max(0, this.shake - dt * 40);
-    this.fx = this.fx.filter((f) => now - f.born < f.life);
-    const view = this.buildView(now);
+    this.fx.update(dt, now);
+    const view = this.buildView(now, dt);
     if (view) this.renderer.draw(view);
+    this.renderer.measure(dt * 1000);
+    this.fx.setQuality(this.renderer.quality);
     if (now - this.lastHud > 90) {
       this.lastHud = now;
-      this.updateHud(now);
+      this.updateHud(now, view);
     }
   }
 
-  buildView(now) {
+  buildView(now, dt) {
     const S = this.snaps;
     if (!S.length || !this.you) return null;
     const rt = now + this.offset - INTERP_MS;
@@ -260,10 +493,17 @@ export class GameClient {
     const span = b.time - a.time;
     const t = span > 0 ? Math.min(1, Math.max(0, (rt - a.time) / span)) : 1;
     const pa = new Map(a.players.map((p) => [p.i, p]));
-    const players = b.players.map((p) => {
+    const figures = [];
+    for (const p of b.players) {
       const q = pa.get(p.i);
-      return q ? { ...p, x: lerp(q.x, p.x, t), y: lerp(q.y, p.y, t), a: lerpAngle(q.a, p.a, t) } : p;
-    });
+      const x = q ? lerp(q.x, p.x, t) : p.x;
+      const y = q ? lerp(q.y, p.y, t) : p.y;
+      const aim = q ? lerpAngle(q.a, p.a, t) : p.a;
+      const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c });
+      this.woundCheck(an, p.h, now);
+      figures.push({ a: an, color: p.c, name: p.n, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, laser: WEAPONS[p.w]?.laser });
+    }
+    this.anims.prune(now);
     const ba = new Map(a.bullets.map((x) => [x.i, x]));
     const bullets = b.bullets.map((x) => {
       const q = ba.get(x.i);
@@ -271,43 +511,74 @@ export class GameClient {
     });
 
     const you = this.you;
-    let me = null;
     let eye;
-    if (you.st === 'alive' && this.pred) {
+    const alive = you.st === 'alive' && this.pred && !this.dead;
+    if (alive) {
       const x = this.pred.x + this.corr.x;
       const y = this.pred.y + this.corr.y;
-      me = { x, y, a: this.aim, c: this.skin, b: this.bluff, e: you.ext, d: this.pred.dashT > 0, h: you.hp, s: you.shield > 0 && this.localFireCd <= 0 };
+      const me = (this.meAnim = this.animSelf(x, y, dt, now));
+      this.woundCheck(me, you.hp, now);
+      figures.push({ a: me, color: this.skin, name: 'you', hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
       eye = { x, y };
-      this.cam = { x, y };
+      // look a little ahead of where you aim
+      const la = Math.min(1, 1 - Math.exp(-dt * 6));
+      this.look.x += (Math.cos(this.aim) * 70 - this.look.x) * la;
+      this.look.y += (Math.sin(this.aim) * 50 - this.look.y) * la;
+      this.cam = { x: x + this.look.x, y: y + this.look.y };
+      this.footsteps(me, now);
     } else {
-      const spec = you.spect ? players.find((p) => p.n === you.spect) : null;
-      eye = spec ? { x: spec.x, y: spec.y } : { x: you.ex, y: you.ey };
+      const spec = you.spect ? figures.find((f) => f.name === you.spect) : null;
+      eye = spec ? { x: spec.a.x, y: spec.a.y } : { x: you.ex, y: you.ey };
       if (!this.cam) this.cam = { ...eye };
-      this.cam.x += (eye.x - this.cam.x) * 0.12;
-      this.cam.y += (eye.y - this.cam.y) * 0.12;
+      this.cam.x += (eye.x - this.cam.x) * 0.1;
+      this.cam.y += (eye.y - this.cam.y) * 0.1;
     }
+    this.sfx.setListener(eye.x, eye.y);
+    const zone = this.plan ? zoneAt(this.plan, Math.max(0, rt / 1000)) : null;
+    const exitStates = zone ? Object.fromEntries(this.map.extracts.map((e) => [e.id, exitState(this.plan, zone, e)])) : null;
+    this.zone = zone;
+    this.exitStates = exitStates;
     return {
       cam: this.cam,
       eye,
-      me,
-      players,
+      figures,
       orbs: last.orbs,
       drops: last.drops,
       bullets,
       fx: this.fx,
       time: now,
       golden: last.golden,
+      zone,
+      exitStates,
       shake: this.shake,
       hurt: this.hurt,
+      storm: alive && you.storm,
       showArrows: true,
+      gore: this.gore,
+      meAlive: alive,
     };
   }
 
-  updateHud(now) {
+  animSelf(x, y, dt, now) {
+    const you = this.you;
+    return this.anims.update(-1, x, y, this.aim, dt, now, { w: you.w ?? 0, bluff: this.bluff, color: this.skin, id: -1 });
+  }
+
+  footsteps(me, now) {
+    if (me.moveK < 0.3) return;
+    const step = Math.floor(me.phase / Math.PI);
+    if (step !== this.stepPhase) {
+      this.stepPhase = step;
+      this.sfx.play('step');
+      if (Math.random() < 0.3) this.fx.dust(me.x, me.y + FEET, 1, 'rgba(150,150,160,0.25)');
+    }
+  }
+
+  updateHud(now, view) {
     const you = this.you;
     const el = this.el;
     if (!you) return;
-    const alive = you.st === 'alive';
+    const alive = you.st === 'alive' && !this.dead;
     el.bag.textContent = fmt(alive ? you.bag : 0);
     const pnl = (alive ? you.bag : 0) - this.stake;
     el.pnl.textContent = `${pnl >= 0 ? '+' : '−'}${fmt(Math.abs(pnl))} vs ${fmt(this.stake)} stake`;
@@ -317,16 +588,59 @@ export class GameClient {
     el.timer.classList.toggle('hot', tl <= 30);
     if (alive && tl <= 10 && tl > 0 && Math.floor(tl) !== this.lastTick) {
       this.lastTick = Math.floor(tl);
-      this.sfx.play('tick');
+      this.sfx.play('beep', { f: 990, dur: 0.05 });
     }
     const last = this.snaps[this.snaps.length - 1];
     if (last) el.alive.textContent = `${last.alive} runner${last.alive === 1 ? '' : 's'} inside`;
-    el.hpBar.style.width = `${Math.max(0, you.hp)}%`;
-    el.hpBar.classList.toggle('low', you.hp <= 35);
-    el.hpNum.textContent = Math.max(0, you.hp);
+    const hp = Math.max(0, you.hp);
+    el.hpBar.style.width = `${hp}%`;
+    el.hpBar.style.background = hpColor(hp / 100);
+    el.hpNum.textContent = hp;
     const cd = this.pred ? this.pred.dashCd : 0;
     el.dashChip.classList.toggle('cooling', cd > 0);
     el.dashChip.firstChild.textContent = cd > 0 ? `Dash ${cd.toFixed(1)}s ` : 'Dash ';
+
+    // weapon ladder
+    const w = you.w ?? 0;
+    el.weapon.textContent = WEAPONS[w].name;
+    el.xpBar.style.width = `${Math.min(100, ((you.xp ?? 0) / XP_PER_LEVEL) * 100)}%`;
+    el.nextWeapon.textContent = `Next: ${WEAPONS[(w + 1) % WEAPONS.length].name}`;
+    el.prestige.textContent = you.pr ? '★'.repeat(Math.min(5, you.pr)) : '';
+    [...el.ladder.children].forEach((d, i) => {
+      d.classList.toggle('on', i === w);
+      d.classList.toggle('done', i < w);
+    });
+
+    // storm
+    const z = this.zone;
+    if (z) {
+      const secs = Math.ceil(z.until);
+      el.storm.textContent = z.final ? 'Final circle · last exit' : z.shrinking ? `Storm closing · ${mmss(secs)}` : `Storm moves in ${mmss(secs)}`;
+      el.storm.classList.toggle('hot', z.shrinking || z.final);
+      if (!z.shrinking && !z.final && z.until < 4.5 && this.riserStage !== z.stage) {
+        this.riserStage = z.stage;
+        this.sfx.music?.riser(z.until);
+      }
+    }
+    if (alive && this.pred && z) {
+      const edge = z.r - Math.hypot(this.pred.x - z.x, this.pred.y - z.y);
+      this.sfx.setStorm(edge < 0 ? 1 : Math.max(0, Math.min(0.6, 1 - edge / 260)));
+    } else this.sfx.setStorm(0);
+
+    // heartbeat when low
+    if (alive && hp < 35 && now - this.heartT > 850) {
+      this.heartT = now;
+      this.sfx.play('heart');
+    }
+
+    // music mood: storm stage + danger + extraction
+    if (this.sfx.music) {
+      const stage = z ? z.stage : 0;
+      const danger = view?.figures?.some((f) => !f.isMe && this.pred && Math.hypot(f.a.x - this.pred.x, f.a.y - this.pred.y) < 380) ? 1 : 0;
+      const intensity = alive ? Math.min(4, 1 + Math.floor(stage * 0.75) + danger + (you.ext > 0 ? 2 : 0) + (this.hurt > 0.3 ? 1 : 0)) : 0;
+      this.sfx.music.set({ mode: alive ? 'raid' : 'lobby', intensity, bpm: alive ? 140 + stage * 7 : 96 });
+    }
+
     if (alive && you.ext > 0) {
       el.extract.hidden = false;
       let best = null;
@@ -349,7 +663,8 @@ export class GameClient {
 }
 
 /**
- * Lobby background: a real bot raid, seen through one bot's eyes.
+ * Lobby background: a real bot raid seen through one bot's eyes, drawn with the
+ * same renderer, figures and effects as a live raid.
  */
 export class Attract {
   constructor(renderer) {
@@ -358,6 +673,8 @@ export class Attract {
     this.acc = 0;
     this.followId = null;
     this.cam = null;
+    this.fx = new Fx();
+    this.anims = new AnimBook();
   }
 
   start() {
@@ -366,6 +683,9 @@ export class Attract {
     this.renderer.setMap(this.world.map);
     this.followId = null;
     this.cam = null;
+    this.fx.clear();
+    this.anims = new AnimBook();
+    this.fcs = new Map();
   }
 
   stop() {
@@ -378,6 +698,15 @@ export class Attract {
     this.acc = Math.min(this.acc + dt, 0.2);
     while (this.acc >= DT) {
       w.step();
+      for (const ev of w.events) {
+        if (ev.k === 'kill') {
+          const a = this.anims.get(ev.vid);
+          if (a) {
+            this.fx.grave(a, { color: a.color, headless: false, gore: false }, now);
+            this.anims.map.delete(ev.vid);
+          }
+        }
+      }
       w.events.length = 0;
       this.acc -= DT;
     }
@@ -392,25 +721,38 @@ export class Attract {
       this.followId = p.id;
     }
     const s = w.snapshotFor(p.id);
-    const eye = { x: p.x, y: p.y };
-    if (!this.cam) this.cam = { ...eye };
-    this.cam.x += (eye.x - this.cam.x) * 0.08;
-    this.cam.y += (eye.y - this.cam.y) * 0.08;
-    const self = { i: p.id, n: p.name, c: p.skin, x: p.x, y: p.y, a: p.aim, h: Math.ceil(p.hp), b: p.bluff, e: p.ext, d: p.dashT > 0 ? 1 : 0 };
+    if (!this.cam) this.cam = { x: p.x, y: p.y };
+    this.cam.x += (p.x - this.cam.x) * 0.08;
+    this.cam.y += (p.y - this.cam.y) * 0.08;
+    const figures = [];
+    for (const q of [{ i: p.id, n: p.name, c: p.skin, x: p.x, y: p.y, a: p.aim, h: Math.ceil(p.hp), b: p.bluff, e: p.ext, s: 0, w: p.w, fc: p.fc, pr: p.prestige }, ...s.players]) {
+      const a = this.anims.update(q.i, q.x, q.y, q.a, dt, now, { w: q.w, bluff: q.b, color: q.c });
+      if (this.fcs.get(q.i) !== undefined && this.fcs.get(q.i) !== q.fc) a.attackT = now;
+      this.fcs.set(q.i, q.fc);
+      figures.push({ a, color: q.c, name: q.n, hp: q.h, isMe: false, flash: false, shield: 0, ext: q.e, pr: q.pr, laser: WEAPONS[q.w]?.laser });
+    }
+    this.anims.prune(now);
+    this.fx.update(dt, now);
+    const zone = zoneAt(w.zonePlan, w.time);
     this.renderer.draw({
       cam: this.cam,
-      eye: this.cam,
-      me: null,
-      players: [self, ...s.players],
+      eye: { x: p.x, y: p.y },
+      figures,
       orbs: s.orbs,
       drops: s.drops,
       bullets: s.bullets,
-      fx: [],
+      fx: this.fx,
       time: now,
       golden: false,
+      zone,
+      exitStates: Object.fromEntries(w.map.extracts.map((e) => [e.id, exitState(w.zonePlan, zone, e)])),
       shake: 0,
       hurt: 0,
+      storm: false,
       showArrows: false,
+      gore: false,
+      meAlive: false,
     });
+    this.renderer.measure(dt * 1000);
   }
 }

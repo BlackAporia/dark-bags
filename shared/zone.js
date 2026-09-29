@@ -80,11 +80,12 @@ export function outsideZone(zone, x, y) {
   return Math.hypot(x - zone.x, y - zone.y) > zone.r;
 }
 
-// 'last' (the exit the storm collapses onto), 'open', 'closing' (outside the next circle), 'closed'
+// 'last' (the exit the storm collapses onto), 'open', 'closing' (the storm is about to
+// swallow it: outside the next circle while it moves or within 20 s of moving), 'closed'
 export function exitState(plan, zone, e) {
   if (e.id === plan.finalExit) return 'last';
   if (Math.hypot(e.x - zone.x, e.y - zone.y) > zone.r - e.r * 0.25) return 'closed';
   const n = zone.next;
-  if (Math.hypot(e.x - n.x, e.y - n.y) > n.r - e.r * 0.25) return 'closing';
+  if (Math.hypot(e.x - n.x, e.y - n.y) > n.r - e.r * 0.25 && (zone.shrinking || zone.until < 20)) return 'closing';
   return 'open';
 }

@@ -76,3 +76,18 @@ test('loot and damage also earn experience', () => {
   assert.ok(a.xp > before);
   assert.equal(b.status, 'alive');
 });
+
+test('first blood goes to everyone; chained kills climb the multi-kill ladder', () => {
+  const w = new World({ stake: 1000, seed: 8, bots: false });
+  const k = w.addPlayer({ name: 'killer', skin: '#fff' });
+  const vs = [1, 2, 3, 4, 5, 6].map((i) => w.addPlayer({ name: `v${i}`, skin: '#fff' }));
+  w.step();
+  const tiers = [];
+  for (const v of vs) {
+    w.events.length = 0;
+    w.kill(v, k);
+    for (const e of w.events) if (e.k === 'streak') tiers.push([e.tier, e.to ? 'me' : 'all']);
+    w.time += 1; // well inside the multi-kill window
+  }
+  assert.deepEqual(tiers, [[1, 'all'], [2, 'me'], [3, 'me'], [4, 'me'], [5, 'me'], [5, 'me']]);
+});

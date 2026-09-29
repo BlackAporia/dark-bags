@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="DARK BAGS: stake sats, loot in the dark, extract before the timer. Nobody can see how much you carry.">
+<meta name="description" content="DARK BAGS: stake sats, start with a knife, level up your gun, loot in the dark and extract before the storm seals the raid.">
 <!--@page-->
 <title>Dark Bags</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,12 +23,18 @@
   </div>
   <div class="hud-clock">
     <span id="timer" class="timer">3:00</span>
+    <span id="storm" class="storm-line">Storm moves in 0:30</span>
     <span id="alive" class="eyebrow">0 runners inside</span>
     <span id="golden" class="golden-tag" hidden>Golden raid</span>
   </div>
-  <canvas id="minimap" class="minimap" width="150" height="150" aria-label="Map with exits"></canvas>
+  <canvas id="minimap" class="minimap" width="150" height="150" aria-label="Map with exits and the storm"></canvas>
   <ol id="feed" class="feed" aria-live="polite"></ol>
   <div id="banner" class="banner" hidden></div>
+  <div id="streak" class="streak" hidden aria-live="assertive">
+    <div class="st-fx" aria-hidden="true"></div>
+    <p class="st-title">Double kill</p>
+    <p class="st-sub"></p>
+  </div>
   <div id="extract" class="extract" hidden>
     <span class="eyebrow">Extracting · <b id="ext-name"></b></span>
     <div class="ext-track"><div id="ext-bar" class="ext-bar"></div></div>
@@ -36,10 +42,19 @@
   </div>
   <div id="spect" class="spect" hidden></div>
   <div class="hud-bottom">
+    <div class="weapon-panel">
+      <div class="weapon-row"><span id="weapon" class="weapon-name">Knife</span><span id="prestige" class="prestige"></span></div>
+      <div id="ladder" class="ladder" aria-label="Weapon ladder"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="xp"><div id="xp-bar" class="xp-bar"></div></div>
+      <span id="next-weapon" class="next-weapon">Next: Pistol</span>
+    </div>
     <div class="hp"><div id="hp-bar" class="hp-bar"></div><span id="hp-num" class="hp-num">100</span></div>
-    <button id="dash-chip" class="chip" type="button">Dash <kbd>Space</kbd></button>
-    <button id="bluff-chip" class="chip" type="button">Bag look: medium <kbd>Q</kbd></button>
-    <button id="mute-chip" class="chip" type="button" aria-pressed="false">Sound <kbd>M</kbd></button>
+    <div class="chips">
+      <button id="dash-chip" class="chip" type="button">Dash <kbd>Space</kbd></button>
+      <button id="bluff-chip" class="chip" type="button">Bag look: medium <kbd>Q</kbd></button>
+      <button id="mute-chip" class="chip" type="button" aria-pressed="false">Sound <kbd>M</kbd></button>
+      <button id="music-chip" class="chip" type="button" aria-pressed="false">Music <kbd>N</kbd></button>
+    </div>
   </div>
 </div>
 
@@ -55,9 +70,9 @@
 <section id="lobby" class="screen lobby">
   <div class="lobby-col">
     <header class="brand">
-      <p class="kicker">Extraction · private bags · sats</p>
+      <p class="kicker">Extraction · arms race · private bags</p>
       <h1 class="logo">Dark<br>Bags</h1>
-      <p class="tagline">Walk in with sats. Grab what glows. Get to an exit before the raid seals. Die, and your bag drops for whoever shot you. Nobody knows what anyone is carrying.</p>
+      <p class="tagline">Everyone walks in equal: a knife, 100 health, a stake in sats. Kill to climb from knife to laser sniper. Grab what glows, outrun the storm, get out through an open exit. Nobody knows what anyone is carrying.</p>
     </header>
 
     <div class="mode" role="tablist" aria-label="Mode">
@@ -74,34 +89,44 @@
     <div class="who">
       <label for="name" class="eyebrow">Runner name</label>
       <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="runner">
-      <div id="skins" class="skins" role="radiogroup" aria-label="Skin"></div>
+      <div id="skins" class="skins" role="radiogroup" aria-label="Colour"></div>
     </div>
 
-    <button id="play" class="cta" type="button">Enter raid</button>
+    <label class="gore" for="gore"><input id="gore" type="checkbox"> <span><b>18+ mode.</b> Limbs come off as health drops, heads pop, blood stays on the floor.</span></label>
+
+    <button id="play" class="cta" type="button">Go to the table</button>
     <p class="balance"><span class="eyebrow">Balance</span> <b id="balance" class="num">—</b> <span class="unit">test sats</span> <button id="faucet" class="link" type="button" hidden>Refill to 100,000</button></p>
 
     <details class="how">
       <summary>How a raid works</summary>
       <ul>
-        <li><b>Stake.</b> 5% rake. Half of the rest rides in your bag, half is scattered on the map as loot.</li>
-        <li><b>Loot.</b> Orange dust, stacks, and vault chests. Dropped bags show a <b>?</b> until someone opens them.</li>
+        <li><b>Ready room.</b> Stake and press Ready. Your icon lights up; the countdown starts; everyone drops in together.</li>
+        <li><b>Arms race.</b> Knife → pistol → shotgun → SMG → rifle → laser sniper → knife again. Kills move you up; damage and loot add a little.</li>
+        <li><b>Storm.</b> The circle shrinks four times and collapses onto one exit. Exits it swallows close for good.</li>
         <li><b>Bluff.</b> Your bag's look is a choice (<kbd>Q</kbd>). Look broke and slip out, or look fat and bait a fight.</li>
-        <li><b>Extract.</b> Stand in a green exit for 3 seconds. You cash out whatever you carry.</li>
-        <li><b>Seal.</b> At 0:00 anyone still inside loses their bag to the next raid's pot.</li>
+        <li><b>Extract.</b> Stand in an open exit for 3 seconds. You cash out whatever you carry. Still inside at 0:00, you lose it.</li>
       </ul>
-      <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> shoot · <kbd>Space</kbd> dash · <kbd>Q</kbd> bag look · <kbd>M</kbd> sound</p>
+      <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> bag look · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
     </details>
     <p class="fine">Test build. Sats here are play money: no deposits, no withdrawals.</p>
   </div>
 </section>
 
-<!-- queued for next raid -->
-<section id="wait" class="screen overlay" hidden>
-  <div class="card">
-    <p class="eyebrow">Raid sealed</p>
-    <p id="wait-text" class="wait-text">Next raid in 0s</p>
-    <p class="sub">You're queued. Your stake is taken when the raid opens.</p>
-    <button id="wait-cancel" class="ghost" type="button">Back to tables</button>
+<!-- ready room -->
+<section id="prep" class="screen prep" hidden>
+  <div class="prep-inner">
+    <header class="prep-head">
+      <p id="prep-kicker" class="eyebrow">Raid 1 · 1,000 sats table</p>
+      <p id="prep-count" class="prep-count">Ready up</p>
+      <p id="prep-status" class="prep-status">The countdown starts when the first runner is ready.</p>
+    </header>
+    <div id="lineup" class="lineup" aria-label="Runners in the next raid"></div>
+    <p class="pot"><span class="eyebrow">Pot</span> <b id="pot" class="num">0</b> <span class="unit">sats</span></p>
+    <div class="prep-actions">
+      <button id="ready" class="cta" type="button">Stake &amp; ready</button>
+      <button id="prep-back" class="ghost" type="button">Back to tables</button>
+    </div>
+    <p id="prep-balance" class="fine"></p>
   </div>
 </section>
 
@@ -112,7 +137,7 @@
     <p id="res-amount" class="res-amount">+0</p>
     <p id="res-detail" class="res-detail"></p>
     <div class="res-actions">
-      <button id="res-again" class="cta" type="button">Enter next raid</button>
+      <button id="res-again" class="cta" type="button">Ready for the next raid</button>
       <button id="res-tables" class="ghost" type="button">Tables</button>
       <a id="res-share" class="ghost share" href="#" target="_blank" rel="noopener" hidden>Post on X</a>
     </div>

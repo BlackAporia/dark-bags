@@ -70,6 +70,7 @@ export class LocalTransport {
       send: (_cid, msg) => queueMicrotask(() => !this.closed && onMessage(msg)),
       newToken: () => 'practice',
       bots: true,
+      prepSeconds: 8, // solo practice: short ready-room countdown
     });
     this.lobby.connect(1);
     this.closed = false;

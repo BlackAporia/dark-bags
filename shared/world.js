@@ -380,9 +380,25 @@ export class World {
     if (killer) {
       killer.kills++;
       this.addXp(killer, XP.kill);
+      this.streak(killer);
     }
     // public feed: names only, never amounts
     this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id, cause });
+  }
+
+  // First blood for the whole raid; multi-kills (each within MULTI_WINDOW of the last) for the killer.
+  streak(k) {
+    if (!this.firstBlood) {
+      this.firstBlood = true;
+      this.emit({ k: 'streak', tier: 1, name: k.name, pid: k.id });
+    }
+    k.multi = this.time - (k.lastKillT ?? -99) <= CFG.MULTI_WINDOW ? (k.multi ?? 1) + 1 : 1;
+    k.lastKillT = this.time;
+    if (k.multi >= 2) {
+      const tier = Math.min(5, k.multi);
+      this.emit({ k: 'streak', tier, to: [k.id], name: k.name, pid: k.id });
+      if (tier >= 3) this.emit({ k: 'streakFeed', tier, name: k.name, pid: k.id });
+    }
   }
 
   addXp(p, amount) {

@@ -24,6 +24,7 @@ export const CFG = {
   DASH_TIME: 0.15,
   DASH_CD: 2.4,
   HP: 100,
+  MULTI_WINDOW: 4,        // seconds between kills to chain a double/triple/... kill
   SPAWN_SHIELD: 3,        // seconds of spawn protection; firing drops it early
   REGEN_DELAY: 4,         // seconds without damage before regen starts
   REGEN_RATE: 8,          // hp per second

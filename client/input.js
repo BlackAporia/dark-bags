@@ -23,6 +23,7 @@ export class Input {
       if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.dashQueued = true;
       if (e.code === 'KeyQ') this.onBluff?.();
       if (e.code === 'KeyM') this.onMute?.();
+      if (e.code === 'KeyN') this.onMusic?.();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     addEventListener('blur', () => {

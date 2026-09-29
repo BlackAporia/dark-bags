@@ -13,6 +13,7 @@ import { MemoryWallet } from '../shared/wallet.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
 const ROUND_SECONDS = Number(process.env.ROUND_SECONDS || CFG.ROUND_SECONDS);
+const PREP_SECONDS = Number(process.env.PREP_SECONDS || CFG.PREP_SECONDS);
 const BOTS = process.env.BOTS !== '0';
 const WALLET_FILE = process.env.WALLET_FILE || '';
 
@@ -44,6 +45,7 @@ const lobby = new Lobby({
   send,
   bots: BOTS,
   roundSeconds: ROUND_SECONDS,
+  prepSeconds: PREP_SECONDS,
   newToken: () => crypto.randomBytes(16).toString('hex'),
 });
 
