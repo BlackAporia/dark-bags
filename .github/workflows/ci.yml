@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run sim -- 2 1000
+      - run: npm run build
+        env:
+          DARK_BAGS_SERVER: ${{ vars.DARK_BAGS_SERVER }}
+      - name: Attach the single-file build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dark-bags-single-file
+          path: dist/index.html

@@ -1,0 +1,17 @@
+# Render Blueprint: New → Blueprint → pick this repo. Free web services support WebSockets
+# (they sleep after ~15 idle minutes, so the first visit after a pause takes a while).
+services:
+  - type: web
+    name: dark-bags
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ROUND_SECONDS
+        value: "180"
+      - key: BOTS
+        value: "1"

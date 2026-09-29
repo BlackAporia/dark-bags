@@ -1,0 +1,24 @@
+{
+  "name": "dark-bags",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DARK BAGS — a browser extraction game with private bags and sats stakes",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test test/*.test.js",
+    "build": "node scripts/build.js",
+    "sim": "node scripts/sim.js"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

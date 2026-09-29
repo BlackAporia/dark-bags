@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="DARK BAGS: stake sats, loot in the dark, extract before the timer. Nobody can see how much you carry.">
+<!--@page-->
+<title>Dark Bags</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;900&family=Chakra+Petch:wght@400;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game" aria-label="Raid view"></canvas>
+
+<!-- in-raid HUD -->
+<div id="hud" class="hud" hidden>
+  <div class="hud-bag">
+    <span class="eyebrow">Your bag · private</span>
+    <span id="bag" class="bag-num">0</span>
+    <span id="pnl" class="pnl">stake 0</span>
+  </div>
+  <div class="hud-clock">
+    <span id="timer" class="timer">3:00</span>
+    <span id="alive" class="eyebrow">0 runners inside</span>
+    <span id="golden" class="golden-tag" hidden>Golden raid</span>
+  </div>
+  <canvas id="minimap" class="minimap" width="150" height="150" aria-label="Map with exits"></canvas>
+  <ol id="feed" class="feed" aria-live="polite"></ol>
+  <div id="banner" class="banner" hidden></div>
+  <div id="extract" class="extract" hidden>
+    <span class="eyebrow">Extracting · <b id="ext-name"></b></span>
+    <div class="ext-track"><div id="ext-bar" class="ext-bar"></div></div>
+    <span class="ext-hint">Hold still. A hit resets it.</span>
+  </div>
+  <div id="spect" class="spect" hidden></div>
+  <div class="hud-bottom">
+    <div class="hp"><div id="hp-bar" class="hp-bar"></div><span id="hp-num" class="hp-num">100</span></div>
+    <button id="dash-chip" class="chip" type="button">Dash <kbd>Space</kbd></button>
+    <button id="bluff-chip" class="chip" type="button">Bag look: medium <kbd>Q</kbd></button>
+    <button id="mute-chip" class="chip" type="button" aria-pressed="false">Sound <kbd>M</kbd></button>
+  </div>
+</div>
+
+<!-- touch controls -->
+<div id="touch" class="touch" hidden>
+  <div id="tz-left" class="tzone left"><div class="stick"><div class="knob"></div></div><span class="thint">move</span></div>
+  <div id="tz-right" class="tzone right"><div class="stick"><div class="knob"></div></div><span class="thint">aim · fire</span></div>
+  <button id="t-dash" class="tbtn dash" type="button">Dash</button>
+  <button id="t-bag" class="tbtn bagbtn" type="button">Bag</button>
+</div>
+
+<!-- lobby -->
+<section id="lobby" class="screen lobby">
+  <div class="lobby-col">
+    <header class="brand">
+      <p class="kicker">Extraction · private bags · sats</p>
+      <h1 class="logo">Dark<br>Bags</h1>
+      <p class="tagline">Walk in with sats. Grab what glows. Get to an exit before the raid seals. Die, and your bag drops for whoever shot you. Nobody knows what anyone is carrying.</p>
+    </header>
+
+    <div class="mode" role="tablist" aria-label="Mode">
+      <button id="mode-online" class="seg" role="tab" type="button">Online</button>
+      <button id="mode-practice" class="seg" role="tab" type="button">Practice vs bots</button>
+    </div>
+    <p id="net-status" class="net-status"></p>
+
+    <fieldset class="tables">
+      <legend class="eyebrow">Table · stake per raid</legend>
+      <div id="tables" class="table-list"></div>
+    </fieldset>
+
+    <div class="who">
+      <label for="name" class="eyebrow">Runner name</label>
+      <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="runner">
+      <div id="skins" class="skins" role="radiogroup" aria-label="Skin"></div>
+    </div>
+
+    <button id="play" class="cta" type="button">Enter raid</button>
+    <p class="balance"><span class="eyebrow">Balance</span> <b id="balance" class="num">—</b> <span class="unit">test sats</span> <button id="faucet" class="link" type="button" hidden>Refill to 100,000</button></p>
+
+    <details class="how">
+      <summary>How a raid works</summary>
+      <ul>
+        <li><b>Stake.</b> 5% rake. Half of the rest rides in your bag, half is scattered on the map as loot.</li>
+        <li><b>Loot.</b> Orange dust, stacks, and vault chests. Dropped bags show a <b>?</b> until someone opens them.</li>
+        <li><b>Bluff.</b> Your bag's look is a choice (<kbd>Q</kbd>). Look broke and slip out, or look fat and bait a fight.</li>
+        <li><b>Extract.</b> Stand in a green exit for 3 seconds. You cash out whatever you carry.</li>
+        <li><b>Seal.</b> At 0:00 anyone still inside loses their bag to the next raid's pot.</li>
+      </ul>
+      <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> shoot · <kbd>Space</kbd> dash · <kbd>Q</kbd> bag look · <kbd>M</kbd> sound</p>
+    </details>
+    <p class="fine">Test build. Sats here are play money: no deposits, no withdrawals.</p>
+  </div>
+</section>
+
+<!-- queued for next raid -->
+<section id="wait" class="screen overlay" hidden>
+  <div class="card">
+    <p class="eyebrow">Raid sealed</p>
+    <p id="wait-text" class="wait-text">Next raid in 0s</p>
+    <p class="sub">You're queued. Your stake is taken when the raid opens.</p>
+    <button id="wait-cancel" class="ghost" type="button">Back to tables</button>
+  </div>
+</section>
+
+<!-- raid result -->
+<section id="result" class="screen overlay" hidden>
+  <div class="card result">
+    <p id="res-kicker" class="res-kicker">Extracted</p>
+    <p id="res-amount" class="res-amount">+0</p>
+    <p id="res-detail" class="res-detail"></p>
+    <div class="res-actions">
+      <button id="res-again" class="cta" type="button">Enter next raid</button>
+      <button id="res-tables" class="ghost" type="button">Tables</button>
+      <a id="res-share" class="ghost share" href="#" target="_blank" rel="noopener" hidden>Post on X</a>
+    </div>
+  </div>
+</section>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<script type="module" src="main.js"></script>
+<!--@end-->
+</body>
+</html>
