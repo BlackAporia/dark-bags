@@ -105,6 +105,9 @@ export class RoomCore {
       case 'watch':
         if (c.pid && this.world && this.state === 'live') this.world.watch(c.pid, Math.sign(Number(msg.d) || 0));
         break;
+      case 'buy':
+        if (c.pid && this.world && this.state === 'live') this.world.buy(c.pid, String(msg.item));
+        break;
       case 'bluff':
         if (c.pid && this.world && this.state === 'live') this.world.setBluff(c.pid, msg.v);
         break;
@@ -416,6 +419,7 @@ export class RoomCore {
         lost: p.lostBag,
         stake: p.stake,
         kills: p.kills,
+        ...(w.dm ? { deaths: p.deaths, place: w.standings().indexOf(p) + 1, top: w.standings()[0]?.kills ?? 0 } : {}),
         secs: Math.round((p.endedAt ?? w.time) - p.joinedAt),
         killer: p.killerName,
         cause: p.cause,

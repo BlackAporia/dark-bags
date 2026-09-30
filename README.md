@@ -31,6 +31,9 @@ Game modes, each at every stake:
 | Raid | 10 | Extraction: half your stake rides in your bag, half is loot; keep what you carry out |
 | Battle Royale | up to 20 | One prize pot; the last runner standing takes it |
 | Duel | 1 v 1 | The winner takes both stakes |
+| Deathmatch | 12 | Everyone for themselves, back in 3 s after every death, no storm. When the clock runs out the most kills takes the pot (a tie splits it) |
+| Guns + Lasers | 12 | Deathmatch after the CS 1.6 CSDM sentry-guns mod: kills pay in-match credits (+300; +100 for wrecking an enemy gadget) that buy a medkit (+60 HP), a sentry turret (auto-aims, 60 s, can be shot down; its kills are yours) or a laser tripmine (a beam to the nearest wall that blows up whoever crosses it). Keys 1 / 2 / 3, buttons on touch. Credits are not money and vanish at the whistle |
+| Hardcore | 12 | Battle royale on one hit point: any hit is a kill |
 | Knives / Pistols / Shotguns / Rifles / Snipers only | 12 | Battle royale with one weapon for everyone, all raid |
 | Team 2 v 2, 4 v 4, 8 v 8 | 4 / 8 / 16 | Every stake grows one team pot; the last team standing splits it equally, fallen teammates included; no friendly fire |
 
@@ -41,7 +44,7 @@ Other commands:
 ```bash
 npm test             # rules, economy, privacy, netcode, rooms (node:test, no deps)
 npm run sim -- 4     # headless bot raids, prints the ledger per raid
-npm run build        # dist/index.html: the whole game in one ~700 KB file (practice mode)
+npm run build        # dist/index.html: the whole game in one ~1.2 MB file (practice mode)
 npm run build:wallets # client/vendor/wallets.js: the wallet layer for real-token mode
 npm run dev          # server with auto-restart
 npm run house -- status   # operator console for real-token mode
@@ -86,7 +89,10 @@ Your runner is **him or her** in one of **80 outfits** across six rarities (Comm
 
 Opening is a show: the box charges up and glows through the rarities up to your best drop, bursts in its colour (god rays and particles; screen shake for Exotics), then the cards flip one by one. Tap to skip. A single drop shows your runner alive in the new outfit. **Share cards** (1200×675) exist for nearly everything: a win, an extraction, a death, a box hit or miss, a rank-up.
 
-**Announcer**: first blood, double and triple kills, rampage, godlike, victory, extraction and the final circle are called out in your language (the browser's speech engine, best voice on the device first; off in Settings).
+**Announcer**: first blood, double and triple kills, rampage, godlike, victory, extraction, the final circle and, in deathmatch, "you have taken / lost the lead" are recorded voice lines (`client/voice-data.js`, about 500 KB) played through the game's own mixer, so they work on every device and follow the sound volume; the music ducks under them. Recorded in English, Ukrainian, Spanish, French and Portuguese; other languages hear English. Off in Settings.
+
+Voices (generated offline with [Piper](https://github.com/rhasspy/piper), MIT):
+English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0), Ukrainian "Lada" (Apache 2.0), Spanish "carlfm" (public domain), French "SIWIS" (CC BY 4.0), Brazilian Portuguese "Edresson" (CC BY 4.0).
 
 **Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
 
@@ -96,7 +102,7 @@ Paid random rewards are regulated in some countries; skins only through boxes, w
 
 - Runners are single-line stick figures in the spirit of Gravity Defied, standing upright on a top-down map, with walk cycles, recoil, knife swings and per-weapon line art. Health bars over everyone go green → yellow → red.
 - The map is drawn from procedural textures (concrete slabs, diamond-plate vaults with hazard-striped doorways, brick, cinder block, crates, shipping containers, painted roads, puddles, manholes, a perimeter fence). Everything that looks solid is solid; everything on the floor is flat paint. It renders once into cached chunks per zoom level, and quality steps down on its own if frames get slow.
-- Every sound is synthesized (no audio files): layered gunshots per weapon through a generated reverb, stereo placement by where things happen, flesh and armour hits, bone cracks, ricochets, coin clinks, footsteps, a heartbeat at low health, a storm drone that swells near the edge. The soundtrack is generated live too: a dark pulse in the lobby, a build-up in the ready room, techno/drum & bass in the raid that speeds up with each storm stage and hits harder when enemies are close or you're extracting.
+- Every sound effect is synthesized (the announcer is the one recording): layered gunshots per weapon through a generated reverb, stereo placement by where things happen, flesh and armour hits, bone cracks, ricochets, coin clinks, footsteps, a heartbeat at low health, a storm drone that swells near the edge. The soundtrack is generated live too: a dark pulse in the lobby, a build-up in the ready room, techno/drum & bass in the raid that speeds up with each storm stage and hits harder when enemies are close or you're extracting.
 
 ## Economy
 
@@ -189,8 +195,8 @@ This was built without network access to Starknet RPCs, Ekubo, Privy or the STRK
 ```
 shared/            runs identically on server and in the browser
   config.js        every tunable number
-  modes.js         the 11 game modes (raid, battle royale, duel, weapon-only, teams)
-  world.js         one raid: movement, weapons, loot, storm, extraction or prize pot, teams, streaks, ledger, spectating, per-player snapshots
+  modes.js         the 14 game modes (raid, battle royale, duel, deathmatch, guns + lasers, hardcore, weapon-only, teams)
+  world.js         one raid: movement, weapons, loot, storm, extraction or prize pot, teams, respawns and kill scoring, turrets and tripmines, streaks, ledger, spectating, per-player snapshots
   weapons.js       the Arms Race ladder and experience values
   ranks.js         career ranks 1-90, the XP curve, what a raid is worth, titles
   achievements.js  39 achievements over career counters

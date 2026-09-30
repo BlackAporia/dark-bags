@@ -172,17 +172,20 @@ export class Renderer {
     v.fx.drawGround(ctx, t, inView);
     for (const o of v.orbs) if (inView(o.x, o.y, 40)) this.drawOrb(o, t, v.golden);
     for (const d of v.drops) if (inView(d.x, d.y, 40)) this.drawDrop(d, t);
+    for (const m of v.mines ?? []) this.drawMineBase(m, t);
 
     // 4. runners and graves, sorted by depth
     const items = [];
     for (const f of v.figures) if (inView(f.a.x, f.a.y, 80)) items.push({ y: f.a.y + FEET, draw: () => this.drawRunner(f, t, v.gore) });
     for (const g of v.fx.graveItems(t, v.gore)) items.push(g);
+    for (const o of v.turrets ?? []) if (inView(o.x, o.y, 60)) items.push({ y: o.y, draw: () => this.drawTurret(o, t) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw(ctx);
 
     // 5. lasers and bullets (at gun height), then particles
     ctx.globalCompositeOperation = 'lighter';
     for (const f of v.figures) if (f.laser && f.p) this.drawLaser(f);
+    for (const m of v.mines ?? []) this.drawMineBeam(m, t);
     ctx.lineCap = 'round';
     for (const b of v.bullets) if (inView(b.x, b.y, 80)) this.drawTracer(b, t);
     ctx.globalCompositeOperation = 'source-over';
@@ -498,6 +501,140 @@ export class Renderer {
     ctx.lineTo(ex, ey);
     ctx.stroke();
     ctx.drawImage(this.glow.laser, ex - 8, ey - 8, 16, 16);
+  }
+
+  // Guns + Lasers. Colours say whose it is: green yours, cyan a teammate's, red an enemy's.
+  gadgetColor(o) {
+    return o.o === 1 ? '#3ddc97' : o.o === 2 ? '#4cc9f0' : '#ff4d5e';
+  }
+
+  // sentry turret: a tripod, a turning head with a twin barrel, a health ring and a scan cone
+  drawTurret(o, t) {
+    const ctx = this.ctx;
+    const col = this.gadgetColor(o);
+    const z = 22;
+    ctx.save();
+    // shadow and legs
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(o.x, o.y + 2, 18, 7, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = '#2b3242';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (const dx of [-13, 0, 13]) {
+      ctx.moveTo(o.x, o.y - z + 6);
+      ctx.lineTo(o.x + dx, o.y + (dx ? 1 : 4));
+    }
+    ctx.stroke();
+    // scan cone, faint
+    if (!this.reduced) {
+      const g = ctx.createRadialGradient(o.x, o.y - z, 0, o.x, o.y - z, 110);
+      g.addColorStop(0, `${col}40`);
+      g.addColorStop(1, `${col}00`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(o.x, o.y - z);
+      ctx.arc(o.x, o.y - z, 110, o.a - 0.35, o.a + 0.35);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // head
+    ctx.translate(o.x, o.y - z);
+    ctx.rotate(o.a);
+    ctx.fillStyle = '#12161f';
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(4, -5, 20, 3.5);
+    ctx.fillRect(4, 1.5, 20, 3.5);
+    ctx.beginPath();
+    ctx.roundRect(-10, -9, 18, 18, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = col;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = this.quality >= 1 ? 10 : 0;
+    ctx.beginPath();
+    ctx.arc(1, 0, 3 + (this.reduced ? 0 : Math.sin(t / 140) * 0.8), 0, TAU);
+    ctx.fill();
+    ctx.restore();
+    // health arc
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(o.x, o.y - z, 15, -Math.PI / 2, -Math.PI / 2 + (TAU * Math.max(0, o.h)) / 100);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // laser tripmine: a small charge on the floor, blinking until armed
+  drawMineBase(m, t) {
+    const ctx = this.ctx;
+    const col = this.gadgetColor(m);
+    ctx.fillStyle = '#161b26';
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(m.x - 7, m.y - 5, 14, 10, 3);
+    ctx.fill();
+    ctx.stroke();
+    const on = m.arm || Math.floor(t / 180) % 2 === 0;
+    if (on) {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 2.2, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  // the beam itself, drawn additively: a soft glow, a hot core, a travelling shimmer
+  drawMineBeam(m, t) {
+    const ctx = this.ctx;
+    const col = this.gadgetColor(m);
+    const y0 = m.y - 6;
+    const y1 = m.y2 - 6;
+    if (!m.arm) {
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = 0.25;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 8]);
+      ctx.beginPath();
+      ctx.moveTo(m.x, y0);
+      ctx.lineTo(m.x2, y1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    const k = this.reduced ? 1 : 0.75 + Math.sin(t / 90 + m.i) * 0.25;
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.22 * k;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(m.x, y0);
+    ctx.lineTo(m.x2, y1);
+    ctx.stroke();
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.globalAlpha = 0.6 * k;
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    if (!this.reduced) {
+      const u = ((t / 700 + m.i * 0.37) % 1 + 1) % 1;
+      const sx = m.x + (m.x2 - m.x) * u;
+      const sy = y0 + (y1 - y0) * u;
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.4, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.drawImage(this.glow.laser, m.x2 - 7, y1 - 7, 14, 14);
   }
 
   drawTag(f) {

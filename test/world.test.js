@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CFG } from '../shared/config.js';
+import { CFG, GL } from '../shared/config.js';
 import { World } from '../shared/world.js';
 import { stepMovement, sanitizeInput } from '../shared/movement.js';
 import { NavGrid } from '../shared/nav.js';
@@ -275,4 +275,137 @@ test('every mode is playable to the end with its own line-up', () => {
     assert.equal(w.phase, 'ended');
     assert.ok(w.audit().ok, `${m.id} audit`);
   }
+});
+
+test('deathmatch: the fallen respawn, the clock decides, and the most kills takes the whole pot', () => {
+  const w = new World({ stake: 1000, seed: 11, mode: 'dm', botFill: 6, roundSeconds: 60 });
+  const me = w.addPlayer({ name: 'me', skin: '#fff' });
+  w.step();
+  const [a, b] = [...w.players.values()].filter((p) => p !== me);
+  me.shield = a.shield = b.shield = 0;
+  w.kill(a, me);
+  w.kill(b, me);
+  assert.equal(a.status, 'dead');
+  assert.equal(w.leaderId, me.id, 'two kills: the lead');
+  // nobody wins by surviving: the match runs on with everyone else down
+  for (let i = 0; i < CFG.RESPAWN * CFG.TICK_RATE + 2; i++) w.step();
+  assert.equal(w.phase, 'live');
+  assert.equal(a.status, 'alive', 'back in after the respawn timer');
+  assert.equal(a.hp, CFG.HP);
+  assert.equal(a.deaths, 1);
+  assert.ok(a.shield > 0, 'spawn shield on respawn');
+  // the leader goes down at the whistle and still wins: kills count, not survival
+  w.kill(me, a);
+  while (w.phase === 'live') {
+    for (const p of w.players.values()) p.shield = 1; // freeze the score
+    w.step();
+  }
+  assert.ok(w.audit().ok);
+  assert.ok(me.won, 'most kills wins');
+  assert.equal(me.status, 'won');
+  assert.equal(me.payout, w.players.size * 950);
+  assert.equal(w.winners.length, 1);
+});
+
+test('deathmatch: a tie on kills splits the pot; no kills at all rolls it over', () => {
+  const w = new World({ stake: 1000, seed: 12, mode: 'dm', botFill: 4, roundSeconds: 30 });
+  w.step();
+  const [a, b, c, d] = [...w.players.values()];
+  w.kill(c, a);
+  w.kill(d, b);
+  while (w.phase === 'live') {
+    for (const p of w.players.values()) p.shield = 1;
+    w.step();
+  }
+  assert.ok(a.won && b.won);
+  assert.equal(a.payout + b.payout, 4 * 950);
+  assert.ok(w.audit().ok);
+  const z = new World({ stake: 1000, seed: 13, mode: 'dm', botFill: 3, roundSeconds: 20 });
+  z.step();
+  while (z.phase === 'live') {
+    for (const p of z.players.values()) p.shield = 1;
+    z.step();
+  }
+  assert.equal(z.ledger.rolloverOut, 3 * 950);
+  assert.ok(z.audit().ok);
+});
+
+test('hardcore: one hit and you are down, from any weapon', () => {
+  const w = new World({ stake: 1000, seed: 14, mode: 'hardcore', botFill: 4, roundSeconds: 60 });
+  const me = w.addPlayer({ name: 'me', skin: '#fff' });
+  w.step();
+  const foe = [...w.players.values()].find((p) => p !== me);
+  foe.shield = 0;
+  w.damage(foe, me, 1);
+  assert.equal(foe.status, 'dead');
+  // the HUD still reads in %: full health is 100
+  assert.equal(w.snapshotFor(me.id).you.hp, 100);
+  playOut(w);
+  assert.ok(w.audit().ok);
+});
+
+test('guns + lasers: kills pay credits; medkits, turrets and tripmines cost them and work', () => {
+  const w = new World({ stake: 1000, seed: 15, mode: 'gl', bots: false, roundSeconds: 120 });
+  const me = w.addPlayer({ name: 'me', skin: '#fff' });
+  const foe = w.addPlayer({ name: 'foe', skin: '#000' });
+  w.step();
+  assert.equal(me.cr, GL.START);
+  assert.equal(w.buy(me.id, 'turret'), false, 'not enough credits yet');
+  assert.equal(w.buy(me.id, 'constructor'), false, 'only real items');
+  me.shield = foe.shield = 0;
+  w.kill(foe, me);
+  assert.equal(me.cr, GL.START + GL.KILL);
+  // a medkit heals, and costs
+  me.hp = 30;
+  assert.ok(w.buy(me.id, 'medkit'));
+  assert.equal(me.hp, 30 + GL.ITEMS.medkit.heal);
+  assert.equal(me.cr, GL.START + GL.KILL - GL.ITEMS.medkit.cost);
+  me.hp = CFG.HP;
+  assert.equal(w.buy(me.id, 'medkit'), false, 'no medkit at full health');
+  // turret: set it down in the open and bring the foe in front of it
+  me.cr = 5000;
+  me.x = 1200;
+  me.y = 1200;
+  me.aim = 0;
+  assert.ok(w.buy(me.id, 'turret'));
+  assert.equal(w.buy(me.id, 'turret'), false, 'one turret at a time');
+  const tur = [...w.turrets.values()][0];
+  for (let i = 0; i < CFG.RESPAWN * CFG.TICK_RATE + 2; i++) w.step();
+  assert.equal(foe.status, 'alive');
+  foe.shield = 0;
+  foe.x = tur.x + 150;
+  foe.y = tur.y;
+  foe.hp = CFG.HP;
+  const clear = hasLOS(tur.x, tur.y, foe.x, foe.y, w.map.walls);
+  const kills = me.kills;
+  for (let i = 0; i < 200 && foe.status === 'alive'; i++) {
+    foe.x = tur.x + 150;
+    foe.y = tur.y;
+    w.step();
+  }
+  if (clear) {
+    assert.equal(foe.status, 'dead', 'the turret shoots enemies');
+    assert.equal(me.kills, kills + 1, 'turret kills count for the owner');
+    assert.equal(foe.cause, 'turret');
+  }
+  // the owner walks through their own tripmine; the enemy does not
+  for (let i = 0; i < CFG.RESPAWN * CFG.TICK_RATE + 2; i++) w.step();
+  w.turrets.clear();
+  me.aim = Math.PI / 2;
+  assert.ok(w.buy(me.id, 'mine'));
+  const mine = [...w.mines.values()][0];
+  for (let i = 0; i < GL.ITEMS.mine.arm * CFG.TICK_RATE + 2; i++) w.step();
+  assert.ok(w.mines.has(mine.id), 'the owner does not trip it');
+  foe.shield = 0;
+  foe.hp = 50;
+  foe.x = (mine.x + mine.x2) / 2;
+  foe.y = (mine.y + mine.y2) / 2;
+  w.step();
+  assert.ok(!w.mines.has(mine.id), 'an enemy on the beam sets it off');
+  assert.equal(foe.status, 'dead');
+  assert.equal(foe.cause, 'mine');
+  // everything is gone at the whistle and the money still adds up
+  playOut(w);
+  assert.equal(w.turrets.size + w.mines.size, 0);
+  assert.ok(w.audit().ok);
 });

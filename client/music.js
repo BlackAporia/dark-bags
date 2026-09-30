@@ -14,7 +14,8 @@ export class Music {
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'lowpass';
     this.filter.frequency.value = 18000;
-    this.out.connect(this.filter).connect(dest);
+    this.duckG = ctx.createGain();
+    this.out.connect(this.filter).connect(this.duckG).connect(dest);
     this.delay = ctx.createDelay(1);
     this.delay.delayTime.value = 0.3;
     const fb = ctx.createGain();
@@ -54,6 +55,15 @@ export class Music {
     if (mode) this.mode = mode;
     if (intensity !== undefined) this.intensity = Math.max(0, Math.min(4, intensity));
     if (bpm) this.targetBpm = bpm;
+  }
+
+  // the announcer speaks: the music steps back for that long
+  duck(secs) {
+    const g = this.duckG.gain;
+    const t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(0.35, t, 0.04);
+    g.setTargetAtTime(1, t + secs, 0.25);
   }
 
   // taking a hit: the music drops out for a moment, like your ears ringing

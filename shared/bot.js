@@ -1,4 +1,4 @@
-import { CFG } from './config.js';
+import { CFG, GL } from './config.js';
 import { NavGrid } from './nav.js';
 import { WEAPONS, BOT_RANGE } from './weapons.js';
 
@@ -31,7 +31,8 @@ export class BotBrain {
     // practice difficulty: easy bots are slower to react, sloppier and fire in short bursts;
     // normal plays like online bots; hard ones aim and react like veterans
     const diff = world.difficulty ?? (world.practice ? 'easy' : 'normal');
-    this.ffa = !!world.practice; // practice: every bot for itself
+    this.ffa = !!world.practice || world.dm; // practice and deathmatch: every bot for itself
+    this.shopT = 1 + rnd() * 2; // guns + lasers: when to think about buying next
     this.easy = diff === 'easy';
     this.skill = this.easy ? 0.05 + rnd() * 0.3 : diff === 'hard' ? 0.5 + rnd() * 0.45 : 0.15 + rnd() * 0.4; // online: a new player survives first contact more often than not
     this.burstT = 0; // practice: bots fire in bursts with pauses in between
@@ -54,6 +55,48 @@ export class BotBrain {
     this.lastX = p.x;
     this.lastY = p.y;
     p.botInput = { s: 0, mx: 0, my: 0, a: 0, f: false, d: false };
+  }
+
+  // back from the dead (deathmatch): forget the old fight and route
+  reset() {
+    this.path = [];
+    this.goal = null;
+    this.target = null;
+    this.wander = null;
+    this.lootTarget = null;
+    this.seenFoe.clear();
+    this.aimErr = 0;
+  }
+
+  // Guns + Lasers: patch up when hurt, put a turret down when there's cash and a quiet
+  // moment, and now and then lay a tripmine across a corridor.
+  shopping(dt, foe) {
+    const w = this.w;
+    const p = this.p;
+    this.shopT -= dt;
+    if (this.shopT > 0) return;
+    this.shopT = 0.8 + this.rnd() * 1.2;
+    const I = GL.ITEMS;
+    if (p.hp < w.maxHp * 0.45 && p.cr >= I.medkit.cost) w.buy(p.id, 'medkit');
+    else if (foe && p.cr >= I.turret.cost + I.medkit.cost && this.rnd() < 0.5) w.buy(p.id, 'turret');
+    else if (!foe && p.cr >= I.turret.cost && this.rnd() < 0.6) w.buy(p.id, 'turret');
+    else if (!foe && p.cr >= I.mine.cost + I.medkit.cost && this.rnd() < 0.25) w.buy(p.id, 'mine');
+  }
+
+  // Deathmatch: nobody to loot and nowhere to go, so head for the nearest live enemy.
+  hunt() {
+    const p = this.p;
+    let best = null;
+    let bd = Infinity;
+    for (const q of this.w.players.values()) {
+      if (q === p || q.status !== 'alive') continue;
+      const d = dist(q, p);
+      if (d < bd) {
+        bd = d;
+        best = q;
+      }
+    }
+    return best ? { x: best.x, y: best.y } : this.pickWander();
   }
 
   // other live bots currently fighting this runner
@@ -163,7 +206,7 @@ export class BotBrain {
     inp.f = false;
 
     const tl = w.timeLeft;
-    const exit = this.nearestExit();
+    const exit = w.potMode ? null : this.nearestExit(); // pot modes have no exits
     const inZone = exit && dist(exit, p) < exit.r - 12;
     const wantOut =
       tl < this.leaveAt || p.bag >= p.stake * this.greed || (p.hp < 40 && p.bag >= p.stake * 0.6);
@@ -176,7 +219,7 @@ export class BotBrain {
     // Either way, humans get HUMAN_GRACE seconds to find their feet, and then at most
     // HUMAN_HUNTERS bots press one human at a time (unless that human started it):
     // a lone player gets fights, not a pile-on.
-    const truce = w.time < CFG.BOT_TRUCE;
+    const truce = w.time < CFG.BOT_TRUCE && !w.dm;
     const hunter = this.brave > 0.68;
     const foes = w
       .visibleEnemies(p)
@@ -196,6 +239,7 @@ export class BotBrain {
       }
     }
     this.target = foe?.id ?? null;
+    if (w.shop) this.shopping(dt, foe);
     for (const id of this.seenFoe.keys()) if (!foes.some((f) => f.id === id)) this.seenFoe.delete(id);
     if (foe && !this.seenFoe.has(foe.id)) this.seenFoe.set(foe.id, w.time);
 
@@ -280,7 +324,14 @@ export class BotBrain {
         this.lootTarget = this.pickLoot();
       }
       if (this.lootTarget) move = this.goTo(this.lootTarget.x, this.lootTarget.y);
-      else {
+      else if (w.dm) {
+        this.huntT = (this.huntT ?? 0) - dt;
+        if (!this.wander || dist(this.wander, p) < 60 || this.huntT <= 0) {
+          this.huntT = 2;
+          this.wander = this.hunt();
+        }
+        move = this.goTo(this.wander.x, this.wander.y);
+      } else {
         if (!this.wander || dist(this.wander, p) < 60) this.wander = this.pickWander();
         move = this.goTo(this.wander.x, this.wander.y);
       }

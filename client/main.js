@@ -69,6 +69,8 @@ const el = {
   extName: $('ext-name'),
   extBar: $('ext-bar'),
   spect: $('spect'),
+  glShop: $('gl-shop'),
+  glCr: $('gl-cr'),
   spText: $('sp-text'),
   coach: $('coach'),
   hpBar: $('hp-bar'),
@@ -254,7 +256,7 @@ function tableInfo(stake) {
 }
 
 // the mode picker: a card per mode with what it is and how the money works
-const MODE_ICON = { raid: '🎒', br: '👑', duel: '⚔️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
+const MODE_ICON = { raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
 function renderModes() {
   const box = $('modes');
   box.replaceChildren(
@@ -669,14 +671,20 @@ function showResult(m) {
   const inside = t('res.inside', { k: m.kills, t: mmss(m.secs) });
   const pot = MODE[m.mode]?.kind && MODE[m.mode].kind !== 'raid';
   // the announcer calls the big endings
-  if (m.won) sfx.say(t(MODE[m.mode]?.kind === 'team' ? 'res.teamWon' : 'res.victory'), 4, getLang());
-  else if (m.status === 'extracted') sfx.say(t('res.extracted'), 2, getLang());
+  if (m.won) sfx.say('victory', getLang());
+  else if (m.status === 'extracted') sfx.say('extracted', getLang());
   if (pot && m.won) {
     k.textContent = t(MODE[m.mode].kind === 'team' ? 'res.teamWon' : 'res.victory');
     k.className = 'res-kicker win';
     amt.textContent = money(m.payout);
     amt.className = 'res-amount win';
     det.innerHTML = `${t('res.wonText', { p: `<b>${money(m.payout)}</b>`, s: `<b>${money(m.stake)}</b>` })} ${inside}.`;
+  } else if (pot && MODE[m.mode].kind === 'dm') {
+    k.textContent = t('res.dmLost', { p: m.place ?? '?' });
+    k.className = 'res-kicker loss';
+    amt.textContent = `−${money(m.stake)}`;
+    amt.className = 'res-amount';
+    det.innerHTML = `${t('res.dmText', { k: `<b>${m.kills}</b>`, d: `<b>${m.deaths ?? 0}</b>`, top: `<b>${m.top ?? 0}</b>` })}`;
   } else if (pot) {
     k.textContent = t(m.cause === 'storm' ? 'res.storm' : 'res.defeated');
     k.className = 'res-kicker loss';
@@ -800,6 +808,13 @@ muteChip.addEventListener('click', toggleMute);
 musicChip.addEventListener('click', toggleMusic);
 syncAudio();
 input.onBluff = () => game.cycleBluff();
+input.onBuy = (item) => game.buy(item);
+for (const b of $('gl-shop').querySelectorAll('[data-buy]')) b.addEventListener('click', () => game.buy(b.dataset.buy));
+for (const b of document.querySelectorAll('#touch [data-buy]'))
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    game.buy(b.dataset.buy);
+  });
 input.onMute = toggleMute;
 input.onMusic = toggleMusic;
 input.onAnyInput = () => sfx.unlock();

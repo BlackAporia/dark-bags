@@ -1,11 +1,11 @@
-import { CFG } from './config.js';
+import { CFG, GL } from './config.js';
 import { mulberry32, hasLOS, segWalls, segCircle } from './geom.js';
 import { generateMap, findSpawn, randomLootPoint } from './map.js';
 import { stepMovement, sanitizeInput } from './movement.js';
 import { BotBrain, botName } from './bot.js';
 import { botRank } from './ranks.js';
 import { botLook, OUTFIT } from './cosmetics.js';
-import { planZone, zoneAt, exitState, outsideZone } from './zone.js';
+import { planZone, staticZone, zoneAt, exitState, outsideZone } from './zone.js';
 import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 import { MODE } from './modes.js';
 
@@ -50,6 +50,13 @@ export class World {
     this.potMode = m.kind !== 'raid';
     this.teamSize = m.kind === 'team' ? m.teamSize : 0;
     this.fixedWeapon = m.weapon ? WEAPONS.findIndex((w) => w.id === m.weapon) : -1;
+    this.dm = m.kind === 'dm'; // deathmatch: respawns, most kills wins, no storm
+    this.hardcore = !!m.hardcore; // one hit and you're down
+    this.shop = !!m.shop; // guns + lasers: credits buy medkits, turrets and tripmines
+    this.maxHp = this.hardcore ? 1 : CFG.HP;
+    this.turrets = new Map();
+    this.mines = new Map();
+    this.leaderId = null;
     this.pot = 0; // pot modes: every net stake, paid to the winners at the end
     this.sides = 0; // how many sides (players, or teams) entered
     this.difficulty = practice ? difficulty ?? 'easy' : 'normal';
@@ -66,7 +73,7 @@ export class World {
     this.roundNo = roundNo;
     this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
-    this.zonePlan = planZone(this.map, this.rnd, roundSeconds);
+    this.zonePlan = this.dm ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);
     this.zone = zoneAt(this.zonePlan, 0);
     this.exitStates = this.map.extracts.map((e) => exitState(this.zonePlan, this.zone, e));
     this.time = 0;
@@ -180,7 +187,7 @@ export class World {
       dashDx: 0,
       dashDy: 0,
       aim: 0,
-      hp: CFG.HP,
+      hp: this.maxHp,
       shield: this.practice && !isBot ? PRACTICE_SPAWN_SHIELD : CFG.SPAWN_SHIELD,
       bag,
       startBag: bag,
@@ -196,6 +203,9 @@ export class World {
       extId: -1,
       status: 'alive',
       kills: 0,
+      deaths: 0,
+      cr: this.shop ? GL.START : 0, // guns + lasers credits
+      respawnAt: null,
       dmgDealt: 0,
       bestMulti: 0,
       firstBlood: false,
@@ -280,6 +290,7 @@ export class World {
     this.tick++;
     this.time += DT;
     this.updateZone();
+    if (this.dm) for (const p of this.players.values()) if (p.status === 'dead' && p.respawnAt !== null && this.time >= p.respawnAt) this.respawn(p);
 
     for (const [id, brain] of this.brains) {
       const p = this.players.get(id);
@@ -314,14 +325,14 @@ export class World {
       // the storm: damage outside the circle, and no regen while you're in it
       p.inStorm = outsideZone(this.zone, p.x, p.y);
       if (p.inStorm) {
-        p.hp -= this.zone.dps * DT;
+        p.hp -= ((this.zone.dps * this.maxHp) / CFG.HP) * DT;
         p.lastHit = this.time;
         if (p.hp <= 0) {
           this.kill(p, null, 'storm');
           continue;
         }
-      } else if (p.hp < CFG.HP && this.time - p.lastHit > CFG.REGEN_DELAY) {
-        p.hp = Math.min(CFG.HP, p.hp + CFG.REGEN_RATE * DT);
+      } else if (p.hp < this.maxHp && this.time - p.lastHit > CFG.REGEN_DELAY) {
+        p.hp = Math.min(this.maxHp, p.hp + ((CFG.REGEN_RATE * this.maxHp) / CFG.HP) * DT);
       }
 
       let zone = null;
@@ -343,19 +354,24 @@ export class World {
       }
     }
 
+    if (this.shop) {
+      this.stepTurrets();
+      this.stepMines();
+    }
     this.stepBullets();
     this.pickups();
     this.spawnLoot();
     this.announce();
-    if (this.potMode && this.sides > 1 && this.aliveSides().size <= 1) this.end();
+    if (this.potMode && !this.dm && this.sides > 1 && this.aliveSides().size <= 1) this.end();
     else if (this.time >= this.duration - 1e-9) this.end();
-    else if (this.practice && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
+    else if (this.practice && !this.dm && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
   }
 
   updateZone() {
     const before = this.zone;
     this.zone = zoneAt(this.zonePlan, this.time);
     const z = this.zone;
+    if (this.dm) return; // no storm in deathmatch
     if (z.shrinking && !before.shrinking) this.emit({ k: 'storm', text: z.stage === this.zonePlan.times.length ? (this.potMode ? 'storm.finalPot' : 'storm.final') : 'storm.closing' });
     if (!z.shrinking && !z.final && z.until <= 5 && !this.warned[`storm${z.stage}`]) {
       this.warned[`storm${z.stage}`] = true;
@@ -391,6 +407,7 @@ export class World {
         dmg: wp.dmg,
         dist: 0,
         skin: p.ws?.[wp.id] ?? null, // the shooter's weapon skin: clients draw its tracer
+        cause: 'shot',
       };
       this.bullets.set(b.id, b);
     }
@@ -416,7 +433,16 @@ export class World {
         best = q;
       }
     }
-    if (best) this.damage(best, p, wp.dmg);
+    if (best) return this.damage(best, p, wp.dmg);
+    // nobody in reach: a knife still wrecks a turret or a tripmine
+    if (!this.shop) return;
+    for (const o of [...this.turrets.values(), ...this.mines.values()]) {
+      if (!this.hostile(o, p) || Math.hypot(o.x - p.x, o.y - p.y) > wp.reach + CFG.PLAYER_R + 14) continue;
+      let da = Math.atan2(o.y - p.y, o.x - p.x) - p.aim;
+      while (da > Math.PI) da -= Math.PI * 2;
+      while (da < -Math.PI) da += Math.PI * 2;
+      if (Math.abs(da) <= wp.arc / 2) return this.hitGadget(o, p, wp.dmg);
+    }
   }
 
   stepBullets() {
@@ -435,9 +461,28 @@ export class World {
           victim = p;
         }
       }
+      // guns + lasers: turrets and tripmines stop bullets and can be shot to pieces
+      let gadget = null;
+      if (this.shop) {
+        const owner = this.players.get(b.owner);
+        for (const o of [...this.turrets.values(), ...this.mines.values()]) {
+          if (!this.hostile(o, owner)) continue;
+          const t = segCircle(b.x, b.y, nx, ny, o.x, o.y, o.kind === 'turret' ? 16 : 9);
+          if (t >= 0 && t < tMin) {
+            tMin = t;
+            gadget = o;
+            victim = null;
+          }
+        }
+      }
+      if (gadget) {
+        this.bullets.delete(b.id);
+        this.hitGadget(gadget, this.players.get(b.owner), b.dmg);
+        continue;
+      }
       if (victim) {
         this.bullets.delete(b.id);
-        this.damage(victim, this.players.get(b.owner), b.dmg);
+        this.damage(victim, this.players.get(b.owner), b.dmg, b.cause);
         continue;
       }
       if (tWall >= 0) {
@@ -451,10 +496,11 @@ export class World {
     }
   }
 
-  damage(v, shooter, amount) {
+  damage(v, shooter, amount, cause = 'shot') {
     if (v.shield > 0) return;
     if (shooter && shooter !== v && this.teamSize && shooter.team === v.team) return; // no friendly fire
     if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE[this.difficulty] ?? 0.5 : BOT_DAMAGE;
+    if (this.hardcore) amount = Math.max(amount, v.hp); // one hit is enough
     if (shooter && shooter !== v) {
       shooter.dmgDealt += Math.min(amount, Math.max(0, v.hp));
       const k = shooter.isBot && v.isBot ? XP.botOnBotDamage : 1;
@@ -465,7 +511,7 @@ export class World {
     v.lastHit = this.time;
     v.ext = 0;
     this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y) });
-    if (v.hp <= 0) this.kill(v, shooter);
+    if (v.hp <= 0) this.kill(v, shooter, cause);
   }
 
   kill(v, killer, cause = 'shot') {
@@ -481,13 +527,183 @@ export class World {
       this.drops.set(d.id, d);
     }
     v.bag = 0;
-    if (killer) {
+    v.deaths++;
+    if (this.dm && this.phase === 'live') v.respawnAt = this.time + CFG.RESPAWN;
+    if (killer && killer !== v) {
       killer.kills++;
+      if (this.shop) killer.cr = Math.min(GL.MAX, killer.cr + GL.KILL);
       this.addXp(killer, killer.isBot && v.isBot ? XP.botOnBot : XP.kill);
       this.streak(killer);
     }
     // public feed: names only, never amounts
     this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id, cause });
+    if (this.dm && killer && killer !== v) this.checkLead();
+  }
+
+  // ------------------------------------------------------------ deathmatch
+
+  // Back in: a fresh spawn away from everyone, full health, a moment of spawn shield.
+  // You keep your kills, your place on the weapon ladder and your credits.
+  respawn(p) {
+    const others = [...this.players.values()].filter((o) => o.status === 'alive');
+    const pos = findSpawn(this.map, this.rnd, others, this.zone);
+    Object.assign(p, {
+      x: pos.x,
+      y: pos.y,
+      vx: 0,
+      vy: 0,
+      dashT: 0,
+      hp: this.maxHp,
+      shield: CFG.SPAWN_SHIELD,
+      status: 'alive',
+      respawnAt: null,
+      endedAt: null,
+      fireCd: 0,
+      multi: 0,
+      lastHit: -99,
+      inStorm: false,
+      watchId: null,
+    });
+    p.queue.length = 0;
+    p.last = sanitizeInput({ s: p.ack });
+    this.brains.get(p.id)?.reset();
+    this.emit({ k: 'respawn', to: [p.id], pid: p.id });
+  }
+
+  // kill order, most kills first (fewer deaths breaks a tie for the scoreboard only)
+  standings() {
+    return [...this.players.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths || a.id - b.id);
+  }
+
+  // The announcer tells the new sole leader they took the lead, and the old one they lost it.
+  checkLead() {
+    const [a, b] = this.standings();
+    const lead = a && a.kills > 0 && (!b || a.kills > b.kills) ? a : null;
+    if (!lead || lead.id === this.leaderId) return;
+    const old = this.leaderId ? this.players.get(this.leaderId) : null;
+    this.leaderId = lead.id;
+    this.emit({ k: 'lead', to: [lead.id], pid: lead.id });
+    if (old) this.emit({ k: 'lostLead', to: [old.id], pid: old.id });
+    this.emit({ k: 'leader', name: lead.name, pid: lead.id, kills: lead.kills });
+  }
+
+  // ------------------------------------------------------- guns + lasers
+
+  // can this gadget hurt (or be hurt by) that runner? Never its owner or the owner's team.
+  hostile(o, p) {
+    if (!p || p.id === o.owner) return false;
+    return !(this.teamSize && p.team === o.team);
+  }
+
+  buy(id, item) {
+    const p = this.players.get(id);
+    const it = Object.hasOwn(GL.ITEMS, item) ? GL.ITEMS[item] : null;
+    if (!this.shop || !it || !p || p.status !== 'alive' || this.phase !== 'live') return false;
+    const no = (why) => {
+      this.emit({ k: 'buyFail', to: [p.id], item, why });
+      return false;
+    };
+    if (p.cr < it.cost) return no('cash');
+    if (item === 'medkit') {
+      if (p.hp >= this.maxHp) return no('full');
+      p.hp = Math.min(this.maxHp, p.hp + it.heal);
+    } else if (item === 'turret') {
+      if ([...this.turrets.values()].filter((o) => o.owner === p.id).length >= it.max) return no('limit');
+      // set down a step in front of you, or at your feet if a wall is in the way
+      const fx = p.x + Math.cos(p.aim) * 34;
+      const fy = p.y + Math.sin(p.aim) * 34;
+      const free = segWalls(p.x, p.y, fx, fy, this.map.walls) < 0;
+      const o = { id: this.nextId++, kind: 'turret', owner: p.id, team: p.team, x: free ? fx : p.x, y: free ? fy : p.y, a: p.aim, hp: it.hp, cd: 0.6, until: this.time + it.life, fc: 0 };
+      this.turrets.set(o.id, o);
+    } else if (item === 'mine') {
+      const mine = [...this.mines.values()].filter((o) => o.owner === p.id);
+      if (mine.length >= it.max) return no('limit');
+      // the beam runs from your feet the way you aim, to the first wall
+      const ex = p.x + Math.cos(p.aim) * it.len;
+      const ey = p.y + Math.sin(p.aim) * it.len;
+      const t = segWalls(p.x, p.y, ex, ey, this.map.walls);
+      const k = t >= 0 ? t : 1;
+      if (k * it.len < 60) return no('wall');
+      const o = { id: this.nextId++, kind: 'mine', owner: p.id, team: p.team, x: p.x, y: p.y, x2: p.x + (ex - p.x) * k, y2: p.y + (ey - p.y) * k, armAt: this.time + it.arm };
+      this.mines.set(o.id, o);
+    }
+    p.cr -= it.cost;
+    this.emit({ k: 'bought', to: [p.id], item, pid: p.id, x: r1(p.x), y: r1(p.y) });
+    return true;
+  }
+
+  hitGadget(o, by, dmg) {
+    if (o.kind === 'turret') {
+      o.hp -= dmg;
+      if (o.hp > 0) return;
+      this.turrets.delete(o.id);
+    } else this.mines.delete(o.id);
+    if (by && this.shop) by.cr = Math.min(GL.MAX, by.cr + GL.WRECK);
+    this.emit({ k: 'wreck', kind: o.kind, x: r1(o.x), y: r1(o.y), owner: o.owner, by: by?.id ?? 0 });
+  }
+
+  // Sentry turrets: turn toward the nearest enemy they can see and fire. Kills count for
+  // the owner, even while the owner is waiting to respawn.
+  stepTurrets() {
+    const it = GL.ITEMS.turret;
+    for (const o of this.turrets.values()) {
+      if (this.time >= o.until) {
+        this.turrets.delete(o.id);
+        this.emit({ k: 'wreck', kind: 'turret', x: r1(o.x), y: r1(o.y), owner: o.owner, by: 0 });
+        continue;
+      }
+      o.cd = Math.max(0, o.cd - DT);
+      let best = null;
+      let bd = it.range;
+      for (const p of this.players.values()) {
+        if (p.status !== 'alive' || p.shield > 0 || !this.hostile(o, p)) continue;
+        const d = Math.hypot(p.x - o.x, p.y - o.y);
+        if (d < bd && hasLOS(o.x, o.y, p.x, p.y, this.map.walls)) {
+          bd = d;
+          best = p;
+        }
+      }
+      if (!best) continue;
+      let da = Math.atan2(best.y - o.y, best.x - o.x) - o.a;
+      while (da > Math.PI) da -= Math.PI * 2;
+      while (da < -Math.PI) da += Math.PI * 2;
+      const turn = it.turn * DT;
+      o.a += Math.max(-turn, Math.min(turn, da));
+      if (Math.abs(da) > 0.12 || o.cd > 0) continue;
+      o.cd = it.cd;
+      o.fc = (o.fc + 1) % 1000;
+      const a = o.a + (this.rnd() - 0.5) * 0.06;
+      const b = { id: this.nextId++, owner: o.owner, x: o.x + Math.cos(a) * 18, y: o.y + Math.sin(a) * 18, vx: Math.cos(a) * 1000, vy: Math.sin(a) * 1000, speed: 1000, range: it.range + 40, dmg: it.dmg, dist: 0, skin: null, cause: 'turret' };
+      this.bullets.set(b.id, b);
+    }
+  }
+
+  // Laser tripmines: armed after a moment; an enemy crossing the beam sets it off.
+  stepMines() {
+    const it = GL.ITEMS.mine;
+    for (const o of this.mines.values()) {
+      if (this.time < o.armAt) continue;
+      let trip = null;
+      for (const p of this.players.values()) {
+        if (p.status !== 'alive' || p.shield > 0 || !this.hostile(o, p)) continue;
+        if (segCircle(o.x, o.y, o.x2, o.y2, p.x, p.y, CFG.PLAYER_R) >= 0) {
+          trip = p;
+          break;
+        }
+      }
+      if (!trip) continue;
+      this.mines.delete(o.id);
+      const bx = trip.x;
+      const by = trip.y;
+      this.emit({ k: 'boom', x: r1(bx), y: r1(by), mid: o.id });
+      const owner = this.players.get(o.owner);
+      for (const p of this.players.values()) {
+        if (p.status !== 'alive' || !this.hostile(o, p)) continue;
+        const d = Math.hypot(p.x - bx, p.y - by);
+        if (d > it.r) continue;
+        this.damage(p, owner, it.dmg * (1 - (0.6 * d) / it.r), 'mine');
+      }
+    }
   }
 
   // First blood for the whole raid; multi-kills (each within MULTI_WINDOW of the last) for the killer.
@@ -650,6 +866,7 @@ export class World {
   // Pot modes: the last side standing takes the pot. If the clock runs out first, the side
   // with the most runners alive wins (then most kills); a dead heat splits it among them.
   settlePot() {
+    if (this.dm) return this.settleKills();
     const alive = [...this.players.values()].filter((p) => p.status === 'alive');
     const score = new Map();
     for (const p of this.players.values()) {
@@ -674,6 +891,20 @@ export class World {
     const winners = this.teamSize ? [...this.players.values()].filter((p) => winSides.has(this.sideOf(p))) : alive.filter((p) => winSides.has(this.sideOf(p)));
     this.winners = winners.map((p) => p.id);
     if (!winners.length || this.pot <= 0) return;
+    this.payPot(winners);
+  }
+
+  // Deathmatch: the most kills takes the pot; a tie splits it. Nobody scored: it rolls over.
+  settleKills() {
+    const all = [...this.players.values()];
+    const top = Math.max(0, ...all.map((p) => p.kills));
+    const winners = top > 0 ? all.filter((p) => p.kills === top) : [];
+    this.winners = winners.map((p) => p.id);
+    if (!winners.length || this.pot <= 0) return;
+    this.payPot(winners);
+  }
+
+  payPot(winners) {
     const share = Math.floor(this.pot / winners.length);
     let rest = this.pot - share * winners.length;
     for (const p of winners) {
@@ -690,6 +921,14 @@ export class World {
   }
 
   end() {
+    if (this.dm) {
+      // everyone is still in it at the whistle, the fallen included
+      for (const p of this.players.values()) {
+        if (p.status !== 'dead') continue;
+        p.status = 'alive';
+        p.respawnAt = null;
+      }
+    }
     if (this.potMode) {
       this.settlePot();
       for (const p of this.players.values()) {
@@ -715,6 +954,8 @@ export class World {
     this.orbs.clear();
     this.drops.clear();
     this.bullets.clear();
+    this.turrets.clear();
+    this.mines.clear();
     this.lootPool = 0;
     this.emit({ k: 'end' });
   }
@@ -763,6 +1004,28 @@ export class World {
     return out;
   }
 
+  // deathmatch HUD: your place, deaths, respawn countdown and the top three
+  dmView(me) {
+    const order = this.standings();
+    return {
+      dth: me.deaths,
+      pl: order.indexOf(me) + 1,
+      rs: me.status === 'dead' && me.respawnAt !== null ? r2(Math.max(0, me.respawnAt - this.time)) : 0,
+      top: order.slice(0, 3).map((p) => [p.name, p.kills, p.id === me.id ? 1 : 0]),
+    };
+  }
+
+  // turrets and tripmines in sight range (tripmines by either end of the beam)
+  gadgetsNear(me, near) {
+    const pct = (o) => Math.ceil((o.hp / GL.ITEMS.turret.hp) * 100);
+    const mine = (o) => (o.owner === me.id ? 1 : this.teamSize && o.team === me.team ? 2 : 0);
+    const turrets = [];
+    for (const o of this.turrets.values()) if (near(o.x, o.y, 40)) turrets.push({ i: o.id, x: r1(o.x), y: r1(o.y), a: r2(o.a), h: pct(o), fc: o.fc, o: mine(o), tl: Math.ceil(o.until - this.time) });
+    const mines = [];
+    for (const o of this.mines.values()) if (near(o.x, o.y, 40) || near(o.x2, o.y2, 40) || near((o.x + o.x2) / 2, (o.y + o.y2) / 2, 40)) mines.push({ i: o.id, x: r1(o.x), y: r1(o.y), x2: r1(o.x2), y2: r1(o.y2), o: mine(o), arm: this.time >= o.armAt ? 1 : 0 });
+    return { turrets, mines };
+  }
+
   /**
    * What one runner is allowed to know. This is the privacy boundary:
    * other runners' bags are never serialised, only their own-chosen bluff size,
@@ -788,7 +1051,7 @@ export class World {
         x: r1(p.x),
         y: r1(p.y),
         a: r2(p.aim),
-        h: Math.ceil(p.hp),
+        h: Math.ceil((p.hp * CFG.HP) / this.maxHp), // health in % (hardcore runs on 1 hp)
         b: p.bluff,
         e: p.ext > 0 ? r2(p.ext) : 0,
         d: p.dashT > 0 ? 1 : 0,
@@ -826,7 +1089,7 @@ export class World {
         dashCd: me.dashCd,
         dashDx: me.dashDx,
         dashDy: me.dashDy,
-        hp: Math.ceil(me.hp),
+        hp: Math.ceil((me.hp * CFG.HP) / this.maxHp),
         shield: r2(me.shield),
         storm: me.inStorm && me.status === 'alive' ? 1 : 0,
         w: me.w,
@@ -846,8 +1109,11 @@ export class World {
         spect: eye !== me ? eye.name : null,
         ...(this.potMode ? { pot: this.pot, sides: this.aliveSides().size } : {}),
         ...(this.teamSize ? { tm: me.team } : {}),
+        ...(this.dm ? this.dmView(me) : {}),
+        ...(this.shop ? { cr: me.cr } : {}),
       },
       players,
+      ...(this.shop ? this.gadgetsNear(me, near) : {}),
       orbs,
       drops,
       bullets,

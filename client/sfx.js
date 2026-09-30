@@ -1,5 +1,6 @@
 import { store } from './store.js';
 import { Music } from './music.js';
+import { VOICE } from './voice-data.js';
 
 // Synthesized, spatial sound effects. No audio files: every sound is built from
 // oscillators and noise, then placed in stereo by where it happens on screen and
@@ -312,6 +313,15 @@ export class Sfx {
         [659, 988].forEach((f, i) => this.osc(v, { type: 'triangle', f, dur: 0.25, vol: 0.12, at: i * 0.08 }));
         break;
       }
+      case 'boom': {
+        // tripmine: a crack, a deep body and a rolling tail
+        const v = this.voice(o, 1.4, 0.8);
+        this.noise(v, { dur: 0.03, vol: 0.9, type: 'highpass', f: 2500 });
+        this.osc(v, { f: 90 * r, to: 24, dur: 0.7, vol: 1 });
+        this.noise(v, { dur: 1.3, vol: 0.9, type: 'lowpass', f: 1800, to: 90, brown: true });
+        this.noise(v, { dur: 0.5, vol: 0.4, f: 700, to: 200, q: 0.7, at: 0.05 });
+        break;
+      }
       case 'storm':
         this.noise(this.voice({}, 0.8, 0.6), { dur: 1.4, vol: 0.4, type: 'lowpass', f: 900, to: 120, brown: true, attack: 0.1 });
         break;
@@ -389,32 +399,58 @@ export class Sfx {
     }
   }
 
-  // Announcer voice through the browser's speech engine, in the player's language, pitched
-  // down, with the best voice the device has (neural/online voices first). Best effort.
-  say(text, tier = 1, lang = 'en') {
-    if (this.muted || this.voiceOff || !('speechSynthesis' in window)) return;
-    const LOCALE = { en: 'en-US', uk: 'uk-UA', ru: 'ru-RU', es: 'es-ES', fr: 'fr-FR', pt: 'pt-BR', tr: 'tr-TR', zh: 'zh-CN', hi: 'hi-IN', ar: 'ar-SA' };
-    setTimeout(() => {
+  // Announcer: recorded lines (voice-data.js) in the player's language, English where a
+  // language has no recording. Played through the effects bus with a little extra punch
+  // and a hall tail, so it follows the sound volume and mute. Keys: s1..s5 (kill streaks),
+  // victory, extracted, final, lead, lostLead.
+  say(key, lang = 'en', delay = 0.15) {
+    if (this.muted || this.voiceOff || !this.ctx) return;
+    const src = VOICE[lang]?.[key] ? VOICE[lang][key] : VOICE.en[key];
+    if (!src) return;
+    this.voiceBufs ??= new Map();
+    const id = `${VOICE[lang]?.[key] ? lang : 'en'}:${key}`;
+    const play = (buf) => {
+      const c = this.ctx;
+      const t = c.currentTime + delay;
+      // one line at a time: a new call cuts the previous one
       try {
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = LOCALE[lang] ?? 'en-US';
-        u.pitch = [0.6, 0.5, 0.6, 0.55, 0.45, 0.35][tier] ?? 0.55;
-        u.rate = tier >= 4 ? 0.82 : 0.95;
-        u.volume = Math.min(1, 0.4 + (this.volume ?? 1));
-        const voices = speechSynthesis.getVoices();
-        const mine = voices.filter((v) => v.lang?.toLowerCase().startsWith(lang));
-        const rank = (v) => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 3 : 0) + (/google|microsoft|siri/i.test(v.name) ? 2 : 0) + (/male|daniel|fred|alex|dmitri|pavel|jorge|thomas|yuri|maxim/i.test(v.name) ? 1 : 0);
-        const pick = mine.sort((a, b) => rank(b) - rank(a))[0] ?? voices.find((v) => /^en/i.test(v.lang));
-        if (pick) {
-          u.voice = pick;
-          if (!mine.length) u.lang = pick.lang;
-        }
-        speechSynthesis.cancel();
-        speechSynthesis.speak(u);
+        this.voiceNow?.stop();
       } catch {
-        /* no speech engine: the sting still plays */
+        /* already ended */
       }
-    }, tier === 1 ? 420 : 180);
+      const n = c.createBufferSource();
+      n.buffer = buf;
+      const lo = c.createBiquadFilter();
+      lo.type = 'lowshelf';
+      lo.frequency.value = 180;
+      lo.gain.value = 5;
+      const pres = c.createBiquadFilter();
+      pres.type = 'peaking';
+      pres.frequency.value = 2800;
+      pres.Q.value = 0.8;
+      pres.gain.value = 3;
+      const g = c.createGain();
+      g.gain.value = 1.35;
+      const wet = c.createGain();
+      wet.gain.value = 0.22;
+      n.connect(lo).connect(pres).connect(g);
+      g.connect(this.master);
+      g.connect(wet).connect(this.verbIn);
+      // duck the music under the voice
+      this.music?.duck?.(buf.duration + 0.2);
+      n.start(t);
+      this.voiceNow = n;
+    };
+    const cached = this.voiceBufs.get(id);
+    if (cached) return play(cached);
+    const bin = Uint8Array.from(atob(src), (ch) => ch.charCodeAt(0));
+    this.ctx.decodeAudioData(bin.buffer).then(
+      (buf) => {
+        this.voiceBufs.set(id, buf);
+        play(buf);
+      },
+      () => {},
+    );
   }
 
   // Continuous storm bed; level 0..1 follows how close you are to (or deep in) the storm.
