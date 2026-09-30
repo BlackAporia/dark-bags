@@ -1,9 +1,10 @@
-// Builds single-file versions of the client (practice mode works with no server):
-//   dist/index.html     full page, for GitHub Pages or any static host
-//   dist/artifact.html  body-only fragment for embedding hosts that supply the <head>
+// Builds the static site for GitHub Pages:
+//   dist/index.html, site.css, site.js, media/  the landing page (site/)
+//   dist/play/index.html  the game as one file (practice mode works with no server)
+//   dist/artifact.html    body-only fragment of the game for embedding hosts that supply the <head>
 // Set DARK_BAGS_SERVER=wss://your-server to point the static build's Online mode at a game server.
 import { build } from 'esbuild';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, cp, rm } from 'node:fs/promises';
 
 const bundle = await build({
   entryPoints: ['client/main.js'],
@@ -37,8 +38,10 @@ function page(artifact) {
   return out;
 }
 
-await mkdir('dist', { recursive: true });
-await writeFile('dist/index.html', page(false));
+await rm('dist', { recursive: true, force: true });
+await mkdir('dist/play', { recursive: true });
+await cp('site', 'dist', { recursive: true });
+await writeFile('dist/play/index.html', page(false));
 await writeFile('dist/artifact.html', page(true));
 const kb = (s) => `${(Buffer.byteLength(s) / 1024).toFixed(0)} KB`;
-console.log(`dist/index.html ${kb(page(false))}, dist/artifact.html ${kb(page(true))}${server ? `, online → ${server}` : ''}`);
+console.log(`dist/index.html (landing), dist/play/index.html ${kb(page(false))}, dist/artifact.html ${kb(page(true))}${server ? `, online → ${server}` : ''}`);

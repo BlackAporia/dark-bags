@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DARK BAGS · Stake. Loot. Get out.</title>
+<meta name="description" content="DARK BAGS is a fast top-down extraction shooter in the browser. Stake a bag, start with a knife, level up your gun on every kill, loot in the dark and get out before the storm seals the raid.">
+<meta name="theme-color" content="#07090f">
+<meta property="og:type" content="website">
+<meta property="og:title" content="DARK BAGS · Stake. Loot. Get out.">
+<meta property="og:description" content="A top-down extraction shooter in your browser. 14 modes, loot bags, skins, guilds. Play free, on PC or phone.">
+<meta property="og:image" content="media/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307090f'/%3E%3Cpath d='M18 26h28l-3 26H21z' fill='%23f7931a'/%3E%3Cpath d='M25 26v-4a7 7 0 0 1 14 0v4' fill='none' stroke='%23ebe5d6' stroke-width='4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;900&family=Chakra+Petch:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="bar" id="bar">
+  <a class="logo" href="#top" aria-label="DARK BAGS"><span>DARK</span><b>BAGS</b></a>
+  <nav class="bar-nav" aria-label="Sections">
+    <a href="#how" data-t="nav.how">How it works</a>
+    <a href="#trailer" data-t="nav.trailer">Trailer</a>
+    <a href="#modes" data-t="nav.modes">Modes</a>
+    <a href="#features" data-t="nav.features">Features</a>
+    <a href="#faq" data-t="nav.faq">FAQ</a>
+  </nav>
+  <div class="bar-end">
+    <div class="langs" role="group" aria-label="Language">
+      <button type="button" data-lang="en">EN</button><button type="button" data-lang="uk">UK</button><button type="button" data-lang="ru">RU</button>
+    </div>
+    <a class="btn btn-play sm" href="play/" data-t="cta.play">Play now</a>
+  </div>
+</header>
+
+<main id="top">
+  <!-- hero: the raid plays behind a flashlight that follows you -->
+  <section class="hero" id="hero">
+    <video class="hero-vid" poster="media/hero.jpg" autoplay muted loop playsinline preload="auto" aria-hidden="true"><source src="media/hero.mp4" type="video/mp4"><source src="media/hero.webm" type="video/webm"></video>
+    <div class="hero-dark" aria-hidden="true"></div>
+    <canvas class="hero-fx" id="hero-fx" aria-hidden="true"></canvas>
+    <div class="hero-in">
+      <p class="live" id="live" hidden><i></i><span id="live-n">0</span>&nbsp;<span data-t="hero.online">online now</span></p>
+      <h1 class="title" aria-label="DARK BAGS">
+        <span class="t1" data-glitch="DARK">DARK</span>
+        <span class="t2" data-glitch="BAGS">BAGS</span>
+      </h1>
+      <p class="tag"><span data-t="hero.tag1">Stake.</span> <span data-t="hero.tag2">Loot.</span> <b data-t="hero.tag3">Get out.</b></p>
+      <p class="lede" data-t="hero.lede">A fast top-down extraction shooter in your browser. Start with a knife, level up your gun on every kill, grab the bags your rivals drop and reach an exit before the storm seals the raid.</p>
+      <div class="hero-cta">
+        <a class="btn btn-play magnet" href="play/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span data-t="cta.playFree">Play free</span></a>
+        <a class="btn btn-ghost magnet" href="#trailer"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5v7l6-3.5z"/></svg><span data-t="cta.trailer">Watch the trailer</span></a>
+      </div>
+      <ul class="hero-facts">
+        <li><b>14</b><span data-t="fact.modes">modes</span></li>
+        <li><b>2–20</b><span data-t="fact.players">runners a raid</span></li>
+        <li><b>3</b><span data-t="fact.min">minutes a round</span></li>
+        <li><b>0</b><span data-t="fact.install">installs: PC &amp; phone</span></li>
+      </ul>
+    </div>
+    <a class="scroll-cue" href="#how" aria-label="Scroll"><i></i></a>
+  </section>
+
+  <!-- the kill feed, as a ticker -->
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track" id="ticker"></div>
+  </div>
+
+  <!-- how a raid works -->
+  <section class="sec how" id="how">
+    <p class="eyebrow reveal" data-t="how.eyebrow">One raid, three minutes</p>
+    <h2 class="h2 reveal" data-t="how.h">In with a bag. Out with more. Or not at all.</h2>
+    <ol class="steps">
+      <li class="step reveal">
+        <div class="step-ico"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M14 24h36l-4 30H18z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M24 24v-5a8 8 0 0 1 16 0v5" fill="none" stroke="currentColor" stroke-width="4"/><text x="32" y="46" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor">$</text></svg></div>
+        <span class="step-n">01</span>
+        <h3 data-t="how.s1">Stake your bag</h3>
+        <p data-t="how.s1p">Pick a mode and a table. Your stake goes in your bag, and everyone can see roughly how full it looks. Bluff it lighter or heavier.</p>
+      </li>
+      <li class="step reveal">
+        <div class="step-ico"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 50 44 14l6 2 2 6-36 36-8 2z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M36 22l6 6" stroke="currentColor" stroke-width="4"/></svg></div>
+        <span class="step-n">02</span>
+        <h3 data-t="how.s2">Fight up the ladder</h3>
+        <p data-t="how.s2p">Everyone starts with a knife. Every kill levels your weapon: pistol, shotgun, SMG, rifle, sniper. Drop a runner and their bag is yours to grab.</p>
+      </li>
+      <li class="step reveal">
+        <div class="step-ico"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="6 6"/><path d="M26 32h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <span class="step-n">03</span>
+        <h3 data-t="how.s3">Extract before the storm</h3>
+        <p data-t="how.s3p">Exits open and close as the storm closes in. Stand still in one to cash out whatever is in your bag. Get hit and the timer resets.</p>
+      </li>
+    </ol>
+    <div class="bagmeter reveal" aria-hidden="true">
+      <span class="bm-label" data-t="how.bag">Your bag</span>
+      <b class="bm-num" id="bag-num">$1.00</b>
+      <div class="bm-track"><i id="bag-bar"></i></div>
+      <span class="bm-feed" id="bag-feed"></span>
+    </div>
+  </section>
+
+  <!-- trailer -->
+  <section class="sec trailer" id="trailer">
+    <p class="eyebrow reveal" data-t="tr.eyebrow">Straight from the game</p>
+    <h2 class="h2 reveal" data-t="tr.h">30 seconds of raid</h2>
+    <div class="screen reveal" id="screen">
+      <video id="demo" poster="media/poster.jpg" preload="none" playsinline controls muted>
+        <source src="media/demo.mp4" type="video/mp4">
+        <source src="media/demo.webm" type="video/webm">
+      </video>
+      <button type="button" class="screen-play" id="demo-play" aria-label="Play the trailer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
+      <span class="screen-corner tl" aria-hidden="true"></span><span class="screen-corner tr" aria-hidden="true"></span><span class="screen-corner bl" aria-hidden="true"></span><span class="screen-corner br" aria-hidden="true"></span>
+    </div>
+    <p class="fine reveal" data-t="tr.note">Recorded in practice mode against bots: what you see is exactly what runs in your browser.</p>
+  </section>
+
+  <!-- modes -->
+  <section class="sec modes" id="modes">
+    <p class="eyebrow reveal" data-t="md.eyebrow">14 ways to lose your bag</p>
+    <h2 class="h2 reveal" data-t="md.h">Pick your fight</h2>
+    <div class="mode-grid" id="mode-grid"></div>
+  </section>
+
+  <!-- features -->
+  <section class="sec features" id="features">
+    <p class="eyebrow reveal" data-t="ft.eyebrow">Everything else</p>
+    <h2 class="h2 reveal" data-t="ft.h">Built to come back to</h2>
+    <div class="bento">
+      <article class="card big reveal tilt">
+        <img src="media/reveal.jpg" alt="" loading="lazy">
+        <div class="card-in"><h3 data-t="ft.skins">Loot bags &amp; skins</h3><p data-t="ft.skinsP">Outfit bags and weapon crates in nine tiers, from $0.49. Exact odds shown, pity built in, every 10th box free. Cosmetic only: skins never change the fight.</p></div>
+      </article>
+      <article class="card wide reveal tilt">
+        <img src="media/phone.jpg" alt="" loading="lazy">
+        <div class="card-in"><h3 data-t="ft.phone">Plays on your phone</h3><p data-t="ft.phoneP">Hold it sideways: a move stick, one Fire button that aims itself, loot picks up on its own.</p></div>
+      </article>
+      <article class="card reveal tilt">
+        <div class="card-ico">🛡</div>
+        <div class="card-in"><h3 data-t="ft.social">Friends, guilds, chat</h3><p data-t="ft.socialP">Add friends, message them, invite them into your room. Found a guild at rank 20 and talk in its own chat.</p></div>
+      </article>
+      <article class="card reveal tilt">
+        <div class="card-ico">🏆</div>
+        <div class="card-in"><h3 data-t="ft.ranks">Ranks &amp; achievements</h3><p data-t="ft.ranksP">Every raid pays XP, win or lose. Unlock titles that show over your head in the next raid.</p></div>
+      </article>
+      <article class="card reveal tilt">
+        <div class="card-ico">◎</div>
+        <div class="card-in"><h3 data-t="ft.chain">Your wallet, your cash-out</h3><p data-t="ft.chainP">Sign in with Ready, Braavos, Cartridge or just an email. Deposits and cash-outs on Starknet, and a cash-out only ever goes back to the address you signed in with.</p></div>
+      </article>
+      <article class="card reveal tilt">
+        <div class="card-ico">⚖</div>
+        <div class="card-in"><h3 data-t="ft.fair">Server decides, not your screen</h3><p data-t="ft.fairP">Every hit, drop and payout is worked out on the server. Your browser only sends where you move and aim.</p></div>
+      </article>
+      <article class="card wide reveal tilt">
+        <img src="media/menu.jpg" alt="" loading="lazy">
+        <div class="card-in"><h3 data-t="ft.lang">10 languages, live ping, waiting rooms</h3><p data-t="ft.langP">English, Українська, Русский, Español, Français, Português, Türkçe, 中文, हिन्दी, العربية. See who waits in which room and jump in.</p></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- roadmap -->
+  <section class="sec road" id="road">
+    <p class="eyebrow reveal" data-t="rd.eyebrow">Where we are</p>
+    <h2 class="h2 reveal" data-t="rd.h">Road to launch</h2>
+    <ol class="road-line">
+      <li class="reveal now"><span class="dot"></span><b data-t="rd.1">Public testnet</b><p data-t="rd.1p">Live now. Play online on Starknet Sepolia with free test tokens. Break it, tell us.</p><em data-t="rd.now">Now</em></li>
+      <li class="reveal"><span class="dot"></span><b data-t="rd.2">Closed mainnet beta</b><p data-t="rd.2p">Real tokens with small caps, for invited players.</p></li>
+      <li class="reveal"><span class="dot"></span><b data-t="rd.3">Launch</b><p data-t="rd.3p">Open doors, tournaments and seasons, where the law allows it.</p></li>
+    </ol>
+  </section>
+
+  <!-- FAQ -->
+  <section class="sec faq" id="faq">
+    <p class="eyebrow reveal" data-t="fq.eyebrow">Questions</p>
+    <h2 class="h2 reveal" data-t="fq.h">Before you drop in</h2>
+    <div class="faq-list">
+      <details class="reveal"><summary data-t="fq.q1">Is it free?</summary><p data-t="fq.a1">Yes. Practice mode against bots needs nothing at all, not even an account. Online play on the testnet uses free test tokens.</p></details>
+      <details class="reveal"><summary data-t="fq.q2">Do I need crypto to play?</summary><p data-t="fq.a2">No. You can play practice right away. For online testnet play, sign in with a Starknet wallet or with email and grab test tokens from a faucet.</p></details>
+      <details class="reveal"><summary data-t="fq.q3">Is there real money in it right now?</summary><p data-t="fq.a3">Not yet. The public test runs on Starknet Sepolia, where tokens have no value. Real-token play comes later as a closed beta, only for adults and only where it is legal.</p></details>
+      <details class="reveal"><summary data-t="fq.q4">Does it work on my phone?</summary><p data-t="fq.a4">Yes, in the browser. Turn the phone sideways: move with the left stick, hold Fire on the right.</p></details>
+      <details class="reveal"><summary data-t="fq.q5">Can people cheat?</summary><p data-t="fq.a5">The server runs the raid and checks every move, hit and payout. The game in your browser only draws what the server says happened.</p></details>
+    </div>
+  </section>
+
+  <!-- final call -->
+  <section class="final" id="final">
+    <img class="final-bg" src="media/fight.jpg" alt="" loading="lazy" aria-hidden="true">
+    <div class="final-in reveal">
+      <h2 class="h2 big" data-t="fn.h">The storm is already moving.</h2>
+      <p class="lede" data-t="fn.p">No download, no sign-up for practice. One click and you are in the dark with a knife.</p>
+      <a class="btn btn-play xl magnet" href="play/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span data-t="cta.enter">Enter the raid</span></a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <a class="logo" href="#top" aria-label="DARK BAGS"><span>DARK</span><b>BAGS</b></a>
+  <p class="fine" data-t="ft.foot">Testnet beta. Tokens on Sepolia have no value. Real-token play: 18+ and only where legal.</p>
+  <a class="btn btn-ghost sm" href="play/" data-t="cta.play">Play now</a>
+</footer>
+
+<script src="site.js" defer></script>
+</body>
+</html>

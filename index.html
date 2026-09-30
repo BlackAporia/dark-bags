@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DARK BAGS</title>
-<meta http-equiv="refresh" content="0; url=client/">
+<meta http-equiv="refresh" content="0; url=site/">
 <style>body{margin:0;background:#07090f;color:#ebe5d6;font:15px system-ui,sans-serif;display:grid;place-items:center;height:100vh}a{color:#f7931a}</style>
 </head>
 <body>
-<!-- Pages "deploy from a branch" fallback: the game runs from client/ as plain ES modules.
-     The GitHub Actions source (pages.yml) publishes the bundled single-file build instead. -->
-<p><a href="client/">Enter DARK BAGS</a></p>
-<script>location.replace('client/' + location.search + location.hash);</script>
+<!-- Pages "deploy from a branch" fallback: the landing page is site/, the game runs from
+     client/ as plain ES modules. The GitHub Actions source (pages.yml) publishes the built
+     site instead: landing at the root, the one-file game at play/. -->
+<p><a href="site/">DARK BAGS</a></p>
+<script>location.replace((/[?&]server=/.test(location.search) ? 'client/' : 'site/') + location.search + location.hash);</script>
 </body>
 </html>

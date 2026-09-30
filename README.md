@@ -8,7 +8,7 @@ A browser extraction game played for dollars. Think Escape from Tarkov crossed w
 
 ## Play it
 
-**In the browser: <https://blackaporia.github.io/dark-bags/>** (practice vs bots, runs entirely in the page). GitHub Pages serves it straight from `main` (Settings → Pages → Deploy from a branch: `main` / root; the root `index.html` forwards to `client/`).
+**Site: <https://blackaporia.github.io/dark-bags/>** (landing page with the trailer) · **Game: <https://blackaporia.github.io/dark-bags/play/>** (practice vs bots runs entirely in the page). The Pages workflow publishes `npm run build`: the landing page from `site/` at the root and the one-file game at `play/`. Served straight from a branch instead, the root `index.html` forwards to `site/`, whose Play buttons then lead to `client/`.
 
 It opens with a short intro and a real loading bar, then the menu: **Play** (your runner, rank, mode, stake, coin), **Shop** (bags and crates), **Inventory**, **Swap**, **Chat**, **Achievements** and **Settings**; a side rail on desktop, a bottom tab bar on phones. The UI speaks English, 中文, हिन्दी, Español, Français, العربية (right to left), Português, Українська, Русский and Türkçe. Your first three raids show short hints (controls, loot, when and how to get out). For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
 
@@ -44,7 +44,7 @@ Other commands:
 ```bash
 npm test             # rules, economy, privacy, netcode, rooms (node:test, no deps)
 npm run sim -- 4     # headless bot raids, prints the ledger per raid
-npm run build        # dist/index.html: the whole game in one ~1.2 MB file (practice mode)
+npm run build        # dist/: landing page (site/) + dist/play/index.html, the whole game in one file
 npm run build:wallets # client/vendor/wallets.js: the wallet layer for real-token mode
 npm run dev          # server with auto-restart
 npm run house -- status   # operator console for real-token mode
