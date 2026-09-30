@@ -450,4 +450,6 @@ export default {
   'set.language': "Dil",
   'shop.exoticIn': "Egzotik için",
   'shop.guarantee': "{n} açılışta garantili Egzotik",
+  'set.voice': "Spiker",
+  'set.voiceNote': "İlk kan, çifte öldürme ve fazlası, kendi dilinde.",
 };

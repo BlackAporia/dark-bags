@@ -2,7 +2,7 @@
 // a walk cycle, weapons held at the aim. Figures stand upright on the map
 // (billboards), with their feet on the runner's position.
 import { WEAPONS } from '../shared/weapons.js';
-import { OUTFIT, FINISH } from '../shared/cosmetics.js';
+import { OUTFIT, FINISH, modelFor } from '../shared/cosmetics.js';
 
 export const FEET = 16; // world units from the runner's centre down to the feet
 const THIGH = 10;
@@ -20,7 +20,40 @@ const ART = {
   rifle: { lines: [[-9, 1.5, 0, 0, 2.8], [0, -1, 20, -1, 3], [8, 0, 10.5, 7, 2.4], [20, -1, 28, -1, 1.8]], length: 28, support: 13, kick: 3 },
   sniper: { lines: [[-10, 1.8, 0, 0, 2.8], [0, -1, 34, -1, 2.6], [6, -4.5, 16, -4.5, 2.4], [6, -4.5, 6, -1, 1.4], [16, -4.5, 16, -1, 1.4], [26, 0, 28, 4.5, 1.4]], length: 34, support: 18, kick: 9 },
 };
-export const weaponArt = (w) => ART[WEAPONS[w]?.id ?? 'knife'];
+// Skin models (cosmetic): same hands and timing as the base weapon, a different silhouette.
+// energy: the barrel or blade glows in the skin colour; blade: the lines that glow.
+const MODEL_ART = {
+  dagger: { lines: [[-5, 0, 2, 0, 3.4], [2, -3, 2, 3, 2], [2, 0, 15, 0, 2.6], [15, 0, 18, 0, 1.4]], length: 18 },
+  machete: { lines: [[-6, 0, 2, 0, 3.6], [2, -3, 2, 3, 2], [2, 0, 24, -1, 3.6], [24, -1, 27, -3.5, 2.2]], length: 27 },
+  tanto: { lines: [[-6, 0, 2, 0, 3.6], [2, -3.2, 2, 3.2, 2.2], [2, -0.5, 16, -0.5, 3], [16, -0.5, 19.5, -3, 2.4]], length: 19 },
+  cleaver: { lines: [[-6, 0, 2, 0, 3.6], [3, 1.8, 16, 1.8, 6.5], [3, 5, 16, 5, 1]], length: 16 },
+  axe: { lines: [[-8, 0, 17, 0, 2.8], [13, -1, 13, -8, 3], [13, -8, 20, -10.5, 2.2], [20, -10.5, 20, -2.5, 2.6], [20, -2.5, 13, -1, 2]], length: 20 },
+  katana: { lines: [[-10, 0, 1, 0, 3.2], [1, -3.8, 1, 3.8, 2.8], [1, -0.4, 18, -1.6, 2.6], [18, -1.6, 32, -4.5, 2.2], [-8, -1.3, -2, -1.3, 0.8]], length: 32 },
+  dual: { lines: [[-5, 0, 2, 0, 3.2], [2, -3, 2, 3, 2], [2, 0, 22, 0, 2.6], [-5, 6, 2, 6, 3.2], [2, 3, 2, 9, 2], [2, 6, 20, 9, 2.6]], length: 22 },
+  scythe: { lines: [[-12, 0, 22, 0, 2.6], [22, 0, 24, -4, 2.6], [24, -4, 15, -15, 3], [15, -15, 4, -13, 2]], length: 24 },
+  esword: { lines: [[-6, 0, 3, 0, 3.8], [3, -2.8, 3, 2.8, 2.2], [3, 0, 29, 0, 3.2]], length: 29, energy: [2] },
+  hammer: { lines: [[-9, 0, 18, 0, 2.8], [18, -7, 18, 7, 8], [15, -7, 15, 7, 1.4]], length: 22 },
+  revolver: { lines: [[0, 0, -2, 5.5, 2.8], [-2, -1.6, 12, -1.6, 2.4], [1, -1.4, 5, -1.4, 5.4]], length: 12, support: 0, kick: 4 },
+  deagle: { lines: [[0, 0, -2.5, 6, 3.2], [-2, -1.8, 13, -1.8, 3.8], [8, -3.8, 12, -3.8, 1.2]], length: 13, support: 0, kick: 5 },
+  blaster: { lines: [[0, 0, -2, 5.5, 2.6], [-2, -1.6, 8, -1.6, 4.4], [8, -1.6, 14, -1.6, 2], [3, -4.6, 9, -4.6, 1.6]], length: 14, support: 0, kick: 3, energy: [2, 3] },
+  double: { lines: [[-9, 2, 0, 0, 3], [0, -2.2, 23, -2.2, 2], [0, 0.6, 23, 0.6, 2], [6, 1.8, 12, 1.8, 2.8]], length: 23, support: 11, kick: 8 },
+  drum: { lines: [[-7, 1.5, 0, 0, 2.8], [0, -1, 21, -1, 3.2], [7, 3, 7, 3, 7], [21, -1, 23, -1, 2]], length: 23, support: 12, kick: 7 },
+  uzi: { lines: [[0, 0, 1, 8, 2.6], [-3, -1, 11, -1, 3.4], [11, -1, 14, -1, 1.6], [-3, -1, -6, 2, 1.4]], length: 14, support: 0, kick: 2 },
+  vector: { lines: [[-5, 0.5, 0, 0, 2.4], [0, -1, 14, -1, 3.8], [4, 0, 8, 7, 2.4], [9, 1.5, 12, 4.5, 2.2], [14, -1, 17, -1, 1.6]], length: 17, support: 9, kick: 2 },
+  ak: { lines: [[-9, 1.5, 0, 0, 3], [0, -1, 19, -1, 3.2], [7, 0, 9, 4, 2.6], [9, 4, 7.5, 8.5, 2.6], [19, -1, 28, -1, 1.8], [12, -3.4, 18, -3.4, 1.4]], length: 28, support: 14, kick: 4 },
+  bullpup: { lines: [[-6, 2, 0, 0, 3.4], [-6, -1, 21, -1, 3.6], [-3, 0, -1, 6.5, 2.6], [4, -4.4, 12, -4.4, 2.2], [21, -1, 25, -1, 1.8]], length: 25, support: 12, kick: 3 },
+  plasma: { lines: [[-8, 1.5, 0, 0, 2.8], [0, -1, 25, -1, 3.8], [4, -3.8, 20, -3.8, 1.4], [25, -1, 29, -1, 2.2], [6, 1, 9, 6, 2.2]], length: 29, support: 13, kick: 3, energy: [2, 3] },
+  bolt: { lines: [[-11, 2, 0, 0, 3], [0, -1, 37, -1, 2.4], [6, -5, 18, -5, 2.8], [6, -5, 6, -1, 1.4], [18, -5, 18, -1, 1.4], [10, -2, 13, -6, 1.4]], length: 37, support: 18, kick: 9 },
+  rail: { lines: [[-10, 1.8, 0, 0, 2.8], [0, -2.6, 35, -2.6, 1.6], [0, 0.6, 35, 0.6, 1.6], [6, -5.2, 16, -5.2, 2.4], [8, -1, 31, -1, 1], [35, -1, 38, -1, 3]], length: 38, support: 18, kick: 10, energy: [4, 5] },
+};
+// the art for weapon index w, in the model of the skin the runner wears on it
+export const weaponArt = (w, ws = null) => {
+  const id = WEAPONS[w]?.id ?? 'knife';
+  const base = ART[id];
+  const finish = ws?.[id];
+  const m = finish ? MODEL_ART[modelFor(id, finish)] : null;
+  return m ? { support: base.support, kick: base.kick, ...m } : base;
+};
 
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -53,7 +86,7 @@ export function pose(a, t, gore) {
   });
 
   // arms and weapon
-  const art = weaponArt(a.w);
+  const art = weaponArt(a.w, a.ws);
   let aim = a.aim;
   let recoil = 0;
   const since = t - (a.attackT ?? -1e9);
@@ -830,6 +863,23 @@ export function drawWeapon(ctx, p, flash, finish = null, t = performance.now()) 
       ctx.lineWidth = pass ? w : w + 2.4;
       line(x1, y1, x2, y2);
     }
+  }
+  if (art.energy && !flash) {
+    // energy models: the blade or coils burn neon in the skin's accent, with a white core
+    const neon = finish?.fx === 'rainbow' ? `hsl(${(t / 6) % 360}, 100%, 65%)` : finish?.accent ?? finish?.color ?? '#00f5ff';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const pulse = 0.75 + 0.25 * Math.sin(t / 90);
+    for (const i of art.energy) {
+      const [x1, y1, x2, y2, w] = art.lines[i];
+      for (const [k, al, c] of [[4.5, 0.18, neon], [2.4, 0.45, neon], [0.9, 0.95, '#ffffff']]) {
+        ctx.globalAlpha = al * pulse;
+        ctx.strokeStyle = c;
+        ctx.lineWidth = w * k;
+        line(x1, y1, x2, y2);
+      }
+    }
+    ctx.restore();
   }
   if (finish && !flash) {
     // the pattern and sparkle ride on the longest line (the barrel or blade)

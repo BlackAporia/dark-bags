@@ -73,7 +73,7 @@ Controls: `WASD` move · mouse aim · click attack · `Space` dash · `Q` bag lo
 
 ## Locker, shop and boxes
 
-Your runner is **him or her** in one of **80 outfits** across six rarities (Common, Rare, Epic, Legendary, Mythic, Exotic): crypto memes, comic heroes, cartoon animals, sci-fi and multiverse gods, all original names. Headgear (caps, helmets, hoods, visors, ears, wizard hats, viking horns, astronaut domes, pumpkin and skull masks, frog eyes, a floating diamond, …), capes, auras (glow, pulse, spectral, liquid gold, hologram, glitch, fire, prismatic, laser eyes) and particles (lightning, galaxy, sparks, frost, money rain, code rain, shadow smoke). **144 weapon skins**: 24 finishes on every weapon (camo, tiger, carbon, digital, neon, gold, chrome, glacier, inferno, galaxy, plasma, diamond, prism, void, …), drawn on the weapon in your hands. Everyone in a raid sees them; bots dress up too. Looks only, never stats.
+Your runner is **him or her** in one of **80 outfits** across six rarities (Common, Rare, Epic, Legendary, Mythic, Exotic): crypto memes, comic heroes, cartoon animals, sci-fi and multiverse gods, all original names. Headgear (caps, helmets, hoods, visors, ears, wizard hats, viking horns, astronaut domes, pumpkin and skull masks, frog eyes, a floating diamond, …), capes, auras (glow, pulse, spectral, liquid gold, hologram, glitch, fire, prismatic, laser eyes) and particles (lightning, galaxy, sparks, frost, money rain, code rain, shadow smoke). **144 weapon skins**: 24 finishes on every weapon (camo, tiger, carbon, digital, neon, gold, chrome, glacier, inferno, galaxy, plasma, diamond, prism, void, …), and the rarer the finish, the wilder the model: knife skins become daggers, machetes, tantos, cleavers, axes, katanas, twin blades, scythes, energy swords and a war hammer; guns become revolvers, hand cannons, blasters, double barrels, drum shotguns, machine pistols, vector SMGs, assault rifles, bullpups, plasma rifles, bolt snipers and railguns (same stats, looks only). Energy models glow. From Rare up a skin also paints its **neon tracers**, muzzle flash, blade arc and laser sight: longer trails as rarity climbs, sparks on Legendary, a plasma orb on Mythic, a spectrum-cycling star on Exotic. Everyone in a raid sees them; bots dress up too. Looks only, never stats.
 
 | | |
 |---|---|
@@ -85,6 +85,8 @@ Your runner is **him or her** in one of **80 outfits** across six rarities (Comm
 | **Rank-ups** | Only a random outfit to try for 72 hours. XP only moves your rank. |
 
 Opening is a show: the box charges up and glows through the rarities up to your best drop, bursts in its colour (god rays and particles; screen shake for Exotics), then the cards flip one by one. Tap to skip. A single drop shows your runner alive in the new outfit. **Share cards** (1200×675) exist for nearly everything: a win, an extraction, a death, a box hit or miss, a rank-up.
+
+**Announcer**: first blood, double and triple kills, rampage, godlike, victory, extraction and the final circle are called out in your language (the browser's speech engine, best voice on the device first; off in Settings).
 
 **Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
 

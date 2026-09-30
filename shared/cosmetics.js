@@ -166,8 +166,42 @@ export const FINISHES = [
   { id: 'genesis', name: 'Genesis', rarity: 'exotic', limited: 100, color: '#f7931a', accent: '#fff3c4', fx: 'rainbow' },
 ];
 export const FINISH = Object.fromEntries(FINISHES.map((f) => [f.id, f]));
+
+// Each skin is also a model: the rarer the finish, the wilder the weapon. Knife skins
+// become daggers, machetes, axes, katanas, twin blades, scythes, energy swords; guns
+// become revolvers, hand cannons, double barrels, assault rifles, railguns. Looks only:
+// every model of a weapon hits exactly like the plain one.
+export const MODEL_NAMES = {
+  knife: 'Knife', dagger: 'Dagger', machete: 'Machete', tanto: 'Tanto', cleaver: 'Cleaver', axe: 'Axe', katana: 'Katana', dual: 'Twin Blades', scythe: 'Scythe', esword: 'Energy Sword', hammer: 'War Hammer',
+  pistol: 'Pistol', revolver: 'Revolver', deagle: 'Hand Cannon', blaster: 'Blaster',
+  shotgun: 'Shotgun', double: 'Double Barrel', drum: 'Drum Shotgun',
+  smg: 'SMG', uzi: 'Machine Pistol', vector: 'Vector SMG',
+  rifle: 'Rifle', ak: 'Assault Rifle', bullpup: 'Bullpup', plasma: 'Plasma Rifle',
+  sniper: 'Laser Sniper', bolt: 'Bolt Sniper', rail: 'Railgun',
+};
+// models per weapon, by rarity (common → exotic); finishes of one rarity cycle through the list
+const MODELS = {
+  knife: [['knife', 'dagger'], ['machete', 'tanto', 'cleaver'], ['axe', 'cleaver', 'machete'], ['katana', 'axe'], ['dual', 'scythe', 'katana'], ['esword', 'hammer', 'scythe']],
+  pistol: [['pistol'], ['pistol', 'revolver'], ['revolver', 'deagle'], ['deagle', 'revolver'], ['blaster', 'deagle'], ['blaster']],
+  shotgun: [['shotgun'], ['shotgun', 'double'], ['double', 'drum'], ['drum', 'double'], ['drum'], ['double', 'drum']],
+  smg: [['smg'], ['smg', 'uzi'], ['uzi', 'vector'], ['vector'], ['vector', 'uzi'], ['vector']],
+  rifle: [['rifle'], ['rifle', 'ak'], ['ak', 'bullpup'], ['bullpup', 'ak'], ['plasma', 'bullpup'], ['plasma']],
+  sniper: [['sniper'], ['sniper', 'bolt'], ['bolt'], ['bolt', 'rail'], ['rail'], ['rail']],
+};
+export function modelFor(weapon, finishId) {
+  const f = FINISH[finishId];
+  const list = MODELS[weapon];
+  if (!f || !list) return weapon;
+  const ri = RARITY_ORDER.indexOf(f.rarity);
+  const same = FINISHES.filter((x) => x.rarity === f.rarity);
+  const opts = list[ri] ?? [weapon];
+  return opts[same.indexOf(f) % opts.length];
+}
 export const WEAPON_SKINS = WEAPONS.flatMap((w) =>
-  FINISHES.map((f) => ({ id: `${w.id}.${f.id}`, weapon: w.id, finish: f.id, name: `${f.name} ${w.name}`, rarity: f.rarity, ...(f.limited ? { limited: f.limited } : {}) })),
+  FINISHES.map((f) => {
+    const model = modelFor(w.id, f.id);
+    return { id: `${w.id}.${f.id}`, weapon: w.id, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, ...(f.limited ? { limited: f.limited } : {}) };
+  }),
 );
 export const WSKIN = Object.fromEntries(WEAPON_SKINS.map((s) => [s.id, s]));
 

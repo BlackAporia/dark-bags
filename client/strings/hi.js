@@ -450,4 +450,6 @@ export default {
   'set.language': "भाषा",
   'shop.exoticIn': "एक्ज़ॉटिक में",
   'shop.guarantee': "{n} बार में पक्का एक्ज़ॉटिक",
+  'set.voice': "उद्घोषक",
+  'set.voiceNote': "पहला खून, डबल किल और बहुत कुछ, तुम्हारी भाषा में।",
 };

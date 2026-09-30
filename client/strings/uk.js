@@ -450,4 +450,6 @@ export default {
   'set.language': "Мова",
   'shop.exoticIn': "Екзотичний за",
   'shop.guarantee': "Гарантований Екзотичний за {n} відкриттів",
+  'set.voice': "Диктор",
+  'set.voiceNote': "Перша кров, подвійне вбивство та інше вашою мовою.",
 };

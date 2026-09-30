@@ -5,6 +5,7 @@ import { WEAPONS } from '../shared/weapons.js';
 import { MapLayer } from './mapLayer.js';
 import { pose, drawFigure, FEET, hpColor } from './stickman.js';
 import { textures, canvas } from './textures.js';
+import { FINISH, RARITY_ORDER } from '../shared/cosmetics.js';
 
 const C = {
   void: '#07090f',
@@ -183,18 +184,7 @@ export class Renderer {
     ctx.globalCompositeOperation = 'lighter';
     for (const f of v.figures) if (f.laser && f.p) this.drawLaser(f);
     ctx.lineCap = 'round';
-    for (const b of v.bullets) {
-      if (!inView(b.x, b.y, 60)) continue;
-      const sp = Math.hypot(b.vx, b.vy) || 1;
-      const len = Math.min(46, sp * 0.028);
-      const y = b.y - GUN_Z;
-      ctx.strokeStyle = b.o ? 'rgba(255, 196, 120, 0.9)' : 'rgba(255, 240, 210, 0.9)';
-      ctx.lineWidth = sp > 1800 ? 3.2 : 2.2;
-      ctx.beginPath();
-      ctx.moveTo(b.x - (b.vx / sp) * len, y - (b.vy / sp) * len);
-      ctx.lineTo(b.x, y);
-      ctx.stroke();
-    }
+    for (const b of v.bullets) if (inView(b.x, b.y, 80)) this.drawTracer(b, t);
     ctx.globalCompositeOperation = 'source-over';
     v.fx.drawAir(ctx, t);
 
@@ -343,6 +333,91 @@ export class Renderer {
     ctx.textBaseline = 'alphabetic';
   }
 
+  // Tracers. Plain bullets are warm streaks; a weapon skin paints its own neon by rarity:
+  // rare and up burn in the skin colour with a white-hot core, epic trails longer,
+  // legendary sheds sparks, mythic leaves a pulsing plasma tail, exotic cycles the spectrum.
+  drawTracer(b, t) {
+    const ctx = this.ctx;
+    const sp = Math.hypot(b.vx, b.vy) || 1;
+    const ux = b.vx / sp;
+    const uy = b.vy / sp;
+    const y = b.y - GUN_Z;
+    const f = b.s ? FINISH[b.s] : null;
+    const tier = f ? RARITY_ORDER.indexOf(f.rarity) : -1;
+    const base = Math.min(46, sp * 0.028);
+    if (tier < 1) {
+      const c = f ? f.color : b.o ? '#ffc478' : '#fff0d2';
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = c;
+      ctx.lineWidth = sp > 1800 ? 3.2 : 2.2;
+      ctx.beginPath();
+      ctx.moveTo(b.x - ux * base, y - uy * base);
+      ctx.lineTo(b.x, y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
+    const len = base * [1, 1.5, 2.1, 2.5, 3.2, 3.8][tier];
+    // the skin's own colour is the neon; mythic and up burn hotter in the accent at the core
+    const neon = f.fx === 'rainbow' ? `hsl(${(t / 3 + b.i * 37) % 360}, 100%, 62%)` : f.color;
+    const hot = f.fx === 'rainbow' ? `hsl(${(t / 3 + b.i * 37 + 60) % 360}, 100%, 70%)` : tier >= 4 && f.accent ? f.accent : f.color;
+    const tx = b.x - ux * len;
+    const ty = y - uy * len;
+    const wob = tier >= 4 ? 1 + 0.25 * Math.sin(t / 40 + b.i) : 1;
+    // glow, body, white-hot core; the tail fades out along its length
+    const thick = [1, 1, 1.15, 1.3, 1.5, 1.7][tier];
+    for (const [w, al, c] of [[14 * wob * thick, 0.14, neon], [6.5 * wob * thick, 0.42, hot], [2.4 * thick, 1, '#ffffff']]) {
+      const g = ctx.createLinearGradient(tx, ty, b.x, y);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(0.35, c);
+      g.addColorStop(1, c);
+      ctx.globalAlpha = al;
+      ctx.strokeStyle = g;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(b.x, y);
+      ctx.stroke();
+    }
+    if (tier >= 3) {
+      // sparks shed behind the round (seeded by the bullet, so they don't flicker)
+      for (let i = 0; i < (tier >= 5 ? 10 : tier >= 4 ? 7 : 5); i++) {
+        const k = ((b.i * 13 + i * 7) % 10) / 10;
+        const off = (((b.i * 31 + i * 17) % 11) - 5) * 0.7;
+        ctx.globalAlpha = 0.9 * (1 - k);
+        ctx.fillStyle = tier >= 5 ? `hsl(${(t / 2 + i * 50) % 360}, 100%, 70%)` : tier === 3 ? '#ffe29a' : neon;
+        ctx.beginPath();
+        ctx.arc(b.x - ux * len * k - uy * off * 1.6, y - uy * len * k + ux * off * 1.6, 1.4 + 1.4 * (1 - k), 0, TAU);
+        ctx.fill();
+      }
+    }
+    if (tier >= 4) {
+      // the round itself: a burning orb, a star flare on exotics
+      const r = tier >= 5 ? 5.2 : 4.2;
+      const g = ctx.createRadialGradient(b.x, y, 0, b.x, y, r * 3);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.3, hot);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b.x, y, r * 3, 0, TAU);
+      ctx.fill();
+      if (tier >= 5) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(b.x - 14, y);
+        ctx.lineTo(b.x + 14, y);
+        ctx.moveTo(b.x, y - 14);
+        ctx.lineTo(b.x, y + 14);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   drawRunner(f, t, gore) {
     const ctx = this.ctx;
     const a = f.a;
@@ -402,7 +477,21 @@ export class Renderer {
     const len = hit >= 0 ? hit * range : range;
     const ex = a.x + ux * len;
     const ey = a.y + uy * len - GUN_Z;
-    ctx.strokeStyle = 'rgba(255, 40, 60, 0.55)';
+    // a skinned sniper paints its laser in the skin's neon, with a soft glow around it
+    const fin = FINISH[a.ws?.[WEAPONS[a.w].id]];
+    const tier = fin ? RARITY_ORDER.indexOf(fin.rarity) : -1;
+    if (tier >= 1) {
+      const c = fin.fx === 'rainbow' ? `hsl(${(performance.now() / 4) % 360}, 100%, 62%)` : fin.color;
+      ctx.strokeStyle = c;
+      ctx.globalAlpha = 0.18;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(p.muzzle.x, p.muzzle.y);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.globalAlpha = 0.8;
+    }
+    ctx.strokeStyle = tier >= 1 ? (fin.fx === 'rainbow' ? '#ffffff' : fin.color) : 'rgba(255, 40, 60, 0.55)';
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(p.muzzle.x, p.muzzle.y);

@@ -85,13 +85,14 @@ export class Fx {
     this.add({ kind: 'casing', x, y, z, vx: -f * rand(40, 110), vy: rand(-20, 20), vz: rand(90, 170), life: 5, spin: rand(-20, 20) });
   }
 
-  muzzle(x, y, z, aim, big, now) {
-    this.add({ kind: 'flash', x, y, z, aim, life: 0.06, size: big ? 16 : 10, float: true });
+  // color: a weapon skin tints its flash and swing (null = the plain warm flash)
+  muzzle(x, y, z, aim, big, now, color = null) {
+    this.add({ kind: 'flash', x, y, z, aim, life: 0.06, size: big ? 16 : 10, float: true, color });
     this.lights.push({ x, y, r: big ? 150 : 100, t0: now, life: 70 });
   }
 
-  slash(x, y, z, aim, f) {
-    this.add({ kind: 'slash', x, y, z, aim, f, life: 0.16, float: true });
+  slash(x, y, z, aim, f, color = null, big = false) {
+    this.add({ kind: 'slash', x, y, z, aim, f, life: big ? 0.24 : 0.16, float: true, color, big });
   }
 
   ring(x, y, color) {
@@ -280,7 +281,7 @@ export class Fx {
           ctx.translate(p.x, sy);
           ctx.rotate(p.aim);
           ctx.globalAlpha = Math.max(0, a);
-          ctx.fillStyle = '#fff3c4';
+          ctx.fillStyle = p.color ?? '#fff3c4';
           ctx.beginPath();
           const s = p.size;
           ctx.moveTo(0, -s * 0.3);
@@ -296,12 +297,28 @@ export class Fx {
         }
         case 'slash': {
           const k = p.age / p.life;
+          const r = p.big ? 34 : 26;
+          const start = p.aim - 1.0;
+          const end = start + 2.0 * Math.min(1, k * 2.2);
+          if (p.color) {
+            // a skinned blade leaves a neon arc: glow, colour, white edge
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (const [w, al, c] of [[12, 0.2, p.color], [5, 0.55, p.color], [1.6, 0.95, '#ffffff']]) {
+              ctx.globalAlpha = al * (1 - k);
+              ctx.strokeStyle = c;
+              ctx.lineWidth = w;
+              ctx.beginPath();
+              ctx.arc(p.x, sy, r, start, end);
+              ctx.stroke();
+            }
+            ctx.restore();
+            break;
+          }
           ctx.strokeStyle = `rgba(235, 240, 255, ${0.85 * (1 - k)})`;
           ctx.lineWidth = 3;
           ctx.beginPath();
-          const r = 26;
-          const start = p.aim - 1.0;
-          ctx.arc(p.x, sy, r, start, start + 2.0 * Math.min(1, k * 2.2));
+          ctx.arc(p.x, sy, r, start, end);
           ctx.stroke();
           break;
         }

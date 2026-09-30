@@ -37,6 +37,7 @@ export function createSettingsUi() {
       <section class="set-card"><p class="eyebrow">${t('set.audio')}</p>
         ${row('set.sound', slider('sound', 0, 1, 0.05))}
         ${row('set.music', slider('music', 0, 1, 0.05))}
+        ${row('set.voice', toggle('voice'), 'set.voiceNote')}
       </section>
       <section class="set-card"><p class="eyebrow">${t('set.language')}</p>
         <div class="lang-grid">${LANGS.map((l) => `<button type="button" data-lang="${l.id}" aria-pressed="${l.id === getLang()}">${l.name}</button>`).join('')}</div>

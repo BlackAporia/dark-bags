@@ -390,6 +390,7 @@ export class World {
         range: wp.range,
         dmg: wp.dmg,
         dist: 0,
+        skin: p.ws?.[wp.id] ?? null, // the shooter's weapon skin: clients draw its tracer
       };
       this.bullets.set(b.id, b);
     }
@@ -809,7 +810,7 @@ export class World {
     for (const d of this.drops.values()) if (near(d.x, d.y, 40)) drops.push({ i: d.id, x: r1(d.x), y: r1(d.y) });
     const bullets = [];
     for (const b of this.bullets.values()) {
-      if (near(b.x, b.y, 120)) bullets.push({ i: b.id, x: r1(b.x), y: r1(b.y), vx: r1(b.vx), vy: r1(b.vy), o: b.owner === me.id ? 1 : 0 });
+      if (near(b.x, b.y, 120)) bullets.push({ i: b.id, x: r1(b.x), y: r1(b.y), vx: r1(b.vx), vy: r1(b.vy), o: b.owner === me.id ? 1 : 0, ...(b.skin ? { s: b.skin } : {}) });
     }
 
     return {

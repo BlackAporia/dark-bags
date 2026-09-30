@@ -450,4 +450,6 @@ export default {
   'set.language': "اللغة",
   'shop.exoticIn': "استثنائي خلال",
   'shop.guarantee': "استثنائي مضمون خلال {n} فتحات",
+  'set.voice': "المعلّق",
+  'set.voiceNote': "الدم الأول والقتل المزدوج وغيرها، بلغتك.",
 };

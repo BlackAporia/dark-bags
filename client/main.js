@@ -668,6 +668,9 @@ function showResult(m) {
   const det = $('res-detail');
   const inside = t('res.inside', { k: m.kills, t: mmss(m.secs) });
   const pot = MODE[m.mode]?.kind && MODE[m.mode].kind !== 'raid';
+  // the announcer calls the big endings
+  if (m.won) sfx.say(t(MODE[m.mode]?.kind === 'team' ? 'res.teamWon' : 'res.victory'), 4, getLang());
+  else if (m.status === 'extracted') sfx.say(t('res.extracted'), 2, getLang());
   if (pot && m.won) {
     k.textContent = t(MODE[m.mode].kind === 'team' ? 'res.teamWon' : 'res.victory');
     k.className = 'res-kicker win';
@@ -738,6 +741,7 @@ $('gore').addEventListener('change', (e) => setSetting('gore', e.target.checked)
 function applySetting(k) {
   if (k === 'quality') renderer.setQuality(settings.quality === 'auto' ? null : QUALITY[settings.quality]);
   if (k === 'sound') sfx.setVolume(settings.sound);
+  if (k === 'voice') sfx.voiceOff = !settings.voice;
   if (k === 'music') sfx.setMusicVolume(settings.music);
   if (k === 'gore') {
     app.gore = settings.gore;
@@ -749,7 +753,7 @@ function applySetting(k) {
   if (k === 'motion') document.documentElement.classList.toggle('no-motion', !settings.motion);
 }
 onSetting(applySetting);
-for (const k of ['quality', 'sound', 'music', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
+for (const k of ['quality', 'sound', 'music', 'voice', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
 $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 $('mode-online').addEventListener('click', () => app.mode !== 'online' && setMode('online'));
 $('mode-practice').addEventListener('click', () => app.mode !== 'practice' && setMode('practice'));
