@@ -34,7 +34,9 @@ function onlineUrl() {
   }
   if (param) return normalizeServer(param);
   if (globalThis.DARK_BAGS_SERVER) return normalizeServer(globalThis.DARK_BAGS_SERVER);
-  if (!STATIC && /^https?:$/.test(location.protocol)) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  // static hosts (GitHub Pages) have no game server behind them: practice unless configured
+  const staticHost = /\.github\.io$/.test(location.hostname);
+  if (!STATIC && !staticHost && /^https?:$/.test(location.protocol)) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   return null;
 }
 

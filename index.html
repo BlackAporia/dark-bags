@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DARK BAGS</title>
+<meta http-equiv="refresh" content="0; url=client/">
+<style>body{margin:0;background:#07090f;color:#ebe5d6;font:15px system-ui,sans-serif;display:grid;place-items:center;height:100vh}a{color:#f7931a}</style>
+</head>
+<body>
+<!-- Pages "deploy from a branch" fallback: the game runs from client/ as plain ES modules.
+     The GitHub Actions source (pages.yml) publishes the bundled single-file build instead. -->
+<p><a href="client/">Enter DARK BAGS</a></p>
+<script>location.replace('client/' + location.search + location.hash);</script>
+</body>
+</html>
