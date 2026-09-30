@@ -35,10 +35,10 @@ function normalizeServer(u) {
   return url;
 }
 
-// the public game server the GitHub Pages build plays on (override with ?server=…):
-// the game's own domain first, Railway's address while the domain's DNS settles
-const DEFAULT_SERVER = 'wss://dark-bags.gg/ws';
-const FALLBACK_SERVERS = ['wss://dark-bags-production.up.railway.app/ws'];
+// the public game server the GitHub Pages build plays on (override with ?server=…).
+// Only list domains the project owns: an address listed here gets every player's session.
+const DEFAULT_SERVER = 'wss://dark-bags-production.up.railway.app/ws';
+const FALLBACK_SERVERS = [];
 
 function onlineUrl() {
   let param = null;
