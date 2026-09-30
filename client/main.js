@@ -35,8 +35,10 @@ function normalizeServer(u) {
   return url;
 }
 
-// the public game server the GitHub Pages build plays on (override with ?server=…)
-const DEFAULT_SERVER = 'wss://dark-bags.onrender.com/ws';
+// the public game server the GitHub Pages build plays on (override with ?server=…):
+// the game's own domain first, Railway's address while the domain's DNS settles
+const DEFAULT_SERVER = 'wss://dark-bags.gg/ws';
+const FALLBACK_SERVERS = ['wss://ou1q5zqg.up.railway.app/ws'];
 
 function onlineUrl() {
   let param = null;
@@ -541,7 +543,7 @@ function setMode(mode) {
     fetch(SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/healthz'), { mode: 'no-cors' }).catch(() => {});
     setTimeout(() => !app.everOpen && renderLobby(), 4100);
   }
-  app.transport = mode === 'online' ? new WsTransport(SERVER, onMessage, onStatus) : new LocalTransport(onMessage, onStatus);
+  app.transport = mode === 'online' ? new WsTransport(SERVER === DEFAULT_SERVER ? [SERVER, ...FALLBACK_SERVERS] : SERVER, onMessage, onStatus) : new LocalTransport(onMessage, onStatus);
   if (app.screen !== 'lobby') showScreen('lobby');
   renderLobby();
 }

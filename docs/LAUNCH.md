@@ -15,27 +15,39 @@
   (див. `docs/TOKENOMICS.md`). Закрита бета на свої адреси й малі суми — це тест, а не
   запуск для публіки.
 
-## 1. Railway: сервіс і диск
+## 1. Railway: сервіс, диск і домен
 
-Сервер гри живе на Railway (не засинає, диск для журналу, регіон у Європі). Vercel для
-нього не підходить: там немає постійних WebSocket-з'єднань і диска. Сайт гри й далі на
-GitHub Pages.
+Сервер гри живе на Railway: не засинає, має диск для журналу грошей, регіон у Європі.
+Налаштування збірки в `railway.json` (Dockerfile, перевірка `/healthz`, одна копія).
+Сайт гри й далі на GitHub Pages і підключається до `wss://dark-bags.gg`. Vercel для
+сервера не підходить: там немає постійних WebSocket-з'єднань і диска.
 
-1. railway.com → увійди через GitHub → **New Project → Deploy from GitHub repo** →
-   `BlackAporia/dark-bags`. Railway сам знайде `railway.json` і збере `Dockerfile`.
-2. У сервісі: **Settings → Region → EU West (Amsterdam)** (найближче до України з
-   доступних).
-3. **Settings → Networking → Generate Domain**: отримаєш адресу на кшталт
-   `dark-bags-production.up.railway.app`. Надішли її мені: я перемкну на неї гру.
-4. **Додай диск**: у проєкті правий клік на сервіс → **Attach Volume**, Mount Path `/data`.
-5. **Variables**: спочатку тільки `CHAIN=off`, `BOTS=1`, `RAILWAY_RUN_UID=0`
-   (останнє потрібне, щоб сервер міг писати на диск). Реальні змінні з кроку 3
-   додаємо, коли онлайн на тестових токенах запрацює.
-6. Відкрий `https://<твоя-адреса>/healthz`: там має бути `"ok"`.
+1. railway.com → **New Project → Deploy from GitHub repo** → `BlackAporia/dark-bags`.
+   Railway збирає `main` після кожного злиття.
+2. Сервіс → **Settings → Region → EU West (Amsterdam)**.
+3. **Settings → Networking → Generate Domain**: запасна адреса `*.up.railway.app`,
+   працює одразу з HTTPS.
+4. **Свій домен `dark-bags.gg`**: Custom Domain → Railway показує два DNS-записи. Їх
+   додаєш там, де купив домен (Namecheap, Cloudflare, Porkbun…):
 
-Ціна: план Hobby $5/міс, у нього входить $5 використання; наш сервер зазвичай у це
-вкладається або виходить трохи більше (перевір актуальні ціни на railway.com/pricing).
-Команди `npm run house -- …` запускаються через Railway CLI: `railway ssh` у сервіс.
+   | Тип | Ім'я (Host) | Значення |
+   |---|---|---|
+   | CNAME | `@` (сам `dark-bags.gg`) | те, що показує Railway, напр. `ou1q5zqg.up.railway.app` |
+   | TXT | `_railway-verify` | `railway-verify=…` з Railway |
+
+   Для кореня домену (`@`) деякі реєстратори не дозволяють CNAME: тоді тип **ALIAS** або
+   **ANAME** (Namecheap, Porkbun), а в Cloudflare CNAME на корінь працює сам (CNAME
+   flattening; хмарку «Proxy» вимкни, лиши «DNS only»). Поки записи не поширяться
+   (від хвилин до кількох годин), Railway пише «Waiting for DNS update».
+5. Правий клік на сервіс → **Attach Volume**, Mount Path `/data`. Образ сам віддає диск
+   користувачу `node` при старті, нічого додатково вмикати не треба.
+6. **Variables**: поки `CHAIN=off`, `BOTS=1`. Реальні змінні з кроку 3 додаємо, коли онлайн
+   на тестових токенах запрацює.
+7. `https://dark-bags.gg/healthz` має відповісти `"ok"`.
+
+Команди оператора (`npm run house -- …`): встанови Railway CLI
+(`npm i -g @railway/cli`), `railway login`, `railway link`, потім
+`railway ssh` і в консолі сервісу `cd /app && su node -s /bin/sh -c "npm run house -- status"`.
 
 ## 2. Гаманець казино (окремо для Sepolia і для мейнету)
 
@@ -44,7 +56,7 @@ GitHub Pages.
    (https://starknet-faucet.vercel.app) і зроби будь-яку транзакцію, щоб акаунт
    задеплоївся.
 3. Скопіюй адресу акаунта та **експортуй приватний ключ** (Settings → Export private key).
-   Ключ одразу вставляєш у Railway (крок 3) і більше ніде не зберігаєш відкритим текстом.
+   Ключ одразу вставляєш у Railway (Variables, крок 3) і більше ніде не зберігаєш відкритим текстом.
 
 ## 3. Змінні середовища в Railway (Variables)
 
@@ -66,8 +78,8 @@ GitHub Pages.
 `PAYMASTER_API_KEY` (оплата газу за гравців), `STRK20_*` (приватні депозити). Без них
 працюють звичайні гаманці, Cartridge і публічні депозити.
 
-Збережи (Deploy). Railway перезапустить сервіс. Відкрий `https://<твоя-адреса>/healthz`:
-там має бути `"ok"`, а в логах рядок `cashier: sepolia, house 0x…`.
+Після збереження змінних Railway перезапустить сервіс. Відкрий `https://dark-bags.gg/healthz`:
+там має бути `"ok"`, а в логах (Deployments → View logs) рядок `cashier: sepolia, house 0x…`.
 
 Якщо хтось увійде з адреси, якої немає в `ALLOWLIST`, гра покаже йому його адресу.
 Додай її в список, і він зможе увійти після перезапуску.
@@ -81,18 +93,18 @@ GitHub Pages.
 - [ ] Ставка й гра онлайн, виграш і програш: баланси сходяться.
 - [ ] Покупка кейса за внутрішні $.
 - [ ] Вивід на свою адресу; перевірити транзакцію в експлорері (sepolia.voyager.online).
-- [ ] Перезапуск сервісу (Deployments → Restart) під час гри та під час виводу:
+- [ ] Перезапуск (Deployments → ⋮ → Restart) під час гри та під час виводу:
       баланси на місці, вивід не пішов двічі (`npm run house -- review`).
 - [ ] `npm run house -- status`: у гаманці казино не менше, ніж винні гравцям.
 - [ ] Пауза: `npm run house -- pause`, ставки й покупки не проходять, вивід працює;
       `npm run house -- resume`.
 
-Команди `npm run house -- …` запускаються через `railway ssh` у сервіс.
+Команди `npm run house -- …` запускаються через `railway ssh` (див. крок 1).
 
 ## 5. Мейнет, закрита бета
 
 1. Новий гаманець казино в мейнеті (крок 2, але в мейнеті), поповни на трохи STRK для газу.
-2. У Railway зміни `CHAIN=mainnet`, нові `HOUSE_ADDRESS`, `HOUSE_PRIVATE_KEY`,
+2. У Railway → Variables зміни `CHAIN=mainnet`, нові `HOUSE_ADDRESS`, `HOUSE_PRIVATE_KEY`,
    `CASHIER_FILE` і `LOCKER_FILE` за таблицею. `FIXED_PRICES` прибери.
 3. `ALLOWLIST` лише з людей, яких ти знаєш; ліміти лишаються $20 / $200.
 4. Перший тиждень: щодня `status` і `held`; повертай затримані депозити вручну з гаманця
