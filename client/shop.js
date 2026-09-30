@@ -2,7 +2,7 @@
 // limited editions, and the opening show. The server decides every roll; this page
 // only stages it: the box charges up in the colour of the best drop, bursts, and the
 // cards flip one by one.
-import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY } from '../shared/cosmetics.js';
 import { isStable } from '../shared/assets.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { boxArt, weaponStill } from './locker.js';
@@ -77,7 +77,9 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     const bar = odds.map((k) => `<i style="flex:${Math.max(bx.odds[k], 0.8)};background:${RARITIES[k].color}" title="${rn(k)} ${bx.odds[k]}%"></i>`).join('');
     const legend = odds.map((k) => `<li style="--r:${RARITIES[k].color}"><span>${rn(k)}</span><b>${bx.odds[k]}%</b></li>`).join('');
     const meter = (label, have, max) => `<div class="pity"><span>${label}</span><div class="pity-bar"><i style="width:${(have / max) * 100}%"></i></div><b>${max - have}</b></div>`;
-    const cta = paid === 0 ? `${t('lk.openFree')} ×${n}` : `${t('shop.open', { n })} · ${usd(paid * bx.price)}`;
+    const cost = boxCost(bx, paid);
+    const gift = Math.floor(paid / BULK_FREE_EVERY);
+    const cta = paid === 0 ? `${t('lk.openFree')} ×${n}` : `${t('shop.open', { n })} · ${gift ? `<s>${usd(paid * bx.price)}</s> ` : ''}${usd(cost)}`;
     return `<article class="box-card t${bx.tier}" data-box="${bx.id}" style="--r:${RARITIES[bx.jackpot].color}">
       ${held ? `<span class="held-badge">×${held}</span>` : ''}
       <div class="box-art">${boxArt(bx, 128)}</div>
@@ -94,7 +96,8 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
         <button type="button" data-q="+" aria-label="+">+</button>
       </div>
       <div class="qty-chips">${QTY.map((q) => `<button type="button" data-qq="${q}" aria-pressed="${q === n}">×${q}</button>`).join('')}</div>
-      <button type="button" class="cta box-go" ${paid * bx.price > reach() ? 'disabled' : ''}>${cta}</button>
+      <p class="bulk-note${gift ? ' on' : ''}">${gift ? t('shop.bulkOn', { n: gift }) : t('shop.bulk', { n: BULK_FREE_EVERY })}</p>
+      <button type="button" class="cta box-go" ${cost > reach() ? 'disabled' : ''}>${cta}</button>
     </article>`;
   }
 
@@ -324,7 +327,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     const o = itemOf(best);
     const again = st.last;
     const held = L().boxes?.[box.id] ?? 0;
-    const cost = Math.max(0, again.n - held) * box.price;
+    const cost = boxCost(box, Math.max(0, again.n - held));
     const tally = RARITY_ORDER.filter((k) => counts[k]).map((k) => `<span style="color:${RARITIES[k].color}">${counts[k]}× ${rn(k)}</span>`).join(' · ');
     $('op-actions').innerHTML = `
       ${results.length > 1 ? `<p class="op-tally">${tally}${back ? ` · ${t('shop.back', { v: usd(back) })}` : ''}</p>` : ''}

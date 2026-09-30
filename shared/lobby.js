@@ -17,6 +17,8 @@ import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } 
  *   auth_privy {token} → authed {account, privy: {walletId, publicKey}}
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
+const PAUSABLE = new Set(['ready', 'box', 'topup', 'swap']);
+
 export class Lobby {
   constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now() }) {
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
@@ -109,6 +111,11 @@ export class Lobby {
       return;
     }
     if (!s.token) return;
+    // the operator's pause switch (real money): nothing new goes in; cash-outs stay open
+    if (this.cashier?.paused() && PAUSABLE.has(msg.t)) {
+      this.send(cid, { t: 'err', msg: 'Paused for maintenance: new stakes and purchases are off for a moment. Your balance is safe and cash-outs work.' });
+      return;
+    }
 
     switch (msg.t) {
       case 'ping':
@@ -303,7 +310,7 @@ export class Lobby {
         let r;
         if (msg.route === 'private') r = { status: 'ok', credited: (await c.scanPrivate()).filter((x) => x.account === s.account) };
         else r = await c.depositPublic(s.account, msg.tx);
-        reply({ t: 'cashier', op: 'deposit', route: msg.route, status: r.status, credited: r.credited.map((x) => ({ asset: x.token, units: x.amount.toString(), unsupported: !!x.unsupported })) });
+        reply({ t: 'cashier', op: 'deposit', route: msg.route, status: r.status, credited: r.credited.map((x) => ({ asset: x.token, units: x.amount.toString(), unsupported: !!x.unsupported, held: x.held ?? null })) });
         reply({ t: 'balance', balances: this.balances(s) });
       } else if (msg.t === 'withdraw') {
         const route = msg.route === 'private' ? 'private' : 'public';

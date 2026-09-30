@@ -80,8 +80,8 @@ Your runner is **him or her** in one of **80 outfits** across six rarities (Comm
 
 | | |
 |---|---|
-| **Boxes only** | Skins drop only from boxes (and rank-up trials). **Outfit bags** and **weapon crates** are sold separately, nine tiers each, from $0.99 to $999: the dearer the box, the better the odds, up to 30% Exotic. |
-| **Fair** | Exact odds on every box, rolled on the server. Pity: Epic+ within 15 opens, Legendary+ within 60; the $249, $499 and $999 tiers guarantee an Exotic within 12, 7 and 4 opens. Smart drops: something you don't own while that rarity has any left; a duplicate refunds 10% of its value. |
+| **Boxes only** | Skins drop only from boxes (and rank-up trials). **Outfit bags** and **weapon crates** are sold separately, nine tiers each, from $0.49 to $99.99: the dearer the box, the better the odds and the value per dollar, up to 8% Exotic. Every 10th box in a purchase is free. |
+| **Fair** | Exact odds on every box, rolled on the server. Pity: Epic+ within 15 opens, Legendary+ within 60; the $29.99, $59.99 and $99.99 tiers guarantee an Exotic within 60, 30 and 16 opens. Smart drops: something you don't own while that rarity has any left; a duplicate refunds 10% of its value. |
 | **Limited editions** | A few Exotics have a fixed supply (21, 50, 100, 250, 500), numbered as they drop (#12/100), never over-minted. The top tiers drop them most. |
 | **Buy many** | 1 to 100 boxes at once, one charge; boxes you hold go first. |
 | **Shop $** | Bought 1:1 with USDC/USDT, with bonus packs ($5 to $1,000, up to +30%). Spends only in the shop; never withdrawable. |
@@ -96,7 +96,7 @@ English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0), Ukrai
 
 **Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
 
-Paid random rewards are regulated in some countries; skins only through boxes, with boxes up to $999, is the riskiest version of that model. Read [docs/TOKENOMICS.md](docs/TOKENOMICS.md) before selling boxes for real stablecoins.
+Paid random rewards are regulated in some countries; skins only through boxes is the riskiest version of that model. Read [docs/TOKENOMICS.md](docs/TOKENOMICS.md) before selling boxes for real stablecoins.
 
 ## Look and sound
 
@@ -167,6 +167,11 @@ A session is bound to the address. A leaked session token can play with that bal
 | `PAYMASTER_API_KEY`, `PAYMASTER_URL` | AVNU paymaster for gasless house payouts and sponsored player deposits. |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_CLIENT_ID` | Privy sign-in. Add the game's origin to the app's allowed origins and enable the login methods you want. |
 | `CARTRIDGE=0` | Hides the Cartridge option. |
+| `ALLOWLIST` | Closed beta: comma-separated addresses that may sign in; transfers from anyone else are held, not credited. |
+| `MAX_BALANCE_USD`, `MAX_TOTAL_USD` | Beta caps: a deposit that would take a player (or everyone together) over this many $ is held for a manual refund (`npm run house -- held`). |
+| `PAUSE_FILE` | The pause switch (default `<CASHIER_FILE>.paused`; `npm run house -- pause` / `resume`): no new stakes, box buys, top-ups or swaps; cash-outs always work. |
+
+On mainnet the server refuses to start without `CASHIER_FILE`, and a journal written on one network never loads on another. Step-by-step launch (Render, house wallet, Sepolia checklist, closed-beta mainnet): [docs/LAUNCH.md](docs/LAUNCH.md).
 
 The browser wallet layer is a separate 2.5 MB bundle (`npm run build:wallets`, done by the Dockerfile and the Render blueprint) loaded only when a player opens the cashier. The static single-file build can point at a real-token server (`DARK_BAGS_SERVER`); the server allows it cross-origin for `/api/*` and `/vendor/*`.
 
@@ -174,6 +179,8 @@ The browser wallet layer is a separate 2.5 MB bundle (`npm run build:wallets`, d
 
 `npm run house -- <command>` with the same env as the server:
 
+- `pause` / `resume`: stop and restart new stakes and purchases without a restart (cash-outs stay open).
+- `held`: deposits a beta limit kept out of the game, to send back.
 - `status`: tokens held vs owed to players per token (flags any shortfall), and payouts in review.
 - `review`, `resolve <id> sent <0xtx>`, `resolve <id> refund`: settle held payouts (stop the server first).
 - `register`: publish the house viewing key in the STRK20 pool, once, before taking private deposits.
@@ -228,7 +235,9 @@ Netcode: 30 Hz authoritative simulation, 15 Hz snapshots (~0.5 KB each), client-
 
 **Render (simplest).** `render.yaml` is a blueprint: Render → New → Blueprint → pick this repo. The free plan supports WebSockets but sleeps after ~15 idle minutes, so the first visit after a pause takes ~50 s.
 
-**Docker (Fly.io, Railway, a VPS).**
+**Railway (the live server).** `railway.json` builds the Dockerfile, health-checks `/healthz` and keeps one replica (the journal lives on one volume). New Project → Deploy from GitHub repo, region EU West, a volume at `/data`, and the domain `dark-bags.gg` (CNAME and TXT records at the registrar, as Railway shows them). The image starts as root only to hand the mounted volume to the `node` user, then drops privileges. The Pages build plays on `wss://dark-bags.gg`. Step by step (Ukrainian): [docs/LAUNCH.md](docs/LAUNCH.md). Vercel suits the static site only: no long-lived WebSocket server or disk.
+
+**Docker (any VPS).**
 
 ```bash
 docker build -t dark-bags .

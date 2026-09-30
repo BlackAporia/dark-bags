@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CFG } from '../shared/config.js';
-import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, TRIAL_MS, WEAPON_SKINS, WSKIN, MAX_OPEN, rollRarity, botLook } from '../shared/cosmetics.js';
+import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, TRIAL_MS, WEAPON_SKINS, WSKIN, MAX_OPEN, rollRarity, botLook, boxCost } from '../shared/cosmetics.js';
 import { RoomCore } from '../shared/room.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
@@ -132,6 +132,11 @@ test('buy many at once: one charge, held boxes first, a result per box', () => {
   assert.equal(wallet, 10_000 - 9 * BOX.street.price, 'nine paid, in one charge');
   assert.ok(r.results[0].free && !r.results[1].free);
   assert.equal(inv.open('p', 'street', () => false, 5).ok, false, 'all or nothing');
+  // bulk: 10 paid boxes cost 9, 100 cost 90
+  const before = wallet;
+  assert.ok(inv.open('p', 'street', pay, 10).ok);
+  assert.equal(before - wallet, 9 * BOX.street.price, 'every 10th box free');
+  assert.equal(boxCost(BOX.genesis, 100), 90 * BOX.genesis.price);
   inv.rec('p').credit = 1e9;
   assert.equal(inv.open('p', 'street', pay, 10_000).results.length, MAX_OPEN, 'capped per purchase');
 });
@@ -140,9 +145,12 @@ test('dearer boxes have better odds; weapon crates drop weapon skins you can wea
   const bags = BOXES.filter((b) => b.family === 'outfit').sort((a, b) => a.tier - b.tier);
   const ev = (b) => RARITY_ORDER.reduce((s, k, i) => s + (b.odds[k] ?? 0) * i, 0);
   for (let i = 1; i < bags.length; i++) assert.ok(ev(bags[i]) > ev(bags[i - 1]), `${bags[i].id} beats ${bags[i - 1].id}`);
-  assert.equal(bags[0].price, 99);
-  assert.equal(bags.at(-1).price, 99900);
-  assert.ok(bags.at(-1).odds.exotic >= 30);
+  assert.equal(bags[0].price, 49, 'an impulse-priced entry box');
+  assert.equal(bags.at(-1).price, 9999, 'a $99.99 ceiling');
+  // every step up is better value: an Exotic costs less per dollar the dearer the box
+  const perExotic = bags.filter((b) => b.odds.exotic).map((b) => b.price / b.odds.exotic);
+  for (let i = 1; i < perExotic.length; i++) assert.ok(perExotic[i] < perExotic[i - 1], 'Exotics get cheaper per $ up the ladder');
+  for (const b of BOXES) assert.equal(Math.round(Object.values(b.odds).reduce((a, c) => a + c, 0) * 100), 10000, `${b.id} odds add up to 100%`);
   assert.equal(BOXES.filter((b) => b.family === 'weapon').length, 9, 'weapon crates sold separately');
 
   const inv = new Inventory({ rnd: seeded(4) });

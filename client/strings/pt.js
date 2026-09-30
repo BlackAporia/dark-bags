@@ -482,4 +482,6 @@ export default {
   'coach.gl': "Abates dão créditos · gaste num kit médico ✚, numa torreta ◈ ou numa mina laser ⌁",
   'set.voiceNote': "Locutor gravado (inglês, ucraniano, espanhol, francês, português; inglês para os outros idiomas).",
   'net.waking': "Acordando o servidor (a hospedagem grátis dorme quando ninguém joga, até um minuto)… O treino funciona enquanto isso.",
+  'shop.bulk': "A cada {n} caixas, uma grátis",
+  'shop.bulkOn': "Caixas grátis incluídas: {n}",
 };

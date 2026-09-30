@@ -482,4 +482,6 @@ export default {
   'coach.gl': "Las bajas dan créditos · gástalos en un botiquín ✚, una torreta ◈ o una mina láser ⌁",
   'set.voiceNote': "Locutor grabado (inglés, ucraniano, español, francés, portugués; inglés para los demás idiomas).",
   'net.waking': "Despertando el servidor (el hosting gratuito se duerme cuando nadie juega, hasta un minuto)… Mientras tanto, la práctica funciona.",
+  'shop.bulk': "Cada caja n.º {n} gratis",
+  'shop.bulkOn': "Cajas gratis incluidas: {n}",
 };

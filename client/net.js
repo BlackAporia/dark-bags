@@ -5,10 +5,13 @@ import { RankBook } from '../shared/ranks.js';
 import { Inventory } from '../shared/cosmetics.js';
 import { store } from './store.js';
 
-// Online: talks to the Node server over WebSocket. Reconnects on drop.
+// Online: talks to the Node server over WebSocket. Reconnects on drop. Given several
+// addresses, it tries the next one until one answers, then sticks with it.
 export class WsTransport {
   constructor(url, onMessage, onStatus) {
-    this.url = url;
+    this.urls = Array.isArray(url) ? url : [url];
+    this.at = 0;
+    this.everOpen = false;
     this.onMessage = onMessage;
     this.onStatus = onStatus;
     this.closed = false;
@@ -19,7 +22,7 @@ export class WsTransport {
   connect() {
     let ws;
     try {
-      ws = new WebSocket(this.url);
+      ws = new WebSocket(this.urls[this.at]);
     } catch {
       this.onStatus('error');
       return;
@@ -27,6 +30,7 @@ export class WsTransport {
     this.ws = ws;
     this.onStatus('connecting');
     ws.onopen = () => {
+      this.everOpen = true;
       this.retry = 0;
       this.onStatus('open');
     };
@@ -42,6 +46,7 @@ export class WsTransport {
     ws.onclose = () => {
       if (this.closed) return;
       this.onStatus('closed');
+      if (!this.everOpen) this.at = (this.at + 1) % this.urls.length;
       this.retry = Math.min(this.retry + 1, 6);
       setTimeout(() => !this.closed && this.connect(), 600 * this.retry);
     };

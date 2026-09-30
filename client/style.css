@@ -1441,3 +1441,7 @@ body.touch-on .gl-cr b { font-size: 16px; }
 
 /* weapon skins: a landscape still, as wide as the card allows */
 img.wimg { width: 100% !important; max-width: 160px; height: auto !important; aspect-ratio: 3 / 2; object-fit: contain; margin: 8px auto; display: block; }
+
+.bulk-note { margin: 2px 0 6px; font-size: 11px; color: var(--dust); text-align: center; }
+.bulk-note.on { color: #3ddc97; font-weight: 700; }
+.box-go s { opacity: 0.55; font-weight: 500; margin-right: 2px; }

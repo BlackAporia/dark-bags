@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { writeFile, rename } from 'node:fs/promises';
 import { hash } from 'starknet';
 import { PriceBook } from '../../shared/assets.js';
-import { Cashier, normAddr } from './cashier.js';
+import { Cashier, normAddr, pauseFlag } from './cashier.js';
 import { readConfig } from './config.js';
 import { PriceFeed } from './prices.js';
 import { createStarknetChain } from './starknet.js';
@@ -15,6 +15,7 @@ const TRANSFER_SELECTOR = normAddr(hash.getSelectorFromName('transfer'));
 export async function createCashier(env = process.env, log = console) {
   const cfg = readConfig(env);
   if (!cfg) return null;
+  if (!cfg.file && cfg.network === 'mainnet') throw new Error('CASHIER_FILE is required on mainnet (on a persistent disk): without it every restart forgets who owns the deposits.');
   if (!cfg.file) log.warn('CASHIER_FILE is not set: balances live in memory and vanish on restart. Never run real money like this.');
 
   const starkzap = await import('starkzap');
@@ -51,7 +52,9 @@ export async function createCashier(env = process.env, log = console) {
     timer = null;
     return write();
   };
-  cashier = new Cashier({ chain, prices, data, save, flush, privy, minWithdrawUsd: cfg.minWithdrawUsd });
+  const allow = new Set(cfg.allow.map(normAddr).filter(Boolean));
+  cashier = new Cashier({ chain, prices, data, save, flush, privy, minWithdrawUsd: cfg.minWithdrawUsd, allow, maxBalanceUsd: cfg.maxBalanceUsd, maxTotalUsd: cfg.maxTotalUsd, paused: pauseFlag(cfg.pauseFile) });
+  if (cfg.network === 'mainnet' && !allow.size && !cfg.maxBalanceUsd) log.warn('cashier: mainnet with no ALLOWLIST and no MAX_BALANCE_USD: anyone can deposit any amount.');
 
   // paymaster proxy budget: sponsored requests per signed-in account per day
   const sponsored = new Map();

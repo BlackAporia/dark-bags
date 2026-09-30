@@ -58,24 +58,40 @@ Skins come only from boxes (and rank-up trials). Two families, always sold separ
 **outfit bags** for your runner and **weapon crates** for your guns and knife. Nine tiers
 each:
 
-| Tier | Price | Mythic or better | Exotic | Guarantee |
-|---|---|---|---|---|
-| Street / Scrap | $0.99 | 0% | 0% | Epic+ in 15, Legendary+ in 60 |
-| Vault / Armory | $2.99 | 0.3% | 0% | same |
-| Golden / Brass | $7.99 | 1.8% | 0.3% | same |
-| Elite / Spec Ops | $19.99 | 4% | 0.7% | same |
-| Diamond | $49.99 | 10% | 1.5% | same |
-| Obsidian | $99 | 20% | 4% | same |
-| Royal | $249 | 40% | 8% | **Exotic within 12** |
-| Apex | $499 | 60% | 15% | **Exotic within 7** |
-| Genesis | $999 | 80% | 30% | **Exotic within 4** |
+| Tier | Price | Mythic or better | Exotic | ≈ $ per Exotic | Guarantee |
+|---|---|---|---|---|---|
+| Street / Scrap | $0.49 | 0% | 0% | — | Epic+ in 15, Legendary+ in 60 |
+| Vault / Armory | $0.99 | 0.2% | 0% | — | same |
+| Golden / Brass | $1.99 | 0.9% | 0.08% | $2,490 | same |
+| Elite / Spec Ops | $3.99 | 2% | 0.18% | $2,220 | same |
+| Diamond | $7.99 | 4.4% | 0.4% | $2,000 | same |
+| Obsidian | $14.99 | 8.9% | 0.85% | $1,760 | same |
+| Royal | $29.99 | 20% | 2% | $1,500 | **Exotic within 60** |
+| Apex | $59.99 | 39.5% | 4.5% | $1,330 | **Exotic within 30** |
+| Genesis | $99.99 | 63% | 8% | $1,250 | **Exotic within 16** |
 
 - Exact odds are printed on every box and rolled on the server.
 - Smart drops: you get something you don't own while that rarity has any left.
 - Limited editions (for example *First Block #1*, 21 ever; *Multiverse Prime*, 100) are
   numbered as they drop and never over-minted, even across restarts. The dearer the
-  box, the larger the share of Exotics that are limited (3% up to 50%).
-- Buy 1 to 100 at once; boxes you hold are used first; one charge for the rest.
+  box, the larger the share of Exotics that are limited (2% up to 35%).
+- Buy 1 to 100 at once; boxes you hold are used first; one charge for the rest, and
+  **every 10th box is free** (10 for the price of 9).
+
+**Why these prices.** The old ladder ran $0.99 → $999. It now runs $0.49 → $99.99:
+- *Entry*: $0.49 is an impulse buy, which matters most for the first purchase (the
+  single biggest step in conversion).
+- *Ceiling*: nobody buys a single $999 box; whales buy ×10 or ×100 of the $99.99 one,
+  with the 10% bulk bonus, so the top-end spend is still there and spread over many
+  opens (more reveals, more share cards).
+- *Up-sell*: every tier is better value than the one below (an Exotic's expected price
+  falls from ~$2,490 to ~$1,250, a Mythic's from ~$250 to ~$160), which pulls players up
+  the ladder.
+- *Scarcity*: an Exotic still costs over $1,000 in expectation, and a smaller share of
+  them are limited editions than before, so numbered skins stay rare.
+- *Cost to us*: duplicates refund 10% of their rarity's value in shop $ (never cash).
+  That is at most ~2% of the price on the top tier and ~15% on the $0.49 box, and only
+  once a player has the whole rarity; everything else is margin.
 
 **Margin.** Digital goods: close to 100% gross margin, less payment and chain costs.
 
@@ -116,7 +132,7 @@ like this dies, and what it cannot do is supply players. Here is where it stands
      KYC/AML, age 18+, and geo-blocking where it is not allowed.
    - Paid loot boxes are banned in Belgium, restricted in the Netherlands, need published
      odds in China and South Korea, and are under review in the EU and UK. Selling skins
-     **only** through boxes, with boxes up to $999, is the riskiest version of that model;
+     **only** through boxes is the riskiest version of that model (the $99.99 ceiling helps);
      the exotic guarantee on the top tiers helps, spending limits help more (not built yet).
    - Get a lawyer before taking real money.
 4. **Chain dependencies.** Prices, deposits and withdrawals depend on Starknet RPCs and
