@@ -236,16 +236,16 @@ export function moment(kind, d) {
       const pnl = d.payout - d.stake;
       const pct = Math.round((pnl / d.stake) * 100);
       return {
-        spec: { accent: '#3ddc97', kicker: 'Extracted', title: usdText(d.payout, d.rate), titleGlow: true, sub: `Walked out of the dark on a ${usdText(d.stake, d.rate)} stake. Nobody saw what I was carrying.`, chips: [['Profit', `${pnl >= 0 ? '+' : '−'}${Math.abs(pct)}%`], ['Kills', String(d.kills)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon },
-        text: `Got out with ${usdText(d.payout, d.rate)} on a ${usdText(d.stake, d.rate)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Nobody saw what I was carrying. ${tag}`,
+        spec: { accent: '#3ddc97', kicker: 'Extracted', title: usdText(d.payout), titleGlow: true, sub: `Walked out of the dark on a ${usdText(d.stake)} stake. Nobody saw what I was carrying.`, chips: [['Profit', `${pnl >= 0 ? '+' : '−'}${Math.abs(pct)}%`], ['Kills', String(d.kills)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon },
+        text: `Got out with ${usdText(d.payout)} on a ${usdText(d.stake)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Nobody saw what I was carrying. ${tag}`,
       };
     }
     case 'loss': {
       const storm = d.cause === 'storm';
       const who = d.killer ? `${d.killer} has my bag now` : storm ? 'The storm ate me' : 'Sealed inside at 0:00';
       return {
-        spec: { accent: '#ff4d5e', kicker: storm ? 'Eaten by the storm' : d.status === 'mia' ? 'Sealed inside' : 'Dropped', title: `−${usdText(d.stake, d.rate)}`, sub: `${who}. Only the two of us will ever know what was inside. Next raid.`, chips: [['Kills', String(d.kills)], ['Inside', mmss(d.secs)], ['Lost', usdText(d.lost, d.rate)]], look, rank: d.rank, pose: 'down', stamp: storm ? 'STORM' : 'DROPPED', stampColor: '#ff4d5e' },
-        text: `${who}: dropped ${usdText(d.lost, d.rate)} after ${mmss(d.secs)} inside with ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Running it back. ${tag}`,
+        spec: { accent: '#ff4d5e', kicker: storm ? 'Eaten by the storm' : d.status === 'mia' ? 'Sealed inside' : 'Dropped', title: `−${usdText(d.stake)}`, sub: `${who}. Only the two of us will ever know what was inside. Next raid.`, chips: [['Kills', String(d.kills)], ['Inside', mmss(d.secs)], ['Lost', usdText(d.lost)]], look, rank: d.rank, pose: 'down', stamp: storm ? 'STORM' : 'DROPPED', stampColor: '#ff4d5e' },
+        text: `${who}: dropped ${usdText(d.lost)} after ${mmss(d.secs)} inside with ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Running it back. ${tag}`,
       };
     }
     case 'boxHit':
@@ -271,11 +271,9 @@ export function moment(kind, d) {
     }
     case 'rankUp': {
       const r = RANKS[d.rank - 1];
-      const bags = d.rewards?.length ?? 0;
-      const credit = d.rewards?.reduce((s, x) => s + x.credit, 0) ?? 0;
       const trial = d.rewards?.find((x) => x.trial)?.trial;
       return {
-        spec: { accent: '#ffd166', kicker: `Rank up · ${d.rank}`, title: r.name.toUpperCase(), titleGlow: true, sub: `Climbed to rank ${d.rank} of 90 in DARK BAGS.`, chips: [['Bags', `+${bags}`], ['Bonus', `+${usd(credit)}`], trial ? ['Trial', OUTFIT[trial.id]?.name ?? '72h'] : ['Next', `rank ${d.rank + 1}`]], look, rank: d.rank },
+        spec: { accent: '#ffd166', kicker: `Rank up · ${d.rank}`, title: r.name.toUpperCase(), titleGlow: true, sub: `Climbed to rank ${d.rank} of 90 in DARK BAGS.`, chips: [['Rank', `${d.rank} / 90`], trial ? ['New look', OUTFIT[trial.id]?.name ?? '72h'] : ['Next', `rank ${d.rank + 1}`]], look, rank: d.rank },
         text: `Ranked up to ${r.name} (${d.rank}/90) in DARK BAGS. ${tag}`,
       };
     }

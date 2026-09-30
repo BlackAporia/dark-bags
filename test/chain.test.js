@@ -18,36 +18,39 @@ test('config: off by default, tokens from Starkzap presets plus extras', () => {
   assert.equal(readConfig({}), null);
   assert.equal(readConfig({ CHAIN: 'off' }), null);
   assert.throws(() => readConfig({ CHAIN: 'goerli' }), /sepolia or mainnet/);
-  const cfg = readConfig({ CHAIN: 'mainnet', TOKENS: 'strk,usdc,nope', EXTRA_TOKENS: 'strkBTC:0xabc:8', FIXED_PRICES: 'STRK=150' });
+  const cfg = readConfig({ CHAIN: 'mainnet', TOKENS: 'strk,usdc,nope', EXTRA_TOKENS: 'strkBTC:0xabc:8', FIXED_PRICES: 'STRK=0.15' });
   assert.equal(cfg.strk20.pool, '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a');
-  assert.deepEqual(cfg.fixedPrices, { STRK: 150 });
+  assert.deepEqual(cfg.fixedPrices, { STRK: 0.15 });
   const tokens = resolveTokens(cfg, starkzap.mainnetTokens, normAddr);
   assert.deepEqual(tokens.map((t) => t.symbol), ['STRK', 'USDC', 'strkBTC']);
   assert.equal(tokens[2].btc, true);
   assert.equal(tokens[0].id, normAddr(starkzap.mainnetTokens.STRK.address));
 });
 
-test('price feed: swap quotes to sats, BTC wrappers at par, stale prices switch off', async () => {
-  const cfg = readConfig({ CHAIN: 'mainnet', TOKENS: 'STRK,USDC,WBTC,LBTC' });
+test('price feed: swap quotes to $, stables and BTC wrappers pegged, stale prices switch off', async () => {
+  const cfg = readConfig({ CHAIN: 'mainnet', TOKENS: 'STRK,USDC,USDT,WBTC,LBTC' });
   const tokens = resolveTokens(cfg, starkzap.mainnetTokens, normAddr);
-  const [strk, usdc, wbtc, lbtc] = tokens;
+  const [strk, usdc, usdt, wbtc, lbtc] = tokens;
   const prices = new PriceBook([]);
   let now = 0;
   let down = false;
   const quoter = async ({ tokenIn, amountIn }) => {
     if (down) throw new Error('quoter down');
-    if (tokenIn.id === strk.id) return (amountIn * 150n) / 10n ** 18n; // 150 sats per STRK
-    if (tokenIn.id === usdc.id) return (amountIn * 1000n) / 10n ** 6n;
-    if (tokenIn.id === lbtc.id) return amountIn / 2n; // a broken pool: ignored, par instead
+    const perToken = (usd, dec) => (amountIn * BigInt(Math.round(usd * 1e6))) / 10n ** BigInt(dec); // USDC out
+    if (tokenIn.id === strk.id) return perToken(0.15, 18);
+    if (tokenIn.id === usdt.id) return perToken(0.5, 6); // a broken pool: ignored, the $1 peg instead
+    if (tokenIn.id === wbtc.id) return perToken(100000, 8);
+    if (tokenIn.id === lbtc.id) return perToken(50000, 8); // off from WBTC: WBTC's price instead
     return 0n;
   };
-  const feed = new PriceFeed({ tokens, prices, quoter, btc: wbtc, now: () => now, log: quiet });
+  const feed = new PriceFeed({ tokens, prices, quoter, usd: usdc, now: () => now, log: quiet });
   assert.equal(prices.has(strk.id), false);
   await feed.refresh();
-  assert.equal(prices.get(strk.id).satsPerToken, 150);
-  assert.equal(prices.get(usdc.id).satsPerToken, 1000);
-  assert.equal(prices.get(wbtc.id).satsPerToken, 1e8);
-  assert.equal(prices.get(lbtc.id).satsPerToken, 1e8);
+  assert.ok(Math.abs(prices.get(strk.id).usd - 0.15) < 1e-9);
+  assert.equal(prices.get(usdc.id).usd, 1);
+  assert.equal(prices.get(usdt.id).usd, 1);
+  assert.equal(prices.get(wbtc.id).usd, 100000);
+  assert.equal(prices.get(lbtc.id).usd, 100000);
   assert.equal(prices.quote(usdc.id, 1000), 1_000_000n);
 
   down = true;
@@ -57,7 +60,7 @@ test('price feed: swap quotes to sats, BTC wrappers at par, stale prices switch 
   now += 6 * 60 * 1000;
   await feed.refresh();
   assert.equal(prices.has(strk.id), false, 'stale price is dropped');
-  assert.ok(prices.has(wbtc.id));
+  assert.ok(prices.has(usdc.id) && prices.has(usdt.id), 'stablecoins stay on their peg');
 });
 
 test('public deposits are read from Transfer events into the house (Cairo 1 and legacy)', async () => {

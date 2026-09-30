@@ -53,7 +53,7 @@ function fakeChain({ routes = ['private', 'public'] } = {}) {
 
 function setup(opts = {}) {
   const chain = fakeChain(opts);
-  const prices = new PriceBook(chain.tokens.map((t) => ({ ...t, satsPerToken: t.symbol === 'STRK' ? 150 : 1000 })));
+  const prices = new PriceBook(chain.tokens.map((t) => ({ ...t, usd: t.symbol === 'STRK' ? 0.15 : 1 })));
   const cashier = new Cashier({ chain, prices, data: opts.data, privy: opts.privy ?? null });
   return { chain, prices, cashier };
 }

@@ -2,7 +2,11 @@
 // Everything is decided on the server (prices, rolls, pity); this file renders it and
 // stages the moments: try-ons on a lit stage, a roulette that slows onto your drop,
 // and a reveal you can post.
-import { OUTFIT, OUTFITS, BOX, BOXES, RARITIES, RARITY_ORDER, PITY, usd } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, BOX, BOXES, RARITIES, RARITY_ORDER, PITY, PACKS, usd } from '../shared/cosmetics.js';
+import { isStable } from '../shared/assets.js';
+import { t } from './i18n.js';
+
+const rn = (k) => t(`r.${k}`);
 import { drawPreview, figureStill } from './stickman.js';
 import { esc, fmt } from './game.js';
 
@@ -57,20 +61,16 @@ export function createLocker({ app, send, sfx, toast, share }) {
   const L = () => app.locker;
   const trialLeft = (id) => Math.max(0, (L()?.trials?.[id] ?? 0) - Date.now());
   const owns = (id) => OUTFIT[id]?.basic || L()?.owned.includes(id) || trialLeft(id) > 0;
-  // $: bonus credit plus what the player can spend: USDC/USDT with real tokens, the play balance otherwise
+  // USDC/USDT the player could top shop $ up from, in cents
   const stableCents = () => {
-    if (!app.chain) {
-      const sats = BigInt(app.balances?.SATS ?? '0');
-      const rate = app.assets?.find((a) => /^(USDC|USDT)$/i.test(a.symbol))?.satsPerToken ?? 1000;
-      return Math.floor((Number(sats) * 100) / rate);
-    }
     let c = 0n;
     for (const a of app.assets ?? []) {
-      if (!/^(USDC|USDT)$/i.test(a.symbol) || a.decimals < 2) continue;
+      if (!isStable(a) || a.decimals < 2) continue;
       c += BigInt(app.balances?.[a.id] ?? '0') / 10n ** BigInt(a.decimals - 2);
     }
     return Number(c);
   };
+  // what a purchase can reach: shop $ first, the shortfall topped up from USDC/USDT
   const dollars = () => (L()?.credit ?? 0) + stableCents();
   const bagsHeld = () => Object.values(L()?.boxes ?? {}).reduce((a, b) => a + b, 0);
   const left = (ms) => (ms > 86400000 ? `${Math.ceil(ms / 86400000)}d` : `${Math.ceil(ms / 3600000)}h`);
@@ -89,9 +89,9 @@ export function createLocker({ app, send, sfx, toast, share }) {
     const r = RARITIES[o.rarity];
     $('lt-name').textContent = o.name;
     $('lt-name').style.color = r.color;
-    $('lt-rarity').textContent = `${r.name} · ${L().body === 'f' ? 'Her' : 'Him'}`;
+    $('lt-rarity').textContent = `${rn(o.rarity)} · ${L().body === 'f' ? t('lk.her') : t('lk.him')}`;
     const bags = bagsHeld();
-    $('lt-marks').textContent = ` · ${usd(dollars())}${bags ? ` · ${bags} ${bags === 1 ? 'bag' : 'bags'} to open` : ''}`;
+    $('lt-marks').textContent = `${L().credit > 0 ? ` · shop ${usd(L().credit)}` : ''}${bags ? ` · ${bags} ${bags === 1 ? 'bag' : 'bags'} to open` : ''}`;
     $('open-locker').classList.toggle('glow', bags > 0);
     tile.style.setProperty('--r', r.color);
   }
@@ -163,23 +163,26 @@ export function createLocker({ app, send, sfx, toast, share }) {
 
   function render() {
     if (!L()) return;
-    $('lk-marks').textContent = usd(dollars());
-    $('lk-bonus').textContent = L().credit > 0 ? `incl. ${usd(L().credit)} bonus` : '';
+    $('lk-marks').textContent = usd(L().credit);
+    $('lk-bonus').textContent = t('lk.topupFrom', { v: usd(stableCents()) });
     for (const b of document.querySelectorAll('#lk-body [data-body]')) b.setAttribute('aria-checked', String(b.dataset.body === L().body));
     renderDetail();
     if (st.tab === 'outfits') renderGrid('lk-grid', OUTFITS.filter((o) => st.filter === 'all' || (st.filter === 'owned' ? owns(o.id) : o.rarity === st.filter)));
-    if (st.tab === 'shop') renderGrid('lk-shop', OUTFITS.filter((o) => o.price));
+    if (st.tab === 'shop') {
+      renderPacks();
+      renderGrid('lk-shop', OUTFITS.filter((o) => o.price));
+    }
     if (st.tab === 'boxes') renderBoxes();
     const total = OUTFITS.length;
     const have = OUTFITS.filter((o) => owns(o.id)).length;
-    $('lk-count').textContent = `${have} / ${total} collected`;
+    $('lk-count').textContent = t('lk.collected', { a: have, b: total });
   }
 
   function status(o) {
     const trial = !o.basic && !L().owned.includes(o.id) && trialLeft(o.id) > 0;
-    if (L().outfit === o.id) return { text: trial ? `Equipped · trial ${left(trialLeft(o.id))}` : 'Equipped', cls: 'on' };
-    if (trial) return { text: `Trial · ${left(trialLeft(o.id))} left`, cls: 'trial' };
-    if (owns(o.id)) return { text: 'Owned', cls: 'own' };
+    if (L().outfit === o.id) return { text: trial ? `${t('lk.equipped')} · ${left(trialLeft(o.id))}` : t('lk.equipped'), cls: 'on' };
+    if (trial) return { text: t('lk.trialLeft', { t: left(trialLeft(o.id)) }), cls: 'trial' };
+    if (owns(o.id)) return { text: t('lk.owned'), cls: 'own' };
     if (o.price) return { text: usd(o.price), cls: 'price' };
     return { text: usd(o.price), cls: 'price' };
   }
@@ -212,18 +215,32 @@ export function createLocker({ app, send, sfx, toast, share }) {
     d.style.setProperty('--r', r.color);
     const trial = !o.basic && !L().owned.includes(id) && trialLeft(id) > 0;
     let action = '';
-    if (L().outfit === id) action = `<span class="lk-tag">Equipped</span>`;
-    else if (owns(id)) action = `<button type="button" class="cta" data-act="equip">Equip</button>`;
-    if (!o.basic && !L().owned.includes(id)) action += `<button type="button" class="${owns(id) ? 'ghost' : 'cta'}" data-act="buy" ${dollars() < o.price ? 'disabled' : ''}>Buy · ${usd(o.price)}</button>`;
+    if (L().outfit === id) action = `<span class="lk-tag">${t('lk.equipped')}</span>`;
+    else if (owns(id)) action = `<button type="button" class="cta" data-act="equip">${t('lk.equip')}</button>`;
+    if (!o.basic && !L().owned.includes(id)) action += `<button type="button" class="${owns(id) ? 'ghost' : 'cta'}" data-act="buy" ${dollars() < o.price ? 'disabled' : ''}>${t('lk.buy')} · ${usd(o.price)}</button>`;
     const how = trial
-      ? `A rank-up trial: yours for ${left(trialLeft(id))} more. Buy it to keep it.`
+      ? t('lk.trialHow', { t: left(trialLeft(id)) })
       : owns(id)
         ? o.basic
-          ? 'Free for every runner.'
-          : 'In your collection.'
-        : 'Buy it here, or try your luck with a bag.';
-    d.innerHTML = `<p class="lk-rar">${esc(r.name)}${o.fx ? ` · <span>${esc(fxName(o.fx))}</span>` : ''}</p><h3>${esc(o.name)}</h3><p class="fine">${esc(how)}${st.selected && !owns(id) ? ' Trying it on.' : ''}</p><div class="lk-actions">${action}</div>`;
+          ? t('lk.free')
+          : t('lk.inCollection')
+        : t('lk.buyOrBag');
+    d.innerHTML = `<p class="lk-rar">${esc(rn(o.rarity))}${o.fx ? ` · <span>${esc(fxName(o.fx))}</span>` : ''}</p><h3>${esc(o.name)}</h3><p class="fine">${esc(how)}${st.selected && !owns(id) ? ` ${t('lk.tryingOn')}` : ''}</p><div class="lk-actions">${action}</div>`;
     for (const b of d.querySelectorAll('[data-act]')) b.addEventListener('click', () => send({ t: b.dataset.act, id }));
+  }
+
+  function renderPacks() {
+    $('lk-packs').replaceChildren(
+      ...PACKS.map((p) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `lk-pack${p.bonus ? ' bonus' : ''}`;
+        b.disabled = stableCents() < p.price;
+        b.innerHTML = `<b>${usd(p.price + p.bonus)}</b><span>${p.bonus ? t('lk.bonus', { n: Math.round((p.bonus / p.price) * 100) }) : t('lk.shopUsd')}</span><small>${t('lk.pay', { v: usd(p.price) })}</small>`;
+        b.addEventListener('click', () => send({ t: 'topup', id: p.id }));
+        return b;
+      }),
+    );
   }
 
   function renderBoxes() {
@@ -234,16 +251,16 @@ export function createLocker({ app, send, sfx, toast, share }) {
         const el = document.createElement('article');
         el.className = `lk-box b-${bx.id}`;
         const odds = RARITY_ORDER.filter((k) => bx.odds[k] > 0)
-          .map((k) => `<li style="--r:${RARITIES[k].color}"><span>${RARITIES[k].name}</span><b>${bx.odds[k]}%</b></li>`)
+          .map((k) => `<li style="--r:${RARITIES[k].color}"><span>${rn(k)}</span><b>${bx.odds[k]}%</b></li>`)
           .join('');
         const meter = (label, n, max) => `<div class="pity"><span>${label}</span><div class="pity-bar"><i style="width:${(n / max) * 100}%"></i></div><b>${max - n}</b></div>`;
         el.innerHTML = `<div class="lk-box-art">${boxArt(bx.id, 132)}</div>
           <h4>${esc(bx.name)}</h4>
-          <p class="fine">Jackpot: <b style="color:${RARITIES[bx.jackpot].color}">${RARITIES[bx.jackpot].name}</b></p>
+          <p class="fine">${t('lk.jackpot')}: <b style="color:${RARITIES[bx.jackpot].color}">${rn(bx.jackpot)}</b></p>
           <ul class="odds">${odds}</ul>
-          ${meter('Epic+ in', pity.sinceEpic, PITY.epic)}
-          ${meter('Legendary+ in', pity.sinceLegendary, PITY.legendary)}
-          ${(L().boxes?.[bx.id] ?? 0) > 0 ? `<button type="button" class="cta">Open · free <span class="held">×${L().boxes[bx.id]}</span></button>` : `<button type="button" class="cta" ${dollars() < bx.price ? 'disabled' : ''}>Buy &amp; open · ${usd(bx.price)}</button>`}`;
+          ${meter(t('lk.epicIn'), pity.sinceEpic, PITY.epic)}
+          ${meter(t('lk.legIn'), pity.sinceLegendary, PITY.legendary)}
+          ${(L().boxes?.[bx.id] ?? 0) > 0 ? `<button type="button" class="cta">${t('lk.openFree')} <span class="held">×${L().boxes[bx.id]}</span></button>` : `<button type="button" class="cta" ${dollars() < bx.price ? 'disabled' : ''}>${t('lk.buyOpen')} · ${usd(bx.price)}</button>`}`;
         el.querySelector('button').addEventListener('click', () => openBox(bx.id));
         return el;
       }),
@@ -335,16 +352,16 @@ export function createLocker({ app, send, sfx, toast, share }) {
       const rv = $('lk-reveal');
       rv.hidden = false;
       rv.style.setProperty('--r', r.color);
-      rv.innerHTML = `<p class="rv-kicker">${esc(box.name)}${result.pity ? ' · pity drop' : ''}</p>
+      rv.innerHTML = `<p class="rv-kicker">${esc(box.name)}${result.pity ? ` · ${t('lk.pityDrop')}` : ''}</p>
         <div class="rv-stage"><canvas id="rv-canvas"></canvas></div>
-        <p class="rv-rar">${esc(r.name)}</p>
+        <p class="rv-rar">${esc(rn(result.rarity))}</p>
         <h3 class="rv-name">${esc(o.name)}</h3>
-        <p class="rv-note">${result.dup ? `Already yours · <b>+${usd(result.refund)} back</b>` : '<b>New</b> in your collection'}${result.jackpot ? '' : ` · the jackpot is ${esc(RARITIES[box.jackpot].name)}`}</p>
+        <p class="rv-note">${result.dup ? t('lk.dup', { v: `<b>+${usd(result.refund)}</b>` }) : t('lk.new')}${result.jackpot ? '' : ` · ${t('lk.jackpotIs', { r: esc(rn(box.jackpot)) })}`}</p>
         <div class="rv-actions">
-          ${!result.dup && L().outfit !== o.id ? '<button type="button" class="cta" data-rv="equip">Equip</button>' : ''}
-          <button type="button" class="ghost share" data-rv="share">${result.jackpot ? 'Show it off on X' : 'Post the miss on X'}</button>
-          <button type="button" class="ghost" data-rv="again" ${(L().boxes?.[box.id] ?? 0) === 0 && dollars() < box.price ? 'disabled' : ''}>Open another · ${(L().boxes?.[box.id] ?? 0) > 0 ? `free ×${L().boxes[box.id]}` : usd(box.price)}</button>
-          <button type="button" class="link" data-rv="close">Back to the locker</button>
+          ${!result.dup && L().outfit !== o.id ? `<button type="button" class="cta" data-rv="equip">${t('lk.equip')}</button>` : ''}
+          <button type="button" class="ghost share" data-rv="share">${result.jackpot ? t('lk.showOff') : t('lk.postMiss')}</button>
+          <button type="button" class="ghost" data-rv="again" ${(L().boxes?.[box.id] ?? 0) === 0 && dollars() < box.price ? 'disabled' : ''}>${t('lk.another')} · ${(L().boxes?.[box.id] ?? 0) > 0 ? `${t('lk.free1')} ×${L().boxes[box.id]}` : usd(box.price)}</button>
+          <button type="button" class="link" data-rv="close">${t('lk.back')}</button>
         </div>`;
       const cv = $('rv-canvas');
       const spin = (now) => {
@@ -398,10 +415,14 @@ export function createLocker({ app, send, sfx, toast, share }) {
     }
     if (m.op === 'buy') {
       sfx.play('coin');
-      toast(`${OUTFIT[r.item].name} is yours.`);
+      toast(t('lk.yours', { n: OUTFIT[r.item].name }));
       st.selected = r.item;
     }
     if (m.op === 'equip') sfx.play('bag');
+    if (m.op === 'topup') {
+      sfx.play('coin');
+      toast(`+${usd(r.added)} ${t('lk.shopUsd')}`);
+    }
     if ($('dlg-locker').open) render();
   }
 

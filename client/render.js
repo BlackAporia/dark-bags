@@ -8,7 +8,7 @@ import { textures, canvas } from './textures.js';
 
 const C = {
   void: '#07090f',
-  sats: '#f7931a',
+  loot: '#f7931a',
   gold: '#ffd166',
   exit: '#3ddc97',
   amber: '#f5a524',
@@ -52,7 +52,7 @@ export class Renderer {
     this.fastT = 0;
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.glow = {
-      sats: glowSprite('rgba(247,147,26,0.55)'),
+      loot: glowSprite('rgba(247,147,26,0.55)'),
       gold: glowSprite('rgba(255,209,102,0.6)'),
       laser: glowSprite('rgba(255,40,60,0.9)', 32),
     };
@@ -252,9 +252,9 @@ export class Renderer {
 
   drawOrb(o, t, golden) {
     const ctx = this.ctx;
-    const col = golden ? C.gold : C.sats;
+    const col = golden ? C.gold : C.loot;
     const bob = this.reduced ? 0 : Math.sin(t / 300 + o.i) * 2;
-    const g = golden ? this.glow.gold : this.glow.sats;
+    const g = golden ? this.glow.gold : this.glow.loot;
     const halo = [34, 46, 80][o.t];
     ctx.globalCompositeOperation = 'lighter';
     ctx.drawImage(g, o.x - halo / 2, o.y - halo / 2, halo, halo);
@@ -411,8 +411,9 @@ export class Renderer {
     ctx.fillRect(p.head.x - w / 2 - 1, top - 1, w + 2, 6);
     ctx.fillStyle = hpColor(frac);
     ctx.fillRect(p.head.x - w / 2, top, w * frac, 4);
-    if (!f.isMe) {
-      ctx.fillStyle = 'rgba(235, 229, 214, 0.9)';
+    {
+      // your own name too, in gold, so you can find yourself in a fight
+      ctx.fillStyle = f.isMe ? '#ffd166' : 'rgba(235, 229, 214, 0.9)';
       ctx.font = `600 11px ${F_UI}`;
       ctx.textAlign = 'center';
       const label = `${f.name}${f.pr ? ` ${'★'.repeat(Math.min(3, f.pr))}` : ''}`;
@@ -426,6 +427,13 @@ export class Renderer {
         ctx.fillText(label, x0 + 16, top - 5);
         ctx.textAlign = 'center';
       } else ctx.fillText(label, p.head.x, top - 5);
+      if (f.title) {
+        // a worn achievement title, small and gold, over the name
+        ctx.font = `700 9px ${F_UI}`;
+        ctx.fillStyle = 'rgba(255, 209, 102, 0.9)';
+        ctx.textAlign = 'center';
+        ctx.fillText(f.title.toUpperCase(), p.head.x, top - 19);
+      }
     }
   }
 
@@ -653,7 +661,7 @@ export class Renderer {
       m.arc(e.x * k, e.y * k, 4 * this.dpr + (st === 'closed' ? 0 : pulse), 0, TAU);
       m.fill();
     }
-    m.fillStyle = alive ? C.sats : C.dust;
+    m.fillStyle = alive ? C.loot : C.dust;
     m.beginPath();
     m.arc(eye.x * k, eye.y * k, 3.5 * this.dpr, 0, TAU);
     m.fill();

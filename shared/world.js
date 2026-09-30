@@ -15,7 +15,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 /**
  * One raid. Authoritative simulation shared by the server and the offline mode.
  *
- * Economy (integer sats, conserved):
+ * Economy (integer mills, $1 = 1,000, conserved):
  *   each entry pays `stake` → rake to house, BAG_SHARE of the rest into the runner's
  *   own bag, the remainder into the loot pool that gets scattered on the map.
  *   Extract → you keep your bag. Die → your bag drops for anyone to take.
@@ -25,7 +25,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 // bots hit humans for this share of their weapon damage: bots react and aim like
 // machines, so a straight trade would be unfair; practice is softer still
 const BOT_DAMAGE = 0.75;
-const PRACTICE_BOT_DAMAGE = 0.5;
+const PRACTICE_BOT_DAMAGE = { easy: 0.5, normal: 0.75, hard: 1 };
 const PRACTICE_SPAWN_SHIELD = 5; // seconds; firing still drops it early
 
 export class World {
@@ -34,12 +34,16 @@ export class World {
     seed = (Math.random() * 2 ** 32) >>> 0,
     roundNo = 1,
     rolloverIn = 0,
-    golden = false,
+    bonus = 0,
     bots = true,
     botRoster = null,
     roundSeconds = CFG.ROUND_SECONDS,
     practice = false,
+    difficulty = null, // practice: 'easy' | 'normal' | 'hard'
+    botFill = CFG.BOT_FILL,
   }) {
+    this.difficulty = practice ? difficulty ?? 'easy' : 'normal';
+    this.botFill = botFill;
     // practice (offline, vs bots): every bot for itself, softer bots, and the raid
     // ends the moment the last human is out (dead or extracted)
     this.practice = practice;
@@ -50,7 +54,7 @@ export class World {
     this.map = generateMap(seed);
     this.nav = null; // built lazily by the first bot
     this.roundNo = roundNo;
-    this.golden = golden;
+    this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
     this.zonePlan = planZone(this.map, this.rnd, roundSeconds);
     this.zone = zoneAt(this.zonePlan, 0);
@@ -76,8 +80,7 @@ export class World {
     };
     this.ledger.rolloverIn = rolloverIn;
     this.lootPool += rolloverIn;
-    if (golden) {
-      const bonus = stake * CFG.GOLDEN_BONUS;
+    if (bonus > 0) {
       this.ledger.sponsorIn += bonus;
       this.lootPool += bonus;
     }
@@ -89,6 +92,13 @@ export class World {
 
   humansInside() {
     for (const p of this.players.values()) if (!p.isBot && p.status === 'alive') return true;
+    return false;
+  }
+
+  // a human who went down and is still watching the raid (practice keeps it running for them)
+  humansWatching() {
+    if (!this.aliveCount()) return false;
+    for (const p of this.players.values()) if (!p.isBot && p.status === 'dead' && !p.spectDone) return true;
     return false;
   }
 
@@ -109,7 +119,7 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm' }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
     const rake = Math.floor(stake * CFG.RAKE);
@@ -129,6 +139,7 @@ export class World {
       skin,
       isBot,
       rank, // career rank, shown on the name tag
+      title, // an achievement worn as a title (id), shown over the name
       outfit, // cosmetic outfit id and character (m/f): looks only
       body,
       x: pos.x,
@@ -192,6 +203,33 @@ export class World {
     if (!p) return;
     p.queue.length = 0;
     p.last = sanitizeInput({ s: p.ack });
+  }
+
+  // Spectating after death: step through the runners still alive (dir ±1), or stop watching.
+  watch(id, dir) {
+    const me = this.players.get(id);
+    if (!me || me.status !== 'dead') return;
+    if (dir === 0) {
+      me.spectDone = true;
+      return;
+    }
+    const alive = [...this.players.values()].filter((p) => p.status === 'alive').sort((a, b) => a.id - b.id);
+    if (!alive.length) return;
+    const cur = this.eyeOf(me);
+    const i = alive.indexOf(cur);
+    me.watchId = alive[(i + (dir > 0 ? 1 : -1) + alive.length) % alive.length].id;
+  }
+
+  // who a dead runner watches: their pick, else their killer, else anyone still alive
+  eyeOf(me) {
+    if (me.status !== 'dead') return me;
+    for (const id of [me.watchId, me.killer]) {
+      const p = id && this.players.get(id);
+      if (p && p.status === 'alive') return p;
+    }
+    let best = null;
+    for (const p of this.players.values()) if (p.status === 'alive' && (!best || p.kills > best.kills)) best = p;
+    return best ?? me;
   }
 
   setBluff(id, v) {
@@ -278,7 +316,7 @@ export class World {
     this.spawnLoot();
     this.announce();
     if (this.time >= this.duration - 1e-9) this.end();
-    else if (this.practice && this.hadHumans && !this.humansInside()) this.end();
+    else if (this.practice && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
   }
 
   updateZone() {
@@ -381,7 +419,7 @@ export class World {
 
   damage(v, shooter, amount) {
     if (v.shield > 0) return;
-    if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE : BOT_DAMAGE;
+    if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE[this.difficulty] ?? 0.5 : BOT_DAMAGE;
     if (shooter && shooter !== v) {
       shooter.dmgDealt += Math.min(amount, Math.max(0, v.hp));
       const k = shooter.isBot && v.isBot ? XP.botOnBotDamage : 1;
@@ -544,7 +582,7 @@ export class World {
   // Bots only enter at the start, alongside the humans: everyone begins together.
   fillBots() {
     if (!this.botsEnabled || !this.canJoin()) return;
-    for (let i = this.aliveCount(); i < CFG.BOT_FILL; i++) this.addBot();
+    for (let i = this.aliveCount(); i < this.botFill; i++) this.addBot();
   }
 
   addBot() {
@@ -640,11 +678,7 @@ export class World {
   snapshotFor(id) {
     const me = this.players.get(id);
     if (!me) return null;
-    let eye = me;
-    if (me.status === 'dead' && me.killer) {
-      const k = this.players.get(me.killer);
-      if (k && k.status === 'alive') eye = k;
-    }
+    const eye = this.eyeOf(me);
     const V = CFG.VISION + 30;
     const V2 = V * V;
     const near = (x, y, pad = 0) => (x - eye.x) ** 2 + (y - eye.y) ** 2 < (V + pad) ** 2;
@@ -670,6 +704,7 @@ export class World {
         fc: p.fc,
         pr: p.prestige,
         rk: p.rank,
+        ...(p.title ? { tt: p.title } : {}),
         o: p.outfit,
         g: p.body,
       });

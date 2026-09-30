@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { MemoryWallet } from '../../shared/wallet.js';
+import { MILLS } from '../../shared/assets.js';
 
 /**
  * The cashier for real tokens. Chain-agnostic: everything that touches Starknet
@@ -78,14 +79,14 @@ export class CashierError extends Error {
 }
 
 export class Cashier {
-  constructor({ chain, prices, data = {}, save = null, flush = null, privy = null, now = () => Date.now(), minWithdrawSats = 100 }) {
+  constructor({ chain, prices, data = {}, save = null, flush = null, privy = null, now = () => Date.now(), minWithdrawUsd = 1 }) {
     this.chain = chain;
     this.prices = prices;
     this.now = now;
     this.save = save; // debounced write of toJSON()
     this.flush = flush; // write now; awaited before any payout leaves
     this.privy = privy; // optional: sign-in with Privy (see ./privy.js)
-    this.minWithdrawSats = minWithdrawSats;
+    this.minWithdrawUsd = minWithdrawUsd;
     this.tokenIds = new Set(chain.tokens.map((t) => t.id));
     this.ledger = new MemoryWallet({ faucet: [], data: data.ledger ?? {}, onChange: () => this.persist() });
     this.seen = new Set(data.seen ?? []); // deposit ids already credited
@@ -102,7 +103,7 @@ export class Cashier {
   }
 
   info() {
-    return { ...this.chain.info(), minWithdrawSats: this.minWithdrawSats };
+    return { ...this.chain.info(), minWithdrawUsd: this.minWithdrawUsd };
   }
 
   toJSON() {
@@ -289,8 +290,8 @@ export class Cashier {
       return Promise.reject(new CashierError('Bad amount.'));
     }
     if (amount <= 0n) return Promise.reject(new CashierError('Bad amount.'));
-    const sats = this.prices.value(token, amount);
-    if (this.prices.has(token) && sats < this.minWithdrawSats) return Promise.reject(new CashierError(`Cash out at least ${this.minWithdrawSats} sats worth.`));
+    const mills = this.prices.value(token, amount);
+    if (this.prices.has(token) && mills < this.minWithdrawUsd * MILLS) return Promise.reject(new CashierError(`Cash out at least $${this.minWithdrawUsd} worth.`));
     if (!this.ledger.debit(account, token, amount)) return Promise.reject(new CashierError('Not enough balance.'));
 
     const w = { id: crypto.randomUUID(), account, token, amount: amount.toString(), route, to: account, status: 'sending', at: this.now() };

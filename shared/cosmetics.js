@@ -3,29 +3,29 @@
 // Built on the Warface model (a shop plus random "luck boxes"), with the parts that
 // make players feel cheated taken out:
 //   - odds are published on every box, and the roll happens on the server
-//   - pity: every box guarantees an Epic-or-better within 10 opens and a
-//     Legendary-or-better within 40, and the counter shows how close you are
+//   - pity: every box guarantees an Epic-or-better within 15 opens and a
+//     Legendary-or-better within 60, and the counter shows how close you are
 //   - smart drops: while you are missing items of the rolled rarity, you get one
 //     you don't own; duplicates only happen once you own them all
 //   - a duplicate pays part of its price back as $ credit
 //   - every outfit can also be bought outright, so nothing is locked behind luck
 //   - bought items are permanent; timed outfits only come free, as rank-up trials
 //
-// One currency: $, pegged 1:1 to USDC/USDT. A purchase spends $ credit first (bonus
-// money from rank-ups, shop-only, never withdrawable), then the player's USDC or
-// USDT balance. Every rank-up pays a luck box ("bag"), some $ credit and a random
-// outfit to try for 72 hours.
+// One shop currency: shop $, bought 1:1 with USDC/USDT (packs add a bonus). It can
+// only be spent here, never withdrawn. A purchase spends shop $ first and tops up
+// the exact difference from the player's USDC/USDT if they are short.
+// Rank-ups pay one thing: a random outfit to try for 72 hours. Rank is XP only.
 // Nothing here changes how a runner plays. It's all looks.
 
 export const BODIES = ['m', 'f'];
 
 export const RARITIES = {
   // price and duplicate refund in US cents
-  common: { name: 'Common', color: '#b8bfcc', price: 49, refund: 10 },
-  rare: { name: 'Rare', color: '#4cc9f0', price: 149, refund: 30 },
-  epic: { name: 'Epic', color: '#b37bff', price: 399, refund: 80 },
-  legendary: { name: 'Legendary', color: '#f7931a', price: 999, refund: 200 },
-  mythic: { name: 'Mythic', color: '#ff3d7f', price: 1999, refund: 400 },
+  common: { name: 'Common', color: '#b8bfcc', price: 49, refund: 5 },
+  rare: { name: 'Rare', color: '#4cc9f0', price: 149, refund: 15 },
+  epic: { name: 'Epic', color: '#b37bff', price: 399, refund: 40 },
+  legendary: { name: 'Legendary', color: '#f7931a', price: 999, refund: 100 },
+  mythic: { name: 'Mythic', color: '#ff3d7f', price: 1999, refund: 200 },
 };
 export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 const rank = (r) => RARITY_ORDER.indexOf(r);
@@ -68,26 +68,31 @@ export const DEFAULT_OUTFIT = 'basic-0';
 // odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss)
 // prices are in US cents
 export const BOXES = [
-  { id: 'street', name: 'Street Bag', price: 99, odds: { common: 70, rare: 24, epic: 5, legendary: 1, mythic: 0 }, jackpot: 'legendary' },
-  { id: 'vault', name: 'Vault Bag', price: 299, odds: { common: 35, rare: 43, epic: 16, legendary: 5.5, mythic: 0.5 }, jackpot: 'legendary' },
-  { id: 'golden', name: 'Golden Bag', price: 799, odds: { common: 0, rare: 45, epic: 35, legendary: 17, mythic: 3 }, jackpot: 'mythic' },
+  { id: 'street', name: 'Street Bag', price: 99, odds: { common: 80, rare: 16.5, epic: 3, legendary: 0.5, mythic: 0 }, jackpot: 'legendary' },
+  { id: 'vault', name: 'Vault Bag', price: 299, odds: { common: 50, rare: 36, epic: 11, legendary: 2.7, mythic: 0.3 }, jackpot: 'legendary' },
+  { id: 'golden', name: 'Golden Bag', price: 799, odds: { common: 0, rare: 60, epic: 30, legendary: 8.5, mythic: 1.5 }, jackpot: 'mythic' },
 ];
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
-export const PITY = { epic: 10, legendary: 40 }; // guaranteed at or better, by the Nth open of a box
+export const PITY = { epic: 15, legendary: 60 }; // guaranteed at or better, by the Nth open of a box
 
 export const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
 export const TRIAL_MS = 72 * 3600 * 1000;
 export const START_BOXES = { street: 1 }; // a welcome bag for every new runner
 
-// What one rank-up pays: a luck box (better ones as you climb), $ credit, a 72h trial outfit.
+// Shop $ packs: paid in USDC/USDT, credited as shop $ with a bonus on the bigger ones.
+export const PACKS = [
+  { id: 'p5', price: 500, bonus: 0 },
+  { id: 'p10', price: 1000, bonus: 50 },
+  { id: 'p25', price: 2500, bonus: 250 },
+  { id: 'p50', price: 5000, bonus: 750 },
+];
+export const PACK = Object.fromEntries(PACKS.map((p) => [p.id, p]));
+
+// The rarity of the 72h trial outfit one rank-up pays (the only rank-up reward).
 export function rankReward(rank, rnd) {
-  const g = Math.min(1, rank / 90);
-  const r = rnd();
-  const box = r < 0.05 + g * 0.2 ? 'golden' : r < 0.3 + g * 0.35 ? 'vault' : 'street';
-  const credit = Math.round(10 + rank * 2 + rnd() * (20 + rank * 3)); // cents
-  const tr = rnd();
+  const tr = rnd() + Math.min(0.1, rank / 900); // a little better as you climb
   const rarity = tr < 0.55 ? 'rare' : tr < 0.85 ? 'epic' : tr < 0.97 ? 'legendary' : 'mythic';
-  return { box, credit, rarity };
+  return { rarity };
 }
 
 // ------------------------------------------------------------------ rolls
@@ -201,14 +206,24 @@ export class Inventory {
     this.onChange?.(this);
   }
 
-  // rank-ups: one reward per rank gained
+  // Top up shop $ from USDC/USDT with a pack. Shop $ never goes back out.
+  topUp(key, packId, external) {
+    const p = PACK[packId];
+    if (!p) return { ok: false, error: 'Unknown pack.' };
+    if (!(external && external(p.price))) return { ok: false, error: `Not enough USDC or USDT (${usd(p.price)} needed).` };
+    const r = this.rec(key);
+    r.credit += p.price + p.bonus;
+    r.bought = (r.bought ?? 0) + p.price;
+    this.changed();
+    return { ok: true, pack: p.id, added: p.price + p.bonus };
+  }
+
+  // rank-ups: one 72h trial outfit per rank gained, nothing else
   rankUp(key, fromRank, toRank) {
     const r = this.rec(key);
     const out = [];
     for (let rank = fromRank + 1; rank <= toRank; rank++) {
       const w = rankReward(rank, this.rnd);
-      r.boxes[w.box] = (r.boxes[w.box] ?? 0) + 1;
-      r.credit += w.credit;
       // a trial of something you don't have yet (any rarity if you own them all)
       const all = OUTFITS.filter((o) => !o.basic && !r.owned.includes(o.id));
       const pool = all.filter((o) => o.rarity === w.rarity);
@@ -219,7 +234,7 @@ export class Inventory {
         r.trials[o.id] = Math.max(r.trials[o.id] ?? 0, this.now()) + TRIAL_MS;
         trial = { id: o.id, until: r.trials[o.id] };
       }
-      out.push({ rank, box: w.box, credit: w.credit, trial });
+      out.push({ rank, trial });
     }
     if (out.length) this.changed();
     return out;

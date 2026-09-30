@@ -1,27 +1,33 @@
-// Live sats prices for the table tokens, from on-chain swap quotes (Starkzap's
-// Ekubo provider, no API key): "how many WBTC base units (= sats) do I get for
-// N tokens". A price older than STALE_MS is dropped, which disables staking
-// with that token until the feed recovers; nobody stakes at a dead rate.
+// Live dollar prices for the table tokens, from on-chain swap quotes (Starkzap's
+// Ekubo provider, no API key): "how much USDC do I get for N tokens". A price older
+// than STALE_MS is dropped, which disables staking with that token until the feed
+// recovers; nobody stakes at a dead rate.
 
 const STALE_MS = 10 * 60 * 1000;
 // probe sizes: big enough for a clean quote, small enough to ignore price impact
-const PROBE = { STRK: '200', ETH: '0.01', USDC: '25', USDT: '25', WBTC: '0.0005' };
+const PROBE = { STRK: '200', ETH: '0.01', USDT: '25', WBTC: '0.0005' };
+const STABLE = new Set(['USDC', 'USDT', 'DAI', 'USDC.E']);
 
 export class PriceFeed {
-  constructor({ tokens, prices, quoter, btc, fixed = {}, now = () => Date.now(), log = console }) {
+  constructor({ tokens, prices, quoter, usd, fixed = {}, now = () => Date.now(), log = console }) {
     this.tokens = tokens; // Starkzap Token objects with id/color/btc
     this.prices = prices; // shared PriceBook
     this.quoter = quoter; // async ({ tokenIn, tokenOut, amountIn: bigint }) → amountOut bigint
-    this.btc = btc; // the token quotes are measured in (WBTC: 8 decimals, so base units are sats)
-    this.fixed = fixed;
+    this.usdToken = usd; // the token quotes are measured in (USDC)
+    this.fixed = fixed; // SYMBOL → $ per token
     this.now = now;
     this.log = log;
-    this.last = new Map(); // id → { at, satsPerToken }
-    for (const t of tokens) this.publish(t, this.fixed[t.symbol.toUpperCase()] ?? 0);
+    this.last = new Map(); // id → { at, usd }
+    this.btcUsd = 0; // WBTC's price, the reference for the other BTC wrappers
+    for (const t of tokens) this.publish(t, this.fixed[t.symbol.toUpperCase()] ?? (this.stable(t) ? 1 : 0));
   }
 
-  publish(t, satsPerToken) {
-    this.prices.set({ id: t.id, symbol: t.symbol, decimals: t.decimals, color: t.color, satsPerToken });
+  stable(t) {
+    return STABLE.has(t.symbol.toUpperCase());
+  }
+
+  publish(t, usd) {
+    this.prices.set({ id: t.id, symbol: t.symbol, decimals: t.decimals, color: t.color, usd, stable: this.stable(t) });
   }
 
   probeUnits(t) {
@@ -33,30 +39,34 @@ export class PriceFeed {
   async quoteOne(t) {
     const sym = t.symbol.toUpperCase();
     if (this.fixed[sym]) return this.fixed[sym];
-    if (t.id === this.btc?.id) return 1e8; // one whole BTC
-    if (!this.btc) return t.btc ? 1e8 : 0;
-    const amountIn = this.probeUnits(t);
+    if (t.id === this.usdToken?.id) return 1;
+    const peg = this.stable(t) ? 1 : t.btc && sym !== 'WBTC' ? this.btcUsd : 0;
+    if (!this.usdToken) return peg;
     try {
-      const out = await this.quoter({ tokenIn: t, tokenOut: this.btc, amountIn });
+      const amountIn = this.probeUnits(t);
+      const out = await this.quoter({ tokenIn: t, tokenOut: this.usdToken, amountIn });
       if (out <= 0n) throw new Error('empty quote');
-      // out is in btc base units; scale to sats (8 decimals) per whole token
-      const sats = (Number(out) * 10 ** (8 - this.btc.decimals)) / (Number(amountIn) / 10 ** t.decimals);
-      // BTC wrappers should sit near 1 BTC; a quote far off is a thin pool, not a price
-      if (t.btc && (sats < 0.9e8 || sats > 1.1e8)) return 1e8;
-      return sats;
+      const usd = Number(out) / 10 ** this.usdToken.decimals / (Number(amountIn) / 10 ** t.decimals);
+      // pegged tokens should sit near their peg; a quote far off is a thin pool, not a price
+      const band = this.stable(t) ? 0.05 : 0.1;
+      if (peg && Math.abs(usd / peg - 1) > band) return peg;
+      return usd;
     } catch (e) {
-      if (t.btc) return 1e8; // pegged: fall back to par rather than switching the token off
+      if (peg) return peg; // fall back to the peg rather than switching the token off
       throw e;
     }
   }
 
   async refresh() {
-    for (const t of this.tokens) {
+    // WBTC first: the other BTC wrappers are checked against it
+    const order = [...this.tokens].sort((a, b) => (b.symbol.toUpperCase() === 'WBTC') - (a.symbol.toUpperCase() === 'WBTC'));
+    for (const t of order) {
       try {
-        const sats = await this.quoteOne(t);
-        if (sats > 0) {
-          this.last.set(t.id, { at: this.now(), satsPerToken: sats });
-          this.publish(t, sats);
+        const usd = await this.quoteOne(t);
+        if (usd > 0) {
+          if (t.symbol.toUpperCase() === 'WBTC') this.btcUsd = usd;
+          this.last.set(t.id, { at: this.now(), usd });
+          this.publish(t, usd);
           continue;
         }
       } catch (e) {

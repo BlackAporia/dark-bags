@@ -277,7 +277,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       );
     }
     $('wd-go').disabled = !cs.wdRoute;
-    $('wd-hint').textContent = cs.wdRoute ? `Minimum about $${Math.max(0.01, cs.chain.minWithdrawSats / (app.assets?.find((a) => /^(USDC|USDT)$/i.test(a.symbol))?.satsPerToken ?? 1000)).toFixed(2)}. Paid to ${short(cs.account)}.` : 'Cash-outs are switched off on this server right now.';
+    $('wd-hint').textContent = cs.wdRoute ? `Minimum $${cs.chain.minWithdrawUsd ?? 1}. Paid to ${short(cs.account)}.` : 'Cash-outs are switched off on this server right now.';
     $('dep-hint').textContent = cs.depRoute === 'private' ? 'Your wallet builds a zero-knowledge proof; that can take a minute.' : 'Your balance updates once the transfer is accepted on Starknet.';
   }
 

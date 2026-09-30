@@ -5,8 +5,8 @@ import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
 import { PriceBook, unitsAtEntryRate } from '../shared/assets.js';
 
-const START = 100000; // test faucet SATS
-const sats = (wallet, token) => Number(wallet.balance(token, 'SATS'));
+const START = 100000; // test faucet: $100 of USDC, in mills ($1 = 1,000)
+const mills = (wallet, token) => Number(wallet.balance(token, 'USDC')) / 1000; // 6 decimals: 1 mill = 1,000 units
 
 function setup({ roundSeconds = 120, bots = false } = {}) {
   const inbox = new Map();
@@ -41,11 +41,11 @@ test('entering a table is free; Ready escrows the stake and lights your icon', (
   const { lobby, wallet, client } = setup();
   const c = client(1, 'vy');
   lobby.handle(1, { t: 'join', stake: 1000 });
-  assert.equal(sats(wallet, c.token), START);
+  assert.equal(mills(wallet, c.token), START);
   assert.equal(c.last('prep').state, 'prep');
   assert.equal(c.last('prep').count, null, 'no countdown until someone is ready');
   lobby.handle(1, { t: 'ready' });
-  assert.equal(sats(wallet, c.token), START - 1000);
+  assert.equal(mills(wallet, c.token), START - 1000);
   const prep = c.last('prep');
   assert.equal(prep.slots.length, 1);
   assert.equal(prep.slots[0].n, 'vy');
@@ -59,7 +59,7 @@ test('Unready refunds the stake and stops the countdown', () => {
   lobby.handle(1, { t: 'join', stake: 100 });
   lobby.handle(1, { t: 'ready' });
   lobby.handle(1, { t: 'unready' });
-  assert.equal(sats(wallet, c.token), START);
+  assert.equal(mills(wallet, c.token), START);
   assert.equal(c.last('prep').count, null);
 });
 
@@ -113,7 +113,7 @@ test('extracting credits the wallet with the bag', () => {
   const res = c.last('result');
   assert.equal(res.status, 'extracted');
   assert.equal(res.payout, 2500);
-  assert.equal(sats(wallet, c.token), START - 1000 + 2500);
+  assert.equal(mills(wallet, c.token), START - 1000 + 2500);
   assert.ok(room.world.audit().ok);
 });
 
@@ -128,22 +128,22 @@ test('Ready during a live raid carries you into the next one', () => {
   lobby.handle(2, { t: 'join', stake: 100 });
   assert.equal(b.last('prep').state, 'live');
   lobby.handle(2, { t: 'ready' });
-  assert.equal(sats(wallet, b.token), START - 100, 'escrowed');
+  assert.equal(mills(wallet, b.token), START - 100, 'escrowed');
   assert.equal(b.last('start'), undefined, 'no mid-raid entry');
   ticks(30 + CFG.INTERMISSION + CFG.PREP_SECONDS + 1);
   assert.ok(b.last('start'), 'entered the next raid');
 });
 
-test('cannot ready up without the sats; the test faucet refills', () => {
+test('cannot ready up without the money; the test faucet refills', () => {
   const { lobby, wallet, client } = setup();
   const c = client(1);
-  wallet.accounts.set(c.token, new Map([['SATS', 50n]]));
+  wallet.accounts.set(c.token, new Map([['USDC', 50000n]]));
   lobby.handle(1, { t: 'join', stake: 100 });
   lobby.handle(1, { t: 'ready' });
   assert.ok(c.last('err'));
   assert.equal(c.last('prep').slots.length, 0);
   lobby.handle(1, { t: 'faucet' });
-  assert.equal(sats(wallet, c.token), START);
+  assert.equal(mills(wallet, c.token), START);
 });
 
 test('leaving the ready room refunds; leaving a raid leaves the body behind', () => {
@@ -152,7 +152,7 @@ test('leaving the ready room refunds; leaving a raid leaves the body behind', ()
   lobby.handle(1, { t: 'join', stake: 1000 });
   lobby.handle(1, { t: 'ready' });
   lobby.disconnect(1);
-  assert.equal(sats(wallet, a.token), START);
+  assert.equal(mills(wallet, a.token), START);
 
   const b = client(2);
   lobby.handle(2, { t: 'join', stake: 1000 });
@@ -166,7 +166,7 @@ test('leaving the ready room refunds; leaving a raid leaves the body behind', ()
   assert.ok(room.world.audit().ok);
 });
 
-test('any token can be staked: quoted from sats, paid out at the entry rate', () => {
+test('any token can be staked: the $ stake is quoted in it, paid out at the entry rate', () => {
   const { lobby, wallet, client, ticks } = setup();
   const prices = lobby.prices;
   const c = client(1, 'strk-holder');
@@ -175,7 +175,7 @@ test('any token can be staked: quoted from sats, paid out at the entry rate', ()
   lobby.handle(1, { t: 'ready', asset: 'STRK' });
   const quote = prices.quote('STRK', 1000);
   assert.equal(wallet.balance(c.token, 'STRK'), before - quote, 'escrowed the quoted STRK');
-  assert.equal(sats(wallet, c.token), START, 'SATS untouched');
+  assert.equal(mills(wallet, c.token), START, 'USDC untouched');
   assert.ok(prices.value('STRK', quote) >= 1000, 'the quote covers the stake');
   ticks(CFG.PREP_SECONDS + 0.1);
   const room = lobby.rooms.get(1000);
@@ -186,7 +186,7 @@ test('any token can be staked: quoted from sats, paid out at the entry rate', ()
   ticks(CFG.EXTRACT_TIME + 1);
   const res = c.last('result');
   assert.equal(res.asset, 'STRK');
-  const expected = unitsAtEntryRate({ units: quote, sats: 1000 }, 3000);
+  const expected = unitsAtEntryRate({ units: quote, mills: 1000 }, 3000);
   assert.equal(res.payoutUnits, expected.toString());
   assert.equal(wallet.balance(c.token, 'STRK'), before - quote + expected);
   assert.equal(room.totals.byAsset.STRK.in, quote);
@@ -204,7 +204,7 @@ test('a token without a price cannot be staked', () => {
 });
 
 test('price book rounds quotes up and values down', () => {
-  const pb = new PriceBook([{ id: 'X', symbol: 'X', decimals: 18, satsPerToken: 150 }]);
+  const pb = new PriceBook([{ id: 'X', symbol: 'X', decimals: 18, usd: 0.15 }]);
   const q = pb.quote('X', 1000); // 6.666… X
   assert.equal(q, 6666666666666666667n);
   assert.ok(pb.value('X', q) >= 1000);

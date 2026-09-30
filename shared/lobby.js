@@ -1,9 +1,9 @@
 import { CFG } from './config.js';
 import { RoomCore } from './room.js';
 import { cleanName } from './wallet.js';
-import { PriceBook, satsPerUsd } from './assets.js';
+import { PriceBook, isStable } from './assets.js';
 import { RankBook } from './ranks.js';
-import { Inventory, OUTFITS, BOXES, RARITIES, PITY } from './cosmetics.js';
+import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS } from './cosmetics.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -44,7 +44,7 @@ export class Lobby {
     this.sessions.set(cid, { token: null, account: null, name: 'runner', room: null, busy: false });
   }
 
-  // whose balance this session plays with: the session itself (test sats) or a signed-in address
+  // whose balance this session plays with: the session itself (play money) or a signed-in address
   key(s) {
     return this.cashier ? s.account : s.token;
   }
@@ -80,8 +80,9 @@ export class Lobby {
         tables: this.tables(),
         assets: this.prices.list(),
         rank: this.key(s) ? this.ranks.get(this.key(s)) : null,
+        career: this.key(s) ? this.ranks.career(this.key(s)) : null,
         locker: this.key(s) ? this.inventory.view(this.key(s)) : null,
-        catalog: { outfits: OUTFITS, boxes: BOXES, rarities: RARITIES, pity: PITY },
+        catalog: { outfits: OUTFITS, boxes: BOXES, rarities: RARITIES, pity: PITY, packs: PACKS },
         practice: this.practice,
         chain: this.cashier ? this.cashier.info() : null,
         account: s.account,
@@ -104,6 +105,27 @@ export class Lobby {
       case 'tables':
         this.send(cid, { t: 'tables', tables: this.tables(), balances: this.balances(s), assets: this.prices.list() });
         return;
+      case 'title': {
+        const k = this.key(s);
+        if (!k) return;
+        if (!this.ranks.setTitle(k, msg.id === null ? null : String(msg.id ?? ''))) return this.send(cid, { t: 'err', msg: 'Unlock that achievement first.' });
+        this.send(cid, { t: 'career', career: this.ranks.career(k) });
+        return;
+      }
+      case 'practice_cfg':
+        // practice only: bot difficulty, how many runners, raid length. Applies from the next raid.
+        if (!this.practice) return;
+        for (const r of this.rooms.values()) {
+          if (['easy', 'normal', 'hard'].includes(msg.difficulty)) r.difficulty = msg.difficulty;
+          const n = Math.round(Number(msg.runners));
+          if (n >= 2 && n <= 16) {
+            r.botFill = n;
+            if (r.state === 'prep') r.openPrep(); // re-roll the lineup
+          }
+          const secs = Math.round(Number(msg.seconds));
+          if (secs >= 60 && secs <= 600) r.roundSeconds = secs;
+        }
+        return;
       case 'faucet':
         if (this.cashier) return;
         this.wallet.faucet(s.token);
@@ -113,6 +135,7 @@ export class Lobby {
       case 'body':
       case 'buy':
       case 'box':
+      case 'topup':
         this.lockerOp(cid, s, msg);
         return;
       case 'auth_start':
@@ -151,7 +174,7 @@ export class Lobby {
     }
   }
 
-  // Locker: cosmetics bought with marks. The server rolls every box.
+  // Locker: cosmetics bought with shop $. The server rolls every box.
   lockerOp(cid, s, msg) {
     const key = this.key(s);
     if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
@@ -162,22 +185,18 @@ export class Lobby {
       msg.t === 'equip' ? inv.equip(key, id)
       : msg.t === 'body' ? inv.setBody(key, id)
       : msg.t === 'buy' ? inv.buy(key, id, pay)
+      : msg.t === 'topup' ? inv.topUp(key, id, pay)
       : inv.open(key, id, pay);
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (s.room && (msg.t === 'equip' || msg.t === 'body')) s.room.broadcastPrep();
   }
 
-  // $ in the shop: USDC or USDT 1:1 with real tokens; in test mode the play balance (sats at the $ rate)
+  // Shop $ is bought 1:1 with USDC or USDT (play-money test tokens without a cashier)
   stablePay(key) {
     return (cents) => {
-      if (!this.cashier) {
-        // play money: one balance, the same one the client shows
-        const units = BigInt(Math.ceil((cents * satsPerUsd(this.prices)) / 100));
-        return this.prices.has('SATS') && this.wallet.debit(key, 'SATS', units);
-      }
       for (const a of this.prices.list()) {
-        if (!/^(USDC|USDT)$/i.test(a.symbol) || a.decimals < 2) continue;
+        if (!isStable(a) || a.decimals < 2) continue;
         const units = BigInt(cents) * 10n ** BigInt(a.decimals - 2);
         if (this.wallet.debit(key, a.id, units)) return true;
       }
@@ -210,13 +229,13 @@ export class Lobby {
         const account = await c.login(s.token, msg.address, msg.signature);
         if (!alive()) return;
         s.account = account;
-        reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account), locker: this.inventory.view(account) });
+        reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
         if (!alive()) return;
         s.account = r.account;
-        reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), locker: this.inventory.view(r.account) });
+        reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
         let r;

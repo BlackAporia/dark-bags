@@ -1,3 +1,4 @@
+import { applyStats, achievementView } from './achievements.js';
 // Career ranks: 1 (Lance Corporal) to 90 (Legend). Every raid pays rank XP, win or lose.
 // The first ranks come after a raid or two; the last ones take hundreds of hours.
 // Separate from the Arms Race weapon XP inside a raid (weapons.js), which resets every raid.
@@ -83,26 +84,60 @@ export function botRank(rnd) {
   return 1 + Math.floor(rnd() ** 1.8 * 45);
 }
 
-// Rank XP per player key (session token, Starknet address, or 'practice' in the browser).
+// Career per player key (session token, Starknet address, or 'practice' in the browser):
+// rank XP, the achievement counters and the title the player wears.
 export class RankBook {
   constructor({ data = {}, onChange = null } = {}) {
-    this.xp = new Map(Object.entries(data).map(([k, v]) => [k, Math.max(0, Math.floor(Number(v) || 0))]));
+    // old save files hold a bare XP number per key
+    this.recs = new Map(
+      Object.entries(data).map(([k, v]) => [k, typeof v === 'object' && v ? { ...v, xp: Math.max(0, Math.floor(Number(v.xp) || 0)) } : { xp: Math.max(0, Math.floor(Number(v) || 0)) }]),
+    );
     this.onChange = onChange;
   }
 
+  rec(key) {
+    if (!this.recs.has(key)) this.recs.set(key, { xp: 0 });
+    return this.recs.get(key);
+  }
+
   get(key) {
-    return rankOf(this.xp.get(key) ?? 0);
+    return rankOf(this.recs.get(key)?.xp ?? 0);
   }
 
   add(key, amount) {
     const before = this.get(key);
-    const next = before.xp + Math.max(0, Math.floor(amount));
-    this.xp.set(key, next);
+    const r = this.rec(key);
+    r.xp = before.xp + Math.max(0, Math.floor(amount));
     this.onChange?.(this);
-    return { before, after: rankOf(next) };
+    return { before, after: rankOf(r.xp) };
+  }
+
+  // fold a raid (or anything else) into the achievement counters; returns what it completed
+  progress(key, add) {
+    const fresh = applyStats(this.rec(key), add);
+    this.onChange?.(this);
+    return fresh;
+  }
+
+  title(key) {
+    return this.recs.get(key)?.title ?? null;
+  }
+
+  // wear an unlocked achievement as a title (null takes it off)
+  setTitle(key, id) {
+    const r = this.rec(key);
+    if (id !== null && !r.done?.[id]) return false;
+    r.title = id;
+    this.onChange?.(this);
+    return true;
+  }
+
+  career(key) {
+    const r = this.recs.get(key);
+    return { title: r?.title ?? null, stats: r?.stats ?? {}, achievements: achievementView(r) };
   }
 
   toJSON() {
-    return Object.fromEntries(this.xp);
+    return Object.fromEntries(this.recs);
   }
 }

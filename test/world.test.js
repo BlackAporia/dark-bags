@@ -12,16 +12,16 @@ function humanWorld(opts = {}) {
   return new World({ stake: 1000, seed: 42, bots: false, ...opts });
 }
 
-// Put sats in a bag for a test scenario, booked as sponsor money so the audit still balances.
+// Put money in a bag for a test scenario, booked as sponsor money so the audit still balances.
 function setBag(w, p, amount) {
   w.ledger.sponsorIn += amount - p.bag;
   p.bag = amount;
 }
 
-test('sats are conserved through full bot raids, rollover and golden raids', () => {
+test('money is conserved through full bot raids, rollover and golden raids', () => {
   let rollover = 0;
   for (let r = 1; r <= 4; r++) {
-    const w = new World({ stake: 1000, seed: 700 + r, roundNo: r, rolloverIn: rollover, golden: r === 4 });
+    const w = new World({ stake: 1000, seed: 700 + r, roundNo: r, rolloverIn: rollover, bonus: r === 4 ? 3000 : 0 });
     while (w.phase === 'live') {
       w.step();
       if (w.tick % 60 === 0) {
@@ -33,7 +33,7 @@ test('sats are conserved through full bot raids, rollover and golden raids', () 
     const a = w.audit();
     assert.ok(a.ok);
     assert.equal(w.inWorld(), 0, 'nothing left inside after the seal');
-    for (const v of Object.values(w.ledger)) assert.ok(Number.isInteger(v), 'ledger stays in whole sats');
+    for (const v of Object.values(w.ledger)) assert.ok(Number.isInteger(v), 'ledger stays in whole mills');
     rollover = w.ledger.rolloverOut;
   }
 });

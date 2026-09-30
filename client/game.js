@@ -1,6 +1,7 @@
 import { CFG } from '../shared/config.js';
 import { OUTFIT } from '../shared/cosmetics.js';
 import { usdText } from '../shared/assets.js';
+import { t } from './i18n.js';
 
 const usdTextCents = (c) => usdText(c * 10, 1000); // cents → "$x.xx"
 import { stepMovement, sanitizeInput } from '../shared/movement.js';
@@ -97,9 +98,9 @@ export class GameClient {
     this.gore = false;
   }
 
-  // sats → $ at the lobby's rate (main sets game.rate before a raid)
-  money(sats) {
-    return usdText(sats, this.rate ?? 1000);
+  // mills → $
+  money(mills) {
+    return usdText(mills);
   }
 
   begin(start, skin, gore, look = null) {
@@ -151,8 +152,8 @@ export class GameClient {
     el.extract.hidden = true;
     this.updateBluffChip();
     this.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
-    if (start.golden) this.banner('Golden raid · sponsor loot inside', 'gold', 3000);
-    else this.banner('Knife up · grab the orange · find an exit', 'money', 2600);
+    if (start.golden) this.banner(t('hud.goldenStart'), 'gold', 3000);
+    else this.banner(t('hud.start'), 'money', 2600);
   }
 
   stop() {
@@ -295,7 +296,7 @@ export class GameClient {
         case 'loot':
           this.fx.floater(ev.x, ev.y, `+${this.money(ev.v)}`, '#ffd166', 24, 1.8);
           this.fx.ring(ev.x, ev.y, '#ffd166');
-          this.banner(`Bag opened · +${this.money(ev.v)}`, 'money', 2000);
+          this.banner(t('hud.bagOpened', { v: this.money(ev.v) }), 'money', 2000);
           this.sfx.play('bag');
           break;
         case 'hit':
@@ -323,7 +324,7 @@ export class GameClient {
           }
           const how = ev.cause === 'storm' ? 'was eaten by the storm' : null;
           if (ev.kid === this.pid) this.feed(`You dropped <b>${esc(ev.victim)}</b>`, 'me');
-          else if (ev.vid === this.pid) this.feed(how ? `The storm took you` : `<b>${esc(ev.killer ?? 'The dark')}</b> dropped you`, 'me');
+          else if (ev.vid === this.pid) this.feed(how ? t('feed.storm') : t('feed.droppedYou', { name: `<b>${esc(ev.killer ?? 'The dark')}</b>` }), 'me');
           else if (how) this.feed(`<b>${esc(ev.victim)}</b> ${how}`);
           else if (ev.killer) this.feed(`<b>${esc(ev.killer)}</b> dropped <b>${esc(ev.victim)}</b>`);
           else this.feed(`<b>${esc(ev.victim)}</b> went down`);
@@ -351,7 +352,7 @@ export class GameClient {
           break;
         case 'level': {
           const wp = WEAPONS[ev.w];
-          this.banner(ev.w === 0 ? `Arsenal complete · back to the knife ★` : `${wp.name} unlocked`, 'gold', 1800);
+          this.banner(ev.w === 0 ? t('hud.arsenal') : t('hud.unlocked', { w: t(`w.${wp.name}`) }), 'gold', 1800);
           this.sfx.play('level');
           break;
         }
@@ -377,8 +378,8 @@ export class GameClient {
     this.el.banner.hidden = true; // the streak owns the centre of the screen
     el.hidden = false;
     el.className = `streak ${s.cls}`;
-    el.querySelector('.st-title').textContent = s.title;
-    el.querySelector('.st-sub').textContent = who ? who : tier === 1 ? 'You drew first blood' : '';
+    el.querySelector('.st-title').textContent = t(`streak.${tier}`);
+    el.querySelector('.st-sub').textContent = who ? who : tier === 1 ? t('streak.you1') : '';
     for (const c of el.querySelectorAll('.coin-rain')) c.remove();
     if (tier === 5) {
       for (let i = 0; i < 28; i++) {
@@ -424,11 +425,11 @@ export class GameClient {
     this.bluff = (this.bluff + 1) % 3;
     this.send({ t: 'bluff', v: this.bluff });
     this.updateBluffChip();
-    if (this.input.touchOn) this.banner(`Bag look: ${BLUFF[this.bluff]}`, 'money', 900);
+    if (this.input.touchOn) this.banner(`${t('hud.bagLook')}: ${t(`bluff.${this.bluff}`)}`, 'money', 900);
   }
 
   updateBluffChip() {
-    this.el.bluffChip.firstChild.textContent = `Bag look: ${BLUFF[this.bluff]} `;
+    this.el.bluffChip.firstChild.textContent = `${t('hud.bagLook')}: ${t(`bluff.${this.bluff}`)} `;
   }
 
   // ------------------------------------------------------------ per frame
@@ -513,7 +514,7 @@ export class GameClient {
       const aim = q ? lerpAngle(q.a, p.a, t) : p.a;
       const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c, outfit: p.o, body: p.g });
       this.woundCheck(an, p.h, now);
-      figures.push({ a: an, color: p.c, name: p.n, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
+      figures.push({ a: an, color: p.c, name: p.n, title: p.tt ? t(`ach.${p.tt}`) : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
     this.anims.prune(now);
     const ba = new Map(a.bullets.map((x) => [x.i, x]));
@@ -530,7 +531,7 @@ export class GameClient {
       const y = this.pred.y + this.corr.y;
       const me = (this.meAnim = this.animSelf(x, y, dt, now));
       this.woundCheck(me, you.hp, now);
-      figures.push({ a: me, color: this.skin, name: 'you', hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
+      figures.push({ a: me, color: this.skin, name: this.myName || 'you', rk: this.myRank, title: this.myTitle, hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
       eye = { x, y };
       // look a little ahead of where you aim
       const la = Math.min(1, 1 - Math.exp(-dt * 6));
@@ -595,11 +596,11 @@ export class GameClient {
       const inside = this.duration ? this.duration - tl : 0;
       this.bagStart ??= you.bag;
       const touch = this.input.touchOn;
-      if (you.storm) hint = "You're in the storm · get back inside the circle";
-      else if (inside < 7) hint = touch ? 'Left thumb moves · right thumb aims and attacks' : 'WASD to move · mouse to aim · click to attack';
-      else if (tl < 75 || you.bag >= this.stake) hint = 'Time to get out · stand in a green EXIT for 3 seconds · edge arrows point the way';
-      else if (you.bag <= this.bagStart) hint = 'Grab the orange loot · it goes into your bag';
-      else if (!you.k) hint = touch ? 'Kills upgrade your weapon · tap Dash to dodge' : 'Kills upgrade your weapon · Space to dash';
+      if (you.storm) hint = t('coach.storm');
+      else if (inside < 7) hint = touch ? t('coach.touch') : t('coach.keys');
+      else if (tl < 75 || you.bag >= this.stake) hint = t('coach.exit');
+      else if (you.bag <= this.bagStart) hint = t('coach.loot');
+      else if (!you.k) hint = touch ? t('coach.killsTouch') : t('coach.kills');
     }
     if (el.textContent !== hint) el.textContent = hint;
     el.hidden = !hint;
@@ -616,7 +617,7 @@ export class GameClient {
     const r = this.rate ?? 1000;
     const cents = (x) => Math.round((x * 100) / r);
     const d = cents(alive ? you.bag : 0) - cents(this.stake);
-    el.pnl.textContent = `${d >= 0 ? '+' : '−'}${usdTextCents(Math.abs(d))} vs ${this.money(this.stake)} stake`;
+    el.pnl.textContent = t('hud.pnl', { d: `${d >= 0 ? '+' : '−'}${usdTextCents(Math.abs(d))}`, s: this.money(this.stake) });
     el.pnl.className = `pnl ${pnl > 0 ? 'up' : pnl < 0 ? 'down' : ''}`;
     const tl = Math.max(0, this.recvTl.tl - (now - this.recvTl.at) / 1000);
     el.timer.textContent = mmss(tl);
@@ -626,20 +627,20 @@ export class GameClient {
       this.sfx.play('beep', { f: 990, dur: 0.05 });
     }
     const last = this.snaps[this.snaps.length - 1];
-    if (last) el.alive.textContent = `${last.alive} runner${last.alive === 1 ? '' : 's'} inside`;
+    if (last) el.alive.textContent = t('hud.alive', { n: last.alive });
     const hp = Math.max(0, you.hp);
     el.hpBar.style.width = `${hp}%`;
     el.hpBar.style.background = hpColor(hp / 100);
     el.hpNum.textContent = hp;
     const cd = this.pred ? this.pred.dashCd : 0;
     el.dashChip.classList.toggle('cooling', cd > 0);
-    el.dashChip.firstChild.textContent = cd > 0 ? `Dash ${cd.toFixed(1)}s ` : 'Dash ';
+    el.dashChip.firstChild.textContent = cd > 0 ? `${t('hud.dash')} ${cd.toFixed(1)}s ` : `${t('hud.dash')} `;
 
     // weapon ladder
     const w = you.w ?? 0;
-    el.weapon.textContent = WEAPONS[w].name;
+    el.weapon.textContent = t(`w.${WEAPONS[w].name}`);
     el.xpBar.style.width = `${Math.min(100, ((you.xp ?? 0) / XP_PER_LEVEL) * 100)}%`;
-    el.nextWeapon.textContent = `Next: ${WEAPONS[(w + 1) % WEAPONS.length].name}`;
+    el.nextWeapon.textContent = t('hud.next', { w: t(`w.${WEAPONS[(w + 1) % WEAPONS.length].name}`) });
     el.prestige.textContent = you.pr ? '★'.repeat(Math.min(5, you.pr)) : '';
     [...el.ladder.children].forEach((d, i) => {
       d.classList.toggle('on', i === w);
@@ -652,7 +653,7 @@ export class GameClient {
     const z = this.zone;
     if (z) {
       const secs = Math.ceil(z.until);
-      el.storm.textContent = z.final ? 'Final circle · last exit' : z.shrinking ? `Storm closing · ${mmss(secs)}` : `Storm moves in ${mmss(secs)}`;
+      el.storm.textContent = z.final ? t('hud.final') : z.shrinking ? t('hud.closing', { t: mmss(secs) }) : t('hud.stormIn', { t: mmss(secs) });
       el.storm.classList.toggle('hot', z.shrinking || z.final);
       if (!z.shrinking && !z.final && z.until < 4.5 && this.riserStage !== z.stage) {
         this.riserStage = z.stage;
@@ -694,7 +695,7 @@ export class GameClient {
     } else el.extract.hidden = true;
     if (you.st === 'dead') {
       el.spect.hidden = false;
-      el.spect.textContent = you.spect ? `Watching ${you.spect} carry your bag` : 'You went down';
+      el.spText.textContent = you.spect ? t('spect.watching', { name: you.spect }) : t('spect.down');
     } else el.spect.hidden = true;
   }
 }

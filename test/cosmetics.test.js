@@ -46,17 +46,17 @@ test('published odds match what boxes actually drop', () => {
   }
 });
 
-test('pity guarantees Epic within 10 and Legendary within 40 opens, even on bad luck', () => {
+test('pity guarantees Epic within 15 and Legendary within 60 opens, even on bad luck', () => {
   const unlucky = () => 0; // always the worst roll (commons first)
   const inv = new Inventory({ rnd: unlucky });
   inv.rec('p').credit = 1e9;
   const got = [];
-  for (let i = 0; i < 40; i++) got.push(inv.open('p', 'street'));
-  assert.ok(got.slice(0, 10).some((r) => r.rarity === 'epic' && r.pity), 'epic by the 10th open');
-  assert.equal(got[39].rarity, 'legendary');
-  assert.ok(got[39].pity && got[39].jackpot);
-  assert.equal(got[9].rarity, 'epic', 'the 10th open is the pity epic');
-  assert.ok(got.slice(0, 9).every((r) => r.rarity === 'common'));
+  for (let i = 0; i < PITY.legendary; i++) got.push(inv.open('p', 'street'));
+  assert.equal(got[PITY.epic - 1].rarity, 'epic', 'the 15th open is the pity epic');
+  assert.ok(got[PITY.epic - 1].pity);
+  assert.ok(got.slice(0, PITY.epic - 1).every((r) => r.rarity === 'common'));
+  assert.equal(got[PITY.legendary - 1].rarity, 'legendary');
+  assert.ok(got[PITY.legendary - 1].pity && got[PITY.legendary - 1].jackpot);
   const view = inv.view('p');
   assert.equal(view.pity.street.sinceLegendary, 0);
 });
@@ -83,7 +83,7 @@ test('smart drops: no duplicates until a rarity is complete, then duplicates pay
   assert.ok(!('scrap' in old.rec('p')));
 });
 
-test('shop in $: credit first, then USDC/USDT; bags you hold open free', () => {
+test('shop $: spent first, the shortfall comes from USDC/USDT; packs add a bonus; bags you hold open free', () => {
   let now = 1_000_000;
   const inv = new Inventory({ now: () => now, rnd: seeded(5) });
   let wallet = 500; // cents of stablecoin the player holds
@@ -102,6 +102,13 @@ test('shop in $: credit first, then USDC/USDT; bags you hold open free', () => {
   assert.equal(inv.view('p').credit, 0, 'credit goes first');
   assert.equal(wallet, 500 - (OUTFIT.olive.price - 30), 'then the stablecoin');
   assert.equal(inv.buy('p', 'olive', pay).ok, false, 'no double buy');
+  wallet = 1000;
+  const pack = inv.topUp('p', 'p10', pay);
+  assert.ok(pack.ok);
+  assert.equal(wallet, 0);
+  assert.equal(inv.view('p').credit, 1050, 'the $10 pack gives $10.50 of shop $');
+  assert.equal(inv.topUp('p', 'p10', pay).ok, false, 'packs need USDC/USDT');
+  inv.rec('p').credit = 0;
   wallet = 0;
   assert.equal(inv.open('p', 'golden', pay).ok, false, 'cannot afford');
   assert.equal(inv.view('p').boxes.street, 0);
@@ -116,14 +123,15 @@ test('shop in $: credit first, then USDC/USDT; bags you hold open free', () => {
   for (let i = 0; i < 100; i++) assert.ok(OUTFIT[botLook(Math.random).outfit]);
 });
 
-test('every rank-up pays a bag, $ credit and a 72h trial outfit that expires', () => {
+test('a rank-up pays only a 72h trial outfit, which expires', () => {
   let now = 5_000_000;
   const inv = new Inventory({ now: () => now, rnd: seeded(9) });
   const got = inv.rankUp('p', 1, 4);
   assert.equal(got.length, 3);
   const v = inv.view('p');
-  assert.equal(Object.values(v.boxes).reduce((a, b) => a + b, 0), 1 + 3);
-  assert.ok(v.credit > 0);
+  assert.equal(Object.values(v.boxes).reduce((a, b) => a + b, 0), 1, 'no bags, just the welcome bag');
+  assert.equal(v.credit, 0, 'no shop $');
+  assert.deepEqual(Object.keys(got[0]).sort(), ['rank', 'trial']);
   const trial = got[0].trial.id;
   assert.ok(!OUTFIT[trial].basic && !v.owned.includes(trial));
   assert.ok(inv.equip('p', trial).ok, 'a trial can be worn');
@@ -146,24 +154,23 @@ test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive wit
   assert.equal(w.catalog.boxes.length, BOXES.length);
   lobby.handle(1, { t: 'box', id: 'street' });
   assert.ok(last('locker').result.free);
-  // play money: the shop charges the one play balance at the $ rate (1,000 sats = $1)
-  const before = BigInt(wallet.balance('tok00001', 'SATS'));
+  // shop $ comes from USDC/USDT, cents × 10⁴ for 6 decimals
+  const usdc = BigInt(wallet.balance('tok00001', 'USDC'));
   lobby.handle(1, { t: 'box', id: 'vault' });
   const paid = last('locker');
   assert.equal(paid.op, 'box');
-  assert.equal(BigInt(wallet.balance('tok00001', 'SATS')), before - BigInt(BOX.vault.price) * 10n);
-  // real tokens: USDC/USDT, cents × 10⁴ for 6 decimals
-  const usdc = BigInt(wallet.balance('tok00001', 'USDC'));
-  lobby.cashier = {};
-  assert.ok(lobby.stablePay('tok00001')(299));
-  lobby.cashier = null;
-  assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - 299n * 10n ** 4n);
+  assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - BigInt(BOX.vault.price) * 10n ** 4n);
+  lobby.handle(1, { t: 'topup', id: 'p5' });
+  assert.equal(last('locker').locker.credit, 500);
+  assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - BigInt(BOX.vault.price + 500) * 10n ** 4n);
+  const strk = BigInt(wallet.balance('tok00001', 'STRK'));
+  assert.ok(strk > 0n);
   lobby.handle(1, { t: 'equip', id: paid.result.item });
   lobby.handle(1, { t: 'body', id: 'f' });
   assert.equal(last('locker').locker.body, 'f');
 
   lobby.handle(1, { t: 'join', stake: 100 });
-  lobby.handle(1, { t: 'ready', asset: 'SATS' });
+  lobby.handle(1, { t: 'ready', asset: 'STRK' });
   const room = lobby.rooms.get(100);
   for (let i = 0; i < CFG.TICK_RATE * 2 && room.state !== 'live'; i++) lobby.tick();
   const me = room.world.players.get(room.clients.get(1).pid);
@@ -176,5 +183,7 @@ test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive wit
   const res = last('result');
   assert.ok(res.rank.after.rank > res.rank.before.rank, 'a good first raid ranks up');
   assert.equal(res.rewards.length, res.rank.after.rank - res.rank.before.rank);
-  assert.ok(res.locker.credit > 0);
+  assert.ok(res.rewards.every((r) => r.trial), 'each rank-up is a trial outfit');
+  assert.equal(res.locker.credit, 500, 'rank-ups add no shop $');
+  assert.ok(BigInt(res.balances.STRK) < strk, 'staked in STRK');
 });

@@ -17,7 +17,7 @@
 <!-- in-raid HUD -->
 <div id="hud" class="hud" hidden>
   <div class="hud-bag">
-    <span class="eyebrow">Your bag · private</span>
+    <span class="eyebrow" data-i18n="hud.bagPrivate">Your bag · private</span>
     <span id="bag" class="bag-num">0</span>
     <span id="pnl" class="pnl">stake 0</span>
   </div>
@@ -25,7 +25,7 @@
     <span id="timer" class="timer">3:00</span>
     <span id="storm" class="storm-line">Storm moves in 0:30</span>
     <span id="alive" class="eyebrow">0 runners inside</span>
-    <span id="golden" class="golden-tag" hidden>Golden raid</span>
+    <span id="golden" class="golden-tag" hidden data-i18n="hud.golden">Golden raid</span>
   </div>
   <canvas id="minimap" class="minimap" width="150" height="150" aria-label="Map with exits and the storm"></canvas>
   <ol id="feed" class="feed" aria-live="polite"></ol>
@@ -36,11 +36,11 @@
     <p class="st-sub"></p>
   </div>
   <div id="extract" class="extract" hidden>
-    <span class="eyebrow">Extracting · <b id="ext-name"></b></span>
+    <span class="eyebrow"><span data-i18n="hud.extracting">Extracting</span> · <b id="ext-name"></b></span>
     <div class="ext-track"><div id="ext-bar" class="ext-bar"></div></div>
-    <span class="ext-hint">Hold still. A hit resets it.</span>
+    <span class="ext-hint" data-i18n="hud.holdStill">Hold still. A hit resets it.</span>
   </div>
-  <div id="spect" class="spect" hidden></div>
+  <div id="spect" class="spect" hidden><button type="button" id="sp-prev" class="sp-btn" aria-label="Previous runner">◀</button><span id="sp-text"></span><button type="button" id="sp-next" class="sp-btn" aria-label="Next runner">▶</button><button type="button" id="sp-done" class="sp-done" data-i18n="spect.results">Results</button></div>
   <div id="coach" class="coach" hidden aria-live="polite"></div>
   <div class="hud-bottom">
     <div class="weapon-panel">
@@ -53,26 +53,27 @@
     <div class="chips">
       <button id="dash-chip" class="chip" type="button">Dash <kbd>Space</kbd></button>
       <button id="bluff-chip" class="chip" type="button">Bag look: medium <kbd>Q</kbd></button>
-      <button id="mute-chip" class="chip" type="button" aria-pressed="false">Sound <kbd>M</kbd></button>
-      <button id="music-chip" class="chip" type="button" aria-pressed="false">Music <kbd>N</kbd></button>
+      <button id="mute-chip" class="chip" type="button" aria-pressed="false"><span data-i18n="hud.sound">Sound</span> <kbd>M</kbd></button>
+      <button id="music-chip" class="chip" type="button" aria-pressed="false"><span data-i18n="hud.music">Music</span> <kbd>N</kbd></button>
     </div>
   </div>
 </div>
 
 <!-- touch controls -->
 <div id="touch" class="touch" hidden>
-  <div id="tz-left" class="tzone left"><div class="stick"><div class="knob"></div></div><span class="thint">move</span></div>
-  <div id="tz-right" class="tzone right"><div class="stick"><div class="knob"></div></div><span class="thint">aim · fire</span></div>
-  <button id="t-dash" class="tbtn dash" type="button">Dash</button>
-  <button id="t-bag" class="tbtn bagbtn" type="button">Bag</button>
+  <div id="tz-left" class="tzone left"><div class="stick"><div class="knob"></div></div><span class="thint" data-i18n="touch.move">move</span></div>
+  <div id="tz-right" class="tzone right"><div class="stick"><div class="knob"></div></div><span class="thint" data-i18n="touch.aim">aim · fire</span></div>
+  <button id="t-dash" class="tbtn dash" type="button" data-i18n="hud.dash">Dash</button>
+  <button id="t-bag" class="tbtn bagbtn" type="button" data-i18n="touch.bag">Bag</button>
 </div>
 
 <!-- lobby -->
 <section id="lobby" class="screen lobby">
   <div class="lobby-col">
     <header class="brand">
+      <label class="lang-pick"><span aria-hidden="true">🌐</span><select id="lang" aria-label="Language"></select></label>
       <h1 class="logo">Dark<br>Bags</h1>
-      <p class="tagline">Stake. Loot. Get out before the storm. <b>Nobody sees what's in your bag.</b></p>
+      <p class="tagline" data-i18n-html="lobby.tagline">Stake. Loot. Get out before the storm. <b>Nobody sees what's in your bag.</b></p>
     </header>
 
     <!-- you: look, name, rank, money -->
@@ -83,28 +84,40 @@
         <p id="lt-rarity" class="lt-rarity" hidden></p>
       </div>
       <div class="pf-main">
-        <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your runner name" aria-label="Runner name">
+        <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your runner name" data-i18n-ph="lobby.namePh" aria-label="Runner name">
+        <p id="pf-title" class="pf-title" hidden></p>
         <div id="rank-card" class="rank-card" hidden></div>
-        <p class="pf-money"><b id="balance" class="num">—</b><span id="lt-marks" class="lt-marks"></span><button id="faucet" class="link" type="button" hidden>Refill test tokens</button></p>
-        <button id="open-locker" class="ghost pf-locker" type="button">Locker · skins · bags</button>
+        <p class="pf-money"><b id="balance" class="num">—</b><span id="lt-marks" class="lt-marks"></span><button id="faucet" class="link" type="button" hidden data-i18n="lobby.refill">Refill test tokens</button></p>
+        <div class="pf-buttons"><button id="open-locker" class="ghost pf-locker" type="button" data-i18n="lobby.locker">Locker · skins · bags</button><button id="open-ach" class="ghost pf-ach" type="button" hidden></button></div>
       </div>
     </div>
 
     <div class="mode" role="tablist" aria-label="Mode">
-      <button id="mode-online" class="seg" role="tab" type="button">Online</button>
-      <button id="mode-practice" class="seg" role="tab" type="button">Practice vs bots</button>
+      <button id="mode-online" class="seg" role="tab" type="button" data-i18n="lobby.online">Online</button>
+      <button id="mode-practice" class="seg" role="tab" type="button" data-i18n="lobby.practice">Practice vs bots</button>
     </div>
     <p id="net-status" class="net-status"></p>
 
     <fieldset class="tables">
-      <legend class="eyebrow">Stake per raid</legend>
+      <legend class="eyebrow" data-i18n="lobby.stakePer">Stake per raid</legend>
       <div id="tables" class="table-list"></div>
     </fieldset>
 
-    <details id="paywith" class="paywith">
-      <summary><span class="eyebrow">Pay with</span> <b id="pay-sym">sats</b> <span id="pay-amt" class="num"></span><span class="pw-change">change</span></summary>
-      <div id="assets" class="asset-list"></div>
+    <details id="pcfg" class="pcfg" hidden>
+      <summary><span class="eyebrow" data-i18n="pcfg.title">Practice settings</span> <span id="pcfg-sum" class="fine"></span></summary>
+      <div class="pcfg-rows">
+        <label><span data-i18n="pcfg.difficulty">Bots</span>
+          <span class="seg-row" id="pcfg-diff" role="radiogroup"><button type="button" data-v="easy" data-i18n="pcfg.easy">Easy</button><button type="button" data-v="normal" data-i18n="pcfg.normal">Normal</button><button type="button" data-v="hard" data-i18n="pcfg.hard">Hard</button></span></label>
+        <label for="pcfg-runners"><span data-i18n="pcfg.runners">Runners in the raid</span> <b id="pcfg-runners-v" class="num"></b>
+          <input id="pcfg-runners" type="range" min="2" max="16" step="1"></label>
+        <label for="pcfg-time"><span data-i18n="pcfg.time">Raid length</span> <b id="pcfg-time-v" class="num"></b>
+          <input id="pcfg-time" type="range" min="60" max="600" step="30"></label>
+      </div>
     </details>
+    <fieldset id="paywith" class="coins">
+      <legend class="eyebrow" data-i18n-html="lobby.stakeWith">Stake with <span class="fine">any coin · shown in $ · winnings come back in the same coin</span></legend>
+      <div id="assets" class="asset-list"></div>
+    </fieldset>
     <div id="cashier" class="cashier" hidden>
       <div class="acct">
         <span id="acct-label" class="acct-label">Not signed in</span>
@@ -119,16 +132,16 @@
     <p id="quote" class="quote"></p>
 
     <details class="how">
-      <summary>How to play</summary>
+      <summary data-i18n="lobby.how">How to play</summary>
       <ol class="how-steps">
-        <li><b>Stake and ready up.</b> Everyone drops in together with a knife and 100 health. Half your stake rides in your bag, half is scattered as loot.</li>
-        <li><b>Grab the orange loot.</b> It goes into your bag. Kills upgrade your weapon: knife → pistol → shotgun → SMG → rifle → laser sniper.</li>
-        <li><b>Get out alive.</b> Stand in a green exit for 3 seconds before the storm closes it. You keep your whole bag. Die and it drops for someone else.</li>
+        <li data-i18n-html="how.1"><b>Stake and ready up.</b> Everyone drops in together with a knife and 100 health. Half your stake rides in your bag, half is scattered as loot.</li>
+        <li data-i18n-html="how.2"><b>Grab the orange loot.</b> It goes into your bag. Kills upgrade your weapon: knife → pistol → shotgun → SMG → rifle → laser sniper.</li>
+        <li data-i18n-html="how.3"><b>Get out alive.</b> Stand in a green exit for 3 seconds before the storm closes it. You keep your whole bag. Die and it drops for someone else.</li>
       </ol>
-      <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> fake your bag size · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
-      <p class="fine">Every raid pays rank XP. Every rank-up gives a free luck bag, bonus money and a skin to try for 3 days.</p>
+      <p class="keys" data-i18n-html="how.keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> fake your bag size · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
+      <p class="fine" data-i18n="how.fine">Every raid and every achievement pays rank XP. Every rank-up lends you a new skin for 3 days.</p>
     </details>
-    <label class="gore" for="gore"><input id="gore" type="checkbox"> <span><b>18+ mode.</b> Limbs come off, blood stays on the floor.</span></label>
+    <label class="gore" for="gore"><input id="gore" type="checkbox"> <span data-i18n-html="lobby.gore"><b>18+ mode.</b> Limbs come off, blood stays on the floor.</span></label>
     <p id="fine" class="fine">Test build. All money here is play money.</p>
   </div>
 </section>
@@ -138,14 +151,14 @@
   <div class="prep-inner">
     <header class="prep-head">
       <p id="prep-kicker" class="eyebrow">Raid 1</p>
-      <p id="prep-count" class="prep-count">Ready up</p>
+      <p id="prep-count" class="prep-count" data-i18n="prep.readyUp">Ready up</p>
       <p id="prep-status" class="prep-status">The countdown starts when the first runner is ready.</p>
     </header>
     <div id="lineup" class="lineup" aria-label="Runners in the next raid"></div>
-    <p class="pot"><span class="eyebrow">Pot</span> <b id="pot" class="num">$0</b></p>
+    <p class="pot"><span class="eyebrow" data-i18n="prep.pot">Pot</span> <b id="pot" class="num">$0</b></p>
     <div class="prep-actions">
       <button id="ready" class="cta" type="button">Stake &amp; ready</button>
-      <button id="prep-back" class="ghost" type="button">Back to tables</button>
+      <button id="prep-back" class="ghost" type="button" data-i18n="prep.back">Back to tables</button>
     </div>
     <p id="prep-balance" class="fine"></p>
   </div>
@@ -159,10 +172,11 @@
     <p id="res-detail" class="res-detail"></p>
     <div id="res-rank" class="res-rank" hidden></div>
     <div id="res-rewards" class="res-rewards" hidden></div>
+    <div id="res-ach" class="res-ach" hidden></div>
     <div class="res-actions">
       <button id="res-again" class="cta" type="button">Ready for the next raid</button>
-      <button id="res-tables" class="ghost" type="button">Tables</button>
-      <button id="res-share" class="ghost share" type="button">Share card</button>
+      <button id="res-tables" class="ghost" type="button" data-i18n="res.tables">Tables</button>
+      <button id="res-share" class="ghost share" type="button" data-i18n="res.share">Share card</button>
     </div>
   </div>
 </section>
@@ -170,14 +184,14 @@
 <!-- share card for X -->
 <dialog id="dlg-share" class="dlg dlg-share" aria-labelledby="share-title">
   <div class="dlg-inner">
-    <header class="dlg-head"><h2 id="share-title">Share</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <header class="dlg-head"><h2 id="share-title" data-i18n="share.title">Share</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
     <img id="share-img" class="share-img" alt="Your share card">
     <div class="share-actions">
-      <button id="share-x" type="button" class="cta">Post on 𝕏</button>
-      <button id="share-copy" type="button" class="ghost">Copy image</button>
-      <a id="share-save" class="ghost" href="#" download>Save PNG</a>
+      <button id="share-x" type="button" class="cta" data-i18n="share.x">Post on 𝕏</button>
+      <button id="share-copy" type="button" class="ghost" data-i18n="share.copy">Copy image</button>
+      <a id="share-save" class="ghost" href="#" download data-i18n="share.save">Save PNG</a>
       <button id="share-native" type="button" class="ghost" hidden>Share…</button>
-      <button id="share-close" type="button" class="link">Close</button>
+      <button id="share-close" type="button" class="link" data-i18n="share.close">Close</button>
     </div>
     <p id="share-status" class="dlg-status"></p>
   </div>
@@ -187,37 +201,38 @@
 <dialog id="dlg-locker" class="dlg dlg-locker" aria-labelledby="lk-title">
   <div class="lk">
     <header class="lk-head">
-      <h2 id="lk-title">Locker</h2>
-      <p class="lk-wallet"><span>Balance <b id="lk-marks">$0.00</b></span><small id="lk-bonus" title="Bonus from rank-ups and duplicates: spent first, shop only"></small></p>
+      <h2 id="lk-title" data-i18n="lk.title">Locker</h2>
+      <p class="lk-wallet"><span><span data-i18n="lk.shopUsd">Shop $</span> <b id="lk-marks">$0.00</b></span><small id="lk-bonus" title="Shop $ is bought 1:1 with USDC/USDT and only spends here. It cannot be withdrawn."></small></p>
       <button type="button" class="x" data-close aria-label="Close">×</button>
     </header>
     <div class="lk-main">
       <section class="lk-left">
         <canvas id="lk-stage" class="lk-stage" aria-label="Your runner"></canvas>
         <div id="lk-body" class="mode lk-bodysel" role="radiogroup" aria-label="Character">
-          <button type="button" class="seg" role="radio" data-body="m">Him</button>
-          <button type="button" class="seg" role="radio" data-body="f">Her</button>
+          <button type="button" class="seg" role="radio" data-body="m" data-i18n="lk.him">Him</button>
+          <button type="button" class="seg" role="radio" data-body="f" data-i18n="lk.her">Her</button>
         </div>
         <div id="lk-detail" class="lk-detail"></div>
       </section>
       <section class="lk-right">
         <div class="mode lk-tabs" role="tablist">
-          <button type="button" class="seg" role="tab" data-lt="outfits">Outfits</button>
-          <button type="button" class="seg" role="tab" data-lt="shop">Shop</button>
-          <button type="button" class="seg" role="tab" data-lt="boxes">Luck bags</button>
+          <button type="button" class="seg" role="tab" data-lt="outfits" data-i18n="lk.outfits">Outfits</button>
+          <button type="button" class="seg" role="tab" data-lt="shop" data-i18n="lk.shop">Shop</button>
+          <button type="button" class="seg" role="tab" data-lt="boxes" data-i18n="lk.bags">Luck bags</button>
         </div>
         <div data-lp="outfits" class="lk-pane">
           <div class="lk-bar"><div id="lk-filter" class="lk-filter">
-            <button type="button" data-f="all" aria-pressed="true">All</button><button type="button" data-f="owned">Owned</button><button type="button" data-f="common">Common</button><button type="button" data-f="rare">Rare</button><button type="button" data-f="epic">Epic</button><button type="button" data-f="legendary">Legendary</button><button type="button" data-f="mythic">Mythic</button>
+            <button type="button" data-f="all" aria-pressed="true" data-i18n="lk.all">All</button><button type="button" data-f="owned" data-i18n="lk.owned">Owned</button><button type="button" data-f="common" data-i18n="r.common">Common</button><button type="button" data-f="rare" data-i18n="r.rare">Rare</button><button type="button" data-f="epic" data-i18n="r.epic">Epic</button><button type="button" data-f="legendary" data-i18n="r.legendary">Legendary</button><button type="button" data-f="mythic" data-i18n="r.mythic">Mythic</button>
           </div><span id="lk-count" class="fine"></span></div>
           <div id="lk-grid" class="lk-grid"></div>
         </div>
         <div data-lp="shop" class="lk-pane" hidden>
-          <p class="fine">Every outfit, straight from your balance. Bonus money is spent first.</p>
+          <p class="fine" data-i18n="lk.shopNote">Top up shop $ with USDC or USDT (bigger packs add a bonus). Shop $ only spends here and can't be withdrawn. Short on shop $? The difference comes from your USDC/USDT.</p>
+          <div id="lk-packs" class="lk-packs"></div>
           <div id="lk-shop" class="lk-grid"></div>
         </div>
         <div data-lp="boxes" class="lk-pane" hidden>
-          <p class="fine">Exact odds, rolled on the server. No duplicates until you own a whole rarity, and a duplicate pays part of its price back. Every rank-up gives you a free bag.</p>
+          <p class="fine" data-i18n="lk.bagsNote">Exact odds, rolled on the server. No duplicates until you own a whole rarity, and a duplicate pays 10% of its price back in shop $. Pity guarantees Epic+ within 15 opens and Legendary+ within 60.</p>
           <div id="lk-boxes" class="lk-boxes"></div>
         </div>
       </section>
@@ -229,6 +244,16 @@
       </div>
       <div id="lk-reveal" class="rv" hidden></div>
     </div>
+  </div>
+</dialog>
+
+<!-- achievements and titles -->
+<dialog id="dlg-ach" class="dlg dlg-ach" aria-labelledby="dlg-ach-title">
+  <div class="dlg-inner">
+    <header class="dlg-head"><h2 id="dlg-ach-title" data-i18n="ach.title">Achievements</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <p class="fine" data-i18n="ach.intro">Each one pays rank XP once and unlocks its name as a title you can wear.</p>
+    <p id="ach-sum" class="ach-sum"></p>
+    <ul id="ach-list" class="ach-list"></ul>
   </div>
 </dialog>
 
