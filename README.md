@@ -80,8 +80,8 @@ Your runner is **him or her** in one of **80 outfits** across six rarities (Comm
 
 | | |
 |---|---|
-| **Boxes only** | Skins drop only from boxes (and rank-up trials). **Outfit bags** and **weapon crates** are sold separately, nine tiers each, from $0.99 to $999: the dearer the box, the better the odds, up to 30% Exotic. |
-| **Fair** | Exact odds on every box, rolled on the server. Pity: Epic+ within 15 opens, Legendary+ within 60; the $249, $499 and $999 tiers guarantee an Exotic within 12, 7 and 4 opens. Smart drops: something you don't own while that rarity has any left; a duplicate refunds 10% of its value. |
+| **Boxes only** | Skins drop only from boxes (and rank-up trials). **Outfit bags** and **weapon crates** are sold separately, nine tiers each, from $0.49 to $99.99: the dearer the box, the better the odds and the value per dollar, up to 8% Exotic. Every 10th box in a purchase is free. |
+| **Fair** | Exact odds on every box, rolled on the server. Pity: Epic+ within 15 opens, Legendary+ within 60; the $29.99, $59.99 and $99.99 tiers guarantee an Exotic within 60, 30 and 16 opens. Smart drops: something you don't own while that rarity has any left; a duplicate refunds 10% of its value. |
 | **Limited editions** | A few Exotics have a fixed supply (21, 50, 100, 250, 500), numbered as they drop (#12/100), never over-minted. The top tiers drop them most. |
 | **Buy many** | 1 to 100 boxes at once, one charge; boxes you hold go first. |
 | **Shop $** | Bought 1:1 with USDC/USDT, with bonus packs ($5 to $1,000, up to +30%). Spends only in the shop; never withdrawable. |
@@ -96,7 +96,7 @@ English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0), Ukrai
 
 **Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
 
-Paid random rewards are regulated in some countries; skins only through boxes, with boxes up to $999, is the riskiest version of that model. Read [docs/TOKENOMICS.md](docs/TOKENOMICS.md) before selling boxes for real stablecoins.
+Paid random rewards are regulated in some countries; skins only through boxes is the riskiest version of that model. Read [docs/TOKENOMICS.md](docs/TOKENOMICS.md) before selling boxes for real stablecoins.
 
 ## Look and sound
 

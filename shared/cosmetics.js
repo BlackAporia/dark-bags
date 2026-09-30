@@ -208,17 +208,22 @@ export const WSKIN = Object.fromEntries(WEAPON_SKINS.map((s) => [s.id, s]));
 // ------------------------------------------------------------------ boxes
 // odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss);
 // prices in US cents; tier drives the odds and the share of limited editions
+// Priced for impulse at the bottom ($0.49) and a $99.99 ceiling at the top (whales buy
+// ×10 or ×100 rather than one $999 box). Every step up is better value per dollar: the
+// expected price of a Mythic falls from ~$250 to ~$180 and of an Exotic from ~$2,500 to
+// ~$1,250, so players are pulled up the ladder while Exotics and limited editions stay
+// scarce. The guarantee caps the worst case on the top three at ~$1,600–1,800 an Exotic.
 const TIERS = [
-  { price: 99, odds: { common: 80, rare: 16.5, epic: 3, legendary: 0.5 }, jackpot: 'legendary' },
-  { price: 299, odds: { common: 50, rare: 36, epic: 11, legendary: 2.7, mythic: 0.3 }, jackpot: 'legendary' },
-  { price: 799, odds: { rare: 60, epic: 30, legendary: 8.2, mythic: 1.5, exotic: 0.3 }, jackpot: 'mythic' },
-  { price: 1999, odds: { rare: 35, epic: 45, legendary: 16, mythic: 3.3, exotic: 0.7 }, jackpot: 'mythic' },
-  { price: 4999, odds: { epic: 55, legendary: 35, mythic: 8.5, exotic: 1.5 }, jackpot: 'mythic' },
-  { price: 9900, odds: { epic: 30, legendary: 50, mythic: 16, exotic: 4 }, jackpot: 'mythic' },
+  { price: 49, odds: { common: 82, rare: 15, epic: 2.6, legendary: 0.4 }, jackpot: 'legendary' },
+  { price: 99, odds: { common: 62, rare: 28, epic: 8, legendary: 1.8, mythic: 0.2 }, jackpot: 'legendary' },
+  { price: 199, odds: { common: 30, rare: 46, epic: 18.12, legendary: 5, mythic: 0.8, exotic: 0.08 }, jackpot: 'mythic' },
+  { price: 399, odds: { rare: 52, epic: 35.02, legendary: 11, mythic: 1.8, exotic: 0.18 }, jackpot: 'mythic' },
+  { price: 799, odds: { rare: 25, epic: 48.6, legendary: 22, mythic: 4, exotic: 0.4 }, jackpot: 'mythic' },
+  { price: 1499, odds: { epic: 56.15, legendary: 35, mythic: 8, exotic: 0.85 }, jackpot: 'mythic' },
   // the top tiers also guarantee an Exotic within `exoticPity` opens
-  { price: 24900, odds: { legendary: 60, mythic: 32, exotic: 8 }, jackpot: 'exotic', exoticPity: 12 },
-  { price: 49900, odds: { legendary: 40, mythic: 45, exotic: 15 }, jackpot: 'exotic', exoticPity: 7 },
-  { price: 99900, odds: { legendary: 20, mythic: 50, exotic: 30 }, jackpot: 'exotic', exoticPity: 4 },
+  { price: 2999, odds: { epic: 35, legendary: 45, mythic: 18, exotic: 2 }, jackpot: 'exotic', exoticPity: 60 },
+  { price: 5999, odds: { legendary: 60.5, mythic: 35, exotic: 4.5 }, jackpot: 'exotic', exoticPity: 30 },
+  { price: 9999, odds: { legendary: 37, mythic: 55, exotic: 8 }, jackpot: 'exotic', exoticPity: 16 },
 ];
 const BAG_IDS = ['street', 'vault', 'golden', 'elite', 'diamond', 'obsidian', 'royal', 'apex', 'genesis'];
 const BAG_NAMES = ['Street Bag', 'Vault Bag', 'Golden Bag', 'Elite Bag', 'Diamond Bag', 'Obsidian Bag', 'Royal Bag', 'Apex Bag', 'Genesis Bag'];
@@ -232,7 +237,11 @@ export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
 export const PITY = { epic: 15, legendary: 60 }; // guaranteed at or better, by the Nth open of a box
 export const MAX_OPEN = 100; // boxes per purchase
 // how often an Exotic from this tier is one of the limited editions (while any are left)
-const limitedShare = (tier) => (tier >= 9 ? 0.5 : tier >= 7 ? 0.3 : tier >= 5 ? 0.12 : 0.03);
+const limitedShare = (tier) => (tier >= 9 ? 0.35 : tier >= 7 ? 0.2 : tier >= 5 ? 0.08 : 0.02);
+
+// Bulk: every 10th box you pay for is free (10 for the price of 9, 100 for 90).
+export const BULK_FREE_EVERY = 10;
+export const boxCost = (box, n) => (n - Math.floor(n / BULK_FREE_EVERY)) * box.price;
 
 export const usd = (cents) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const TRIAL_MS = 72 * 3600 * 1000;
@@ -479,7 +488,7 @@ export class Inventory {
     const held = r.boxes[boxId] ?? 0;
     const free = Math.min(held, count);
     const paid = count - free;
-    if (paid > 0 && !this.charge(key, paid * box.price, external)) return { ok: false, error: `Not enough $ (${usd(paid * box.price)} needed).` };
+    if (paid > 0 && !this.charge(key, boxCost(box, paid), external)) return { ok: false, error: `Not enough $ (${usd(boxCost(box, paid))} needed).` };
     r.boxes[boxId] = held - free;
     const results = [];
     for (let i = 0; i < count; i++) results.push({ ...this.roll(r, box), free: i < free });
