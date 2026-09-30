@@ -503,4 +503,9 @@ export default {
   'rot.title': "Tourne ton téléphone",
   'rot.sub': "Le raid se joue mieux à l'horizontale : déplacement à gauche, tir à droite.",
   'rot.anyway': "Jouer en vertical",
+  'prep.waiting': "En attente de joueurs",
+  'prep.waitingMe': "Pas de chrono : invite tes amis et appuie sur Lancer quand vous êtes prêts. Les places vides vont aux bots. {n} sur {of} places prises.",
+  'prep.waitingJoin': "{n} sur {of} places prises. Mise et appuie sur Prêt pour rejoindre.",
+  'prep.firstWait': "Appuie sur Prêt : la salle attend tout le monde, sans chrono.",
+  'prep.start': "Lancer",
 };

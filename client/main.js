@@ -521,15 +521,22 @@ function renderPrep() {
   $('prep-kicker').textContent = `${t('prep.raid', { n: p.round, s: money(p.stake) })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
   const count = $('prep-count');
   const status = $('prep-status');
+  count.classList.remove('wait');
   if (p.state === 'live') {
     count.textContent = mmss(p.tl);
     status.textContent = t('prep.live');
   } else if (p.state === 'results') {
     count.textContent = `${p.resT}`;
     status.textContent = t('prep.over');
+  } else if (p.waiting && p.slots.length) {
+    // online: no timer. Wait for friends, start whenever you like; bots fill the rest
+    count.textContent = t('prep.waiting');
+    count.classList.remove('tick');
+    count.classList.add('wait');
+    status.textContent = t(p.me?.ready ? 'prep.waitingMe' : 'prep.waitingJoin', { n: p.slots.length, of: p.slotsTotal });
   } else if (p.count === null) {
     count.textContent = t('prep.readyUp');
-    status.textContent = t('prep.first');
+    status.textContent = t(p.waiting ? 'prep.firstWait' : 'prep.first');
   } else {
     const n = Math.ceil(p.count);
     if (count.textContent !== String(n)) {
@@ -568,6 +575,7 @@ function renderPrep() {
     );
   }
   $('pot').textContent = money(p.pot);
+  $('prep-start').hidden = !(p.waiting && p.me?.ready);
   const ready = $('ready');
   const me = p.me ?? {};
   const q = quote(p.stake);
@@ -850,6 +858,10 @@ $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 $('mode-online').addEventListener('click', () => app.mode !== 'online' && setMode('online'));
 $('mode-practice').addEventListener('click', () => app.mode !== 'practice' && setMode('practice'));
 $('ready').addEventListener('click', toggleReady);
+$('prep-start').addEventListener('click', () => {
+  send({ t: 'start' });
+  sfx.play('ready');
+});
 $('prep-back').addEventListener('click', () => {
   send({ t: 'unready' });
   send({ t: 'leave' });

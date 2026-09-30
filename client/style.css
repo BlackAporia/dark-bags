@@ -1503,3 +1503,7 @@ img.wimg { width: 100% !important; max-width: 160px; height: auto !important; as
 .rot-t { margin: 0; font: 800 22px/1.2 var(--f-display); text-transform: uppercase; letter-spacing: 0.04em; }
 .rot-s { margin: 0; max-width: 300px; color: var(--dust); font-size: 14px; line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) { .rot-ico { animation: none; } }
+
+.prep-actions .cta.start { background: linear-gradient(180deg, #3ddc97, #1f9e6a); color: #06120c; }
+
+.prep-count.wait { font-size: clamp(28px, 6vw, 56px); line-height: 1.05; }

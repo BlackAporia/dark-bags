@@ -503,4 +503,9 @@ export default {
   'rot.title': "请横屏",
   'rot.sub': "横屏游玩效果最佳：左侧移动，右侧开火。",
   'rot.anyway': "仍然竖屏游玩",
+  'prep.waiting': "等待玩家",
+  'prep.waitingMe': "不计时：邀请好友，准备好后点“开始”。空位由机器人补上。已占 {n}/{of}。",
+  'prep.waitingJoin': "已占 {n}/{of}。下注并点“准备”加入本局。",
+  'prep.firstWait': "点“准备”：房间会等所有人，不计时。",
+  'prep.start': "立即开始",
 };

@@ -503,4 +503,9 @@ export default {
   'rot.title': "Gira el teléfono",
   'rot.sub': "El raid se juega mejor en horizontal: muévete a la izquierda, dispara a la derecha.",
   'rot.anyway': "Jugar en vertical",
+  'prep.waiting': "Esperando jugadores",
+  'prep.waitingMe': "Sin temporizador: invita a tus amigos y pulsa Empezar cuando estéis listos. Los bots ocupan los huecos. {n} de {of} plazas ocupadas.",
+  'prep.waitingJoin': "{n} de {of} plazas ocupadas. Apuesta y pulsa Listo para unirte.",
+  'prep.firstWait': "Pulsa Listo: la sala espera a todos, sin temporizador.",
+  'prep.start': "Empezar ya",
 };
