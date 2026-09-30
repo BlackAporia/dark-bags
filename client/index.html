@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="DARK BAGS: stake sats, start with a knife, level up your gun, loot in the dark and extract before the storm seals the raid.">
+<meta name="description" content="DARK BAGS: stake, start with a knife, level up your gun, loot in the dark and get out before the storm seals the raid.">
 <!--@page-->
 <title>Dark Bags</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,6 +41,7 @@
     <span class="ext-hint">Hold still. A hit resets it.</span>
   </div>
   <div id="spect" class="spect" hidden></div>
+  <div id="coach" class="coach" hidden aria-live="polite"></div>
   <div class="hud-bottom">
     <div class="weapon-panel">
       <div class="weapon-row"><span id="weapon" class="weapon-name">Knife</span><span id="prestige" class="prestige"></span></div>
@@ -70,10 +71,24 @@
 <section id="lobby" class="screen lobby">
   <div class="lobby-col">
     <header class="brand">
-      <p class="kicker">Extraction · arms race · private bags</p>
       <h1 class="logo">Dark<br>Bags</h1>
-      <p class="tagline">Everyone walks in equal: a knife, 100 health, a stake in sats. Kill to climb from knife to laser sniper. Grab what glows, outrun the storm, get out through an open exit. Nobody knows what anyone is carrying.</p>
+      <p class="tagline">Stake. Loot. Get out before the storm. <b>Nobody sees what's in your bag.</b></p>
     </header>
+
+    <!-- you: look, name, rank, money -->
+    <div class="profile">
+      <div id="locker-tile" class="pf-look" hidden>
+        <canvas id="lt-canvas" aria-label="Your runner (opens the locker)"></canvas>
+        <p id="lt-name" class="lt-name"></p>
+        <p id="lt-rarity" class="lt-rarity" hidden></p>
+      </div>
+      <div class="pf-main">
+        <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your runner name" aria-label="Runner name">
+        <div id="rank-card" class="rank-card" hidden></div>
+        <p class="pf-money"><b id="balance" class="num">—</b><span id="lt-marks" class="lt-marks"></span><button id="faucet" class="link" type="button" hidden>Refill test tokens</button></p>
+        <button id="open-locker" class="ghost pf-locker" type="button">Locker · skins · bags</button>
+      </div>
+    </div>
 
     <div class="mode" role="tablist" aria-label="Mode">
       <button id="mode-online" class="seg" role="tab" type="button">Online</button>
@@ -82,58 +97,39 @@
     <p id="net-status" class="net-status"></p>
 
     <fieldset class="tables">
-      <legend class="eyebrow">Table · stake per raid</legend>
+      <legend class="eyebrow">Stake per raid</legend>
       <div id="tables" class="table-list"></div>
     </fieldset>
 
-    <fieldset class="assets">
-      <legend class="eyebrow">Pay with · your balance by token</legend>
+    <details id="paywith" class="paywith">
+      <summary><span class="eyebrow">Pay with</span> <b id="pay-sym">sats</b> <span id="pay-amt" class="num"></span><span class="pw-change">change</span></summary>
       <div id="assets" class="asset-list"></div>
-      <p id="quote" class="quote"></p>
-      <div id="cashier" class="cashier" hidden>
-        <div class="acct">
-          <span id="acct-label" class="acct-label">Not signed in</span>
-          <button id="connect" class="ghost" type="button">Sign in</button>
-          <button id="open-cashier" class="ghost" type="button" hidden>Deposit · cash out</button>
-          <button id="logout" class="link" type="button" hidden>Sign out</button>
-        </div>
-        <p id="cashier-status" class="fine"></p>
+    </details>
+    <div id="cashier" class="cashier" hidden>
+      <div class="acct">
+        <span id="acct-label" class="acct-label">Not signed in</span>
+        <button id="connect" class="ghost" type="button">Sign in</button>
+        <button id="open-cashier" class="ghost" type="button" hidden>Deposit · cash out</button>
+        <button id="logout" class="link" type="button" hidden>Sign out</button>
       </div>
-    </fieldset>
-
-    <div class="who">
-      <label for="name" class="eyebrow">Runner name</label>
-      <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="runner">
-      <div id="locker-tile" class="locker-tile" hidden>
-        <canvas id="lt-canvas" aria-label="Your runner"></canvas>
-        <div class="lt-body">
-          <p class="eyebrow">Wearing</p>
-          <p id="lt-name" class="lt-name"></p>
-          <p id="lt-rarity" class="fine"></p>
-          <p class="lt-foot"><b id="lt-marks" class="lt-marks"></b><button id="open-locker" class="ghost" type="button">Locker · shop · bags</button></p>
-        </div>
-      </div>
-      <div id="rank-card" class="rank-card" hidden></div>
+      <p id="cashier-status" class="fine"></p>
     </div>
 
-    <label class="gore" for="gore"><input id="gore" type="checkbox"> <span><b>18+ mode.</b> Limbs come off as health drops, heads pop, blood stays on the floor.</span></label>
-
-    <button id="play" class="cta" type="button">Go to the table</button>
-    <p class="balance"><span class="eyebrow">Balance</span> <b id="balance" class="num">—</b> <span id="balance-unit" class="unit">sats across your tokens</span> <button id="faucet" class="link" type="button" hidden>Refill test tokens</button></p>
+    <button id="play" class="cta" type="button">Play</button>
+    <p id="quote" class="quote"></p>
 
     <details class="how">
-      <summary>How a raid works</summary>
-      <ul>
-        <li><b>Ready room.</b> Stake and press Ready. Your icon lights up; the countdown starts; everyone drops in together.</li>
-        <li><b>Arms race.</b> Knife → pistol → shotgun → SMG → rifle → laser sniper → knife again. Kills move you up; damage and loot add a little.</li>
-        <li><b>Storm.</b> The circle shrinks four times and collapses onto one exit. Exits it swallows close for good.</li>
-        <li><b>Bluff.</b> Your bag's look is a choice (<kbd>Q</kbd>). Look broke and slip out, or look fat and bait a fight.</li>
-        <li><b>Extract.</b> Stand in an open exit for 3 seconds. You cash out whatever you carry. Still inside at 0:00, you lose it.</li>
-        <li><b>Rank.</b> Every raid pays rank XP, more for kills and for getting out. 90 ranks, Lance Corporal to Legend.</li>
-      </ul>
-      <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> bag look · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
+      <summary>How to play</summary>
+      <ol class="how-steps">
+        <li><b>Stake and ready up.</b> Everyone drops in together with a knife and 100 health. Half your stake rides in your bag, half is scattered as loot.</li>
+        <li><b>Grab the orange loot.</b> It goes into your bag. Kills upgrade your weapon: knife → pistol → shotgun → SMG → rifle → laser sniper.</li>
+        <li><b>Get out alive.</b> Stand in a green exit for 3 seconds before the storm closes it. You keep your whole bag. Die and it drops for someone else.</li>
+      </ol>
+      <p class="keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> fake your bag size · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
+      <p class="fine">Every raid pays rank XP. Every rank-up gives a free luck bag, bonus money and a skin to try for 3 days.</p>
     </details>
-    <p id="fine" class="fine">Test build. Tokens here are play money with fixed test prices: no deposits, no withdrawals.</p>
+    <label class="gore" for="gore"><input id="gore" type="checkbox"> <span><b>18+ mode.</b> Limbs come off, blood stays on the floor.</span></label>
+    <p id="fine" class="fine">Test build. All money here is play money.</p>
   </div>
 </section>
 
@@ -141,12 +137,12 @@
 <section id="prep" class="screen prep" hidden>
   <div class="prep-inner">
     <header class="prep-head">
-      <p id="prep-kicker" class="eyebrow">Raid 1 · 1,000 sats table</p>
+      <p id="prep-kicker" class="eyebrow">Raid 1</p>
       <p id="prep-count" class="prep-count">Ready up</p>
       <p id="prep-status" class="prep-status">The countdown starts when the first runner is ready.</p>
     </header>
     <div id="lineup" class="lineup" aria-label="Runners in the next raid"></div>
-    <p class="pot"><span class="eyebrow">Pot</span> <b id="pot" class="num">0</b> <span class="unit">sats</span></p>
+    <p class="pot"><span class="eyebrow">Pot</span> <b id="pot" class="num">$0</b></p>
     <div class="prep-actions">
       <button id="ready" class="cta" type="button">Stake &amp; ready</button>
       <button id="prep-back" class="ghost" type="button">Back to tables</button>
@@ -192,7 +188,7 @@
   <div class="lk">
     <header class="lk-head">
       <h2 id="lk-title">Locker</h2>
-      <p class="lk-wallet"><span title="Shop credit from rank-ups: spent first, shop only">Credit <b id="lk-marks">$0.00</b></span><span title="USDC + USDT in your balance, 1:1 with $">USDC/USDT <b id="lk-stable">$0.00</b></span><span title="Scrap: from duplicate drops, crafts any outfit">⬡ <b id="lk-scrap">0</b></span></p>
+      <p class="lk-wallet"><span>Balance <b id="lk-marks">$0.00</b></span><small id="lk-bonus" title="Bonus from rank-ups and duplicates: spent first, shop only"></small></p>
       <button type="button" class="x" data-close aria-label="Close">×</button>
     </header>
     <div class="lk-main">
@@ -217,11 +213,11 @@
           <div id="lk-grid" class="lk-grid"></div>
         </div>
         <div data-lp="shop" class="lk-pane" hidden>
-          <p class="fine">Straight buys in $ (shop credit first, then USDC or USDT). Epic and up come from luck bags or scrap.</p>
+          <p class="fine">Every outfit, straight from your balance. Bonus money is spent first.</p>
           <div id="lk-shop" class="lk-grid"></div>
         </div>
         <div data-lp="boxes" class="lk-pane" hidden>
-          <p class="fine">Odds are exact and rolled on the server. Every bag has pity, you never get a duplicate until you own a whole rarity, and duplicates become scrap to craft what you want. Every rank-up gives you a bag, $ credit and a 72-hour trial outfit.</p>
+          <p class="fine">Exact odds, rolled on the server. No duplicates until you own a whole rarity, and a duplicate pays part of its price back. Every rank-up gives you a free bag.</p>
           <div id="lk-boxes" class="lk-boxes"></div>
         </div>
       </section>

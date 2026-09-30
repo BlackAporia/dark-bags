@@ -5,7 +5,7 @@ import { Sfx } from './sfx.js';
 import { GameClient, Attract, fmt, mmss, esc } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { store } from './store.js';
-import { PriceBook, formatUnits } from '../shared/assets.js';
+import { PriceBook, formatUnits, satsPerUsd, usdText } from '../shared/assets.js';
 import { createCashierUi } from './cashier.js';
 import { rankBadgeSvg } from './rankbadge.js';
 import { createLocker } from './locker.js';
@@ -59,6 +59,7 @@ const el = {
   extName: $('ext-name'),
   extBar: $('ext-bar'),
   spect: $('spect'),
+  coach: $('coach'),
   hpBar: $('hp-bar'),
   hpNum: $('hp-num'),
   dashChip: $('dash-chip'),
@@ -96,7 +97,7 @@ const game = new GameClient({ renderer, input, sfx, send, el });
 // share cards: everything that happens can be posted
 const myLook = () => ({ outfit: app.locker?.outfit ?? 'basic-0', body: app.locker?.body ?? 'm' });
 function shareMoment(kind, data = {}) {
-  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, ...data });
+  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, rate: satsPerUsd(app.prices), ...data });
 }
 wireShare();
 
@@ -132,10 +133,16 @@ function toast(msg) {
   toastT = setTimeout(() => (t.hidden = true), 3500);
 }
 
-// ----------------------------------------------------------------- tokens
+// ----------------------------------------------------------------- money
+// Players see one unit: $. Stakes and bags are sats under the hood, shown at the $ rate.
+const money = (sats) => usdText(sats, satsPerUsd(app.prices));
+// Tokens only matter with real money (the cashier); test and practice play from one balance.
+const multiToken = () => cashier.active;
+
 const units = (a) => BigInt(app.balances?.[a] ?? '0');
 const assetInfo = (a) => app.prices.get(a) ?? { id: a, symbol: a.slice(0, 8), decimals: 18, color: '#8d93a6' };
 function totalSats() {
+  if (!multiToken()) return app.prices.value('SATS', units('SATS'));
   let t = 0;
   for (const [a, u] of Object.entries(app.balances ?? {})) t += app.prices.value(a, BigInt(u));
   return t;
@@ -144,10 +151,15 @@ function quote(stake = app.stake, a = app.asset) {
   return app.prices.quote(a, stake);
 }
 function tokenAmount(a, u) {
+  if (a === 'SATS') return money(Number(BigInt(u))); // the play balance is shown in $
   const info = assetInfo(a);
   return `${formatUnits(u, info.decimals, info.decimals > 8 ? 4 : info.decimals)} ${info.symbol}`;
 }
 function pickUsableAsset() {
+  if (!multiToken() && app.prices.has('SATS')) {
+    app.asset = 'SATS';
+    return;
+  }
   if (app.prices.has(app.asset) && units(app.asset) >= (quote() ?? 0n) && units(app.asset) > 0n) return;
   const ok = app.assets.find((a) => app.prices.has(a.id) && units(a.id) >= quote(app.stake, a.id));
   if (ok) app.asset = ok.id;
@@ -167,21 +179,33 @@ function renderAssets() {
       b.disabled = !priced || u === 0n;
       b.setAttribute('aria-pressed', String(id === app.asset));
       b.title = priced ? '' : 'No price for this token yet';
-      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}</span><span class="amt">${esc(formatUnits(u, info.decimals, 4))}${priced ? ` · ≈${fmt(app.prices.value(id, u))} sats` : ''}</span>`;
+      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}</span><span class="amt">${esc(formatUnits(u, info.decimals, 4))}${priced ? ` · ${money(app.prices.value(id, u))}` : ''}</span>`;
       b.addEventListener('click', () => {
         app.asset = id;
         store.set('darkbags.asset', id);
+        $('paywith').open = false;
         renderLobby();
       });
       return b;
     }),
   );
+  const info = assetInfo(app.asset);
+  $('paywith').hidden = !multiToken();
+  $('pay-sym').textContent = info.symbol;
+  $('pay-amt').textContent = app.balances ? formatUnits(units(app.asset), info.decimals, 4) : '';
+  // one short line under Play: what the stake costs, or what's wrong
   const q = quote();
   const qEl = $('quote');
-  if (q === null) qEl.textContent = 'Pick a token with a price to stake.';
-  else {
-    const short = units(app.asset) < q;
-    qEl.innerHTML = `A ${fmt(app.stake)} sats stake is <b>${esc(tokenAmount(app.asset, q))}</b> right now${short ? ` · <span style="color:var(--blood)">not enough ${esc(assetInfo(app.asset).symbol)}</span>` : ''}. Payouts come back in the same token at the same rate.`;
+  qEl.classList.remove('bad');
+  if (q === null) {
+    qEl.textContent = 'Pick a token to pay with.';
+  } else if (units(app.asset) < q) {
+    qEl.textContent = multiToken() ? `Not enough ${info.symbol} for this stake. Pick another token or deposit.` : 'Not enough balance for this stake. Pick a smaller one or refill.';
+    qEl.classList.add('bad');
+  } else if (!multiToken() || app.asset === 'SATS') {
+    qEl.textContent = 'Get out alive to keep everything you carry.';
+  } else {
+    qEl.textContent = `= ${tokenAmount(app.asset, q)} now. Winnings come back in ${info.symbol}.`;
   }
 }
 
@@ -199,7 +223,7 @@ function renderLobby() {
 
   const st = $('net-status');
   st.classList.toggle('bad', app.status === 'closed' || app.status === 'error');
-  if (app.mode === 'practice') st.textContent = 'Offline raids against bots. Separate practice balance.';
+  if (app.mode === 'practice') st.textContent = 'Just you and the bots, offline.';
   else if (app.status === 'open') st.textContent = 'Connected. Humans and bots share each raid.';
   else if (app.status === 'connecting') st.textContent = 'Connecting to the raid server…';
   else st.textContent = 'Server unreachable. Retrying… Practice mode works offline.';
@@ -212,7 +236,7 @@ function renderLobby() {
       b.type = 'button';
       b.className = 'table-btn';
       b.setAttribute('aria-pressed', String(stake === app.stake));
-      let state = 'Empty ready room';
+      let state = '';
       let cls = '';
       if (t?.state === 'live') {
         state = `Raid live · ${mmss(t.tl)}`;
@@ -220,12 +244,12 @@ function renderLobby() {
       } else if (t?.state === 'prep' && t.count !== null && t.count !== undefined) {
         state = `${t.ready} ready · ${t.count}s`;
         cls = 'live';
-      } else if (t?.state === 'prep' && t.watching) state = `${t.watching} in the room`;
+      } else if (t?.state === 'prep' && t.watching) state = `${t.watching} waiting`;
       if (t?.nextGolden && t.state !== 'live') {
         state = 'Golden raid next';
         cls = 'gold';
       }
-      b.innerHTML = `<span class="stake">${fmt(stake)}</span><span class="unit">sats stake</span><span class="state ${cls}">${esc(state)}</span>`;
+      b.innerHTML = `<span class="stake">${money(stake)}</span>${state ? `<span class="state ${cls}">${esc(state)}</span>` : ''}`;
       b.addEventListener('click', () => {
         app.stake = stake;
         store.set('darkbags.stake', stake);
@@ -237,18 +261,18 @@ function renderLobby() {
 
   $('gore').checked = app.gore;
 
+  cashier.render();
+  const real = cashier.active;
+  $('balance').textContent = app.balances === null ? '—' : money(totalSats());
+  $('faucet').hidden = real || !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
   pickUsableAsset();
   renderAssets();
   renderRankCard();
   locker.renderTile();
-  cashier.render();
-  const real = cashier.active;
-  $('balance').textContent = app.balances === null ? '—' : `≈${fmt(totalSats())}`;
-  $('faucet').hidden = real || !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
   const play = $('play');
   const needSignIn = real && !cashier.signedIn;
   play.disabled = app.status !== 'open' || needSignIn;
-  play.textContent = needSignIn ? 'Sign in to play' : `Go to the ${fmt(app.stake)} sats table`;
+  play.textContent = needSignIn ? 'Sign in to play' : `Play · ${money(app.stake)} stake`;
 }
 
 // ------------------------------------------------------------------ rank
@@ -259,8 +283,8 @@ function renderRankCard() {
   const r = app.rank;
   el.hidden = !r;
   if (!r) return;
-  const whose = app.mode === 'practice' ? 'Practice rank' : 'Rank';
-  el.innerHTML = `${rankBadgeSvg(r.rank, 44)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">${whose} ${r.rank}</span> <b>${esc(r.name)}</b></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div><p class="fine">${r.max ? 'Top rank. Nothing left to climb.' : `${fmt(r.into)} / ${fmt(r.need)} XP · ${fmt(r.toNext)} to rank ${r.rank + 1}`}</p></div>`;
+  el.innerHTML = `${rankBadgeSvg(r.rank, 34)}<div class="rk-body"><p class="rk-title"><b>${esc(r.name)}</b><span class="rk-xp">${r.max ? 'max rank' : `${fmt(r.toNext)} XP to rank ${r.rank + 1}`}</span></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div></div>`;
+  el.title = `${app.mode === 'practice' ? 'Practice rank' : 'Rank'} ${r.rank} of 90`;
 }
 
 // the result card: XP earned, what for, and the bar filling (twice on a rank-up)
@@ -307,7 +331,7 @@ function renderRewards(m) {
   }
   el.innerHTML = `<p class="eyebrow">Rank-up rewards</p><ul>${Object.entries(bags)
     .map(([b, n]) => `<li><span class="rw-ico bag"></span><b>${n > 1 ? `${n}× ` : ''}${esc(BOX[b].name)}</b><span class="fine">waiting in your locker</span></li>`)
-    .join('')}<li><span class="rw-ico cash"></span><b>+${usd(credit)}</b><span class="fine">shop credit</span></li>${trials
+    .join('')}<li><span class="rw-ico cash"></span><b>+${usd(credit)}</b><span class="fine">bonus money</span></li>${trials
     .map((t) => `<li><span class="rw-ico trial"></span><b>${esc(OUTFIT[t.id].name)}</b><span class="fine">72-hour trial</span></li>`)
     .join('')}</ul><div class="rw-actions"><button type="button" class="ghost" data-rw="locker">Open the locker</button><button type="button" class="ghost share" data-rw="share">Share rank-up</button></div>`;
   el.querySelector('[data-rw="locker"]').addEventListener('click', () => locker.open('boxes'));
@@ -321,7 +345,7 @@ const figureSvg = (color) =>
 function renderPrep() {
   const p = app.prep;
   if (!p) return;
-  $('prep-kicker').textContent = `Raid ${p.round} · ${fmt(p.stake)} sats table${p.golden ? ' · golden raid' : ''}`;
+  $('prep-kicker').textContent = `Raid ${p.round} · ${money(p.stake)} stake${p.golden ? ' · golden raid' : ''}`;
   const count = $('prep-count');
   const status = $('prep-status');
   if (p.state === 'live') {
@@ -370,7 +394,7 @@ function renderPrep() {
       }),
     );
   }
-  $('pot').textContent = fmt(p.pot);
+  $('pot').textContent = money(p.pot);
   const ready = $('ready');
   const me = p.me ?? {};
   const q = quote(p.stake);
@@ -378,11 +402,11 @@ function renderPrep() {
     ready.textContent = `Cancel · refund ${tokenAmount(me.escrow.asset, me.escrow.units)}`;
     ready.classList.add('armed');
   } else {
-    ready.textContent = q === null ? 'Pick a token in the lobby' : `Stake ${tokenAmount(app.asset, q)} & ready`;
+    ready.textContent = q === null ? 'Pick a token in the lobby' : `Ready · stake ${tokenAmount(app.asset, q)}`;
     ready.classList.remove('armed');
   }
   ready.disabled = !me.ready && (q === null || units(app.asset) < q);
-  $('prep-balance').textContent = `${assetInfo(app.asset).symbol} balance ${formatUnits(units(app.asset), assetInfo(app.asset).decimals, 4)} · ${fmt(p.stake)} sats stake`;
+  $('prep-balance').textContent = multiToken() ? `${assetInfo(app.asset).symbol} balance ${formatUnits(units(app.asset), assetInfo(app.asset).decimals, 4)}` : `Balance ${money(totalSats())}`;
 }
 
 // ------------------------------------------------------------- transport
@@ -396,7 +420,7 @@ function setMode(mode) {
   app.status = 'connecting';
   app.inRoom = false;
   cashier.reset();
-  if (mode === 'practice') $('fine').textContent = 'Test build. Tokens here are play money with fixed test prices: no deposits, no withdrawals.';
+  if (mode === 'practice') $('fine').textContent = 'Practice runs in your browser. All money here is play money.';
   store.set('darkbags.mode', mode);
   app.transport = mode === 'online' ? new WsTransport(SERVER, onMessage, onStatus) : new LocalTransport(onMessage, onStatus);
   if (app.screen !== 'lobby') showScreen('lobby');
@@ -435,6 +459,7 @@ function handleMessage(m) {
       app.balances = m.balances ?? {};
       app.tables = m.tables;
       app.rank = m.rank ?? null;
+      app.chain = m.chain ?? null; // real-token server, or null for play money
       renderLobby();
       break;
     case 'tables':
@@ -463,6 +488,8 @@ function handleMessage(m) {
       app.balances = m.balances ?? app.balances;
       attract.stop();
       sfx.play('beep', { f: 1320, dur: 0.3 });
+      game.rate = satsPerUsd(app.prices);
+      game.coachOn = store.get('darkbags.raids', 0) < 3; // hints for the first three raids
       game.begin(m, app.skin, app.gore, app.locker);
       renderer.prewarm(m.map.w / 2, m.map.h / 2);
       showScreen('game');
@@ -475,6 +502,7 @@ function handleMessage(m) {
       break;
     case 'result':
       app.balances = m.balances ?? app.balances;
+      store.set('darkbags.raids', store.get('darkbags.raids', 0) + 1);
       if (m.rank) app.rank = m.rank.after;
       showResult(m);
       break;
@@ -496,30 +524,30 @@ function showResult(m) {
     const pct = Math.round((pnl / m.stake) * 100);
     k.textContent = 'Extracted';
     k.className = 'res-kicker win';
-    amt.textContent = `${fmt(m.payout)} sats`;
+    amt.textContent = money(m.payout);
     amt.className = 'res-amount win';
     const paid = m.asset && m.asset !== 'SATS' ? ` Paid out <b>${esc(tokenAmount(m.asset, m.payoutUnits ?? '0'))}</b> at your entry rate.` : '';
-    det.innerHTML = `Out with <b>${fmt(m.payout)}</b> sats on a <b>${fmt(m.stake)}</b> stake: <b>${pnl >= 0 ? '+' : '−'}${fmt(Math.abs(pnl))} (${pct >= 0 ? '+' : '−'}${Math.abs(pct)}%)</b>.${paid} ${inside}.`;
+    det.innerHTML = `Out with <b>${money(m.payout)}</b> on a <b>${money(m.stake)}</b> stake: <b>${pnl >= 0 ? '+' : '−'}${money(Math.abs(pnl))} (${pct >= 0 ? '+' : '−'}${Math.abs(pct)}%)</b>.${paid} ${inside}.`;
   } else if (m.status === 'dead') {
     k.textContent = m.cause === 'storm' ? 'Eaten by the storm' : 'Dropped';
     k.className = 'res-kicker loss';
-    amt.textContent = `−${fmt(m.stake)}`;
+    amt.textContent = `−${money(m.stake)}`;
     amt.className = 'res-amount';
     det.innerHTML = m.killer
-      ? `<b>${esc(m.killer)}</b> has your bag now. It held <b>${fmt(m.lost)} sats</b>, and only the two of you will ever know. ${inside}.`
-      : `Your bag, <b>${fmt(m.lost)} sats</b>, is lying in the storm for anyone brave enough. ${inside}.`;
+      ? `<b>${esc(m.killer)}</b> has your bag now. It held <b>${money(m.lost)}</b>, and only the two of you will ever know. ${inside}.`
+      : `Your bag, <b>${money(m.lost)}</b>, is lying in the storm for anyone brave enough. ${inside}.`;
   } else {
     k.textContent = 'Sealed inside';
     k.className = 'res-kicker loss';
-    amt.textContent = `−${fmt(m.stake)}`;
+    amt.textContent = `−${money(m.stake)}`;
     amt.className = 'res-amount';
-    det.innerHTML = `The raid closed with you still in it. Your <b>${fmt(m.lost)} sats</b> rolled into the next raid's loot. ${inside}.`;
+    det.innerHTML = `The raid closed with you still in it. Your <b>${money(m.lost)}</b> rolled into the next raid's loot. ${inside}.`;
   }
   renderRankResult(m.rank);
   renderRewards(m);
   app.lastResult = m;
   const q = quote(m.stake);
-  $('res-again').textContent = q === null ? 'Ready for the next raid' : `Ready for the next raid · ${tokenAmount(app.asset, q)}`;
+  $('res-again').textContent = q === null ? 'Play again' : `Play again · ${multiToken() ? tokenAmount(app.asset, q) : money(m.stake)}`;
   $('res-again').disabled = q === null || units(app.asset) < q;
   showScreen('result');
 }

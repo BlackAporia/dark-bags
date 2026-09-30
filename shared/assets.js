@@ -85,3 +85,24 @@ export function parseUnits(text, decimals) {
   if (frac.length > decimals) return null;
   return BigInt(m[1] || '0') * 10n ** BigInt(decimals) + BigInt((frac || '0').padEnd(decimals, '0'));
 }
+
+// The one unit players see is $. Sats per dollar comes from the USDC (or USDT) price.
+export function satsPerUsd(prices) {
+  for (const sym of ['USDC', 'USDT']) {
+    const a = prices.list().find((x) => x.symbol.toUpperCase() === sym && x.satsPerToken > 0);
+    if (a) return a.satsPerToken;
+  }
+  return 1000;
+}
+
+// sats → "$1.25"; small amounts keep cents, big ones drop them
+export function usdText(sats, rate = 1000) {
+  const d = sats / rate;
+  const neg = d < 0;
+  const a = Math.abs(d);
+  let s;
+  if (a > 0 && a < 0.005) s = a.toFixed(3); // dust at the smallest table: $0.002, not $0
+  else if (Math.round(a * 100) % 100 === 0 || a >= 1000) s = Math.round(a).toLocaleString('en-US');
+  else s = a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${neg ? '−' : ''}$${s}`;
+}

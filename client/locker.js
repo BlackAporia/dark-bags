@@ -7,7 +7,6 @@ import { drawPreview, figureStill } from './stickman.js';
 import { esc, fmt } from './game.js';
 
 const $ = (id) => document.getElementById(id);
-const SCRAP = '⬡';
 
 // ------------------------------------------------------------- box art
 
@@ -58,8 +57,13 @@ export function createLocker({ app, send, sfx, toast, share }) {
   const L = () => app.locker;
   const trialLeft = (id) => Math.max(0, (L()?.trials?.[id] ?? 0) - Date.now());
   const owns = (id) => OUTFIT[id]?.basic || L()?.owned.includes(id) || trialLeft(id) > 0;
-  // $: shop credit plus USDC/USDT in the player's balance (1:1)
+  // $: bonus credit plus what the player can spend: USDC/USDT with real tokens, the play balance otherwise
   const stableCents = () => {
+    if (!app.chain) {
+      const sats = BigInt(app.balances?.SATS ?? '0');
+      const rate = app.assets?.find((a) => /^(USDC|USDT)$/i.test(a.symbol))?.satsPerToken ?? 1000;
+      return Math.floor((Number(sats) * 100) / rate);
+    }
     let c = 0n;
     for (const a of app.assets ?? []) {
       if (!/^(USDC|USDT)$/i.test(a.symbol) || a.decimals < 2) continue;
@@ -78,6 +82,8 @@ export function createLocker({ app, send, sfx, toast, share }) {
     const tile = $('locker-tile');
     if (!tile) return;
     tile.hidden = !L();
+    $('open-locker').hidden = !L();
+    $('lt-marks').hidden = !L();
     if (!L()) return;
     const o = OUTFIT[L().outfit] ?? OUTFIT['basic-0'];
     const r = RARITIES[o.rarity];
@@ -85,7 +91,8 @@ export function createLocker({ app, send, sfx, toast, share }) {
     $('lt-name').style.color = r.color;
     $('lt-rarity').textContent = `${r.name} · ${L().body === 'f' ? 'Her' : 'Him'}`;
     const bags = bagsHeld();
-    $('lt-marks').textContent = `${usd(dollars())}${bags ? ` · ${bags} ${bags === 1 ? 'bag' : 'bags'}` : ''}`;
+    $('lt-marks').textContent = ` · ${usd(dollars())}${bags ? ` · ${bags} ${bags === 1 ? 'bag' : 'bags'} to open` : ''}`;
+    $('open-locker').classList.toggle('glow', bags > 0);
     tile.style.setProperty('--r', r.color);
   }
 
@@ -156,9 +163,8 @@ export function createLocker({ app, send, sfx, toast, share }) {
 
   function render() {
     if (!L()) return;
-    $('lk-marks').textContent = usd(L().credit);
-    $('lk-stable').textContent = usd(stableCents());
-    $('lk-scrap').textContent = fmt(L().scrap);
+    $('lk-marks').textContent = usd(dollars());
+    $('lk-bonus').textContent = L().credit > 0 ? `incl. ${usd(L().credit)} bonus` : '';
     for (const b of document.querySelectorAll('#lk-body [data-body]')) b.setAttribute('aria-checked', String(b.dataset.body === L().body));
     renderDetail();
     if (st.tab === 'outfits') renderGrid('lk-grid', OUTFITS.filter((o) => st.filter === 'all' || (st.filter === 'owned' ? owns(o.id) : o.rarity === st.filter)));
@@ -175,7 +181,7 @@ export function createLocker({ app, send, sfx, toast, share }) {
     if (trial) return { text: `Trial · ${left(trialLeft(o.id))} left`, cls: 'trial' };
     if (owns(o.id)) return { text: 'Owned', cls: 'own' };
     if (o.price) return { text: usd(o.price), cls: 'price' };
-    return { text: `${SCRAP} ${fmt(RARITIES[o.rarity].craft)} · boxes`, cls: 'lock' };
+    return { text: usd(o.price), cls: 'price' };
   }
 
   function renderGrid(id, list) {
@@ -208,19 +214,14 @@ export function createLocker({ app, send, sfx, toast, share }) {
     let action = '';
     if (L().outfit === id) action = `<span class="lk-tag">Equipped</span>`;
     else if (owns(id)) action = `<button type="button" class="cta" data-act="equip">Equip</button>`;
-    if (!o.basic && !L().owned.includes(id)) {
-      if (o.price) action += `<button type="button" class="${owns(id) ? 'ghost' : 'cta'}" data-act="buy" ${dollars() < o.price ? 'disabled' : ''}>Buy · ${usd(o.price)}</button>`;
-      action += `<button type="button" class="ghost" data-act="craft" ${L().scrap < r.craft ? 'disabled' : ''}>Craft · ${SCRAP} ${fmt(r.craft)}</button>`;
-    }
+    if (!o.basic && !L().owned.includes(id)) action += `<button type="button" class="${owns(id) ? 'ghost' : 'cta'}" data-act="buy" ${dollars() < o.price ? 'disabled' : ''}>Buy · ${usd(o.price)}</button>`;
     const how = trial
-      ? `A rank-up trial: yours for ${left(trialLeft(id))} more. Buy or craft it to keep it.`
+      ? `A rank-up trial: yours for ${left(trialLeft(id))} more. Buy it to keep it.`
       : owns(id)
         ? o.basic
           ? 'Free for every runner.'
           : 'In your collection.'
-        : o.price
-          ? 'In the shop, in luck bags, or crafted from scrap.'
-          : 'Only in luck bags, or crafted from scrap.';
+        : 'Buy it here, or try your luck with a bag.';
     d.innerHTML = `<p class="lk-rar">${esc(r.name)}${o.fx ? ` · <span>${esc(fxName(o.fx))}</span>` : ''}</p><h3>${esc(o.name)}</h3><p class="fine">${esc(how)}${st.selected && !owns(id) ? ' Trying it on.' : ''}</p><div class="lk-actions">${action}</div>`;
     for (const b of d.querySelectorAll('[data-act]')) b.addEventListener('click', () => send({ t: b.dataset.act, id }));
   }
@@ -338,7 +339,7 @@ export function createLocker({ app, send, sfx, toast, share }) {
         <div class="rv-stage"><canvas id="rv-canvas"></canvas></div>
         <p class="rv-rar">${esc(r.name)}</p>
         <h3 class="rv-name">${esc(o.name)}</h3>
-        <p class="rv-note">${result.dup ? `Already yours · <b>+${fmt(result.scrap)} ${SCRAP} scrap</b>` : '<b>New</b> in your collection'}${result.jackpot ? '' : ` · the jackpot is ${esc(RARITIES[box.jackpot].name)}`}</p>
+        <p class="rv-note">${result.dup ? `Already yours · <b>+${usd(result.refund)} back</b>` : '<b>New</b> in your collection'}${result.jackpot ? '' : ` · the jackpot is ${esc(RARITIES[box.jackpot].name)}`}</p>
         <div class="rv-actions">
           ${!result.dup && L().outfit !== o.id ? '<button type="button" class="cta" data-rv="equip">Equip</button>' : ''}
           <button type="button" class="ghost share" data-rv="share">${result.jackpot ? 'Show it off on X' : 'Post the miss on X'}</button>
@@ -395,7 +396,7 @@ export function createLocker({ app, send, sfx, toast, share }) {
       roulette(r);
       return;
     }
-    if (m.op === 'buy' || m.op === 'craft') {
+    if (m.op === 'buy') {
       sfx.play('coin');
       toast(`${OUTFIT[r.item].name} is yours.`);
       st.selected = r.item;

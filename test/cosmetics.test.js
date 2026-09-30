@@ -61,7 +61,7 @@ test('pity guarantees Epic within 10 and Legendary within 40 opens, even on bad 
   assert.equal(view.pity.street.sinceLegendary, 0);
 });
 
-test('smart drops: no duplicates until a rarity is complete, then scrap crafts what you want', () => {
+test('smart drops: no duplicates until a rarity is complete, then duplicates pay $ back', () => {
   const inv = new Inventory({ rnd: seeded(3) });
   inv.rec('p').credit = 1e9;
   const commons = OUTFITS.filter((o) => o.rarity === 'common' && !o.basic).length;
@@ -70,19 +70,17 @@ test('smart drops: no duplicates until a rarity is complete, then scrap crafts w
   for (let i = 0; i < 200; i++) {
     const r = inv.open('p', 'street');
     if (r.rarity !== 'common') continue;
-    if (r.dup && firstDup === null) firstDup = seen.length;
+    if (r.dup && firstDup === null) {
+      firstDup = seen.length;
+      assert.equal(r.refund, RARITIES.common.refund);
+    }
     seen.push(r);
   }
   assert.equal(firstDup, commons, 'the first common duplicate comes only after all commons are owned');
-  const view = inv.view('p');
-  assert.ok(view.scrap > 0);
-  const missing = OUTFITS.find((o) => !o.basic && !view.owned.includes(o.id));
-  if (missing) {
-    inv.data.get('p').scrap = RARITIES[missing.rarity].craft;
-    assert.ok(inv.craft('p', missing.id).ok);
-    assert.equal(inv.view('p').scrap, 0);
-    assert.ok(inv.owns('p', missing.id));
-  }
+  for (const o of OUTFITS) if (!o.basic) assert.equal(o.price, RARITIES[o.rarity].price, `${o.id} can be bought outright`);
+  const old = new Inventory({ data: { p: { scrap: 300, credit: 5 } } });
+  assert.equal(old.view('p').credit, 155, 'leftover scrap from old saves becomes $ bonus');
+  assert.ok(!('scrap' in old.rec('p')));
 });
 
 test('shop in $: credit first, then USDC/USDT; bags you hold open free', () => {
@@ -97,7 +95,7 @@ test('shop in $: credit first, then USDC/USDT; bags you hold open free', () => {
   assert.equal(wallet, 500, 'the welcome bag cost nothing');
 
   assert.equal(inv.equip('p', 'satoshi').ok, false);
-  assert.equal(inv.buy('p', 'satoshi', pay).ok, false, 'legendaries are not in the shop');
+  assert.equal(inv.buy('p', 'satoshi', pay).ok, false, 'a legendary costs more than the player has');
   inv.rec('p').credit = 30;
   const olive = inv.buy('p', 'olive', pay);
   assert.ok(olive.ok);
@@ -136,7 +134,7 @@ test('every rank-up pays a bag, $ credit and a 72h trial outfit that expires', (
   assert.ok(!(trial in inv.view('p').trials));
 });
 
-test('the lobby sells for USDC/USDT, and rank-ups arrive with the result', () => {
+test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive with the result', () => {
   const out = [];
   const wallet = new MemoryWallet();
   const lobby = new Lobby({ wallet, send: (cid, m) => out.push(m), newToken: () => 'tok00001', bots: false, prepSeconds: 1, practice: true });
@@ -148,11 +146,18 @@ test('the lobby sells for USDC/USDT, and rank-ups arrive with the result', () =>
   assert.equal(w.catalog.boxes.length, BOXES.length);
   lobby.handle(1, { t: 'box', id: 'street' });
   assert.ok(last('locker').result.free);
-  const usdc = BigInt(wallet.balance('tok00001', 'USDC'));
+  // play money: the shop charges the one play balance at the $ rate (1,000 sats = $1)
+  const before = BigInt(wallet.balance('tok00001', 'SATS'));
   lobby.handle(1, { t: 'box', id: 'vault' });
   const paid = last('locker');
   assert.equal(paid.op, 'box');
-  assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - BigInt(BOX.vault.price) * 10n ** 4n, 'USDC has 6 decimals: cents × 10⁴');
+  assert.equal(BigInt(wallet.balance('tok00001', 'SATS')), before - BigInt(BOX.vault.price) * 10n);
+  // real tokens: USDC/USDT, cents × 10⁴ for 6 decimals
+  const usdc = BigInt(wallet.balance('tok00001', 'USDC'));
+  lobby.cashier = {};
+  assert.ok(lobby.stablePay('tok00001')(299));
+  lobby.cashier = null;
+  assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - 299n * 10n ** 4n);
   lobby.handle(1, { t: 'equip', id: paid.result.item });
   lobby.handle(1, { t: 'body', id: 'f' });
   assert.equal(last('locker').locker.body, 'f');

@@ -1,7 +1,7 @@
 import { CFG } from './config.js';
 import { RoomCore } from './room.js';
 import { cleanName } from './wallet.js';
-import { PriceBook } from './assets.js';
+import { PriceBook, satsPerUsd } from './assets.js';
 import { RankBook } from './ranks.js';
 import { Inventory, OUTFITS, BOXES, RARITIES, PITY } from './cosmetics.js';
 
@@ -112,7 +112,6 @@ export class Lobby {
       case 'equip':
       case 'body':
       case 'buy':
-      case 'craft':
       case 'box':
         this.lockerOp(cid, s, msg);
         return;
@@ -163,16 +162,20 @@ export class Lobby {
       msg.t === 'equip' ? inv.equip(key, id)
       : msg.t === 'body' ? inv.setBody(key, id)
       : msg.t === 'buy' ? inv.buy(key, id, pay)
-      : msg.t === 'craft' ? inv.craft(key, id)
       : inv.open(key, id, pay);
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (s.room && (msg.t === 'equip' || msg.t === 'body')) s.room.broadcastPrep();
   }
 
-  // $ in the shop is USDC or USDT, 1:1: pay the rest of a price from whichever covers it
+  // $ in the shop: USDC or USDT 1:1 with real tokens; in test mode the play balance (sats at the $ rate)
   stablePay(key) {
     return (cents) => {
+      if (!this.cashier) {
+        // play money: one balance, the same one the client shows
+        const units = BigInt(Math.ceil((cents * satsPerUsd(this.prices)) / 100));
+        return this.prices.has('SATS') && this.wallet.debit(key, 'SATS', units);
+      }
       for (const a of this.prices.list()) {
         if (!/^(USDC|USDT)$/i.test(a.symbol) || a.decimals < 2) continue;
         const units = BigInt(cents) * 10n ** BigInt(a.decimals - 2);

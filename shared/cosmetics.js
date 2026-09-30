@@ -7,7 +7,8 @@
 //     Legendary-or-better within 40, and the counter shows how close you are
 //   - smart drops: while you are missing items of the rolled rarity, you get one
 //     you don't own; duplicates only happen once you own them all
-//   - duplicates turn into scrap, and scrap crafts any outfit you choose
+//   - a duplicate pays part of its price back as $ credit
+//   - every outfit can also be bought outright, so nothing is locked behind luck
 //   - bought items are permanent; timed outfits only come free, as rank-up trials
 //
 // One currency: $, pegged 1:1 to USDC/USDT. A purchase spends $ credit first (bonus
@@ -19,11 +20,12 @@
 export const BODIES = ['m', 'f'];
 
 export const RARITIES = {
-  common: { name: 'Common', color: '#b8bfcc', scrap: 20, craft: 100 },
-  rare: { name: 'Rare', color: '#4cc9f0', scrap: 60, craft: 300 },
-  epic: { name: 'Epic', color: '#b37bff', scrap: 200, craft: 1000 },
-  legendary: { name: 'Legendary', color: '#f7931a', scrap: 600, craft: 3000 },
-  mythic: { name: 'Mythic', color: '#ff3d7f', scrap: 1500, craft: 8000 },
+  // price and duplicate refund in US cents
+  common: { name: 'Common', color: '#b8bfcc', price: 49, refund: 10 },
+  rare: { name: 'Rare', color: '#4cc9f0', price: 149, refund: 30 },
+  epic: { name: 'Epic', color: '#b37bff', price: 399, refund: 80 },
+  legendary: { name: 'Legendary', color: '#f7931a', price: 999, refund: 200 },
+  mythic: { name: 'Mythic', color: '#ff3d7f', price: 1999, refund: 400 },
 };
 export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 const rank = (r) => RARITY_ORDER.indexOf(r);
@@ -36,17 +38,17 @@ const BASIC_NAMES = ['Red', 'Sky', 'Moss', 'Magenta', 'Sun', 'Violet', 'Mint', '
 
 export const OUTFITS = [
   ...BASIC.map((color, i) => ({ id: `basic-${i}`, name: `${BASIC_NAMES[i]} Runner`, rarity: 'common', color, head: 'none', basic: true })),
-  { id: 'olive', name: 'Olive Drab', rarity: 'common', color: '#8a9a5b', head: 'cap', price: 49 },
-  { id: 'slate', name: 'Slate', rarity: 'common', color: '#8c9aab', head: 'beanie', price: 49 },
-  { id: 'rust', name: 'Rust', rarity: 'common', color: '#c4561c', head: 'bandana', price: 49 },
-  { id: 'denim', name: 'Denim', rarity: 'common', color: '#5b82c4', head: 'cap', price: 49 },
-  { id: 'khaki', name: 'Khaki', rarity: 'common', color: '#c3b091', head: 'helmet', price: 49 },
-  { id: 'night-ops', name: 'Night Ops', rarity: 'rare', color: '#6f8fe8', accent: '#1d2745', head: 'helmet', price: 149 },
-  { id: 'hazard', name: 'Hazard', rarity: 'rare', color: '#ffb000', accent: '#1a1a1a', head: 'beanie', price: 149 },
-  { id: 'arctic', name: 'Arctic', rarity: 'rare', color: '#e8f1ff', accent: '#9fd3ff', head: 'beanie', price: 149 },
-  { id: 'toxic', name: 'Toxic', rarity: 'rare', color: '#9ef01a', accent: '#2b2b2b', head: 'mask', price: 149 },
-  { id: 'desert', name: 'Desert Storm', rarity: 'rare', color: '#d9b77e', accent: '#7a5a2a', head: 'helmet', price: 149 },
-  { id: 'neon', name: 'Neon Pink', rarity: 'rare', color: '#ff4fd8', accent: '#ffffff', head: 'bandana', price: 149 },
+  { id: 'olive', name: 'Olive Drab', rarity: 'common', color: '#8a9a5b', head: 'cap' },
+  { id: 'slate', name: 'Slate', rarity: 'common', color: '#8c9aab', head: 'beanie' },
+  { id: 'rust', name: 'Rust', rarity: 'common', color: '#c4561c', head: 'bandana' },
+  { id: 'denim', name: 'Denim', rarity: 'common', color: '#5b82c4', head: 'cap' },
+  { id: 'khaki', name: 'Khaki', rarity: 'common', color: '#c3b091', head: 'helmet' },
+  { id: 'night-ops', name: 'Night Ops', rarity: 'rare', color: '#6f8fe8', accent: '#1d2745', head: 'helmet' },
+  { id: 'hazard', name: 'Hazard', rarity: 'rare', color: '#ffb000', accent: '#1a1a1a', head: 'beanie' },
+  { id: 'arctic', name: 'Arctic', rarity: 'rare', color: '#e8f1ff', accent: '#9fd3ff', head: 'beanie' },
+  { id: 'toxic', name: 'Toxic', rarity: 'rare', color: '#9ef01a', accent: '#2b2b2b', head: 'mask' },
+  { id: 'desert', name: 'Desert Storm', rarity: 'rare', color: '#d9b77e', accent: '#7a5a2a', head: 'helmet' },
+  { id: 'neon', name: 'Neon Pink', rarity: 'rare', color: '#ff4fd8', accent: '#ffffff', head: 'bandana' },
   { id: 'ghost', name: 'Ghost', rarity: 'epic', color: '#dfe7ff', head: 'hood', fx: 'ghost' },
   { id: 'blood-moon', name: 'Blood Moon', rarity: 'epic', color: '#e0233a', accent: '#ffb3b3', head: 'horns', fx: 'glow' },
   { id: 'circuit', name: 'Circuit', rarity: 'epic', color: '#00f5d4', accent: '#0b3d36', head: 'helmet', fx: 'pulse' },
@@ -59,6 +61,7 @@ export const OUTFITS = [
   { id: 'genesis', name: 'Genesis Block', rarity: 'mythic', color: '#ffffff', head: 'halo', fx: 'rainbow' },
   { id: 'inferno', name: 'Inferno', rarity: 'mythic', color: '#ff5a1f', accent: '#ffd166', head: 'horns', fx: 'fire' },
 ];
+for (const o of OUTFITS) if (!o.basic) o.price = RARITIES[o.rarity].price;
 export const OUTFIT = Object.fromEntries(OUTFITS.map((o) => [o.id, o]));
 export const DEFAULT_OUTFIT = 'basic-0';
 
@@ -125,8 +128,16 @@ export function botLook(rnd) {
 
 // ------------------------------------------------------------- inventory
 
+// Saves from before scrap was retired: turn leftover scrap into $ bonus at its old crafting value
+// (100 scrap crafted a $0.49 common), so nobody loses what they had.
+function migrate(r) {
+  if (r.scrap > 0) r.credit = (r.credit ?? 0) + Math.round(r.scrap / 2);
+  delete r.scrap;
+  return r;
+}
+
 function fresh() {
-  return { credit: 0, scrap: 0, owned: [], trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
+  return { credit: 0, owned: [], trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
 }
 
 /**
@@ -135,7 +146,7 @@ function fresh() {
  */
 export class Inventory {
   constructor({ data = {}, onChange = null, rnd = Math.random, now = () => Date.now() } = {}) {
-    this.data = new Map(Object.entries(data).map(([k, v]) => [k, { ...fresh(), ...v }]));
+    this.data = new Map(Object.entries(data).map(([k, v]) => [k, migrate({ ...fresh(), ...v })]));
     this.onChange = onChange;
     this.rnd = rnd;
     this.now = now;
@@ -170,7 +181,6 @@ export class Inventory {
     for (const [id, until] of Object.entries(r.trials)) if (until <= now) delete r.trials[id];
     return {
       credit: r.credit,
-      scrap: r.scrap,
       owned: r.owned,
       trials: r.trials,
       boxes: r.boxes,
@@ -242,20 +252,6 @@ export class Inventory {
     return { ok: true, item: id };
   }
 
-  craft(key, id) {
-    const o = OUTFIT[id];
-    const r = this.rec(key);
-    if (!o || o.basic) return { ok: false, error: 'That cannot be crafted.' };
-    if (r.owned.includes(id)) return { ok: false, error: 'You already own it.' };
-    const cost = RARITIES[o.rarity].craft;
-    if (r.scrap < cost) return { ok: false, error: `Not enough scrap (${cost} needed).` };
-    r.scrap -= cost;
-    r.owned.push(id);
-    delete r.trials[id];
-    this.changed();
-    return { ok: true, item: id };
-  }
-
   // a bag you hold opens free; otherwise it is bought at its price
   open(key, boxId, external) {
     const box = BOX[boxId];
@@ -270,10 +266,10 @@ export class Inventory {
     const roll = rollRarity(box, p, this.rnd);
     const item = pickOutfit(roll.rarity, new Set(r.owned), this.rnd);
     const dup = r.owned.includes(item.id);
-    let scrap = 0;
+    let refund = 0;
     if (dup) {
-      scrap = RARITIES[item.rarity].scrap;
-      r.scrap += scrap;
+      refund = RARITIES[item.rarity].refund;
+      r.credit += refund;
     } else {
       r.owned.push(item.id);
       delete r.trials[item.id];
@@ -282,7 +278,7 @@ export class Inventory {
     p.sinceLegendary = rank(item.rarity) >= rank('legendary') ? 0 : p.sinceLegendary + 1;
     r.opened++;
     this.changed();
-    return { ok: true, box: boxId, item: item.id, rarity: item.rarity, dup, scrap, free, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
+    return { ok: true, box: boxId, item: item.id, rarity: item.rarity, dup, refund, free, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
   }
 
   toJSON() {

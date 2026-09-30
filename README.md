@@ -1,6 +1,6 @@
 # DARK BAGS
 
-A browser extraction game played for sats. Think Escape from Tarkov crossed with Counter-Strike's Arms Race and a battle-royale storm: everyone stakes, readies up and drops in together with a knife and 100 health. Kill to climb from knife to laser sniper, grab the orange loot, outrun the shrinking storm and get out through an exit it hasn't swallowed yet. Die, and everything you carried drops on the floor for whoever gets there first.
+A browser extraction game played for dollars. Think Escape from Tarkov crossed with Counter-Strike's Arms Race and a battle-royale storm: everyone stakes, readies up and drops in together with a knife and 100 health. Kill to climb from knife to laser sniper, grab the orange loot, outrun the shrinking storm and get out through an exit it hasn't swallowed yet. Die, and everything you carried drops on the floor for whoever gets there first.
 
 **The hook is privacy.** Nobody can see how much anyone is carrying. A fat target and an empty bluffer look the same, and you choose how big your own bag *looks*. Without that, every match turns into "everyone shoots the leader".
 
@@ -8,7 +8,9 @@ A browser extraction game played for sats. Think Escape from Tarkov crossed with
 
 ## Play it
 
-**In the browser: <https://blackaporia.github.io/dark-bags/>** (practice vs bots, runs entirely in the page). GitHub Pages publishes it from `main` on every push once Pages is on: Settings → Pages → Source: **GitHub Actions**. For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
+**In the browser: <https://blackaporia.github.io/dark-bags/>** (practice vs bots, runs entirely in the page). GitHub Pages serves it straight from `main` (Settings → Pages → Deploy from a branch: `main` / root; the root `index.html` forwards to `client/`).
+
+The lobby is one screen: your runner, name, rank and balance, the stake, a big **Play** button. Your first three raids show short hints in the raid (controls, loot, when and how to get out). For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
 
 ## Run it
 
@@ -39,7 +41,7 @@ Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (2
 
 | | |
 |---|---|
-| **Ready room** | Pick a table (100, 1,000 or 10,000 sats) and a token, then press *Stake & ready*. The stake is escrowed and your icon lights up. The first Ready starts a 20 s countdown (5 s once every human in the room is ready); bots light up in the last seconds; the pot grows in the middle. Cancel before the start and you get the stake back. Nobody joins mid-raid. |
+| **Ready room** | Pick a table ($0.10, $1 or $10) and press *Play*. The stake is escrowed and your icon lights up. The first Ready starts a 20 s countdown (5 s once every human in the room is ready); bots light up in the last seconds; the pot grows in the middle. Cancel before the start and you get the stake back. Nobody joins mid-raid. |
 | **Arms race** | Everyone starts equal: knife, 100 health. Kills are worth a weapon each (damage and loot add a little experience): knife → pistol → shotgun → SMG → rifle → laser sniper → knife again with a ★. The sniper's laser is visible to others, so it gives you away. |
 | **Storm** | The circle shrinks four times and collapses onto one exit, the *last exit*. Exits it swallows close for good. Outside the circle you lose health every second, more each stage. New loot only lands inside the next circle. |
 | **Stake** | 5% rake. Half of the rest rides in your bag, half is scattered on the map as loot. You start in the red and have to farm or fight to profit. |
@@ -69,10 +71,9 @@ The model is Warface's shop plus luck boxes, minus what makes players feel cheat
 | **Rank-ups pay** | Every rank gained: a luck bag (better ones as you climb), $ credit (shop-only, never withdrawable, so ranks can't be farmed into cash) and a random outfit you don't own, yours for 72 hours. New runners start with one Street Bag. |
 | **Luck bags** | Street $0.99, Vault $2.99, Golden $7.99. Exact odds printed on every bag and rolled on the server. |
 | **Pity** | Every bag guarantees Epic-or-better within 10 opens and Legendary-or-better within 40, with meters showing how close you are. |
-| **Smart drops** | While you are missing outfits of the rolled rarity you get one you don't own. Duplicates only once a rarity is complete, and they turn into scrap. |
-| **Scrap crafts anything** | Pick the outfit you want and craft it. No dead ends. |
+| **Smart drops** | While you are missing outfits of the rolled rarity you get one you don't own. Duplicates only once a rarity is complete, and they pay $ credit back (Common $0.10 up to Mythic $4). |
 | **Permanent** | Bought and dropped outfits are yours for good; only the rank-up trials are timed. |
-| **Shop** | Commons $0.49, Rares $1.49. Epic and up: bags or scrap. |
+| **Shop** | Every outfit can be bought outright: Common $0.49, Rare $1.49, Epic $3.99, Legendary $9.99, Mythic $19.99. No dead ends. |
 
 Opening a bag spins a roulette of real items that slows onto your drop, then reveals it on a lit stage. **Share cards** (1200×675, the size X shows uncropped) exist for nearly everything: an extraction, a death ("DROPPED"), a bag hit, a bag miss ("SO CLOSE"), a rank-up. "Post on X" copies the card to the clipboard and opens the post (X links can't carry images), "Share…" hands the image to a phone's share sheet, "Save PNG" downloads it.
 
@@ -86,7 +87,7 @@ Paid random rewards are regulated in some countries (loot boxes are banned in Be
 
 ## Economy
 
-Tables are priced in sats; you pay in any token you hold. At the moment you press Ready the stake is quoted in your token (rounded up, so the house is never short) and escrowed at that rate; an extraction pays back in the same token at that same entry rate, so price moves during a raid change nothing. The test wallet holds a basket (sats, STRK, ETH, USDC, USDT, strkBTC) at fixed test prices; in real-token mode the list and prices are live (see below).
+**Players only ever see dollars.** Every amount in the game (tables, bag, loot, payouts, shop, share cards) is shown in $ at the live USDC/USDT rate; rank is the only other number, in XP. Under the hood tables are priced in sats; with the real cashier you can pay in any token you hold. At the moment you press Ready the stake is quoted in your token (rounded up, so the house is never short) and escrowed at that rate; an extraction pays back in the same token at that same entry rate, so price moves during a raid change nothing. Without a cashier (practice, GitHub Pages) there is one play-money balance and shop purchases come out of it; in real-token mode the list and prices are live (see below).
 
 Inside the raid everything is integer sats and conserved. For a 1,000 stake: 50 rake, 475 in your bag, 475 into the loot pool.
 

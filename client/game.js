@@ -1,5 +1,8 @@
 import { CFG } from '../shared/config.js';
 import { OUTFIT } from '../shared/cosmetics.js';
+import { usdText } from '../shared/assets.js';
+
+const usdTextCents = (c) => usdText(c * 10, 1000); // cents → "$x.xx"
 import { stepMovement, sanitizeInput } from '../shared/movement.js';
 import { World } from '../shared/world.js';
 import { WEAPONS, XP_PER_LEVEL } from '../shared/weapons.js';
@@ -94,16 +97,21 @@ export class GameClient {
     this.gore = false;
   }
 
+  // sats → $ at the lobby's rate (main sets game.rate before a raid)
+  money(sats) {
+    return usdText(sats, this.rate ?? 1000);
+  }
+
   begin(start, skin, gore, look = null) {
     this.active = true;
-    this.look = start.look ?? look ?? { outfit: null, body: 'm' };
+    this.outfit = start.look ?? look ?? { outfit: null, body: 'm' }; // cosmetics (this.look is the camera offset)
     this.gore = gore;
     this.map = start.map;
     this.plan = start.zone;
     this.pid = start.pid;
     this.stake = start.stake;
     this.golden = start.golden;
-    this.skin = OUTFIT[this.look.outfit]?.color ?? skin;
+    this.skin = OUTFIT[this.outfit.outfit]?.color ?? skin;
     this.snaps = [];
     this.pending = [];
     this.seq = 0;
@@ -130,6 +138,8 @@ export class GameClient {
     this.meAnim = null;
     this.dead = false;
     this.recvTl = { tl: start.duration - start.time, at: performance.now() };
+    this.duration = start.duration;
+    this.bagStart = null;
     this.fx.clear();
     this.anims = new AnimBook();
     this.renderer.setMap(start.map);
@@ -278,14 +288,14 @@ export class GameClient {
     for (const ev of list) {
       switch (ev.k) {
         case 'pickup':
-          this.fx.floater(ev.x, ev.y, `+${fmt(ev.v)}`, this.golden ? '#ffd166' : '#f7931a', 15 + ev.t * 4, 0.9);
+          this.fx.floater(ev.x, ev.y, `+${this.money(ev.v)}`, this.golden ? '#ffd166' : '#f7931a', 15 + ev.t * 4, 0.9);
           this.fx.ring(ev.x, ev.y, '#f7931a');
           this.sfx.play('coin', { tier: ev.t });
           break;
         case 'loot':
-          this.fx.floater(ev.x, ev.y, `+${fmt(ev.v)} sats`, '#ffd166', 24, 1.8);
+          this.fx.floater(ev.x, ev.y, `+${this.money(ev.v)}`, '#ffd166', 24, 1.8);
           this.fx.ring(ev.x, ev.y, '#ffd166');
-          this.banner(`Bag opened · +${fmt(ev.v)} sats`, 'money', 2000);
+          this.banner(`Bag opened · +${this.money(ev.v)}`, 'money', 2000);
           this.sfx.play('bag');
           break;
         case 'hit':
@@ -563,7 +573,7 @@ export class GameClient {
 
   animSelf(x, y, dt, now) {
     const you = this.you;
-    return this.anims.update(-1, x, y, this.aim, dt, now, { w: you.w ?? 0, bluff: this.bluff, color: this.skin, id: -1, outfit: this.look.outfit, body: this.look.body });
+    return this.anims.update(-1, x, y, this.aim, dt, now, { w: you.w ?? 0, bluff: this.bluff, color: this.skin, id: -1, outfit: this.outfit.outfit, body: this.outfit.body });
   }
 
   footsteps(me, now) {
@@ -576,14 +586,37 @@ export class GameClient {
     }
   }
 
+  // First raids: one short hint at a time, picked from what is going on right now.
+  updateCoach(you, alive, tl) {
+    const el = this.el.coach;
+    if (!el) return;
+    let hint = '';
+    if (this.coachOn && alive && !(you.ext > 0)) {
+      const inside = this.duration ? this.duration - tl : 0;
+      this.bagStart ??= you.bag;
+      const touch = this.input.touchOn;
+      if (you.storm) hint = "You're in the storm · get back inside the circle";
+      else if (inside < 7) hint = touch ? 'Left thumb moves · right thumb aims and attacks' : 'WASD to move · mouse to aim · click to attack';
+      else if (tl < 75 || you.bag >= this.stake) hint = 'Time to get out · stand in a green EXIT for 3 seconds · edge arrows point the way';
+      else if (you.bag <= this.bagStart) hint = 'Grab the orange loot · it goes into your bag';
+      else if (!you.k) hint = touch ? 'Kills upgrade your weapon · tap Dash to dodge' : 'Kills upgrade your weapon · Space to dash';
+    }
+    if (el.textContent !== hint) el.textContent = hint;
+    el.hidden = !hint;
+  }
+
   updateHud(now, view) {
     const you = this.you;
     const el = this.el;
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
-    el.bag.textContent = fmt(alive ? you.bag : 0);
+    el.bag.textContent = this.money(alive ? you.bag : 0);
     const pnl = (alive ? you.bag : 0) - this.stake;
-    el.pnl.textContent = `${pnl >= 0 ? '+' : '−'}${fmt(Math.abs(pnl))} vs ${fmt(this.stake)} stake`;
+    // from rounded cents, so bag and profit always add up on screen
+    const r = this.rate ?? 1000;
+    const cents = (x) => Math.round((x * 100) / r);
+    const d = cents(alive ? you.bag : 0) - cents(this.stake);
+    el.pnl.textContent = `${d >= 0 ? '+' : '−'}${usdTextCents(Math.abs(d))} vs ${this.money(this.stake)} stake`;
     el.pnl.className = `pnl ${pnl > 0 ? 'up' : pnl < 0 ? 'down' : ''}`;
     const tl = Math.max(0, this.recvTl.tl - (now - this.recvTl.at) / 1000);
     el.timer.textContent = mmss(tl);
@@ -612,6 +645,8 @@ export class GameClient {
       d.classList.toggle('on', i === w);
       d.classList.toggle('done', i < w);
     });
+
+    this.updateCoach(you, alive, tl);
 
     // storm
     const z = this.zone;
