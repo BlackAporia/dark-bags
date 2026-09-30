@@ -12,16 +12,16 @@ function humanWorld(opts = {}) {
   return new World({ stake: 1000, seed: 42, bots: false, ...opts });
 }
 
-// Put sats in a bag for a test scenario, booked as sponsor money so the audit still balances.
+// Put money in a bag for a test scenario, booked as sponsor money so the audit still balances.
 function setBag(w, p, amount) {
   w.ledger.sponsorIn += amount - p.bag;
   p.bag = amount;
 }
 
-test('sats are conserved through full bot raids, rollover and golden raids', () => {
+test('money is conserved through full bot raids, rollover and golden raids', () => {
   let rollover = 0;
   for (let r = 1; r <= 4; r++) {
-    const w = new World({ stake: 1000, seed: 700 + r, roundNo: r, rolloverIn: rollover, golden: r === 4 });
+    const w = new World({ stake: 1000, seed: 700 + r, roundNo: r, rolloverIn: rollover, bonus: r === 4 ? 3000 : 0 });
     while (w.phase === 'live') {
       w.step();
       if (w.tick % 60 === 0) {
@@ -33,7 +33,7 @@ test('sats are conserved through full bot raids, rollover and golden raids', () 
     const a = w.audit();
     assert.ok(a.ok);
     assert.equal(w.inWorld(), 0, 'nothing left inside after the seal');
-    for (const v of Object.values(w.ledger)) assert.ok(Number.isInteger(v), 'ledger stays in whole sats');
+    for (const v of Object.values(w.ledger)) assert.ok(Number.isInteger(v), 'ledger stays in whole mills');
     rollover = w.ledger.rolloverOut;
   }
 });
@@ -212,5 +212,67 @@ test('bot navigation finds wall-free paths', () => {
     assert.ok(hasLOS(cx, cy, pt.x, pt.y, w.map.walls), 'path leg crosses a wall');
     cx = pt.x;
     cy = pt.y;
+  }
+});
+
+import { MODES } from '../shared/modes.js';
+
+function playOut(w) {
+  let guard = 0;
+  while (w.phase === 'live' && guard++ < 60 * 60 * 10) w.step();
+}
+
+test('pot modes: every stake goes into one pot, the last one standing takes it, and money is conserved', () => {
+  for (const mode of ['br', 'duel', 'knives', 'snipers']) {
+    for (const seed of [1, 2]) {
+      const w = new World({ stake: 1000, seed, mode, botFill: mode === 'duel' ? 2 : 6, roundSeconds: 120 });
+      w.step();
+      const n = w.players.size;
+      assert.equal(w.pot, n * (1000 - 50), `${mode}: pot is the net stakes`);
+      for (const p of w.players.values()) assert.equal(p.bag, 0, 'nothing rides in bags');
+      playOut(w);
+      assert.ok(w.audit().ok, `${mode} audit`);
+      const won = [...w.players.values()].filter((p) => p.won);
+      if (won.length) assert.equal(won.reduce((s, p) => s + p.payout, 0), w.ledger.paidOut + w.ledger.botPaidOut);
+      assert.equal(w.orbs.size, 0, 'no loot on the map');
+      if (mode === 'knives') for (const p of w.players.values()) assert.equal(p.w, 0, 'knives only, all raid');
+      if (mode === 'snipers') for (const p of w.players.values()) assert.equal(p.w, 5, 'snipers only, all raid');
+    }
+  }
+});
+
+test('team modes: balanced sides, no friendly fire, the winning team splits the whole pot', () => {
+  const w = new World({ stake: 1000, seed: 5, mode: 'team2', botFill: 4, roundSeconds: 150 });
+  const me = w.addPlayer({ name: 'me', skin: '#fff' });
+  w.step();
+  const teams = [0, 0];
+  for (const p of w.players.values()) teams[p.team]++;
+  assert.deepEqual(teams, [2, 2]);
+  const mate = [...w.players.values()].find((p) => p !== me && p.team === me.team);
+  const foe = [...w.players.values()].find((p) => p.team !== me.team);
+  me.shield = mate.shield = foe.shield = 0;
+  const hp = mate.hp;
+  w.damage(mate, me, 40);
+  assert.equal(mate.hp, hp, 'teammates cannot hurt each other');
+  assert.ok(!w.visibleEnemies(me).includes(mate));
+  // wipe the other team: my team wins, and my fallen teammate shares it
+  w.kill(mate, foe);
+  for (const p of w.players.values()) if (p.team !== me.team) w.kill(p, me);
+  w.step();
+  assert.equal(w.phase, 'ended');
+  assert.ok(me.won && mate.won, 'the whole team wins, the fallen too');
+  assert.equal(me.payout + mate.payout, 4 * 950);
+  assert.equal(me.status, 'won');
+  assert.ok(w.audit().ok);
+});
+
+test('every mode is playable to the end with its own line-up', () => {
+  for (const m of MODES) {
+    const w = new World({ stake: 100, seed: 3, mode: m.id, botFill: m.size, roundSeconds: 60 });
+    w.step();
+    assert.equal(w.players.size, m.size, `${m.id} fills to ${m.size}`);
+    playOut(w);
+    assert.equal(w.phase, 'ended');
+    assert.ok(w.audit().ok, `${m.id} audit`);
   }
 });

@@ -277,7 +277,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       );
     }
     $('wd-go').disabled = !cs.wdRoute;
-    $('wd-hint').textContent = cs.wdRoute ? `Minimum ${fmt(cs.chain.minWithdrawSats)} sats worth. Paid to ${short(cs.account)}.` : 'Cash-outs are switched off on this server right now.';
+    $('wd-hint').textContent = cs.wdRoute ? `Minimum $${cs.chain.minWithdrawUsd ?? 1}. Paid to ${short(cs.account)}.` : 'Cash-outs are switched off on this server right now.';
     $('dep-hint').textContent = cs.depRoute === 'private' ? 'Your wallet builds a zero-knowledge proof; that can take a minute.' : 'Your balance updates once the transfer is accepted on Starknet.';
   }
 
@@ -425,7 +425,27 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     if (t) $('wd-amount').value = formatUnits(ledger(t.id), t.decimals, t.decimals).replace(/,/g, '');
   });
 
+  // AVNU swaps inside the player's own wallet (tokens that never touched the house)
+  const tokenById = (id) => cs.chain?.tokens?.find((x) => x.id === id);
+  const avnu = {
+    get ready() {
+      return !!cs.chain && !!cs.account && app.mode === 'online';
+    },
+    tokens: () => cs.chain?.tokens ?? [],
+    async quote(from, to, units) {
+      const v = await vendor();
+      return v.avnuQuote(cs.chain, await ensureFacade(), tokenById(from), tokenById(to), units);
+    },
+    async swap(from, to, units, slippageBps = 50n) {
+      const v = await vendor();
+      return v.avnuSwap(cs.chain, await ensureFacade(), tokenById(from), tokenById(to), units, slippageBps);
+    },
+    open: () => openCashier(),
+  };
+
   return {
+    avnu,
+    openCashier: () => cs.account && openCashier(),
     onMessage,
     render,
     get active() {

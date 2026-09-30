@@ -22,7 +22,7 @@ export class Sfx {
         const c = new AC();
         this.ctx = c;
         this.master = c.createGain();
-        this.master.gain.value = this.muted ? 0 : 0.9;
+        this.master.gain.value = this.muted ? 0 : 0.9 * (this.volume ?? 1);
         const comp = c.createDynamicsCompressor();
         comp.threshold.value = -14;
         comp.ratio.value = 4;
@@ -41,6 +41,7 @@ export class Sfx {
         this.brown = noiseBuffer(c, 3, true);
         this.music = new Music(c, this.master);
         this.music.setEnabled(this.musicOn);
+        this.music.setVolume(this.musicVolume ?? 1);
         this.startStormBed();
       } catch {
         this.ctx = null;
@@ -50,10 +51,21 @@ export class Sfx {
     this.ctx.resume?.().catch(() => {});
   }
 
+  // 0..1 master volume for effects (music has its own)
+  setVolume(v) {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.9 * this.volume, this.ctx.currentTime, 0.05);
+  }
+
+  setMusicVolume(v) {
+    this.musicVolume = Math.max(0, Math.min(1, v));
+    this.music?.setVolume?.(this.musicVolume);
+  }
+
   toggle() {
     this.muted = !this.muted;
     store.set('darkbags.muted', this.muted);
-    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.9, this.ctx.currentTime, 0.05);
+    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.9 * (this.volume ?? 1), this.ctx.currentTime, 0.05);
     return this.muted;
   }
 

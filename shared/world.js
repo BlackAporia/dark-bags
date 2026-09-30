@@ -7,6 +7,7 @@ import { botRank } from './ranks.js';
 import { botLook, OUTFIT } from './cosmetics.js';
 import { planZone, zoneAt, exitState, outsideZone } from './zone.js';
 import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
+import { MODE } from './modes.js';
 
 const DT = 1 / CFG.TICK_RATE;
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -15,7 +16,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 /**
  * One raid. Authoritative simulation shared by the server and the offline mode.
  *
- * Economy (integer sats, conserved):
+ * Economy (integer mills, $1 = 1,000, conserved):
  *   each entry pays `stake` → rake to house, BAG_SHARE of the rest into the runner's
  *   own bag, the remainder into the loot pool that gets scattered on the map.
  *   Extract → you keep your bag. Die → your bag drops for anyone to take.
@@ -25,7 +26,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 // bots hit humans for this share of their weapon damage: bots react and aim like
 // machines, so a straight trade would be unfair; practice is softer still
 const BOT_DAMAGE = 0.75;
-const PRACTICE_BOT_DAMAGE = 0.5;
+const PRACTICE_BOT_DAMAGE = { easy: 0.5, normal: 0.75, hard: 1 };
 const PRACTICE_SPAWN_SHIELD = 5; // seconds; firing still drops it early
 
 export class World {
@@ -34,12 +35,25 @@ export class World {
     seed = (Math.random() * 2 ** 32) >>> 0,
     roundNo = 1,
     rolloverIn = 0,
-    golden = false,
+    bonus = 0,
     bots = true,
     botRoster = null,
     roundSeconds = CFG.ROUND_SECONDS,
     practice = false,
+    difficulty = null, // practice: 'easy' | 'normal' | 'hard'
+    botFill = CFG.BOT_FILL,
+    mode = 'raid',
   }) {
+    // the mode's rules (modes.js): raid = extraction; br/team = one prize pot, last side standing
+    this.mode = MODE[mode] ? mode : 'raid';
+    const m = MODE[this.mode];
+    this.potMode = m.kind !== 'raid';
+    this.teamSize = m.kind === 'team' ? m.teamSize : 0;
+    this.fixedWeapon = m.weapon ? WEAPONS.findIndex((w) => w.id === m.weapon) : -1;
+    this.pot = 0; // pot modes: every net stake, paid to the winners at the end
+    this.sides = 0; // how many sides (players, or teams) entered
+    this.difficulty = practice ? difficulty ?? 'easy' : 'normal';
+    this.botFill = botFill;
     // practice (offline, vs bots): every bot for itself, softer bots, and the raid
     // ends the moment the last human is out (dead or extracted)
     this.practice = practice;
@@ -50,7 +64,7 @@ export class World {
     this.map = generateMap(seed);
     this.nav = null; // built lazily by the first bot
     this.roundNo = roundNo;
-    this.golden = golden;
+    this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
     this.zonePlan = planZone(this.map, this.rnd, roundSeconds);
     this.zone = zoneAt(this.zonePlan, 0);
@@ -75,20 +89,36 @@ export class World {
       rake: 0, paidOut: 0, botPaidOut: 0, rolloverOut: 0,
     };
     this.ledger.rolloverIn = rolloverIn;
-    this.lootPool += rolloverIn;
-    if (golden) {
-      const bonus = stake * CFG.GOLDEN_BONUS;
-      this.ledger.sponsorIn += bonus;
-      this.lootPool += bonus;
-    }
+    if (bonus > 0) this.ledger.sponsorIn += bonus;
+    // raid: rollover and jackpot become loot on the map; pot modes: they grow the prize
+    if (this.potMode) this.pot += rolloverIn + bonus;
+    else this.lootPool += rolloverIn + bonus;
   }
 
   get timeLeft() {
     return Math.max(0, this.duration - this.time);
   }
 
+  // pot modes: who is still in it (a player id, or a team)
+  sideOf(p) {
+    return this.teamSize ? `t${p.team}` : `p${p.id}`;
+  }
+
+  aliveSides() {
+    const s = new Set();
+    for (const p of this.players.values()) if (p.status === 'alive') s.add(this.sideOf(p));
+    return s;
+  }
+
   humansInside() {
     for (const p of this.players.values()) if (!p.isBot && p.status === 'alive') return true;
+    return false;
+  }
+
+  // a human who went down and is still watching the raid (practice keeps it running for them)
+  humansWatching() {
+    if (!this.aliveCount()) return false;
+    for (const p of this.players.values()) if (!p.isBot && p.status === 'dead' && !p.spectDone) return true;
     return false;
   }
 
@@ -109,17 +139,25 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm' }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
     const rake = Math.floor(stake * CFG.RAKE);
     const net = stake - rake;
-    const bag = Math.floor(net * CFG.BAG_SHARE);
+    const bag = this.potMode ? 0 : Math.floor(net * CFG.BAG_SHARE);
     const loot = net - bag;
     if (isBot) this.ledger.botStakesIn += stake;
     else this.ledger.stakesIn += stake;
     this.ledger.rake += rake;
-    this.lootPool += loot;
+    if (this.potMode) this.pot += loot;
+    else this.lootPool += loot;
+    // teams: fill the smaller side (humans enter first, bots top both sides up)
+    let team = null;
+    if (this.teamSize) {
+      const n = [0, 0];
+      for (const o of this.players.values()) n[o.team]++;
+      team = n[1] < n[0] ? 1 : 0;
+    }
 
     const others = [...this.players.values()].filter((o) => o.status === 'alive');
     const pos = findSpawn(this.map, this.rnd, others, this.zone);
@@ -129,8 +167,10 @@ export class World {
       skin,
       isBot,
       rank, // career rank, shown on the name tag
+      title, // an achievement worn as a title (id), shown over the name
       outfit, // cosmetic outfit id and character (m/f): looks only
       body,
+      ws: ws && Object.keys(ws).length ? ws : null, // weapon skins: { weaponId: finishId }
       x: pos.x,
       y: pos.y,
       vx: 0,
@@ -146,7 +186,8 @@ export class World {
       startBag: bag,
       stake,
       fireCd: 0,
-      w: 0, // weapon index: everyone starts with the knife
+      w: this.fixedWeapon >= 0 ? this.fixedWeapon : 0, // weapon index: the knife, unless the mode fixes one
+      team,
       xp: 0,
       prestige: 0,
       fc: 0, // attack counter, lets clients animate and play other runners' shots
@@ -173,6 +214,7 @@ export class World {
     };
     this.players.set(p.id, p);
     if (isBot) this.brains.set(p.id, new BotBrain(this, p, this.rnd));
+    this.sides = this.teamSize ? new Set([...this.players.values()].map((o) => o.team)).size : this.players.size;
     return p;
   }
 
@@ -192,6 +234,33 @@ export class World {
     if (!p) return;
     p.queue.length = 0;
     p.last = sanitizeInput({ s: p.ack });
+  }
+
+  // Spectating after death: step through the runners still alive (dir ±1), or stop watching.
+  watch(id, dir) {
+    const me = this.players.get(id);
+    if (!me || me.status !== 'dead') return;
+    if (dir === 0) {
+      me.spectDone = true;
+      return;
+    }
+    const alive = [...this.players.values()].filter((p) => p.status === 'alive').sort((a, b) => a.id - b.id);
+    if (!alive.length) return;
+    const cur = this.eyeOf(me);
+    const i = alive.indexOf(cur);
+    me.watchId = alive[(i + (dir > 0 ? 1 : -1) + alive.length) % alive.length].id;
+  }
+
+  // who a dead runner watches: their pick, else their killer, else anyone still alive
+  eyeOf(me) {
+    if (me.status !== 'dead') return me;
+    for (const id of [me.watchId, me.killer]) {
+      const p = id && this.players.get(id);
+      if (p && p.status === 'alive') return p;
+    }
+    let best = null;
+    for (const p of this.players.values()) if (p.status === 'alive' && (!best || p.kills > best.kills)) best = p;
+    return best ?? me;
   }
 
   setBluff(id, v) {
@@ -256,6 +325,7 @@ export class World {
       }
 
       let zone = null;
+      if (this.potMode) continue; // no exits: last one standing
       for (const e of this.map.extracts) {
         if (this.exitStates[e.id] === 'closed') continue;
         if (Math.hypot(e.x - p.x, e.y - p.y) < e.r) zone = e;
@@ -277,18 +347,19 @@ export class World {
     this.pickups();
     this.spawnLoot();
     this.announce();
-    if (this.time >= this.duration - 1e-9) this.end();
-    else if (this.practice && this.hadHumans && !this.humansInside()) this.end();
+    if (this.potMode && this.sides > 1 && this.aliveSides().size <= 1) this.end();
+    else if (this.time >= this.duration - 1e-9) this.end();
+    else if (this.practice && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
   }
 
   updateZone() {
     const before = this.zone;
     this.zone = zoneAt(this.zonePlan, this.time);
     const z = this.zone;
-    if (z.shrinking && !before.shrinking) this.emit({ k: 'storm', text: z.stage === this.zonePlan.times.length ? 'Final collapse · last exit only' : 'The storm is closing in' });
+    if (z.shrinking && !before.shrinking) this.emit({ k: 'storm', text: z.stage === this.zonePlan.times.length ? (this.potMode ? 'storm.finalPot' : 'storm.final') : 'storm.closing' });
     if (!z.shrinking && !z.final && z.until <= 5 && !this.warned[`storm${z.stage}`]) {
       this.warned[`storm${z.stage}`] = true;
-      this.emit({ k: 'storm', text: 'Storm moves in 5s' });
+      this.emit({ k: 'storm', text: 'storm.in5' });
     }
     for (const e of this.map.extracts) {
       const s = exitState(this.zonePlan, z, e);
@@ -381,7 +452,8 @@ export class World {
 
   damage(v, shooter, amount) {
     if (v.shield > 0) return;
-    if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE : BOT_DAMAGE;
+    if (shooter && shooter !== v && this.teamSize && shooter.team === v.team) return; // no friendly fire
+    if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE[this.difficulty] ?? 0.5 : BOT_DAMAGE;
     if (shooter && shooter !== v) {
       shooter.dmgDealt += Math.min(amount, Math.max(0, v.hp));
       const k = shooter.isBot && v.isBot ? XP.botOnBotDamage : 1;
@@ -437,6 +509,10 @@ export class World {
   addXp(p, amount) {
     if (p.status !== 'alive' || amount <= 0) return;
     p.xp += amount;
+    if (this.fixedWeapon >= 0) {
+      p.xp %= XP_PER_LEVEL; // one weapon for the whole raid: no arms race
+      return;
+    }
     while (p.xp >= XP_PER_LEVEL) {
       p.xp -= XP_PER_LEVEL;
       p.w = (p.w + 1) % WEAPONS.length;
@@ -544,7 +620,7 @@ export class World {
   // Bots only enter at the start, alongside the humans: everyone begins together.
   fillBots() {
     if (!this.botsEnabled || !this.canJoin()) return;
-    for (let i = this.aliveCount(); i < CFG.BOT_FILL; i++) this.addBot();
+    for (let i = this.aliveCount(); i < this.botFill; i++) this.addBot();
   }
 
   addBot() {
@@ -552,7 +628,7 @@ export class World {
     const pre = this.botRoster?.find((b) => !taken.has(b.name));
     if (pre) {
       this.botRoster.splice(this.botRoster.indexOf(pre), 1);
-      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true, rank: pre.rank ?? botRank(this.rnd), outfit: pre.outfit ?? null, body: pre.body ?? 'm' });
+      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true, rank: pre.rank ?? botRank(this.rnd), outfit: pre.outfit ?? null, body: pre.body ?? 'm', ws: pre.ws ?? null });
     }
     const look = botLook(this.rnd);
     return this.addPlayer({ name: botName(this.rnd, taken), skin: OUTFIT[look.outfit].color, isBot: true, rank: botRank(this.rnd), ...look });
@@ -565,11 +641,64 @@ export class World {
       this.warned[key] = true;
       this.emit({ k: 'warn', text });
     };
-    if (tl <= 30) say('30', '30s · reach an open exit');
-    if (tl <= 10) say('10', '10s · extract or lose it all');
+    // keys the client translates
+    if (tl <= 30) say('30', this.potMode ? 'warn.pot30' : 'warn.exit30');
+    if (tl <= 10) say('10', this.potMode ? 'warn.pot10' : 'warn.exit10');
+  }
+
+  // Pot modes: the last side standing takes the pot. If the clock runs out first, the side
+  // with the most runners alive wins (then most kills); a dead heat splits it among them.
+  settlePot() {
+    const alive = [...this.players.values()].filter((p) => p.status === 'alive');
+    const score = new Map();
+    for (const p of this.players.values()) {
+      const s = this.sideOf(p);
+      const cur = score.get(s) ?? { alive: 0, kills: 0 };
+      if (p.status === 'alive') cur.alive++;
+      cur.kills += p.kills;
+      score.set(s, cur);
+    }
+    let best = [];
+    let top = null;
+    for (const [s, v] of score) {
+      if (!v.alive) continue;
+      const cmp = top === null ? 1 : v.alive - top.alive || v.kills - top.kills;
+      if (cmp > 0) {
+        best = [s];
+        top = v;
+      } else if (cmp === 0) best.push(s);
+    }
+    const winSides = new Set(best);
+    // the team shares its win, fallen teammates included; solo modes pay the survivors
+    const winners = this.teamSize ? [...this.players.values()].filter((p) => winSides.has(this.sideOf(p))) : alive.filter((p) => winSides.has(this.sideOf(p)));
+    this.winners = winners.map((p) => p.id);
+    if (!winners.length || this.pot <= 0) return;
+    const share = Math.floor(this.pot / winners.length);
+    let rest = this.pot - share * winners.length;
+    for (const p of winners) {
+      const amount = share + (rest > 0 ? 1 : 0);
+      if (rest > 0) rest--;
+      p.payout = amount;
+      p.won = true;
+      if (p.isBot) this.ledger.botPaidOut += amount;
+      else this.ledger.paidOut += amount;
+      this.emit({ k: 'payout', to: [p.id], pid: p.id, amount });
+    }
+    this.pot = 0;
+    this.emit({ k: 'winners', names: winners.map((p) => p.name), team: this.teamSize ? winners[0].team : null });
   }
 
   end() {
+    if (this.potMode) {
+      this.settlePot();
+      for (const p of this.players.values()) {
+        if (p.status !== 'alive') continue;
+        p.status = p.won ? 'won' : 'mia';
+        p.endedAt = this.time;
+      }
+      this.ledger.rolloverOut += this.pot; // nobody alive to take it: it waits for the next raid
+      this.pot = 0;
+    }
     this.phase = 'ended';
     for (const p of this.players.values()) {
       if (p.status !== 'alive') continue;
@@ -592,7 +721,7 @@ export class World {
   // --------------------------------------------------------- accounting
 
   inWorld() {
-    let s = this.lootPool;
+    let s = this.lootPool + this.pot;
     for (const p of this.players.values()) if (p.status === 'alive') s += p.bag;
     for (const o of this.orbs.values()) s += o.v;
     for (const d of this.drops.values()) s += d.v;
@@ -625,6 +754,7 @@ export class World {
     const V2 = CFG.VISION * CFG.VISION;
     for (const p of this.players.values()) {
       if (p === me || p.status !== 'alive') continue;
+      if (this.teamSize && p.team === me.team) continue;
       const d2 = (p.x - me.x) ** 2 + (p.y - me.y) ** 2;
       if (d2 > V2) continue;
       if (this.canSee(me, p)) out.push(p);
@@ -640,11 +770,7 @@ export class World {
   snapshotFor(id) {
     const me = this.players.get(id);
     if (!me) return null;
-    let eye = me;
-    if (me.status === 'dead' && me.killer) {
-      const k = this.players.get(me.killer);
-      if (k && k.status === 'alive') eye = k;
-    }
+    const eye = this.eyeOf(me);
     const V = CFG.VISION + 30;
     const V2 = V * V;
     const near = (x, y, pad = 0) => (x - eye.x) ** 2 + (y - eye.y) ** 2 < (V + pad) ** 2;
@@ -670,6 +796,9 @@ export class World {
         fc: p.fc,
         pr: p.prestige,
         rk: p.rank,
+        ...(p.title ? { tt: p.title } : {}),
+        ...(this.teamSize ? { tm: p.team } : {}),
+        ...(p.ws ? { ws: p.ws } : {}),
         o: p.outfit,
         g: p.body,
       });
@@ -714,6 +843,8 @@ export class World {
         ex: r1(eye.x),
         ey: r1(eye.y),
         spect: eye !== me ? eye.name : null,
+        ...(this.potMode ? { pot: this.pot, sides: this.aliveSides().size } : {}),
+        ...(this.teamSize ? { tm: me.team } : {}),
       },
       players,
       orbs,

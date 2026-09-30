@@ -5,6 +5,7 @@
 import { drawPreview } from './stickman.js';
 import { rankBadgeSvg } from './rankbadge.js';
 import { OUTFIT, RARITIES, usd } from '../shared/cosmetics.js';
+import { usdText } from '../shared/assets.js';
 import { RANKS } from '../shared/ranks.js';
 
 const W = 1200;
@@ -205,7 +206,7 @@ export async function renderCard(spec) {
   ctx.fillStyle = '#8d93a6';
   ctx.font = `500 18px ${UI}`;
   ctx.textAlign = 'right';
-  ctx.fillText(spec.footer ?? 'Extraction for sats · nobody sees your bag', W - 40, H - 25);
+  ctx.fillText(spec.footer ?? 'Get out alive · nobody sees your bag', W - 40, H - 25);
   return c;
 }
 
@@ -235,16 +236,16 @@ export function moment(kind, d) {
       const pnl = d.payout - d.stake;
       const pct = Math.round((pnl / d.stake) * 100);
       return {
-        spec: { accent: '#3ddc97', kicker: 'Extracted', title: `${fmt(d.payout)} SATS`, titleGlow: true, sub: `Walked out of the dark on a ${fmt(d.stake)} stake. Nobody saw what I was carrying.`, chips: [['Profit', `${pnl >= 0 ? '+' : '−'}${Math.abs(pct)}%`], ['Kills', String(d.kills)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon },
-        text: `Extracted with ${fmt(d.payout)} sats on a ${fmt(d.stake)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Nobody saw what I was carrying. ${tag}`,
+        spec: { accent: '#3ddc97', kicker: d.won ? 'Victory' : 'Extracted', title: usdText(d.payout), titleGlow: true, sub: d.won ? `Last one standing on a ${usdText(d.stake)} stake. The pot is mine.` : `Walked out of the dark on a ${usdText(d.stake)} stake. Nobody saw what I was carrying.`, chips: [['Profit', `${pnl >= 0 ? '+' : '−'}${Math.abs(pct)}%`], ['Kills', String(d.kills)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon },
+        text: d.won ? `Won ${usdText(d.payout)} on a ${usdText(d.stake)} stake, ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Last one standing. ${tag}` : `Got out with ${usdText(d.payout)} on a ${usdText(d.stake)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Nobody saw what I was carrying. ${tag}`,
       };
     }
     case 'loss': {
       const storm = d.cause === 'storm';
       const who = d.killer ? `${d.killer} has my bag now` : storm ? 'The storm ate me' : 'Sealed inside at 0:00';
       return {
-        spec: { accent: '#ff4d5e', kicker: storm ? 'Eaten by the storm' : d.status === 'mia' ? 'Sealed inside' : 'Dropped', title: `−${fmt(d.stake)} SATS`, sub: `${who}. Only the two of us will ever know what was inside. Next raid.`, chips: [['Kills', String(d.kills)], ['Inside', mmss(d.secs)], ['Lost', `${fmt(d.lost)} sats`]], look, rank: d.rank, pose: 'down', stamp: storm ? 'STORM' : 'DROPPED', stampColor: '#ff4d5e' },
-        text: `${who}: dropped ${fmt(d.lost)} sats after ${mmss(d.secs)} inside with ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Running it back. ${tag}`,
+        spec: { accent: '#ff4d5e', kicker: storm ? 'Eaten by the storm' : d.status === 'mia' ? 'Sealed inside' : 'Dropped', title: `−${usdText(d.stake)}`, sub: `${who}. Only the two of us will ever know what was inside. Next raid.`, chips: [['Kills', String(d.kills)], ['Inside', mmss(d.secs)], ['Lost', usdText(d.lost)]], look, rank: d.rank, pose: 'down', stamp: storm ? 'STORM' : 'DROPPED', stampColor: '#ff4d5e' },
+        text: `${who}: dropped ${usdText(d.lost)} after ${mmss(d.secs)} inside with ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Running it back. ${tag}`,
       };
     }
     case 'boxHit':
@@ -259,8 +260,8 @@ export function moment(kind, d) {
           kicker: `${d.box.name} · ${r.name}`,
           title: o.name.toUpperCase(),
           titleGlow: hit,
-          sub: hit ? `Pulled a ${r.name} from the ${d.box.name}.${d.result.pity ? ' Pity kicked in, as promised.' : ''}` : `Went for the ${jackpot}. Got ${/^[aeiou]/i.test(r.name) ? 'an' : 'a'} ${r.name} instead.${d.result.dup ? ` Duplicate → +${d.result.scrap} scrap.` : ''}`,
-          chips: [['Rarity', r.name], ['Bag', d.box.name], d.result.dup ? ['Scrap', `+${d.result.scrap}`] : ['Status', 'New']],
+          sub: hit ? `Pulled a ${r.name} from the ${d.box.name}.${d.result.pity ? ' Pity kicked in, as promised.' : ''}` : `Went for the ${jackpot}. Got ${/^[aeiou]/i.test(r.name) ? 'an' : 'a'} ${r.name} instead.${d.result.dup ? ` Duplicate: +${usd(d.result.refund)} back.` : ''}`,
+          chips: [['Rarity', r.name], ['Bag', d.box.name], d.result.dup ? ['Back', `+${usd(d.result.refund)}`] : ['Status', 'New']],
           look,
           rank: d.rank,
           stamp: hit ? null : 'SO CLOSE',
@@ -270,11 +271,9 @@ export function moment(kind, d) {
     }
     case 'rankUp': {
       const r = RANKS[d.rank - 1];
-      const bags = d.rewards?.length ?? 0;
-      const credit = d.rewards?.reduce((s, x) => s + x.credit, 0) ?? 0;
       const trial = d.rewards?.find((x) => x.trial)?.trial;
       return {
-        spec: { accent: '#ffd166', kicker: `Rank up · ${d.rank}`, title: r.name.toUpperCase(), titleGlow: true, sub: `Climbed to rank ${d.rank} of 90 in DARK BAGS.`, chips: [['Bags', `+${bags}`], ['Credit', `+${usd(credit)}`], trial ? ['Trial', OUTFIT[trial.id]?.name ?? '72h'] : ['Next', `rank ${d.rank + 1}`]], look, rank: d.rank },
+        spec: { accent: '#ffd166', kicker: `Rank up · ${d.rank}`, title: r.name.toUpperCase(), titleGlow: true, sub: `Climbed to rank ${d.rank} of 90 in DARK BAGS.`, chips: [['Rank', `${d.rank} / 90`], trial ? ['New look', OUTFIT[trial.id]?.name ?? '72h'] : ['Next', `rank ${d.rank + 1}`]], look, rank: d.rank },
         text: `Ranked up to ${r.name} (${d.rank}/90) in DARK BAGS. ${tag}`,
       };
     }

@@ -8,7 +8,7 @@ import { textures, canvas } from './textures.js';
 
 const C = {
   void: '#07090f',
-  sats: '#f7931a',
+  loot: '#f7931a',
   gold: '#ffd166',
   exit: '#3ddc97',
   amber: '#f5a524',
@@ -52,7 +52,7 @@ export class Renderer {
     this.fastT = 0;
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.glow = {
-      sats: glowSprite('rgba(247,147,26,0.55)'),
+      loot: glowSprite('rgba(247,147,26,0.55)'),
       gold: glowSprite('rgba(255,209,102,0.6)'),
       laser: glowSprite('rgba(255,40,60,0.9)', 32),
     };
@@ -78,8 +78,18 @@ export class Renderer {
   }
 
   // Adaptive quality: drop resolution and effects when frames get slow, restore when fast.
+  // settings: 'auto' adapts, or pin low/medium/high (0/1/2)
+  setQuality(q) {
+    this.lockQuality = q;
+    if (q !== null && q !== undefined && q !== this.quality) {
+      this.quality = q;
+      this.resize();
+    }
+  }
+
   measure(dtMs) {
     this.ema += (dtMs - this.ema) * 0.05;
+    if (this.lockQuality !== null && this.lockQuality !== undefined) return; // the player picked a quality
     if (this.ema > 24) {
       this.slowT += dtMs;
       this.fastT = 0;
@@ -151,7 +161,7 @@ export class Renderer {
     this.layer.draw(ctx, vb, this.quality >= 1 ? 2 : 1);
 
     // 2. exits: live state on top of the painted pads
-    for (const e of map.extracts) {
+    for (const e of this.noExits ? [] : map.extracts) {
       if (!inView(e.x, e.y, e.r + 20)) continue;
       const st = v.exitStates?.[e.id] ?? 'open';
       this.drawExit(e, st, t);
@@ -196,7 +206,7 @@ export class Renderer {
     if (v.zone) this.drawStorm(v.zone, t, vb);
 
     // 8. crisp overlays: exit labels, names and health, floaters
-    for (const e of map.extracts) {
+    for (const e of this.noExits ? [] : map.extracts) {
       if (!inView(e.x, e.y, e.r + 60)) continue;
       const st = v.exitStates?.[e.id] ?? 'open';
       const label = st === 'last' ? `LAST EXIT · ${e.name.toUpperCase()}` : st === 'closed' ? `CLOSED · ${e.name.toUpperCase()}` : `EXIT · ${e.name.toUpperCase()}${st === 'closing' ? ' · CLOSING' : ''}`;
@@ -252,9 +262,9 @@ export class Renderer {
 
   drawOrb(o, t, golden) {
     const ctx = this.ctx;
-    const col = golden ? C.gold : C.sats;
+    const col = golden ? C.gold : C.loot;
     const bob = this.reduced ? 0 : Math.sin(t / 300 + o.i) * 2;
-    const g = golden ? this.glow.gold : this.glow.sats;
+    const g = golden ? this.glow.gold : this.glow.loot;
     const halo = [34, 46, 80][o.t];
     ctx.globalCompositeOperation = 'lighter';
     ctx.drawImage(g, o.x - halo / 2, o.y - halo / 2, halo, halo);
@@ -411,8 +421,10 @@ export class Renderer {
     ctx.fillRect(p.head.x - w / 2 - 1, top - 1, w + 2, 6);
     ctx.fillStyle = hpColor(frac);
     ctx.fillRect(p.head.x - w / 2, top, w * frac, 4);
-    if (!f.isMe) {
-      ctx.fillStyle = 'rgba(235, 229, 214, 0.9)';
+    if (f.isMe || !f.noName) {
+      // your own name too, in gold, so you can find yourself in a fight
+      // team modes: allies green, enemies red
+      ctx.fillStyle = f.isMe ? '#ffd166' : f.ally === true ? '#3ddc97' : f.ally === false ? '#ff6b6b' : 'rgba(235, 229, 214, 0.9)';
       ctx.font = `600 11px ${F_UI}`;
       ctx.textAlign = 'center';
       const label = `${f.name}${f.pr ? ` ${'★'.repeat(Math.min(3, f.pr))}` : ''}`;
@@ -426,6 +438,13 @@ export class Renderer {
         ctx.fillText(label, x0 + 16, top - 5);
         ctx.textAlign = 'center';
       } else ctx.fillText(label, p.head.x, top - 5);
+      if (f.title) {
+        // a worn achievement title, small and gold, over the name
+        ctx.font = `700 9px ${F_UI}`;
+        ctx.fillStyle = 'rgba(255, 209, 102, 0.9)';
+        ctx.textAlign = 'center';
+        ctx.fillText(f.title.toUpperCase(), p.head.x, top - 19);
+      }
     }
   }
 
@@ -533,7 +552,7 @@ export class Renderer {
     const right = this.w - 40;
     const cx = (left + right) / 2;
     const cy = (top + bottom) / 2;
-    for (const e of this.map.extracts) {
+    for (const e of this.noExits ? [] : this.map.extracts) {
       const st = states?.[e.id] ?? 'open';
       if (st === 'closed') continue;
       const p = this.toScreen(e.x, e.y);
@@ -646,14 +665,14 @@ export class Renderer {
       m.setLineDash([]);
     }
     const pulse = this.reduced ? 0 : Math.sin(t / 300) * 1.5;
-    for (const e of this.map.extracts) {
+    for (const e of this.noExits ? [] : this.map.extracts) {
       const st = states?.[e.id] ?? 'open';
       m.fillStyle = st === 'last' ? C.gold : st === 'closed' ? 'rgba(255,77,94,0.5)' : st === 'closing' ? C.amber : C.exit;
       m.beginPath();
       m.arc(e.x * k, e.y * k, 4 * this.dpr + (st === 'closed' ? 0 : pulse), 0, TAU);
       m.fill();
     }
-    m.fillStyle = alive ? C.sats : C.dust;
+    m.fillStyle = alive ? C.loot : C.dust;
     m.beginPath();
     m.arc(eye.x * k, eye.y * k, 3.5 * this.dpr, 0, TAU);
     m.fill();

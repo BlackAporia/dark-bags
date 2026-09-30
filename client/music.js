@@ -42,7 +42,12 @@ export class Music {
 
   setEnabled(on) {
     this.enabled = on;
-    this.out.gain.setTargetAtTime(on ? 0.55 : 0, this.ctx.currentTime, 0.2);
+    this.out.gain.setTargetAtTime(on ? 0.55 * (this.volume ?? 1) : 0, this.ctx.currentTime, 0.2);
+  }
+
+  setVolume(v) {
+    this.volume = v;
+    this.setEnabled(this.enabled);
   }
 
   set({ mode, intensity, bpm }) {

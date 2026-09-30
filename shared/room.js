@@ -4,6 +4,8 @@ import { cleanName } from './wallet.js';
 import { botName } from './bot.js';
 import { PriceBook, unitsAtEntryRate } from './assets.js';
 import { RankBook, botRank, raidXp } from './ranks.js';
+import { raidStats } from './achievements.js';
+import { MODE } from './modes.js';
 import { Inventory, botLook, OUTFIT } from './cosmetics.js';
 
 /**
@@ -18,8 +20,11 @@ import { Inventory, botLook, OUTFIT } from './cosmetics.js';
  * Transport-agnostic: the server plugs in WebSockets, offline mode a direct callback.
  */
 export class RoomCore {
-  constructor({ stake, wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
+  constructor({ stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
     this.stake = stake;
+    this.mode = MODE[mode] ? mode : 'raid';
+    const m = MODE[this.mode];
+    if (m.seconds) roundSeconds = m.seconds;
     this.ranks = ranks;
     this.inventory = inventory;
     this.practice = practice;
@@ -29,8 +34,10 @@ export class RoomCore {
     this.bots = bots;
     this.roundSeconds = roundSeconds;
     this.prepSeconds = prepSeconds;
+    this.botFill = m.size; // runners per raid; bots fill the empty spots
+    this.difficulty = null; // practice only
     this.clients = new Map();
-    this.accounts = new Map(); // pid -> { token, asset, units, sats }: who paid what, at which rate
+    this.accounts = new Map(); // pid -> { token, asset, units, mills }: who paid what, at which rate
     this.world = null;
     this.state = 'idle';
     this.countT = null; // seconds left on the ready-room countdown; null = waiting for a first Ready
@@ -38,6 +45,7 @@ export class RoomCore {
     this.roster = [];
     this.roundNo = 0;
     this.rollover = 0;
+    this.jackpot = 0; // fed by part of the rake on players' stakes, paid out as golden raids
     this.tickN = 0;
     this.totals = { raids: 0, rake: 0, stakesIn: 0, paidOut: 0, sponsorIn: 0, byAsset: {} };
   }
@@ -86,13 +94,16 @@ export class RoomCore {
       case 'ready':
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
-        this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'SATS');
+        this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'USDC');
         break;
       case 'unready':
         this.unready(c);
         break;
       case 'in':
         if (c.pid && this.world && this.state === 'live') this.world.queueInput(c.pid, msg);
+        break;
+      case 'watch':
+        if (c.pid && this.world && this.state === 'live') this.world.watch(c.pid, Math.sign(Number(msg.d) || 0));
         break;
       case 'bluff':
         if (c.pid && this.world && this.state === 'live') this.world.setBluff(c.pid, msg.v);
@@ -103,7 +114,7 @@ export class RoomCore {
 
   // ------------------------------------------------------------ ready room
 
-  // Ready: quote the sats stake in the chosen token and escrow it at that rate.
+  // Ready: quote the $ stake in the chosen token and escrow it at that rate.
   ready(c, asset) {
     if (c.ready || this.inRaid(c)) return;
     const units = this.prices.quote(asset, this.stake);
@@ -117,7 +128,7 @@ export class RoomCore {
       return;
     }
     c.ready = true;
-    c.escrow = { asset, units, sats: this.stake };
+    c.escrow = { asset, units, mills: this.stake };
     if (this.state === 'idle') this.openPrep();
     if (this.state === 'prep' && this.countT === null) this.countT = this.prepSeconds;
     this.hurry();
@@ -156,7 +167,7 @@ export class RoomCore {
     // bots for the next raid are rolled now so their icons can light up by name
     const taken = new Set();
     this.roster = [];
-    for (let i = 0; i < CFG.BOT_FILL; i++) {
+    for (let i = 0; i < this.botFill; i++) {
       const n = botName(Math.random, taken);
       taken.add(n);
       const look = botLook(Math.random);
@@ -165,8 +176,17 @@ export class RoomCore {
     this.hurry();
   }
 
+  // Golden raids are paid by the room's jackpot, never by the house: every Nth raid, if the
+  // jackpot holds at least one stake. Practice is play money, so it is always sponsored.
+  goldenBonus(round) {
+    if (!(CFG.GOLDEN_EVERY > 0 && round % CFG.GOLDEN_EVERY === 0)) return 0;
+    const full = this.stake * CFG.GOLDEN_BONUS;
+    if (this.practice) return full;
+    return this.jackpot >= this.stake ? Math.min(full, this.jackpot) : 0;
+  }
+
   botsNeeded() {
-    return this.bots ? Math.max(0, CFG.BOT_FILL - this.readyList().length) : 0;
+    return this.bots ? Math.max(0, this.botFill - this.readyList().length) : 0;
   }
 
   botsShown() {
@@ -178,16 +198,20 @@ export class RoomCore {
   startRaid() {
     const ready = this.readyList();
     this.roundNo++;
-    const golden = CFG.GOLDEN_EVERY > 0 && this.roundNo % CFG.GOLDEN_EVERY === 0;
+    const bonus = this.goldenBonus(this.roundNo);
+    this.jackpot -= bonus;
     const w = new World({
       stake: this.stake,
       roundNo: this.roundNo,
       rolloverIn: this.rollover,
-      golden,
+      bonus,
       bots: this.bots,
       botRoster: this.roster,
       roundSeconds: this.roundSeconds,
       practice: this.practice,
+      difficulty: this.difficulty,
+      botFill: this.botFill,
+      mode: this.mode,
     });
     this.world = w;
     this.rollover = 0;
@@ -200,7 +224,7 @@ export class RoomCore {
     }
     for (const c of ready) {
       const look = this.inventory.look(c.token);
-      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, ...look });
+      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), ...look });
       this.accounts.set(p.id, { token: c.token, ...c.escrow });
       this.book(c.escrow.asset, 'in', c.escrow.units);
       c.pid = p.id;
@@ -208,12 +232,15 @@ export class RoomCore {
       c.escrow = null; // the stake is in the raid's ledger now
       c.reported = false;
       this.totals.stakesIn += this.stake;
+      this.jackpot += Math.floor(this.stake * CFG.RAKE * CFG.JACKPOT_SHARE);
       this.send(c.cid, {
         t: 'start',
         pid: p.id,
         map: w.map,
         zone: w.zonePlan,
         stake: this.stake,
+        mode: this.mode,
+        teamSize: w.teamSize,
         round: this.roundNo,
         golden: w.golden,
         duration: w.duration,
@@ -272,6 +299,8 @@ export class RoomCore {
     if (w && this.state === 'live') for (const p of w.players.values()) if (!p.isBot && p.status === 'alive') humans++;
     return {
       stake: this.stake,
+      mode: this.mode,
+      size: this.botFill,
       state: this.state,
       tl: w && this.state === 'live' ? Math.round(w.timeLeft) : 0,
       count: this.countT === null ? null : Math.max(0, Math.ceil(this.countT)),
@@ -280,7 +309,8 @@ export class RoomCore {
       watching: this.clients.size,
       round: this.roundNo,
       golden: !!(w && this.state === 'live' && w.golden),
-      nextGolden: CFG.GOLDEN_EVERY > 0 && (this.roundNo + 1) % CFG.GOLDEN_EVERY === 0,
+      nextGolden: this.goldenBonus(this.roundNo + 1) > 0,
+      jackpot: this.practice ? 0 : this.jackpot,
     };
   }
 
@@ -294,11 +324,11 @@ export class RoomCore {
       state: this.state,
       stake: this.stake,
       round: this.roundNo + (this.state === 'live' || this.state === 'results' ? 1 : 1),
-      golden: CFG.GOLDEN_EVERY > 0 && (this.roundNo + 1) % CFG.GOLDEN_EVERY === 0,
+      golden: this.goldenBonus(this.roundNo + 1) > 0,
       count: this.countT === null ? null : Math.max(0, Math.round(this.countT * 10) / 10),
       tl: this.world && this.state === 'live' ? Math.round(this.world.timeLeft) : 0,
       resT: this.state === 'results' ? Math.ceil(this.resT) : 0,
-      slotsTotal: Math.max(CFG.BOT_FILL, ready.length),
+      slotsTotal: Math.max(this.botFill, ready.length),
       bots,
       pot: (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,
     };
@@ -358,10 +388,18 @@ export class RoomCore {
       if (!c.pid || c.reported) continue;
       const p = w.players.get(c.pid);
       if (!p || p.status === 'alive') continue;
+      // pot modes: the fallen learn the outcome when the raid is settled (they watch meanwhile)
+      if (w.potMode && p.status === 'dead' && w.phase !== 'ended') continue;
       c.reported = true;
       // career rank: every raid pays, win or lose
       const earned = raidXp(p, { practice: this.practice });
+      // achievements: career counters, each completed one pays its XP once
+      const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit });
+      const done = this.ranks.progress(c.token, { ...stats, outfits: this.inventory.view(c.token).owned.length });
+      for (const a of done) if (a.xp) earned.parts.push({ label: 'Achievement', ach: a.id, xp: a.xp });
+      earned.total += done.reduce((s, a) => s + a.xp, 0);
       const { before, after } = this.ranks.add(c.token, earned.total);
+      done.push(...this.ranks.progress(c.token, { rank: after.rank }));
       // every rank gained pays a luck bag, $ credit and a 72h trial outfit
       const rewards = this.inventory.rankUp(c.token, before.rank, after.rank);
       this.send(c.cid, {
@@ -369,7 +407,11 @@ export class RoomCore {
         rewards,
         locker: this.inventory.view(c.token),
         rank: { gained: earned.total, parts: earned.parts, before, after },
+        achievements: done.map((a) => a.id),
+        career: this.ranks.career(c.token),
         status: p.status,
+        mode: this.mode,
+        won: !!p.won,
         payout: p.payout,
         lost: p.lostBag,
         stake: p.stake,

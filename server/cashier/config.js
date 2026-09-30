@@ -7,9 +7,9 @@
 // HOUSE_PRIVATE_KEY     its Stark key; without it the cashier takes deposits but cannot pay out
 // TOKENS                comma list of preset symbols (default STRK,ETH,USDC,USDT,WBTC)
 // EXTRA_TOKENS          SYMBOL:0xaddress:decimals[:btc],... for tokens missing from the presets (e.g. strkBTC)
-// FIXED_PRICES          SYMBOL=satsPerToken,... overrides the swap-quote feed (handy on Sepolia)
+// FIXED_PRICES          SYMBOL=usdPerToken,... (e.g. STRK=0.15) overrides the swap-quote feed (handy on Sepolia)
 // PRICE_SECONDS         feed refresh (60)
-// MIN_WITHDRAW_SATS     smallest cash-out (100)
+// MIN_WITHDRAW_USD      smallest cash-out in $ (1)
 // CASHIER_FILE          JSON journal: ledger, sessions, deposits, withdrawals (required on real networks)
 // STRK20 private pool:  STRK20_POOL (mainnet default below), STRK20_VIEWING_KEY, STRK20_PROVER_URL,
 //                       STRK20_FEED_URL, STRK20_CACHE_DIR
@@ -61,7 +61,7 @@ export function readConfig(env = process.env) {
     extraTokens,
     fixedPrices,
     priceSeconds: Number(env.PRICE_SECONDS || 60),
-    minWithdrawSats: Number(env.MIN_WITHDRAW_SATS || 100),
+    minWithdrawUsd: Number(env.MIN_WITHDRAW_USD || 1),
     file: env.CASHIER_FILE || null,
     strk20: {
       pool: env.STRK20_POOL || (network === 'mainnet' ? STRK20_POOL_MAINNET : null),

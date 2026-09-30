@@ -21,8 +21,8 @@ export async function createCashier(env = process.env, log = console) {
   const chain = await createStarknetChain({ cfg, starkzap, log });
   const privy = await createPrivy({ cfg, starkzap, log });
   const prices = new PriceBook([]);
-  const btc = chain.tokens.find((t) => t.symbol.toUpperCase() === 'WBTC') ?? null;
-  const feed = new PriceFeed({ tokens: chain.tokens, prices, quoter: chain.quote, btc, fixed: cfg.fixedPrices, log });
+  const usd = chain.tokens.find((t) => t.symbol.toUpperCase() === 'USDC') ?? null;
+  const feed = new PriceFeed({ tokens: chain.tokens, prices, quoter: chain.quote, usd, fixed: cfg.fixedPrices, log });
 
   // journal: debounced atomic writes, plus an immediate flush before any payout
   const data = cfg.file && existsSync(cfg.file) ? JSON.parse(readFileSync(cfg.file, 'utf8')) : {};
@@ -51,7 +51,7 @@ export async function createCashier(env = process.env, log = console) {
     timer = null;
     return write();
   };
-  cashier = new Cashier({ chain, prices, data, save, flush, privy, minWithdrawSats: cfg.minWithdrawSats });
+  cashier = new Cashier({ chain, prices, data, save, flush, privy, minWithdrawUsd: cfg.minWithdrawUsd });
 
   // paymaster proxy budget: sponsored requests per signed-in account per day
   const sponsored = new Map();

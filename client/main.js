@@ -5,13 +5,23 @@ import { Sfx } from './sfx.js';
 import { GameClient, Attract, fmt, mmss, esc } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { store } from './store.js';
-import { PriceBook, formatUnits } from '../shared/assets.js';
+import { PriceBook, formatUnits, usdText } from '../shared/assets.js';
 import { createCashierUi } from './cashier.js';
 import { rankBadgeSvg } from './rankbadge.js';
 import { createLocker } from './locker.js';
 import { figureStill } from './stickman.js';
 import { openShare, wireShare } from './sharecard.js';
-import { OUTFIT, BOX, usd } from '../shared/cosmetics.js';
+import { OUTFIT } from '../shared/cosmetics.js';
+import { createAchievements, achName } from './achievements.js';
+import { createShop } from './shop.js';
+import { createInventory } from './inventory.js';
+import { createSwap } from './swap.js';
+import { createChat } from './chat.js';
+import { createSettingsUi } from './settingsui.js';
+import { createIntro } from './intro.js';
+import { settings, setSetting, onSetting, QUALITY } from './settings.js';
+import { MODE, MODES } from '../shared/modes.js';
+import { t, applyI18n, setLang, getLang, onLang, LANGS } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -59,6 +69,8 @@ const el = {
   extName: $('ext-name'),
   extBar: $('ext-bar'),
   spect: $('spect'),
+  spText: $('sp-text'),
+  coach: $('coach'),
   hpBar: $('hp-bar'),
   hpNum: $('hp-num'),
   dashChip: $('dash-chip'),
@@ -78,12 +90,14 @@ const app = {
   balances: null, // { asset: units string } — private pool balances (test tokens in test mode)
   assets: [],
   prices: new PriceBook([]),
-  asset: store.get('darkbags.asset', 'SATS'),
+  asset: store.get('darkbags.asset', 'USDC'),
   tables: [],
   stake: CFG.TIERS.includes(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
   name: store.get('darkbags.name', ''),
   skin: SKINS.includes(store.get('darkbags.skin', '')) ? store.get('darkbags.skin') : SKINS[Math.floor(Math.random() * SKINS.length)],
-  gore: store.get('darkbags.gore', false),
+  gore: settings.gore,
+  gameMode: store.get('darkbags.gmode', 'raid'),
+  page: 'play',
   screen: 'lobby',
   prep: null,
   locker: null, // { marks, scrap, owned, outfit, body, pity }
@@ -100,10 +114,34 @@ function shareMoment(kind, data = {}) {
 }
 wireShare();
 
-// locker: outfits, shop, luck boxes
-const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
 // real-token mode (server started with CHAIN=…): sign-in, deposits, cash-outs
 const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: () => renderLobby(), base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href });
+// the menu pages
+const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
+const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
+const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }) });
+const inventory = createInventory({ app, send, go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
+const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
+const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
+const settingsUi = createSettingsUi();
+
+// ------------------------------------------------------------------ pages
+const PAGES = { shop, inventory, swap, chat, settings: settingsUi };
+function go(page, extra) {
+  if (!document.querySelector(`.page[data-page="${page}"]`)) page = 'play';
+  app.page = page;
+  store.set('darkbags.page', page);
+  for (const p of document.querySelectorAll('.page')) p.hidden = p.dataset.page !== page;
+  for (const b of document.querySelectorAll('.nav-btn')) b.setAttribute('aria-current', String(b.dataset.page === page));
+  if (page === 'achievements') ach.renderList();
+  if (page === 'shop' && extra) shop.family?.(extra);
+  PAGES[page]?.render();
+  document.querySelector('.pages').scrollTo?.({ top: 0 });
+  sfx.play('beep', { f: 990, dur: 0.02 });
+}
+for (const b of document.querySelectorAll('.nav-btn')) b.addEventListener('click', () => go(b.dataset.page));
+$('tb-wallet').addEventListener('click', () => go('inventory'));
+$('tb-credit').addEventListener('click', () => go('shop'));
 const attract = new Attract(renderer);
 
 // ---------------------------------------------------------------- screens
@@ -132,10 +170,14 @@ function toast(msg) {
   toastT = setTimeout(() => (t.hidden = true), 3500);
 }
 
-// ----------------------------------------------------------------- tokens
+// ----------------------------------------------------------------- money
+// Players see one unit: $. Every coin is shown at its $ value; stakes are $ amounts.
+const money = (mills) => usdText(mills);
+
 const units = (a) => BigInt(app.balances?.[a] ?? '0');
 const assetInfo = (a) => app.prices.get(a) ?? { id: a, symbol: a.slice(0, 8), decimals: 18, color: '#8d93a6' };
-function totalSats() {
+// the whole wallet in $ (mills)
+function walletValue() {
   let t = 0;
   for (const [a, u] of Object.entries(app.balances ?? {})) t += app.prices.value(a, BigInt(u));
   return t;
@@ -145,7 +187,13 @@ function quote(stake = app.stake, a = app.asset) {
 }
 function tokenAmount(a, u) {
   const info = assetInfo(a);
-  return `${formatUnits(u, info.decimals, info.decimals > 8 ? 4 : info.decimals)} ${info.symbol}`;
+  const digits = info.decimals > 8 ? 4 : Math.min(info.decimals, 6);
+  return `${formatUnits(u, info.decimals, digits)} ${info.symbol}`;
+}
+// "6.667 STRK ($1)" for coins, just "$1" for stablecoins
+function coinAndUsd(a, u) {
+  const v = money(app.prices.value(a, BigInt(u)));
+  return assetInfo(a).stable ? v : `${tokenAmount(a, u)} (${v})`;
 }
 function pickUsableAsset() {
   if (app.prices.has(app.asset) && units(app.asset) >= (quote() ?? 0n) && units(app.asset) > 0n) return;
@@ -155,19 +203,25 @@ function pickUsableAsset() {
 
 function renderAssets() {
   const list = $('assets');
-  const ids = [...new Set([...app.assets.map((a) => a.id), ...Object.keys(app.balances ?? {})])];
+  // every coin the game prices, plus anything else the player holds; richest first
+  const ids = [...new Set([...app.assets.map((a) => a.id), ...Object.keys(app.balances ?? {})])].sort(
+    (x, y) => app.prices.value(y, units(y)) - app.prices.value(x, units(x)),
+  );
   list.replaceChildren(
     ...ids.map((id) => {
       const info = assetInfo(id);
       const u = units(id);
       const priced = app.prices.has(id);
+      const need = priced ? quote(app.stake, id) : null;
+      const short = need !== null && u < need;
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'asset';
+      b.className = `asset${short ? ' short' : ''}`;
       b.disabled = !priced || u === 0n;
       b.setAttribute('aria-pressed', String(id === app.asset));
-      b.title = priced ? '' : 'No price for this token yet';
-      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}</span><span class="amt">${esc(formatUnits(u, info.decimals, 4))}${priced ? ` · ≈${fmt(app.prices.value(id, u))} sats` : ''}</span>`;
+      b.title = priced ? `${info.symbol} ≈ ${usdText(app.prices.value(id, 10n ** BigInt(info.decimals)))}` : 'No price for this coin right now';
+      const needText = need === null ? 'no price now' : info.stable ? `stake ${money(app.stake)}` : `stake ${tokenAmount(id, need)}`;
+      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}</span><span class="amt">${priced ? money(app.prices.value(id, u)) : esc(formatUnits(u, info.decimals, 4))}</span><span class="need">${esc(needText)}</span>`;
       b.addEventListener('click', () => {
         app.asset = id;
         store.set('darkbags.asset', id);
@@ -176,18 +230,52 @@ function renderAssets() {
       return b;
     }),
   );
+  const info = assetInfo(app.asset);
+  $('paywith').hidden = app.balances === null || !ids.length;
+  // one short line under Play: what the stake costs, or what's wrong
   const q = quote();
   const qEl = $('quote');
-  if (q === null) qEl.textContent = 'Pick a token with a price to stake.';
-  else {
-    const short = units(app.asset) < q;
-    qEl.innerHTML = `A ${fmt(app.stake)} sats stake is <b>${esc(tokenAmount(app.asset, q))}</b> right now${short ? ` · <span style="color:var(--blood)">not enough ${esc(assetInfo(app.asset).symbol)}</span>` : ''}. Payouts come back in the same token at the same rate.`;
+  qEl.classList.remove('bad');
+  if (q === null) {
+    qEl.textContent = t('q.pick');
+  } else if (units(app.asset) < q) {
+    qEl.textContent = t(cashier.active ? 'q.shortDeposit' : 'q.short', { c: info.symbol, s: money(app.stake) });
+    qEl.classList.add('bad');
+  } else if (info.stable) {
+    qEl.textContent = t('q.stable', { s: money(app.stake), c: info.symbol });
+  } else {
+    qEl.textContent = t('q.coin', { a: tokenAmount(app.asset, q), s: money(app.stake), c: info.symbol });
   }
 }
 
 // ------------------------------------------------------------------ lobby
 function tableInfo(stake) {
-  return app.tables.find((t) => t.stake === stake);
+  return app.tables.find((x) => x.stake === stake && (x.mode ?? 'raid') === app.gameMode);
+}
+
+// the mode picker: a card per mode with what it is and how the money works
+const MODE_ICON = { raid: '🎒', br: '👑', duel: '⚔️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
+function renderModes() {
+  const box = $('modes');
+  box.replaceChildren(
+    ...MODES.map((m) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `mode-card k-${m.kind}`;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(m.id === app.gameMode));
+      const live = app.tables.filter((x) => x.mode === m.id).reduce((s, x) => s + (x.humans ?? 0) + (x.ready ?? 0), 0);
+      const size = m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
+      b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>`;
+      b.addEventListener('click', () => {
+        app.gameMode = m.id;
+        store.set('darkbags.gmode', m.id);
+        sfx.play('beep', { f: 1180, dur: 0.03 });
+        renderLobby();
+      });
+      return b;
+    }),
+  );
 }
 
 function renderLobby() {
@@ -199,33 +287,33 @@ function renderLobby() {
 
   const st = $('net-status');
   st.classList.toggle('bad', app.status === 'closed' || app.status === 'error');
-  if (app.mode === 'practice') st.textContent = 'Offline raids against bots. Separate practice balance.';
-  else if (app.status === 'open') st.textContent = 'Connected. Humans and bots share each raid.';
-  else if (app.status === 'connecting') st.textContent = 'Connecting to the raid server…';
-  else st.textContent = 'Server unreachable. Retrying… Practice mode works offline.';
+  if (app.mode === 'practice') st.textContent = t('net.practice');
+  else if (app.status === 'open') st.textContent = t('net.open');
+  else if (app.status === 'connecting') st.textContent = t('net.connecting');
+  else st.textContent = t('net.down');
 
   const list = $('tables');
   list.replaceChildren(
     ...CFG.TIERS.map((stake) => {
-      const t = tableInfo(stake);
+      const tb = tableInfo(stake);
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'table-btn';
       b.setAttribute('aria-pressed', String(stake === app.stake));
-      let state = 'Empty ready room';
+      let state = '';
       let cls = '';
-      if (t?.state === 'live') {
-        state = `Raid live · ${mmss(t.tl)}`;
+      if (tb?.state === 'live') {
+        state = t('tb.live', { t: mmss(tb.tl) });
         cls = 'live';
-      } else if (t?.state === 'prep' && t.count !== null && t.count !== undefined) {
-        state = `${t.ready} ready · ${t.count}s`;
+      } else if (tb?.state === 'prep' && tb.count !== null && tb.count !== undefined) {
+        state = t('tb.ready', { n: tb.ready, s: tb.count });
         cls = 'live';
-      } else if (t?.state === 'prep' && t.watching) state = `${t.watching} in the room`;
-      if (t?.nextGolden && t.state !== 'live') {
-        state = 'Golden raid next';
+      } else if (tb?.state === 'prep' && tb.watching) state = t('tb.waiting', { n: tb.watching });
+      if (tb?.nextGolden && tb.state !== 'live') {
+        state = t('tb.golden');
         cls = 'gold';
-      }
-      b.innerHTML = `<span class="stake">${fmt(stake)}</span><span class="unit">sats stake</span><span class="state ${cls}">${esc(state)}</span>`;
+      } else if (!state && tb?.jackpot > 0) state = t('tb.jackpot', { v: money(tb.jackpot) });
+      b.innerHTML = `<span class="stake">${money(stake)}</span>${state ? `<span class="state ${cls}">${esc(state)}</span>` : ''}`;
       b.addEventListener('click', () => {
         app.stake = stake;
         store.set('darkbags.stake', stake);
@@ -237,19 +325,59 @@ function renderLobby() {
 
   $('gore').checked = app.gore;
 
+  cashier.render();
+  const real = cashier.active;
+  $('balance').textContent = app.balances === null ? '—' : money(walletValue());
+  $('faucet').hidden = real || !(app.balances !== null && walletValue() < Math.max(...CFG.TIERS));
   pickUsableAsset();
   renderAssets();
   renderRankCard();
+  renderModes();
+  renderPracticeCfg();
   locker.renderTile();
-  cashier.render();
-  const real = cashier.active;
-  $('balance').textContent = app.balances === null ? '—' : `≈${fmt(totalSats())}`;
-  $('faucet').hidden = real || !(app.balances !== null && totalSats() < Math.max(...CFG.TIERS));
   const play = $('play');
   const needSignIn = real && !cashier.signedIn;
   play.disabled = app.status !== 'open' || needSignIn;
-  play.textContent = needSignIn ? 'Sign in to play' : `Go to the ${fmt(app.stake)} sats table`;
+  play.textContent = needSignIn ? t('lobby.signIn') : t('lobby.play', { s: money(app.stake) });
 }
+
+// ------------------------------------------------------- practice settings
+const pcfg = {
+  difficulty: ['easy', 'normal', 'hard'].includes(store.get('darkbags.pdiff', 'easy')) ? store.get('darkbags.pdiff', 'easy') : 'easy',
+  runners: Math.min(16, Math.max(2, Number(store.get('darkbags.prunners', CFG.BOT_FILL)) || CFG.BOT_FILL)),
+  seconds: Math.min(600, Math.max(60, Number(store.get('darkbags.ptime', CFG.ROUND_SECONDS)) || CFG.ROUND_SECONDS)),
+};
+function sendPracticeCfg() {
+  if (app.mode === 'practice') send({ t: 'practice_cfg', ...pcfg });
+}
+function renderPracticeCfg() {
+  $('pcfg').hidden = app.mode !== 'practice';
+  for (const b of $('pcfg-diff').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === pcfg.difficulty));
+  $('pcfg-runners').value = pcfg.runners;
+  $('pcfg-runners-v').textContent = pcfg.runners;
+  $('pcfg-time').value = pcfg.seconds;
+  $('pcfg-time-v').textContent = mmss(pcfg.seconds);
+  $('pcfg-sum').textContent = `${t(`pcfg.${pcfg.difficulty}`)} · ${pcfg.runners} · ${mmss(pcfg.seconds)}`;
+}
+for (const b of $('pcfg-diff').querySelectorAll('button'))
+  b.addEventListener('click', () => {
+    pcfg.difficulty = b.dataset.v;
+    store.set('darkbags.pdiff', pcfg.difficulty);
+    renderPracticeCfg();
+    sendPracticeCfg();
+  });
+$('pcfg-runners').addEventListener('input', (e) => {
+  pcfg.runners = Number(e.target.value);
+  store.set('darkbags.prunners', pcfg.runners);
+  renderPracticeCfg();
+  sendPracticeCfg();
+});
+$('pcfg-time').addEventListener('input', (e) => {
+  pcfg.seconds = Number(e.target.value);
+  store.set('darkbags.ptime', pcfg.seconds);
+  renderPracticeCfg();
+  sendPracticeCfg();
+});
 
 // ------------------------------------------------------------------ rank
 const pct = (r) => (r.max ? 100 : Math.max(0, Math.min(100, (r.into / r.need) * 100)));
@@ -259,8 +387,18 @@ function renderRankCard() {
   const r = app.rank;
   el.hidden = !r;
   if (!r) return;
-  const whose = app.mode === 'practice' ? 'Practice rank' : 'Rank';
-  el.innerHTML = `${rankBadgeSvg(r.rank, 44)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">${whose} ${r.rank}</span> <b>${esc(r.name)}</b></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div><p class="fine">${r.max ? 'Top rank. Nothing left to climb.' : `${fmt(r.into)} / ${fmt(r.need)} XP · ${fmt(r.toNext)} to rank ${r.rank + 1}`}</p></div>`;
+  el.innerHTML = `${rankBadgeSvg(r.rank, 34)}<div class="rk-body"><p class="rk-title"><b>${esc(r.name)}</b><span class="rk-xp">${r.max ? t('rk.max') : t('rk.toNext', { x: fmt(r.toNext), r: r.rank + 1 })}</span></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div></div>`;
+  el.title = t('rk.of', { r: r.rank });
+}
+
+// XP line labels come from the server in English; translate the known ones
+function xpLabel(p) {
+  if (p.ach) return `★ ${achName(p.ach)}`;
+  const m = /^(\d+) kills?$/.exec(p.label);
+  if (m) return t('xp.kills', { n: m[1] });
+  const k = `xp.${p.label}`;
+  const s = t(k);
+  return s === k ? p.label : s;
 }
 
 // the result card: XP earned, what for, and the bar filling (twice on a rank-up)
@@ -274,15 +412,15 @@ function renderRankResult(res) {
   const up = after.rank > before.rank;
   el.hidden = false;
   el.classList.toggle('up', up);
-  el.innerHTML = `<div class="rr-head">${rankBadgeSvg(before.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">Rank ${before.rank}</span> <b>${esc(before.name)}</b></p><div class="rk-bar"><i style="width:${pct(before)}%"></i></div><p class="rr-gain"><b>+${fmt(gained)}</b> rank XP</p></div></div>
-    <ul class="rr-parts">${parts.map((p) => `<li><span>${esc(p.label)}</span><b>${p.xp >= 0 ? '+' : '−'}${fmt(Math.abs(p.xp))}</b></li>`).join('')}</ul>`;
+  el.innerHTML = `<div class="rr-head">${rankBadgeSvg(before.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">${t('rk.rank')} ${before.rank}</span> <b>${esc(before.name)}</b></p><div class="rk-bar"><i style="width:${pct(before)}%"></i></div><p class="rr-gain"><b>+${fmt(gained)}</b> ${t('rk.xp')}</p></div></div>
+    <ul class="rr-parts">${parts.map((p) => `<li><span>${esc(xpLabel(p))}</span><b>${p.xp >= 0 ? '+' : '−'}${fmt(Math.abs(p.xp))}</b></li>`).join('')}</ul>`;
   const bar = el.querySelector('.rk-bar i');
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       bar.style.width = up ? '100%' : `${pct(after)}%`;
       if (!up) return;
       setTimeout(() => {
-        el.querySelector('.rr-head').innerHTML = `${rankBadgeSvg(after.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow rr-up">Rank up · ${after.rank}</span> <b>${esc(after.name)}</b></p><div class="rk-bar"><i style="width:0%"></i></div><p class="rr-gain"><b>+${fmt(gained)}</b> rank XP</p></div>`;
+        el.querySelector('.rr-head').innerHTML = `${rankBadgeSvg(after.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow rr-up">${t('rk.up')} · ${after.rank}</span> <b>${esc(after.name)}</b></p><div class="rk-bar"><i style="width:0%"></i></div><p class="rr-gain"><b>+${fmt(gained)}</b> ${t('rk.xp')}</p></div>`;
         sfx.play('beep', { f: 1480, dur: 0.25 });
         const b2 = el.querySelector('.rk-bar i');
         requestAnimationFrame(() => requestAnimationFrame(() => (b2.style.width = `${pct(after)}%`)));
@@ -291,27 +429,17 @@ function renderRankResult(res) {
   );
 }
 
-// rank-up rewards on the result card: bags, $ credit, a trial outfit
+// rank-up reward on the result card: a 72h trial outfit per rank gained
 function renderRewards(m) {
   const el = $('res-rewards');
-  const list = m.rewards ?? [];
-  el.hidden = !list.length;
-  if (!list.length) return;
-  const bags = {};
-  let credit = 0;
-  const trials = [];
-  for (const r of list) {
-    bags[r.box] = (bags[r.box] ?? 0) + 1;
-    credit += r.credit;
-    if (r.trial) trials.push(r.trial);
-  }
-  el.innerHTML = `<p class="eyebrow">Rank-up rewards</p><ul>${Object.entries(bags)
-    .map(([b, n]) => `<li><span class="rw-ico bag"></span><b>${n > 1 ? `${n}× ` : ''}${esc(BOX[b].name)}</b><span class="fine">waiting in your locker</span></li>`)
-    .join('')}<li><span class="rw-ico cash"></span><b>+${usd(credit)}</b><span class="fine">shop credit</span></li>${trials
-    .map((t) => `<li><span class="rw-ico trial"></span><b>${esc(OUTFIT[t.id].name)}</b><span class="fine">72-hour trial</span></li>`)
-    .join('')}</ul><div class="rw-actions"><button type="button" class="ghost" data-rw="locker">Open the locker</button><button type="button" class="ghost share" data-rw="share">Share rank-up</button></div>`;
-  el.querySelector('[data-rw="locker"]').addEventListener('click', () => locker.open('boxes'));
-  el.querySelector('[data-rw="share"]').addEventListener('click', () => shareMoment('rankUp', { rank: m.rank.after.rank, rewards: list }));
+  const trials = (m.rewards ?? []).map((r) => r.trial).filter(Boolean);
+  el.hidden = !(m.rewards ?? []).length;
+  if (el.hidden) return;
+  el.innerHTML = `<p class="eyebrow">${t('rw.title')}</p><ul>${trials
+    .map((tr) => `<li><span class="rw-ico trial"></span><b>${esc(OUTFIT[tr.id].name)}</b><span class="fine">${t('rw.trial')}</span></li>`)
+    .join('')}</ul><div class="rw-actions"><button type="button" class="ghost" data-rw="locker">${t('rw.try')}</button><button type="button" class="ghost share" data-rw="share">${t('rw.share')}</button></div>`;
+  el.querySelector('[data-rw="locker"]').addEventListener('click', () => locker.open('outfits'));
+  el.querySelector('[data-rw="share"]').addEventListener('click', () => shareMoment('rankUp', { rank: m.rank.after.rank, rewards: m.rewards }));
 }
 
 // ------------------------------------------------------------- ready room
@@ -321,18 +449,18 @@ const figureSvg = (color) =>
 function renderPrep() {
   const p = app.prep;
   if (!p) return;
-  $('prep-kicker').textContent = `Raid ${p.round} · ${fmt(p.stake)} sats table${p.golden ? ' · golden raid' : ''}`;
+  $('prep-kicker').textContent = `${t('prep.raid', { n: p.round, s: money(p.stake) })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
   const count = $('prep-count');
   const status = $('prep-status');
   if (p.state === 'live') {
     count.textContent = mmss(p.tl);
-    status.textContent = 'A raid is running. Ready up now and you drop into the next one together.';
+    status.textContent = t('prep.live');
   } else if (p.state === 'results') {
     count.textContent = `${p.resT}`;
-    status.textContent = 'Raid over. The ready room opens in a moment.';
+    status.textContent = t('prep.over');
   } else if (p.count === null) {
-    count.textContent = 'Ready up';
-    status.textContent = 'The countdown starts when the first runner is ready.';
+    count.textContent = t('prep.readyUp');
+    status.textContent = t('prep.first');
   } else {
     const n = Math.ceil(p.count);
     if (count.textContent !== String(n)) {
@@ -342,7 +470,7 @@ function renderPrep() {
       count.classList.add('tick');
       if (n <= 5 && n > 0) sfx.play('beep', { f: n <= 3 ? 990 : 740 });
     }
-    status.textContent = p.slots.length > 1 ? 'Everyone here starts with a knife. Bots join in the last seconds.' : 'Bots fill the empty spots in the last seconds.';
+    status.textContent = p.slots.length > 1 ? t('prep.many') : t('prep.bots');
     sfx.music?.set({ mode: 'prep', intensity: 0, bpm: 124 + Math.max(0, 20 - p.count) * 1.5 });
   }
 
@@ -359,7 +487,7 @@ function renderPrep() {
         const d = document.createElement('div');
         if (!s) {
           d.className = 'slot';
-          d.innerHTML = `${figureSvg('#283042')}<span class="sn">open</span>`; // empty spot
+          d.innerHTML = `${figureSvg('#283042')}<span class="sn">${esc(t('prep.open'))}</span>`; // empty spot
           return d;
         }
         d.className = `slot lit ${s.kind === 'me' ? 'me' : ''} ${s.kind === 'bot' ? 'bot' : ''}`;
@@ -370,19 +498,19 @@ function renderPrep() {
       }),
     );
   }
-  $('pot').textContent = fmt(p.pot);
+  $('pot').textContent = money(p.pot);
   const ready = $('ready');
   const me = p.me ?? {};
   const q = quote(p.stake);
   if (me.ready && me.escrow) {
-    ready.textContent = `Cancel · refund ${tokenAmount(me.escrow.asset, me.escrow.units)}`;
+    ready.textContent = t('prep.cancel', { v: coinAndUsd(me.escrow.asset, me.escrow.units) });
     ready.classList.add('armed');
   } else {
-    ready.textContent = q === null ? 'Pick a token in the lobby' : `Stake ${tokenAmount(app.asset, q)} & ready`;
+    ready.textContent = q === null ? t('q.pick') : t('prep.ready', { v: coinAndUsd(app.asset, q) });
     ready.classList.remove('armed');
   }
   ready.disabled = !me.ready && (q === null || units(app.asset) < q);
-  $('prep-balance').textContent = `${assetInfo(app.asset).symbol} balance ${formatUnits(units(app.asset), assetInfo(app.asset).decimals, 4)} · ${fmt(p.stake)} sats stake`;
+  $('prep-balance').textContent = `${assetInfo(app.asset).symbol}: ${coinAndUsd(app.asset, units(app.asset))}`;
 }
 
 // ------------------------------------------------------------- transport
@@ -396,7 +524,7 @@ function setMode(mode) {
   app.status = 'connecting';
   app.inRoom = false;
   cashier.reset();
-  if (mode === 'practice') $('fine').textContent = 'Test build. Tokens here are play money with fixed test prices: no deposits, no withdrawals.';
+  if (mode === 'practice') $('fine').textContent = t('lobby.fine');
   store.set('darkbags.mode', mode);
   app.transport = mode === 'online' ? new WsTransport(SERVER, onMessage, onStatus) : new LocalTransport(onMessage, onStatus);
   if (app.screen !== 'lobby') showScreen('lobby');
@@ -409,8 +537,10 @@ function onStatus(st) {
   if (st === 'open') {
     const token = app.mode === 'online' ? store.get('darkbags.token', null) : 'practice';
     send({ t: 'hello', token, name: app.name });
+    sendPracticeCfg();
+    intro.mark('connect');
   } else if (wasOpen && app.screen !== 'lobby') {
-    toast('Lost the connection. Back at the tables.');
+    toast(t('net.lost'));
     app.inRoom = false;
     showScreen('lobby');
   }
@@ -419,15 +549,22 @@ function onStatus(st) {
 
 // the locker owns its own messages, and sees everything else after the app has updated
 function onMessage(m) {
-  if (m.t === 'locker') return locker.onMessage(m);
-  handleMessage(m);
+  if (m.t !== 'locker') handleMessage(m);
   locker.onMessage(m);
+  if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
+  if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
+  if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
+  if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
+  if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
+  if (app.page === 'shop' && (m.t === 'balance' || m.t === 'welcome')) shop.render();
 }
 
 function handleMessage(m) {
   if (cashier.onMessage(m) && m.t !== 'welcome') return;
   switch (m.t) {
     case 'welcome':
+      intro.mark('profile');
+      app.swap = m.swap ?? null;
       app.token = m.token;
       if (app.mode === 'online') store.set('darkbags.token', m.token);
       app.assets = m.assets ?? [];
@@ -435,6 +572,7 @@ function handleMessage(m) {
       app.balances = m.balances ?? {};
       app.tables = m.tables;
       app.rank = m.rank ?? null;
+      app.chain = m.chain ?? null; // real-token server, or null for play money
       renderLobby();
       break;
     case 'tables':
@@ -457,12 +595,17 @@ function handleMessage(m) {
       app.wasReady = m.me?.ready;
       if (m.me?.ready && !wasReady) sfx.play('ready');
       if (app.screen === 'prep') renderPrep();
+      if (app.pendingResult && m.state !== 'live') finishSpectating();
       break;
     }
     case 'start':
       app.balances = m.balances ?? app.balances;
       attract.stop();
       sfx.play('beep', { f: 1320, dur: 0.3 });
+      game.coachOn = store.get('darkbags.raids', 0) < 3; // hints for the first three raids
+      game.myName = app.name || 'runner';
+      game.myRank = app.rank?.rank ?? 1;
+      game.myTitle = app.career?.title ? achName(app.career.title) : null;
       game.begin(m, app.skin, app.gore, app.locker);
       renderer.prewarm(m.map.w / 2, m.map.h / 2);
       showScreen('game');
@@ -475,7 +618,14 @@ function handleMessage(m) {
       break;
     case 'result':
       app.balances = m.balances ?? app.balances;
+      store.set('darkbags.raids', store.get('darkbags.raids', 0) + 1);
       if (m.rank) app.rank = m.rank.after;
+      // went down with others still inside: watch them first, results when you want them
+      if (game.active && m.status === 'dead' && app.prep?.state === 'live' && !app.wantResult) {
+        app.pendingResult = m;
+        break;
+      }
+      app.wantResult = false;
       showResult(m);
       break;
     case 'err':
@@ -485,41 +635,80 @@ function handleMessage(m) {
   }
 }
 
+// ------------------------------------------------------------- spectating
+function finishSpectating() {
+  const m = app.pendingResult;
+  if (!m) {
+    // pot modes settle at the end: show the result the moment it lands
+    if (game.active && game.dead && !app.wantResult) {
+      app.wantResult = true;
+      send({ t: 'watch', d: 0 });
+      toast(t('spect.settling'));
+    }
+    return;
+  }
+  app.pendingResult = null;
+  send({ t: 'watch', d: 0 });
+  showResult(m);
+}
+$('sp-prev').addEventListener('click', () => send({ t: 'watch', d: -1 }));
+$('sp-next').addEventListener('click', () => send({ t: 'watch', d: 1 }));
+$('sp-done').addEventListener('click', finishSpectating);
+addEventListener('keydown', (e) => {
+  if (!app.pendingResult || !game.active) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyQ') send({ t: 'watch', d: -1 });
+  else if (e.code === 'ArrowRight' || e.code === 'KeyE') send({ t: 'watch', d: 1 });
+  else if (e.code === 'Enter' || e.code === 'Escape') finishSpectating();
+});
+
 // ----------------------------------------------------------------- result
 function showResult(m) {
   const k = $('res-kicker');
   const amt = $('res-amount');
   const det = $('res-detail');
-  const inside = `${m.kills} ${m.kills === 1 ? 'kill' : 'kills'} · ${mmss(m.secs)} inside`;
-  if (m.status === 'extracted') {
+  const inside = t('res.inside', { k: m.kills, t: mmss(m.secs) });
+  const pot = MODE[m.mode]?.kind && MODE[m.mode].kind !== 'raid';
+  if (pot && m.won) {
+    k.textContent = t(MODE[m.mode].kind === 'team' ? 'res.teamWon' : 'res.victory');
+    k.className = 'res-kicker win';
+    amt.textContent = money(m.payout);
+    amt.className = 'res-amount win';
+    det.innerHTML = `${t('res.wonText', { p: `<b>${money(m.payout)}</b>`, s: `<b>${money(m.stake)}</b>` })} ${inside}.`;
+  } else if (pot) {
+    k.textContent = t(m.cause === 'storm' ? 'res.storm' : 'res.defeated');
+    k.className = 'res-kicker loss';
+    amt.textContent = `−${money(m.stake)}`;
+    amt.className = 'res-amount';
+    det.innerHTML = `${t(MODE[m.mode].kind === 'team' ? 'res.teamLost' : 'res.lostPot')} ${inside}.`;
+  } else if (m.status === 'extracted') {
     const pnl = m.payout - m.stake;
     const pct = Math.round((pnl / m.stake) * 100);
-    k.textContent = 'Extracted';
+    k.textContent = t('res.extracted');
     k.className = 'res-kicker win';
-    amt.textContent = `${fmt(m.payout)} sats`;
+    amt.textContent = money(m.payout);
     amt.className = 'res-amount win';
-    const paid = m.asset && m.asset !== 'SATS' ? ` Paid out <b>${esc(tokenAmount(m.asset, m.payoutUnits ?? '0'))}</b> at your entry rate.` : '';
-    det.innerHTML = `Out with <b>${fmt(m.payout)}</b> sats on a <b>${fmt(m.stake)}</b> stake: <b>${pnl >= 0 ? '+' : '−'}${fmt(Math.abs(pnl))} (${pct >= 0 ? '+' : '−'}${Math.abs(pct)}%)</b>.${paid} ${inside}.`;
+    const paid = m.asset && !assetInfo(m.asset).stable ? ` ${t('res.paid', { v: `<b>${esc(tokenAmount(m.asset, m.payoutUnits ?? '0'))}</b>` })}` : '';
+    det.innerHTML = `${t('res.out', { p: `<b>${money(m.payout)}</b>`, s: `<b>${money(m.stake)}</b>`, d: `<b>${pnl >= 0 ? '+' : '−'}${money(Math.abs(pnl))} (${pct >= 0 ? '+' : '−'}${Math.abs(pct)}%)</b>` })}${paid} ${inside}.`;
   } else if (m.status === 'dead') {
-    k.textContent = m.cause === 'storm' ? 'Eaten by the storm' : 'Dropped';
+    k.textContent = m.cause === 'storm' ? t('res.storm') : t('res.dropped');
     k.className = 'res-kicker loss';
-    amt.textContent = `−${fmt(m.stake)}`;
+    amt.textContent = `−${money(m.stake)}`;
     amt.className = 'res-amount';
     det.innerHTML = m.killer
-      ? `<b>${esc(m.killer)}</b> has your bag now. It held <b>${fmt(m.lost)} sats</b>, and only the two of you will ever know. ${inside}.`
-      : `Your bag, <b>${fmt(m.lost)} sats</b>, is lying in the storm for anyone brave enough. ${inside}.`;
+      ? `${t('res.killer', { n: `<b>${esc(m.killer)}</b>`, v: `<b>${money(m.lost)}</b>` })} ${inside}.`
+      : `${t('res.inStorm', { v: `<b>${money(m.lost)}</b>` })} ${inside}.`;
   } else {
-    k.textContent = 'Sealed inside';
+    k.textContent = t('res.sealed');
     k.className = 'res-kicker loss';
-    amt.textContent = `−${fmt(m.stake)}`;
+    amt.textContent = `−${money(m.stake)}`;
     amt.className = 'res-amount';
-    det.innerHTML = `The raid closed with you still in it. Your <b>${fmt(m.lost)} sats</b> rolled into the next raid's loot. ${inside}.`;
+    det.innerHTML = `${t('res.sealedText', { v: `<b>${money(m.lost)}</b>` })} ${inside}.`;
   }
   renderRankResult(m.rank);
   renderRewards(m);
   app.lastResult = m;
   const q = quote(m.stake);
-  $('res-again').textContent = q === null ? 'Ready for the next raid' : `Ready for the next raid · ${tokenAmount(app.asset, q)}`;
+  $('res-again').textContent = q === null ? t('res.again') : `${t('res.again')} · ${money(m.stake)}`;
   $('res-again').disabled = q === null || units(app.asset) < q;
   showScreen('result');
 }
@@ -529,7 +718,7 @@ function goToTable() {
   sfx.unlock();
   app.name = $('name').value.trim();
   store.set('darkbags.name', app.name);
-  send({ t: 'join', stake: app.stake, name: app.name || 'runner', skin: app.skin });
+  send({ t: 'join', stake: app.stake, mode: app.gameMode, name: app.name || 'runner', skin: app.skin });
   app.inRoom = true;
   showScreen('prep');
 }
@@ -544,10 +733,23 @@ $('name').value = app.name;
 $('name').addEventListener('change', () => store.set('darkbags.name', $('name').value.trim()));
 $('name').addEventListener('keydown', (e) => e.key === 'Enter' && !$('play').disabled && goToTable());
 $('play').addEventListener('click', goToTable);
-$('gore').addEventListener('change', (e) => {
-  app.gore = e.target.checked;
-  store.set('darkbags.gore', app.gore);
-});
+$('gore').addEventListener('change', (e) => setSetting('gore', e.target.checked));
+// settings apply the moment they change
+function applySetting(k) {
+  if (k === 'quality') renderer.setQuality(settings.quality === 'auto' ? null : QUALITY[settings.quality]);
+  if (k === 'sound') sfx.setVolume(settings.sound);
+  if (k === 'music') sfx.setMusicVolume(settings.music);
+  if (k === 'gore') {
+    app.gore = settings.gore;
+    game.gore = settings.gore;
+    $('gore').checked = settings.gore;
+  }
+  if (k === 'stick') document.documentElement.style.setProperty('--stick', settings.stick);
+  if (k === 'lefty') $('touch').classList.toggle('lefty', settings.lefty);
+  if (k === 'motion') document.documentElement.classList.toggle('no-motion', !settings.motion);
+}
+onSetting(applySetting);
+for (const k of ['quality', 'sound', 'music', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
 $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 $('mode-online').addEventListener('click', () => app.mode !== 'online' && setMode('online'));
 $('mode-practice').addEventListener('click', () => app.mode !== 'practice' && setMode('practice'));
@@ -561,7 +763,7 @@ $('prep-back').addEventListener('click', () => {
 $('res-share').addEventListener('click', () => {
   const m = app.lastResult;
   if (!m) return;
-  shareMoment(m.status === 'extracted' ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
+  shareMoment(m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
@@ -621,5 +823,28 @@ globalThis.__darkbags = { app, game, input, renderer, sfx, cashier };
 
 attract.start();
 showScreen('lobby');
+go(store.get('darkbags.page', 'play'));
+// language: picker in the lobby header, everything re-renders on a switch
+const langSel = $('lang');
+langSel.replaceChildren(...LANGS.map((l) => Object.assign(document.createElement('option'), { value: l.id, textContent: l.name })));
+langSel.value = getLang();
+langSel.addEventListener('change', () => setLang(langSel.value));
+onLang(() => {
+  renderLobby();
+  ach.renderProfile();
+  PAGES[app.page]?.render();
+  if (app.page === 'achievements') ach.renderList();
+  if (app.screen === 'prep') renderPrep();
+  langSel.value = getLang();
+});
+applyI18n();
+
+// intro: a real loading bar over what the game waits for
+const intro = createIntro({ onDone: () => document.body.classList.add('ready') });
+for (const s of ['fonts', 'world', 'connect', 'profile']) intro.need(s);
+(document.fonts?.ready ?? Promise.resolve()).then(() => intro.mark('fonts'));
+requestAnimationFrame(() => requestAnimationFrame(() => intro.mark('world')));
+globalThis.__darkbags.intro = intro;
+
 setMode(SERVER && store.get('darkbags.mode', 'online') === 'online' ? 'online' : 'practice');
 requestAnimationFrame(loop);

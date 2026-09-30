@@ -5,6 +5,7 @@ import { World } from '../shared/world.js';
 import { RoomCore } from '../shared/room.js';
 import { MemoryWallet } from '../shared/wallet.js';
 import { MAX_RANK, RANKS, RANK_STEP, RANK_XP, RankBook, rankOf, raidXp, botRank } from '../shared/ranks.js';
+import { ACHIEVEMENTS, raidStats } from '../shared/achievements.js';
 
 test('90 ranks from Lance Corporal to Legend, cheap early and expensive late', () => {
   assert.equal(RANKS.length, MAX_RANK);
@@ -80,7 +81,14 @@ test('in practice the raid ends when the human is out, and bots hit softer', () 
   assert.equal(w.snapshotFor(bot.id).players.find((p) => p.i === me.id)?.rk ?? 12, 12);
   w.kill(me, bot);
   w.step();
-  assert.equal(w.phase, 'ended', 'no watching bots play on after you die');
+  assert.equal(w.phase, 'live', 'you can watch the survivors after you die');
+  const watched = w.snapshotFor(me.id).you.spect;
+  assert.equal(watched, bot.name, 'your killer first');
+  w.watch(me.id, 1);
+  assert.notEqual(w.snapshotFor(me.id).you.spect, watched, 'then anyone still alive');
+  w.watch(me.id, 0);
+  w.step();
+  assert.equal(w.phase, 'ended', 'and the raid ends once you stop watching');
   assert.ok(w.audit().ok, 'the ledger still balances');
 
   const online = new World({ stake: 1000, seed: 9 });
@@ -117,7 +125,7 @@ test('the room pays rank XP with the result and shows ranks in the lineup', () =
   const room = new RoomCore({ stake: 100, wallet, ranks, practice: true, send: (cid, m) => out.push(m), prepSeconds: 1 });
   wallet.ensure('tok');
   room.addClient(1, { token: 'tok', name: 'me' });
-  room.handle(1, { t: 'ready', asset: 'SATS' });
+  room.handle(1, { t: 'ready', asset: 'USDC' });
   const prep = out.filter((m) => m.t === 'prep').at(-1);
   assert.equal(prep.slots[0].rk, 1);
   for (let i = 0; i < CFG.TICK_RATE * 2 && room.state !== 'live'; i++) room.tick();
@@ -130,6 +138,8 @@ test('the room pays rank XP with the result and shows ranks in the lineup', () =
   assert.equal(res.rank.after.xp, res.rank.gained);
   assert.equal(ranks.get('tok').xp, res.rank.gained);
   assert.ok(res.rank.parts.some((p) => p.label === 'Practice ×0.5'));
+  room.handle(1, { t: 'watch', d: 0 }); // done watching
+  room.tick();
   assert.equal(room.world.phase, 'ended');
 });
 
@@ -155,4 +165,28 @@ test('bots give a human a grace period, then at most two press them at once', ()
       assert.ok(maxHunters <= 2, `at most two bots on one human (saw ${maxHunters})`);
     }
   }
+});
+
+test('achievements count a career, pay XP once and unlock titles', () => {
+  const ids = new Set();
+  for (const a of ACHIEVEMENTS) {
+    assert.ok(!ids.has(a.id), `unique id ${a.id}`);
+    ids.add(a.id);
+    assert.ok(a.goal > 0 && a.xp >= 0);
+  }
+  const book = new RankBook();
+  const raid = { status: 'extracted', kills: 3, bestMulti: 2, prestige: 0, firstBlood: true, joinedAt: 0, endedAt: 100, stake: 1000, payout: 2500 };
+  const first = book.progress('me', raidStats(raid, { golden: true }));
+  const got = new Set(first.map((a) => a.id));
+  for (const id of ['rookie', 'escape_artist', 'first_kill', 'double_tap', 'first_blood', 'double_up', 'gold_rush']) assert.ok(got.has(id), id);
+  assert.ok(!got.has('pacifist'), 'had kills');
+  assert.equal(book.progress('me', raidStats(raid)).filter((a) => a.id === 'rookie').length, 0, 'paid once');
+  assert.equal(book.career('me').stats.kills, 6, 'kills add up');
+  assert.equal(book.career('me').stats.bestKills, 3, 'best of one raid is kept');
+  assert.equal(book.setTitle('me', 'apex'), false, 'locked titles cannot be worn');
+  assert.ok(book.setTitle('me', 'gold_rush'));
+  assert.equal(book.title('me'), 'gold_rush');
+  const saved = new RankBook({ data: JSON.parse(JSON.stringify(book.toJSON())) });
+  assert.deepEqual(saved.career('me'), book.career('me'));
+  assert.equal(new RankBook({ data: { old: 500 } }).get('old').xp, 500, 'old saves: bare XP numbers');
 });

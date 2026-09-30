@@ -20,8 +20,9 @@ await build({
   conditions: ['browser', 'import', 'module'],
   define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
   // node built-ins some deps reference behind runtime checks, and Starkzap's optional
-  // peers for features the game does not use (Solana/Hyperlane bridge, AVNU SDK)
-  external: ['node:*', 'fs', 'path', 'crypto', 'os', 'module', 'url', 'worker_threads', 'child_process', '@hyperlane-xyz/*', '@avnu/avnu-sdk'],
+  // peers for features the game does not use (Solana/Hyperlane bridge); the AVNU SDK is
+  // bundled: the swap screen uses it
+  external: ['node:*', 'fs', 'path', 'crypto', 'os', 'module', 'url', 'worker_threads', 'child_process', '@hyperlane-xyz/*'],
   logLevel: 'warning',
 });
 const { size } = await stat(out);

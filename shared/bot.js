@@ -28,9 +28,12 @@ export class BotBrain {
     this.w = world;
     this.p = p;
     this.rnd = rnd;
-    // practice bots are softer: slower to react, sloppier aim, shorter bursts
-    this.easy = !!world.practice;
-    this.skill = this.easy ? 0.05 + rnd() * 0.3 : 0.15 + rnd() * 0.4; // online: a new player survives first contact more often than not
+    // practice difficulty: easy bots are slower to react, sloppier and fire in short bursts;
+    // normal plays like online bots; hard ones aim and react like veterans
+    const diff = world.difficulty ?? (world.practice ? 'easy' : 'normal');
+    this.ffa = !!world.practice; // practice: every bot for itself
+    this.easy = diff === 'easy';
+    this.skill = this.easy ? 0.05 + rnd() * 0.3 : diff === 'hard' ? 0.5 + rnd() * 0.45 : 0.15 + rnd() * 0.4; // online: a new player survives first contact more often than not
     this.burstT = 0; // practice: bots fire in bursts with pauses in between
     this.burstOn = true;
     this.target = null; // who this bot is fighting right now (id)
@@ -177,7 +180,7 @@ export class BotBrain {
     const hunter = this.brave > 0.68;
     const foes = w
       .visibleEnemies(p)
-      .filter((f) => f.shield <= 0 && (this.easy || !f.isBot || p.lastAttacker === f.id || (!truce && hunter)))
+      .filter((f) => f.shield <= 0 && (this.ffa || !f.isBot || p.lastAttacker === f.id || (!truce && hunter)))
       .filter((f) => f.isBot || p.lastAttacker === f.id || (w.time >= CFG.HUMAN_GRACE && (this.target === f.id || this.huntersOn(f.id) < HUMAN_HUNTERS)));
     let foe = null;
     let fd = Infinity;

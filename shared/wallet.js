@@ -11,8 +11,12 @@ export class MemoryWallet {
     this.faucetBasket = Object.fromEntries(faucet.filter((a) => a.faucet).map((a) => [a.id, BigInt(a.faucet)]));
     this.accounts = new Map();
     for (const [token, bal] of Object.entries(data)) {
-      // old single-number save files become a SATS balance
-      const m = typeof bal === 'object' && bal ? bal : { SATS: String(bal) };
+      const m = typeof bal === 'object' && bal ? { ...bal } : { SATS: String(bal) };
+      // saves from before the game went all-dollar held play "sats" (1,000 = $1): now test USDC
+      if (m.SATS !== undefined) {
+        m.USDC = (BigInt(m.USDC ?? 0) + BigInt(m.SATS) * 1000n).toString();
+        delete m.SATS;
+      }
       this.accounts.set(token, new Map(Object.entries(m).map(([k, v]) => [k, BigInt(v)])));
     }
     this.onChange = onChange;
