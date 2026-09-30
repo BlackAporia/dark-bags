@@ -54,7 +54,7 @@ function fakeChain({ routes = ['private', 'public'] } = {}) {
 function setup(opts = {}) {
   const chain = fakeChain(opts);
   const prices = new PriceBook(chain.tokens.map((t) => ({ ...t, usd: t.symbol === 'STRK' ? 0.15 : 1 })));
-  const cashier = new Cashier({ chain, prices, data: opts.data, privy: opts.privy ?? null });
+  const cashier = new Cashier({ chain, prices, data: opts.data, privy: opts.privy ?? null, allow: opts.allow ?? null, maxBalanceUsd: opts.maxBalanceUsd ?? 0, maxTotalUsd: opts.maxTotalUsd ?? 0, paused: opts.paused ?? (() => false) });
   return { chain, prices, cashier };
 }
 
@@ -226,4 +226,71 @@ test('lobby with a cashier: wallet first, then stake from the signed-in balance'
   lobby.connect(2);
   lobby.handle(2, { t: 'hello', token: 'sess0001' });
   assert.equal(last('welcome').account, ALICE);
+});
+
+test('closed beta: only listed addresses sign in; deposits over the caps are held, not credited', async () => {
+  const { chain, cashier } = setup({ allow: new Set([ALICE]), maxBalanceUsd: 20, maxTotalUsd: 30 });
+  await assert.rejects(signIn(cashier, 's2', BOB), /Closed beta/);
+  assert.equal(await signIn(cashier, 's1', ALICE), ALICE);
+  const dep = (tx, token, amount, from = ALICE) => {
+    chain.receipts.set(normAddr(tx), { status: 'ok', transfers: [{ id: `${tx}:0`, token, from, amount }] });
+    return cashier.depositPublic(ALICE, tx);
+  };
+  // $15 of USDC: fine
+  let r = await dep('0x1', USDC, 15n * 10n ** 6n);
+  assert.equal(r.credited[0].held, undefined);
+  assert.equal(cashier.ledger.balance(ALICE, USDC), 15n * 10n ** 6n);
+  // another $10 would make $25 > $20: held, balance unchanged, on record for a refund
+  r = await dep('0x2', USDC, 10n * 10n ** 6n);
+  assert.equal(r.credited[0].held, 'over-limit');
+  assert.equal(cashier.ledger.balance(ALICE, USDC), 15n * 10n ** 6n);
+  assert.ok(cashier.history(ALICE).deposits.some((d) => d.held === 'over-limit'));
+  // $5 in STRK still fits
+  r = await dep('0x3', STRK, 33n * E18); // 33 × $0.15 = $4.95
+  assert.equal(r.credited[0].held, undefined);
+  // a transfer from someone off the list is never credited
+  r = await dep('0x4', USDC, 1n * 10n ** 6n, BOB);
+  assert.equal(r.credited[0].held, 'not-allowed');
+  assert.equal(cashier.ledger.balance(BOB, USDC), 0n);
+  assert.equal(cashier.info().beta, true);
+  assert.equal(cashier.info().maxBalanceUsd, 20);
+});
+
+test('the house cap holds deposits once the total owed would pass it', async () => {
+  const { chain, cashier } = setup({ maxTotalUsd: 30 });
+  const dep = (tx, from, usd) => {
+    chain.receipts.set(normAddr(tx), { status: 'ok', transfers: [{ id: `${tx}:0`, token: USDC, from, amount: BigInt(usd) * 10n ** 6n }] });
+    return cashier.depositPublic(from, tx);
+  };
+  assert.equal((await dep('0x1', ALICE, 20)).credited[0].held, undefined);
+  assert.equal((await dep('0x2', BOB, 15)).credited[0].held, 'house-limit');
+  assert.equal((await dep('0x3', BOB, 10)).credited[0].held, undefined);
+});
+
+test('pause stops new stakes and purchases, never cash-outs', async () => {
+  let paused = false;
+  const { chain, cashier } = setup({ paused: () => paused });
+  const out = [];
+  const lobby = new Lobby({ cashier, send: (_c, m) => out.push(m), newToken: () => 'tok', bots: false });
+  lobby.connect(1);
+  lobby.handle(1, { t: 'hello', token: null, name: 'a' });
+  await signIn(cashier, 'tok', ALICE);
+  chain.receipts.set(normAddr('0x1'), { status: 'ok', transfers: [{ id: '0x1:0', token: USDC, from: ALICE, amount: 50n * 10n ** 6n }] });
+  await cashier.depositPublic(ALICE, '0x1');
+  paused = true;
+  assert.equal(cashier.info().paused, true);
+  out.length = 0;
+  lobby.handle(1, { t: 'box', id: 'street', n: 1 });
+  assert.ok(out.some((m) => m.t === 'err' && /Paused/.test(m.msg)), 'no box buys while paused');
+  const w = await cashier.withdraw(ALICE, { asset: USDC, units: (5n * 10n ** 6n).toString(), route: 'public' });
+  assert.equal(w.status, 'sent', 'cash-outs still work');
+});
+
+test('a journal from one network never loads on another', () => {
+  const { cashier } = setup();
+  const saved = JSON.parse(JSON.stringify(cashier.toJSON()));
+  assert.equal(saved.network, 'sepolia');
+  const chain = fakeChain();
+  chain.info = () => ({ network: 'mainnet', chainId: 'SN_MAIN', house: HOUSE, routes: ['public'], tokens: chain.tokens });
+  assert.throws(() => new Cashier({ chain, prices: new PriceBook([]), data: saved }), /separate file per network/);
 });

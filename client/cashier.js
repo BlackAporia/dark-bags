@@ -63,7 +63,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     $('connect').hidden = !!cs.account;
     $('open-cashier').hidden = !cs.account;
     $('logout').hidden = !cs.account;
-    $('fine').textContent = `Real tokens on Starknet ${cs.chain.network}. The house holds deposits until you cash out; cash-outs go only to the address you signed in with.`;
+    $('fine').textContent = `Real tokens on Starknet ${cs.chain.network}. The house holds deposits until you cash out; cash-outs go only to the address you signed in with.${cs.chain.maxBalanceUsd ? ` Beta: up to $${cs.chain.maxBalanceUsd} per player.` : ''}`;
   }
 
   function kindLabel() {
@@ -315,7 +315,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 
   function renderHistory(m) {
     const rows = [
-      ...m.deposits.map((d) => ({ ...d, what: d.unsupported ? 'Deposit (token not accepted, contact support)' : 'Deposit' })),
+      ...m.deposits.map((d) => ({ ...d, what: d.unsupported ? 'Deposit (token not accepted, contact support)' : d.held ? 'Deposit held (over a beta limit, being refunded)' : 'Deposit' })),
       ...m.withdrawals.map((w) => ({ ...w, what: `Cash-out · ${w.status}` })),
     ].sort((a, b) => b.at - a.at);
     const link = (tx) => (tx && tx.startsWith('0x') ? ` · <a href="${esc(cs.chain.explorer)}/tx/${esc(tx)}" target="_blank" rel="noopener">${esc(short(tx))}</a>` : '');
@@ -365,7 +365,11 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       case 'cashier': {
         if (m.op === 'deposit') {
           if (m.status === 'checking') setStatus('cash-status', 'The cashier is checking the chain…');
-          else if (m.status === 'ok' && m.credited?.length) {
+          else if (m.status === 'ok' && m.credited?.some((c) => c.held)) {
+            const why = { 'not-allowed': 'this address is not in the closed beta', 'over-limit': `it would take you over the beta limit of $${cs.chain.maxBalanceUsd ?? '?'}`, 'house-limit': 'the beta is full right now', 'no-price': 'that token has no price right now' };
+            const reason = why[m.credited.find((c) => c.held).held] ?? 'of a beta limit';
+            setStatus('cash-status', `Received but not credited because ${reason}. It is safe with the house and will be sent back to you.`, true);
+          } else if (m.status === 'ok' && m.credited?.length) {
             const txt = m.credited.map((c) => (token(c.asset) ? `${formatUnits(c.units, token(c.asset).decimals, 6)} ${token(c.asset).symbol}` : 'an unsupported token')).join(', ');
             setStatus('cash-status', `Credited ${txt}.`);
             toast(`Deposit credited: ${txt}.`);

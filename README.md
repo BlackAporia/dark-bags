@@ -167,6 +167,11 @@ A session is bound to the address. A leaked session token can play with that bal
 | `PAYMASTER_API_KEY`, `PAYMASTER_URL` | AVNU paymaster for gasless house payouts and sponsored player deposits. |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_CLIENT_ID` | Privy sign-in. Add the game's origin to the app's allowed origins and enable the login methods you want. |
 | `CARTRIDGE=0` | Hides the Cartridge option. |
+| `ALLOWLIST` | Closed beta: comma-separated addresses that may sign in; transfers from anyone else are held, not credited. |
+| `MAX_BALANCE_USD`, `MAX_TOTAL_USD` | Beta caps: a deposit that would take a player (or everyone together) over this many $ is held for a manual refund (`npm run house -- held`). |
+| `PAUSE_FILE` | The pause switch (default `<CASHIER_FILE>.paused`; `npm run house -- pause` / `resume`): no new stakes, box buys, top-ups or swaps; cash-outs always work. |
+
+On mainnet the server refuses to start without `CASHIER_FILE`, and a journal written on one network never loads on another. Step-by-step launch (Render, house wallet, Sepolia checklist, closed-beta mainnet): [docs/LAUNCH.md](docs/LAUNCH.md).
 
 The browser wallet layer is a separate 2.5 MB bundle (`npm run build:wallets`, done by the Dockerfile and the Render blueprint) loaded only when a player opens the cashier. The static single-file build can point at a real-token server (`DARK_BAGS_SERVER`); the server allows it cross-origin for `/api/*` and `/vendor/*`.
 
@@ -174,6 +179,8 @@ The browser wallet layer is a separate 2.5 MB bundle (`npm run build:wallets`, d
 
 `npm run house -- <command>` with the same env as the server:
 
+- `pause` / `resume`: stop and restart new stakes and purchases without a restart (cash-outs stay open).
+- `held`: deposits a beta limit kept out of the game, to send back.
 - `status`: tokens held vs owed to players per token (flags any shortfall), and payouts in review.
 - `review`, `resolve <id> sent <0xtx>`, `resolve <id> refund`: settle held payouts (stop the server first).
 - `register`: publish the house viewing key in the STRK20 pool, once, before taking private deposits.

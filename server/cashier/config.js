@@ -63,6 +63,12 @@ export function readConfig(env = process.env) {
     priceSeconds: Number(env.PRICE_SECONDS || 60),
     minWithdrawUsd: Number(env.MIN_WITHDRAW_USD || 1),
     file: env.CASHIER_FILE || null,
+    // launch guards: closed-beta address list, $ caps per player and for the whole house,
+    // and the pause switch file (defaults to <CASHIER_FILE>.paused)
+    allow: list(env.ALLOWLIST),
+    maxBalanceUsd: Number(env.MAX_BALANCE_USD || 0),
+    maxTotalUsd: Number(env.MAX_TOTAL_USD || 0),
+    pauseFile: env.PAUSE_FILE || (env.CASHIER_FILE ? `${env.CASHIER_FILE}.paused` : null),
     strk20: {
       pool: env.STRK20_POOL || (network === 'mainnet' ? STRK20_POOL_MAINNET : null),
       viewingKey: env.STRK20_VIEWING_KEY || null,

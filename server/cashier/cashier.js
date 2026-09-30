@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { MemoryWallet } from '../../shared/wallet.js';
 import { MILLS } from '../../shared/assets.js';
 
@@ -71,6 +72,22 @@ export function loginTypedData({ chainId, nonce, issued }) {
   };
 }
 
+// The pause switch is a file next to the journal: `npm run house -- pause` creates it,
+// `resume` removes it. Checked at most once a second, so it works without a restart.
+export function pauseFlag(file) {
+  if (!file) return () => false;
+  let at = 0;
+  let on = false;
+  return () => {
+    const now = Date.now();
+    if (now - at > 1000) {
+      at = now;
+      on = existsSync(file);
+    }
+    return on;
+  };
+}
+
 export class CashierError extends Error {
   constructor(msg) {
     super(msg);
@@ -79,7 +96,19 @@ export class CashierError extends Error {
 }
 
 export class Cashier {
-  constructor({ chain, prices, data = {}, save = null, flush = null, privy = null, now = () => Date.now(), minWithdrawUsd = 1 }) {
+  // Launch guards (all optional; see readConfig):
+  //   allow          Set of addresses that may sign in and deposit (closed beta); null = anyone
+  //   maxBalanceUsd  a deposit that would take a player's balance over this is held, not credited
+  //   maxTotalUsd    same for everything the house owes all players together
+  //   paused         () => bool: no new stakes, box buys, top-ups or swaps; cash-outs always work
+  constructor({ chain, prices, data = {}, save = null, flush = null, privy = null, now = () => Date.now(), minWithdrawUsd = 1, allow = null, maxBalanceUsd = 0, maxTotalUsd = 0, paused = () => false }) {
+    // a journal belongs to one network: Sepolia balances must never show up as mainnet money
+    const net = chain.info().network;
+    if (data.network && data.network !== net) throw new Error(`CASHIER_FILE holds a ${data.network} journal but CHAIN is ${net}. Use a separate file per network.`);
+    this.allow = allow && allow.size ? allow : null;
+    this.maxBalanceUsd = maxBalanceUsd;
+    this.maxTotalUsd = maxTotalUsd;
+    this.paused = paused;
     this.chain = chain;
     this.prices = prices;
     this.now = now;
@@ -103,11 +132,44 @@ export class Cashier {
   }
 
   info() {
-    return { ...this.chain.info(), minWithdrawUsd: this.minWithdrawUsd };
+    return { ...this.chain.info(), minWithdrawUsd: this.minWithdrawUsd, beta: !!this.allow, maxBalanceUsd: this.maxBalanceUsd || null, paused: this.paused() };
+  }
+
+  allowed(account) {
+    return !this.allow || this.allow.has(account);
+  }
+
+  // $ value (mills) of a balance map { token: units }; null if any token has no price
+  worth(bal) {
+    let v = 0;
+    for (const [k, u] of Object.entries(bal ?? {})) {
+      if (BigInt(u) === 0n) continue;
+      if (!this.prices.has(k)) return null;
+      v += this.prices.value(k, BigInt(u));
+    }
+    return v;
+  }
+
+  // why a deposit may not be credited automatically (null = fine)
+  holdReason(account, token, amount) {
+    if (!this.allowed(account)) return 'not-allowed';
+    if (!this.maxBalanceUsd && !this.maxTotalUsd) return null;
+    if (!this.prices.has(token)) return 'no-price';
+    const add = this.prices.value(token, amount);
+    if (this.maxBalanceUsd) {
+      const mine = this.worth(this.ledger.toJSON()[account]);
+      if (mine === null || mine + add > this.maxBalanceUsd * MILLS) return 'over-limit';
+    }
+    if (this.maxTotalUsd) {
+      const all = this.worth(this.liabilities());
+      if (all === null || all + add > this.maxTotalUsd * MILLS) return 'house-limit';
+    }
+    return null;
   }
 
   toJSON() {
     return {
+      network: this.chain.info().network,
       ledger: this.ledger.toJSON(),
       seen: [...this.seen],
       sessions: Object.fromEntries(this.sessions),
@@ -155,6 +217,7 @@ export class Cashier {
       console.error('signature check failed', e?.message ?? e);
     }
     if (!ok) throw new CashierError('The signature did not check out. Is the account deployed?');
+    if (!this.allowed(account)) throw new CashierError(`Closed beta: ${account} is not on the list yet. Send this address to the team.`);
     this.sessions.set(session, { account, at: this.now() });
     this.ledger.ensure(account);
     this.persist();
@@ -172,6 +235,7 @@ export class Cashier {
       w = await this.privy.createWallet(userId);
       this.privyWallets[userId] = w;
     }
+    if (!this.allowed(w.account)) throw new CashierError(`Closed beta: ${w.account} is not on the list yet. Send this address to the team.`);
     this.sessions.set(session, { account: w.account, at: this.now(), privy: userId });
     this.ledger.ensure(w.account);
     this.persist();
@@ -208,6 +272,15 @@ export class Cashier {
       this.deposits.push({ id: dep.id, account: from, token, amount: amount.toString(), route, at: this.now(), unsupported: true });
       this.persist();
       return { account: from, token, amount, unsupported: true };
+    }
+    const held = this.holdReason(from, token, amount);
+    if (held) {
+      // the money is on chain with the house but not in the game: the operator refunds it
+      // (npm run house -- held), so nobody goes over the beta limits
+      this.deposits.push({ id: dep.id, account: from, token, amount: amount.toString(), route, at: this.now(), held });
+      this.persist();
+      console.warn(`deposit ${dep.id} from ${from} held: ${held}`);
+      return { account: from, token, amount, held };
     }
     this.ledger.credit(from, token, amount);
     this.deposits.push({ id: dep.id, account: from, token, amount: amount.toString(), route, at: this.now() });
@@ -323,7 +396,7 @@ export class Cashier {
   history(account, n = 20) {
     const pick = (l) => l.filter((x) => x.account === account).slice(-n).reverse();
     return {
-      deposits: pick(this.deposits).map(({ id, token, amount, route, at, unsupported }) => ({ id, asset: token, units: amount, route, at, unsupported: !!unsupported })),
+      deposits: pick(this.deposits).map(({ id, token, amount, route, at, unsupported, held }) => ({ id, asset: token, units: amount, route, at, unsupported: !!unsupported, held: held ?? null })),
       withdrawals: pick(this.withdrawals).map(({ id, token, amount, route, status, tx, at }) => ({ id, asset: token, units: amount, route, status, tx, at })),
     };
   }

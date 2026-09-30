@@ -4,6 +4,8 @@
 //   node scripts/house.js review                     payouts held for a human after a crash or unclear error
 //   node scripts/house.js resolve <id> sent <0xtx>   mark a held payout as delivered
 //   node scripts/house.js resolve <id> refund        give a held payout back to the player's balance
+//   node scripts/house.js pause | resume            stop / restart new stakes and purchases (cash-outs stay open)
+//   node scripts/house.js held                       deposits kept out of the game by a beta limit, to send back
 //   node scripts/house.js register                   publish the house viewing key in the STRK20 pool (once)
 //   node scripts/house.js pools <staker>             a validator's delegation pools (Starkzap staking)
 //   node scripts/house.js stake <pool> <amount> [token]   delegate idle house STRK (default) or BTC (surplus only)
@@ -14,7 +16,7 @@
 //
 // Stop the server before `resolve`: both write CASHIER_FILE.
 // The surplus guard counts only balances in CASHIER_FILE; stakes inside a live raid are on top.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import * as starkzap from 'starkzap';
 import { readConfig } from '../server/cashier/config.js';
 import { createStarknetChain } from '../server/cashier/starknet.js';
@@ -29,7 +31,7 @@ if (!cfg) {
 }
 const { Amount, fromAddress } = starkzap;
 const data = cfg.file && existsSync(cfg.file) ? JSON.parse(readFileSync(cfg.file, 'utf8')) : {};
-const needsChain = !['review', 'resolve'].includes(cmd);
+const needsChain = !['review', 'resolve', 'pause', 'resume', 'held'].includes(cmd);
 const chain = needsChain ? await createStarknetChain({ cfg, starkzap, log: { warn() {}, error: console.error, log() {} } }) : null;
 const tokenBy = (s) => chain.tokens.find((t) => t.symbol.toUpperCase() === String(s).toUpperCase() || t.id === normAddr(s));
 const fmt = (t, units) => Amount.fromRaw(BigInt(units), t).toFormatted();
@@ -63,6 +65,21 @@ const needWallet = () => {
 };
 
 switch (cmd) {
+  case 'pause':
+  case 'resume': {
+    if (!cfg.pauseFile) {
+      console.error('Set CASHIER_FILE (or PAUSE_FILE) first.');
+      process.exit(1);
+    }
+    if (cmd === 'pause') writeFileSync(cfg.pauseFile, new Date().toISOString());
+    else if (existsSync(cfg.pauseFile)) unlinkSync(cfg.pauseFile);
+    console.log(cmd === 'pause' ? 'Paused: no new stakes, box buys, top-ups or swaps within a second. Cash-outs stay open.' : 'Resumed.');
+    break;
+  }
+  case 'held':
+    // refund each one from the house wallet to its sender, then note the tx for your records
+    for (const d of (data.deposits ?? []).filter((x) => x.held)) console.log(`${new Date(d.at).toISOString()}  ${d.held.padEnd(11)}  ${d.account}  ${d.amount} of ${d.token}  (deposit ${d.id})`);
+    break;
   case 'status': {
     const o = owed();
     console.log(`${cfg.network} house ${chain.info().house}`);
