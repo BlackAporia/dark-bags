@@ -192,6 +192,7 @@ export default {
   'r.epic': 'Epic',
   'r.legendary': 'Legendary',
   'r.mythic': 'Mythic',
+  'r.exotic': 'Exotic',
   // achievements
   'ach.title': 'Achievements',
   'ach.button': 'Achievements',

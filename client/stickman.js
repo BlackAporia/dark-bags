@@ -96,6 +96,9 @@ function seg(ctx, a, b) {
 export function outfitColor(outfit, t, fallback) {
   if (!outfit) return fallback;
   if (outfit.fx === 'rainbow') return `hsl(${(t / 12) % 360}, 95%, 70%)`;
+  if (outfit.fx === 'gold') return `hsl(${44 + 6 * Math.sin(t / 300)}, 100%, ${62 + 14 * Math.sin(t / 170)}%)`;
+  if (outfit.fx === 'holo') return `hsl(${185 + 25 * Math.sin(t / 400)}, 100%, 72%)`;
+  if (outfit.fx === 'glitch' && Math.sin(t / 37) > 0.93) return outfit.accent ?? '#ff2d55';
   return outfit.color;
 }
 
@@ -103,7 +106,7 @@ export function outfitColor(outfit, t, fallback) {
 function drawAura(ctx, p, outfit, color, t, legsLeft) {
   const fx = outfit.fx;
   const k = fx === 'pulse' ? 0.5 + 0.5 * Math.sin(t / 260) : fx === 'fire' ? 0.75 + 0.25 * Math.sin(t / 45) * Math.sin(t / 71) : 0.8;
-  const auraColor = fx === 'fire' ? '#ff7a1a' : outfit.accent && fx === 'pulse' ? color : color;
+  const auraColor = fx === 'fire' ? '#ff7a1a' : fx === 'gold' ? '#ffd166' : color;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const [w, alpha] of [
@@ -144,6 +147,99 @@ function drawAura(ctx, p, outfit, color, t, legsLeft) {
       ctx.fill();
     }
   }
+  ctx.restore();
+}
+
+// Premium particle effects around the figure (outfit.fx2). Cheap: a handful of dots
+// and strokes per runner, all derived from time, no state.
+function drawParticles(ctx, p, outfit, t, color) {
+  const fx = outfit.fx2;
+  const cx = p.shoulder.x;
+  const cy = (p.head.y + p.hip.y) / 2;
+  const seed = (outfit.id?.length ?? 3) * 7.3;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  if (fx === 'lightning') {
+    // crackling arcs that jump between random points around the body
+    if (Math.sin(t / 53 + seed) > 0.2) {
+      ctx.strokeStyle = '#bfe9ff';
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 0.9;
+      for (let k = 0; k < 2; k++) {
+        const a0 = t / 90 + k * 2.4 + seed;
+        let x = cx + Math.cos(a0) * 14;
+        let y = cy + Math.sin(a0) * 18;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        for (let i = 0; i < 4; i++) {
+          x += Math.sin(t / 17 + i * 3 + k) * 6;
+          y += 5 + Math.cos(t / 23 + i) * 3;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+  } else if (fx === 'galaxy' || fx === 'sparks' || fx === 'frost') {
+    // orbiting stars / sparks / ice flakes
+    const n = fx === 'galaxy' ? 9 : 7;
+    for (let i = 0; i < n; i++) {
+      const a0 = t / (fx === 'frost' ? 1400 : 900) + (i / n) * Math.PI * 2 + seed;
+      const rr = 15 + 5 * Math.sin(t / 500 + i);
+      const x = cx + Math.cos(a0) * rr;
+      const y = cy + Math.sin(a0) * rr * 1.3;
+      const tw = 0.5 + 0.5 * Math.sin(t / 120 + i * 1.7);
+      ctx.globalAlpha = 0.35 + 0.65 * tw;
+      ctx.fillStyle = fx === 'galaxy' ? `hsl(${(i * 47 + t / 20) % 360}, 90%, 75%)` : fx === 'frost' ? '#d8f3ff' : '#ffd166';
+      ctx.beginPath();
+      ctx.arc(x, y, fx === 'galaxy' ? 1.2 + tw : 1 + tw * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (fx === 'money' || fx === 'matrix') {
+    // falling $ bills or green code around the runner
+    ctx.font = `700 ${fx === 'money' ? 7 : 6}px monospace`;
+    ctx.textAlign = 'center';
+    for (let i = 0; i < 6; i++) {
+      const fall = (t / (fx === 'money' ? 18 : 12) + i * 17 + seed) % 44;
+      const x = cx + ((i * 9 + seed) % 28) - 14;
+      const y = p.head.y - 16 + fall;
+      ctx.globalAlpha = 1 - fall / 44;
+      ctx.fillStyle = fx === 'money' ? '#7dff9b' : '#39ff14';
+      ctx.fillText(fx === 'money' ? '$' : String.fromCharCode(0x30a0 + ((i * 13 + Math.floor(t / 150)) % 90)), x, y);
+    }
+  } else if (fx === 'shadow') {
+    // dark smoke rising off the shoulders
+    ctx.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 6; i++) {
+      const life = (t / 30 + i * 11) % 30;
+      ctx.globalAlpha = 0.35 * (1 - life / 30);
+      ctx.fillStyle = outfit.accent ?? '#1a0026';
+      ctx.beginPath();
+      ctx.arc(cx + Math.sin(t / 300 + i) * 8, p.shoulder.y - life, 3 + life / 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// A cape from the shoulders, trailing behind the runner and rippling with the stride.
+function drawCape(ctx, p, a, outfit, t) {
+  const f = p.f;
+  const wave = Math.sin(t / 160 + (a.id ?? 0)) * 2 + (a.moveK ?? 0) * 4;
+  const sx = p.shoulder.x;
+  const sy = p.shoulder.y + 1;
+  ctx.save();
+  ctx.fillStyle = outfit.cape;
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(sx - 3, sy);
+  ctx.lineTo(sx + 3, sy);
+  ctx.quadraticCurveTo(sx - f * (6 + wave), p.hip.y, sx - f * (10 + wave * 1.6), p.hip.y + 9);
+  ctx.lineTo(sx - f * (3 + wave * 0.5), p.hip.y + 8);
+  ctx.quadraticCurveTo(sx - f * 2, p.hip.y - 2, sx - 3, sy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -314,6 +410,205 @@ function drawHead(ctx, p, a, outfit, color, t, flash) {
       ctx.fill();
       break;
     }
+    case 'visor':
+      // wraparound cyber visor
+      ctx.beginPath();
+      ctx.rect(h.x - r - 0.5, h.y - 3, (r + 0.5) * 2 + 1.5, 3.6);
+      fill(acc);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = flash ? '#fff' : outfit.accent2 ?? '#00f5ff';
+      ctx.fillRect(h.x + f * 1 - (f < 0 ? r + 1.5 : 0), h.y - 2.2, r + 1.5, 1.6);
+      break;
+    case 'catears':
+    case 'dogears':
+    case 'bunny':
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        if (g === 'bunny') {
+          ctx.ellipse(h.x + side * 3, h.y - r - 6, 1.8, 6, side * 0.15, 0, Math.PI * 2);
+        } else {
+          const tall = g === 'dogears' ? 6 : 5;
+          ctx.moveTo(h.x + side * 1.5, h.y - r + 1);
+          ctx.lineTo(h.x + side * 6, h.y - r - tall);
+          ctx.lineTo(h.x + side * 6.5, h.y - r + 2.5);
+          ctx.closePath();
+        }
+        fill(acc);
+      }
+      break;
+    case 'wizard':
+      ctx.beginPath();
+      ctx.moveTo(h.x - 7.5, h.y - r + 1.5);
+      ctx.quadraticCurveTo(h.x - 1, h.y - r - 8, h.x - f * 4, h.y - r - 16 + Math.sin(t / 500) * 1.2);
+      ctx.quadraticCurveTo(h.x + 2, h.y - r - 6, h.x + 7.5, h.y - r + 1.5);
+      ctx.closePath();
+      fill(acc);
+      ctx.fillStyle = flash ? '#fff' : '#ffd166';
+      ctx.beginPath();
+      ctx.arc(h.x - 1, h.y - r - 6, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'viking':
+      ctx.beginPath();
+      ctx.arc(h.x, h.y - 0.5, r + 1.4, Math.PI, 0);
+      ctx.closePath();
+      fill(acc);
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(h.x + side * (r - 0.5), h.y - 3);
+        ctx.quadraticCurveTo(h.x + side * (r + 7), h.y - 4, h.x + side * (r + 5), h.y - r - 7);
+        ctx.quadraticCurveTo(h.x + side * (r + 3.5), h.y - 5, h.x + side * (r - 1.5), h.y - 5.5);
+        ctx.closePath();
+        fill('#f1e3c8');
+      }
+      break;
+    case 'astro':
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, r + 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(160, 220, 255, 0.25)';
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = flash ? '#fff' : acc;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, r + 2, -2.4, -1.6);
+      ctx.stroke();
+      break;
+    case 'mohawk':
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(h.x + i * 2.4 - 1.2, h.y - r + 1);
+        ctx.lineTo(h.x + i * 2.4 - f * 1.5, h.y - r - 6 + Math.abs(i) * 1.2);
+        ctx.lineTo(h.x + i * 2.4 + 1.2, h.y - r + 1);
+        ctx.closePath();
+        fill(acc);
+      }
+      break;
+    case 'antenna':
+      ctx.strokeStyle = flash ? '#fff' : acc;
+      ctx.lineWidth = 1.4;
+      for (const side of [-1, 1]) {
+        const tipX = h.x + side * 5 + Math.sin(t / 200 + side) * 1.2;
+        const tipY = h.y - r - 8;
+        ctx.beginPath();
+        ctx.moveTo(h.x + side * 2, h.y - r + 0.5);
+        ctx.quadraticCurveTo(h.x + side * 2, tipY + 3, tipX, tipY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, 1.8, 0, Math.PI * 2);
+        fill(outfit.accent2 ?? '#9ef01a');
+      }
+      break;
+    case 'cowboy':
+      ctx.beginPath();
+      ctx.ellipse(h.x, h.y - r + 0.5, 10, 2.2, 0, 0, Math.PI * 2);
+      fill(acc);
+      ctx.beginPath();
+      ctx.moveTo(h.x - 5, h.y - r + 0.5);
+      ctx.lineTo(h.x - 4.5, h.y - r - 6);
+      ctx.quadraticCurveTo(h.x, h.y - r - 4, h.x + 4.5, h.y - r - 6);
+      ctx.lineTo(h.x + 5, h.y - r + 0.5);
+      ctx.closePath();
+      fill(acc);
+      break;
+    case 'pumpkin':
+    case 'skull': {
+      // a full-face mask over the head circle
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, r + 0.8, 0, Math.PI * 2);
+      fill(flash ? '#fff' : g === 'pumpkin' ? '#ff8c1a' : '#efe8d8');
+      ctx.fillStyle = g === 'pumpkin' ? '#ffd166' : '#111';
+      if (g === 'pumpkin') {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t / 90);
+      }
+      for (const dx of [-2.4, 2.4]) {
+        ctx.beginPath();
+        ctx.arc(h.x + f * 1 + dx, h.y - 1, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillRect(h.x + f * 1 - 2.5, h.y + 2.2, 5, 1.2);
+      if (g === 'pumpkin') {
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = '#3a7d1a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(h.x, h.y - r - 0.5);
+        ctx.lineTo(h.x + 1.5, h.y - r - 3.5);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'frog':
+      // big bulging eyes on top
+      for (const dx of [-3.4, 3.4]) {
+        ctx.beginPath();
+        ctx.arc(h.x + dx, h.y - r + 0.5, 3, 0, Math.PI * 2);
+        fill(flash ? '#fff' : acc);
+        ctx.fillStyle = '#f7f7f7';
+        ctx.beginPath();
+        ctx.arc(h.x + dx + f * 0.6, h.y - r + 0.3, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(h.x + dx + f * 1.1, h.y - r + 0.3, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    case 'domino':
+      // a hero's eye mask with trailing ties
+      ctx.beginPath();
+      ctx.ellipse(h.x + f * 2, h.y - 1, r * 0.75, 2.2, 0, 0, Math.PI * 2);
+      fill(acc);
+      ctx.strokeStyle = acc;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(h.x - f * (r - 1), h.y - 1);
+      ctx.lineTo(h.x - f * (r + 5), h.y + 1 + Math.sin(t / 120) * 1.5);
+      ctx.stroke();
+      break;
+    case 'party':
+      ctx.beginPath();
+      ctx.moveTo(h.x - 4.5, h.y - r + 1.5);
+      ctx.lineTo(h.x + f * 1.5, h.y - r - 11);
+      ctx.lineTo(h.x + 4.5, h.y - r + 1.5);
+      ctx.closePath();
+      fill(acc);
+      ctx.fillStyle = `hsl(${(t / 8) % 360}, 90%, 65%)`;
+      ctx.beginPath();
+      ctx.arc(h.x + f * 1.5, h.y - r - 11.5, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'headphones':
+      ctx.strokeStyle = flash ? '#fff' : acc;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(h.x, h.y - 0.5, r + 1.5, Math.PI * 1.05, -0.05);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(h.x - f * 0.5, h.y + 0.5, 2.2, 3.2, 0, 0, Math.PI * 2);
+      fill(outfit.accent2 ?? acc);
+      break;
+    case 'diamond': {
+      // a floating diamond over the head, catching light
+      const dy = h.y - r - 9 + Math.sin(t / 380) * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(h.x, dy - 4.5);
+      ctx.lineTo(h.x + 4, dy - 1);
+      ctx.lineTo(h.x, dy + 5);
+      ctx.lineTo(h.x - 4, dy - 1);
+      ctx.closePath();
+      fill(flash ? '#fff' : '#9fe8ff');
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t / 150);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(h.x - 1, dy - 2.5, 1.2, 1.2);
+      break;
+    }
     case 'halo':
       ctx.globalCompositeOperation = 'lighter';
       for (const [w, al] of [
@@ -375,10 +670,11 @@ export function drawFigure(ctx, a, p, o) {
   ];
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const ghostly = outfit?.fx === 'ghost';
+  const ghostly = outfit?.fx === 'ghost' || outfit?.fx === 'holo';
   const prevAlpha = ctx.globalAlpha;
   if (outfit?.fx && outfit.fx !== 'laser') drawAura(ctx, p, outfit, color, t, legsLeft);
-  if (ghostly) ctx.globalAlpha = prevAlpha * (0.62 + 0.12 * Math.sin(t / 300));
+  if (outfit?.cape) drawCape(ctx, p, a, outfit, t);
+  if (ghostly) ctx.globalAlpha = prevAlpha * (outfit.fx === 'holo' ? 0.7 + 0.2 * Math.sin(t / 45) : 0.62 + 0.12 * Math.sin(t / 300));
 
   // sack on the back, sized by the bluff the runner picked
   const bagR = [6, 9, 13][a.bluff ?? 1] ?? 9;
@@ -452,6 +748,23 @@ export function drawFigure(ctx, a, p, o) {
     drawHead(ctx, p, a, outfit, color, t, flash);
   }
   if (ghostly) ctx.globalAlpha = prevAlpha;
+  if (outfit?.fx2) drawParticles(ctx, p, outfit, t, color);
+  if (outfit?.fx === 'glitch' && Math.sin(t / 61) > 0.6) {
+    // RGB split: a cyan and a magenta ghost of the head, a few pixels off
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.6;
+    for (const [dx, c] of [[-2, '#00f5ff'], [2, '#ff2dd4']]) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.head.x + dx, p.head.y, p.head.r, 0, Math.PI * 2);
+      ctx.moveTo(p.shoulder.x + dx, p.shoulder.y);
+      ctx.lineTo(p.hip.x + dx, p.hip.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   // gore: stumps
   if (gore && a.wounds > 0) {
     ctx.fillStyle = '#b3121f';

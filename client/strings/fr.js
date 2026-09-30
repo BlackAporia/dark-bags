@@ -185,6 +185,7 @@ export default {
   'r.epic': 'Épique',
   'r.legendary': 'Légendaire',
   'r.mythic': 'Mythique',
+  'r.exotic': 'Exotique',
   'ach.title': 'Succès',
   'ach.button': 'Succès',
   'ach.intro': 'Chacun rapporte de l’XP de grade une fois et débloque son nom comme titre à porter.',

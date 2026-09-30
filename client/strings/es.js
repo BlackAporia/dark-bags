@@ -185,6 +185,7 @@ export default {
   'r.epic': 'Épico',
   'r.legendary': 'Legendario',
   'r.mythic': 'Mítico',
+  'r.exotic': 'Exótico',
   'ach.title': 'Logros',
   'ach.button': 'Logros',
   'ach.intro': 'Cada uno da XP de rango una vez y desbloquea su nombre como título que puedes llevar.',

@@ -185,6 +185,7 @@ export default {
   'r.epic': 'Épico',
   'r.legendary': 'Lendário',
   'r.mythic': 'Mítico',
+  'r.exotic': 'Exótico',
   'ach.title': 'Conquistas',
   'ach.button': 'Conquistas',
   'ach.intro': 'Cada uma dá XP de patente uma vez e libera seu nome como título para usar.',

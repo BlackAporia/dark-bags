@@ -835,7 +835,7 @@ body.touch-on .banner { top: 27%; font-size: 20px; }
 .lk-item img { width: 70px; height: 94px; }
 .lk-shine { position: absolute; inset: -40% -60%; background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.10) 50%, transparent 60%); transform: translateX(-60%); transition: transform 0.6s ease; pointer-events: none; }
 .lk-item:hover .lk-shine { transform: translateX(60%); }
-.r-legendary .lk-shine, .r-mythic .lk-shine { animation: shine 3.2s ease-in-out infinite; }
+.r-legendary .lk-shine, .r-mythic .lk-shine, .r-exotic .lk-shine { animation: shine 3.2s ease-in-out infinite; }
 @keyframes shine { 0%, 55% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
 .lk-name { font-weight: 600; font-size: 13px; line-height: 1.15; }
 .lk-state { font: 500 11px/1 var(--f-num); color: var(--dust); }
@@ -903,7 +903,8 @@ body.touch-on .banner { top: 27%; font-size: 20px; }
   .rl-card { width: 104px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lk-shine, .r-legendary .lk-shine, .r-mythic .lk-shine { animation: none; transition: none; }
+  .lk-shine, .r-legendary .lk-shine, .r-mythic .lk-shine, .r-exotic .lk-shine { animation: none; transition: none; }
+  .lk-item.r-mythic, .lk-item.r-exotic { animation: none; }
   .rv { animation: none; }
 }
 
@@ -1062,3 +1063,13 @@ body.touch-on .coach { bottom: auto; top: calc(62px + var(--safe-t)); font-size:
 .brand { position: relative; }
 .lang-pick { position: absolute; top: 0; inset-inline-end: 0; display: inline-flex; gap: 4px; align-items: center; font-size: 13px; }
 .lang-pick select { background: var(--tarp); color: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font: inherit; }
+
+/* premium rarities: mythic and exotic cards glow and breathe; exotic gets a moving prism border */
+.lk-item.r-mythic { background: radial-gradient(120% 90% at 50% 0%, rgba(255, 61, 127, 0.22), transparent 60%), var(--night); animation: premium-breathe 2.8s ease-in-out infinite; }
+.lk-item.r-exotic { background: radial-gradient(120% 90% at 50% 0%, rgba(0, 240, 255, 0.25), transparent 60%), #06121a; border-color: transparent; animation: premium-breathe 2.2s ease-in-out infinite; }
+.lk-item.r-exotic::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; background: conic-gradient(from var(--spin, 0deg), #00f0ff, #ff3dd4, #ffd166, #7dff9b, #00f0ff); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: prism-spin 4s linear infinite; pointer-events: none; }
+.lk-item.r-exotic .lk-name { background: linear-gradient(90deg, #00f0ff, #ff3dd4, #ffd166); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800; }
+@property --spin { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes prism-spin { to { --spin: 360deg; } }
+@keyframes premium-breathe { 50% { box-shadow: 0 0 22px -6px var(--r); } }
+@media (prefers-reduced-motion: reduce) { .lk-item.r-exotic::before { animation: none; } }

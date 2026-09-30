@@ -185,6 +185,7 @@ export default {
   'r.epic': 'Destansı',
   'r.legendary': 'Efsanevi',
   'r.mythic': 'Mitik',
+  'r.exotic': 'Egzotik',
   'ach.title': 'Başarımlar',
   'ach.button': 'Başarımlar',
   'ach.intro': 'Her biri bir kez rütbe XP’si verir ve adını takabileceğin bir unvan olarak açar.',

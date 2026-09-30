@@ -225,7 +225,7 @@ export function createLocker({ app, send, sfx, toast, share }) {
           ? t('lk.free')
           : t('lk.inCollection')
         : t('lk.buyOrBag');
-    d.innerHTML = `<p class="lk-rar">${esc(rn(o.rarity))}${o.fx ? ` · <span>${esc(fxName(o.fx))}</span>` : ''}</p><h3>${esc(o.name)}</h3><p class="fine">${esc(how)}${st.selected && !owns(id) ? ` ${t('lk.tryingOn')}` : ''}</p><div class="lk-actions">${action}</div>`;
+    d.innerHTML = `<p class="lk-rar">${esc(rn(o.rarity))}${[o.fx, o.fx2].filter(Boolean).length ? ` · <span>${esc([o.fx, o.fx2].filter(Boolean).map(fxName).join(' + '))}${o.cape ? ' + cape' : ''}</span>` : o.cape ? ' · <span>cape</span>' : ''}</p><h3>${esc(o.name)}</h3><p class="fine">${esc(how)}${st.selected && !owns(id) ? ` ${t('lk.tryingOn')}` : ''}</p><div class="lk-actions">${action}</div>`;
     for (const b of d.querySelectorAll('[data-act]')) b.addEventListener('click', () => send({ t: b.dataset.act, id }));
   }
 
@@ -443,4 +443,4 @@ export function createLocker({ app, send, sfx, toast, share }) {
   return { onMessage, renderTile, open };
 }
 
-const fxName = (fx) => ({ glow: 'aura', pulse: 'pulsing aura', ghost: 'spectral', laser: 'laser eyes', rainbow: 'prismatic', fire: 'burning' })[fx] ?? fx;
+const fxName = (fx) => ({ glow: 'aura', pulse: 'pulsing aura', ghost: 'spectral', laser: 'laser eyes', rainbow: 'prismatic', fire: 'burning', gold: 'liquid gold', holo: 'hologram', glitch: 'glitch', lightning: 'lightning', galaxy: 'galaxy', sparks: 'sparks', frost: 'frost', money: 'money rain', matrix: 'code rain', shadow: 'shadow smoke' })[fx] ?? fx;

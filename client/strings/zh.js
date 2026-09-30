@@ -185,6 +185,7 @@ export default {
   'r.epic': '史诗',
   'r.legendary': '传说',
   'r.mythic': '神话',
+  'r.exotic': '异域',
   'ach.title': '成就',
   'ach.button': '成就',
   'ach.intro': '每个成就只发放一次军衔经验，并解锁同名称号供你佩戴。',

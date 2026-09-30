@@ -26,13 +26,20 @@ export const RARITIES = {
   epic: { name: 'Epic', color: '#b37bff', price: 399, refund: 40 },
   legendary: { name: 'Legendary', color: '#f7931a', price: 999, refund: 100 },
   mythic: { name: 'Mythic', color: '#ff3d7f', price: 1999, refund: 200 },
+  exotic: { name: 'Exotic', color: '#00f0ff', price: 4999, refund: 500 },
 };
-export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic', 'exotic'];
 const rank = (r) => RARITY_ORDER.indexOf(r);
 
-// head: none cap beanie bandana helmet mask hood horns kabuto tophat crown halo
-// fx: glow (soft aura), pulse (breathing aura), ghost (translucent), laser (eye beams),
-//     rainbow (hue cycles), fire (flickering flame aura)
+// head: none cap beanie bandana helmet mask hood horns kabuto tophat crown halo visor
+//       catears dogears bunny wizard viking astro mohawk antenna cowboy pumpkin skull
+//       frog domino party headphones diamond
+// fx (aura): glow, pulse, ghost (translucent), laser (eye beams), rainbow (hue cycles),
+//     fire, gold (shimmering gold), holo (flickering hologram), glitch (RGB split)
+// fx2 (particles): lightning, galaxy, sparks, frost, money, matrix, shadow
+// cape: a colour for a cape off the shoulders
+// Names are original archetypes (crypto memes, comics, cartoons, sci-fi); no real
+// characters or brands.
 const BASIC = ['#ff5a5f', '#4cc9f0', '#b5e48c', '#f72585', '#ffd166', '#9b5de5', '#00f5d4', '#ff9f1c'];
 const BASIC_NAMES = ['Red', 'Sky', 'Moss', 'Magenta', 'Sun', 'Violet', 'Mint', 'Tangerine'];
 
@@ -60,6 +67,57 @@ export const OUTFITS = [
   { id: 'void', name: 'Void Walker', rarity: 'legendary', color: '#b36bff', accent: '#140f24', head: 'hood', fx: 'pulse' },
   { id: 'genesis', name: 'Genesis Block', rarity: 'mythic', color: '#ffffff', head: 'halo', fx: 'rainbow' },
   { id: 'inferno', name: 'Inferno', rarity: 'mythic', color: '#ff5a1f', accent: '#ffd166', head: 'horns', fx: 'fire' },
+  // commons: everyday crypto and street
+  { id: 'paper-hands', name: 'Paper Hands', rarity: 'common', color: '#f4f1ea', accent: '#3a3a3a', head: 'headphones' },
+  { id: 'gm', name: 'GM Sunrise', rarity: 'common', color: '#ffb347', accent: '#b35c00', head: 'cap' },
+  { id: 'stacker', name: 'Stacker', rarity: 'common', color: '#7bc67b', accent: '#2f5d2f', head: 'beanie' },
+  { id: 'rookie-vest', name: 'Rookie Vest', rarity: 'common', color: '#9aa5b1', accent: '#4a5561', head: 'helmet' },
+  { id: 'streetwear', name: 'Streetwear', rarity: 'common', color: '#e5e5e5', accent: '#ef233c', head: 'headphones' },
+  { id: 'woodland', name: 'Woodland', rarity: 'common', color: '#6b8f5e', accent: '#2f4a2a', head: 'bandana' },
+  // rares: memes and cartoon archetypes
+  { id: 'hodler', name: 'HODLer', rarity: 'rare', color: '#5b8fd8', accent: '#1f3a60', head: 'beanie' },
+  { id: 'degen', name: 'Degen', rarity: 'rare', color: '#ff006e', accent: '#ffbe0b', head: 'party' },
+  { id: 'shiba-scout', name: 'Shiba Scout', rarity: 'rare', color: '#f4a261', accent: '#e76f51', head: 'dogears' },
+  { id: 'rug-pull', name: 'Rug Pull', rarity: 'rare', color: '#9d7fb0', accent: '#e56b6f', head: 'mask' },
+  { id: 'sheriff', name: 'Sheriff', rarity: 'rare', color: '#d8b27c', accent: '#6b4423', head: 'cowboy' },
+  { id: 'toon-cat', name: 'Toon Cat', rarity: 'rare', color: '#ff8fab', accent: '#ffc2d1', head: 'catears' },
+  { id: 'bunny-bandit', name: 'Bunny Bandit', rarity: 'rare', color: '#ececec', accent: '#ff5d8f', head: 'bunny' },
+  { id: 'mad-scientist', name: 'Mad Scientist', rarity: 'rare', color: '#f1faee', accent: '#7fd1d8', head: 'mohawk' },
+  { id: 'airdrop', name: 'Airdrop Hunter', rarity: 'rare', color: '#90be6d', accent: '#2d6a4f', head: 'cap' },
+  // epics: glowing heroes, meme icons, sci-fi
+  { id: 'moon-boy', name: 'Moon Boy', rarity: 'epic', color: '#cfd8ff', accent: '#5b6cff', head: 'astro', fx: 'pulse' },
+  { id: 'much-wow', name: 'Much Wow', rarity: 'epic', color: '#e9c46a', accent: '#c47f2c', head: 'dogears', fx: 'glow' },
+  { id: 'frog-prince', name: 'Frog Prince', rarity: 'epic', color: '#52b788', accent: '#2d6a4f', head: 'frog', fx: 'pulse' },
+  { id: 'validator', name: 'Validator', rarity: 'epic', color: '#4cc9f0', accent: '#1b263b', head: 'visor', fx: 'glow' },
+  { id: 'bear-market', name: 'Bear Market', rarity: 'epic', color: '#a1887f', accent: '#3e2723', head: 'catears', fx2: 'shadow' },
+  { id: 'pumpkin-king', name: 'Pumpkin King', rarity: 'epic', color: '#ff8c1a', accent: '#2b2b2b', head: 'pumpkin', fx2: 'sparks' },
+  { id: 'alien', name: 'Alien Visitor', rarity: 'epic', color: '#9ef01a', accent: '#1b4332', head: 'antenna', fx: 'holo' },
+  { id: 'arcade', name: 'Arcade Glitch', rarity: 'epic', color: '#ff2dd4', accent: '#00f5ff', head: 'visor', fx: 'glitch' },
+  { id: 'neon-ninja', name: 'Neon Ninja', rarity: 'epic', color: '#2b3a55', accent: '#00f5d4', head: 'bandana', fx: 'pulse' },
+  { id: 'caped-wonder', name: 'Caped Wonder', rarity: 'epic', color: '#3a86ff', accent: '#ff006e', head: 'domino', cape: '#e0115f' },
+  // legendaries: bright, animated, unmistakable
+  { id: 'diamond-hands', name: 'Diamond Hands', rarity: 'legendary', color: '#9fe8ff', accent: '#e0fbff', head: 'diamond', fx: 'glow', fx2: 'sparks' },
+  { id: 'bull-run', name: 'Bull Run', rarity: 'legendary', color: '#2dc653', accent: '#f1e3c8', head: 'horns', fx: 'gold' },
+  { id: 'whale', name: 'Whale', rarity: 'legendary', color: '#3b82f6', accent: '#93c5fd', head: 'headphones', fx: 'pulse', fx2: 'money' },
+  { id: 'night-vigilante', name: 'Night Vigilante', rarity: 'legendary', color: '#4b5563', accent: '#0b0b0b', head: 'domino', cape: '#0b0b10', fx2: 'shadow' },
+  { id: 'space-ranger', name: 'Space Ranger', rarity: 'legendary', color: '#e5e7eb', accent: '#7c3aed', head: 'astro', fx: 'glow', fx2: 'galaxy' },
+  { id: 'skull-rider', name: 'Skull Rider', rarity: 'legendary', color: '#efe8d8', accent: '#111111', head: 'skull', fx: 'fire' },
+  { id: 'chrome-android', name: 'Chrome Android', rarity: 'legendary', color: '#d1d5db', accent: '#4b5563', head: 'visor', fx: 'glow', fx2: 'sparks' },
+  { id: 'frost-queen', name: 'Frost Queen', rarity: 'legendary', color: '#bde0fe', accent: '#a2d2ff', head: 'crown', fx: 'glow', fx2: 'frost' },
+  { id: 'matrix-runner', name: 'Matrix Runner', rarity: 'legendary', color: '#39ff14', accent: '#022c22', head: 'visor', fx: 'pulse', fx2: 'matrix' },
+  { id: 'zero-knowledge', name: 'Zero Knowledge', rarity: 'legendary', color: '#9d7bff', accent: '#1e1b4b', head: 'hood', fx: 'holo', fx2: 'sparks' },
+  // mythics: gods of the multiverse, with capes and particle storms
+  { id: 'thunder-god', name: 'Thunder God', rarity: 'mythic', color: '#60a5fa', accent: '#c0c0c0', head: 'viking', fx: 'glow', fx2: 'lightning', cape: '#b91c1c' },
+  { id: 'cosmic-wizard', name: 'Cosmic Wizard', rarity: 'mythic', color: '#a78bfa', accent: '#312e81', head: 'wizard', fx: 'pulse', fx2: 'galaxy', cape: '#1e1b4b' },
+  { id: 'shadow-demon', name: 'Shadow Demon', rarity: 'mythic', color: '#ef4444', accent: '#1a0000', head: 'horns', fx: 'fire', fx2: 'shadow', cape: '#1a0000' },
+  { id: 'galaxy-brain', name: 'Galaxy Brain', rarity: 'mythic', color: '#f0abfc', head: 'halo', fx: 'rainbow', fx2: 'galaxy' },
+  { id: 'money-printer', name: 'Money Printer', rarity: 'mythic', color: '#22c55e', accent: '#14532d', head: 'visor', fx: 'gold', fx2: 'money' },
+  { id: 'stark-pioneer', name: 'Stark Pioneer', rarity: 'mythic', color: '#ec796b', accent: '#0c0c4f', head: 'astro', fx: 'holo', fx2: 'galaxy', cape: '#0c0c4f' },
+  // exotics: the rarest in the game, everything at once
+  { id: 'golden-bull', name: 'Golden Bull', rarity: 'exotic', color: '#ffd166', accent: '#fff3c4', head: 'horns', fx: 'gold', fx2: 'money', cape: '#8a6508' },
+  { id: 'genesis-ghost', name: 'Genesis Ghost', rarity: 'exotic', color: '#a5f3fc', accent: '#0e7490', head: 'hood', fx: 'holo', fx2: 'matrix', cape: '#083344' },
+  { id: 'multiverse-prime', name: 'Multiverse Prime', rarity: 'exotic', color: '#ffffff', head: 'halo', fx: 'rainbow', fx2: 'lightning', cape: '#f8fafc' },
+  { id: 'void-emperor', name: 'Void Emperor', rarity: 'exotic', color: '#c084fc', accent: '#000000', head: 'crown', fx: 'glitch', fx2: 'galaxy', cape: '#050008' },
 ];
 for (const o of OUTFITS) if (!o.basic) o.price = RARITIES[o.rarity].price;
 export const OUTFIT = Object.fromEntries(OUTFITS.map((o) => [o.id, o]));
@@ -70,7 +128,7 @@ export const DEFAULT_OUTFIT = 'basic-0';
 export const BOXES = [
   { id: 'street', name: 'Street Bag', price: 99, odds: { common: 80, rare: 16.5, epic: 3, legendary: 0.5, mythic: 0 }, jackpot: 'legendary' },
   { id: 'vault', name: 'Vault Bag', price: 299, odds: { common: 50, rare: 36, epic: 11, legendary: 2.7, mythic: 0.3 }, jackpot: 'legendary' },
-  { id: 'golden', name: 'Golden Bag', price: 799, odds: { common: 0, rare: 60, epic: 30, legendary: 8.5, mythic: 1.5 }, jackpot: 'mythic' },
+  { id: 'golden', name: 'Golden Bag', price: 799, odds: { common: 0, rare: 60, epic: 30, legendary: 8.2, mythic: 1.5, exotic: 0.3 }, jackpot: 'mythic' },
 ];
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
 export const PITY = { epic: 15, legendary: 60 }; // guaranteed at or better, by the Nth open of a box
@@ -225,7 +283,10 @@ export class Inventory {
     for (let rank = fromRank + 1; rank <= toRank; rank++) {
       const w = rankReward(rank, this.rnd);
       // a trial of something you don't have yet (any rarity if you own them all)
-      const all = OUTFITS.filter((o) => !o.basic && !r.owned.includes(o.id));
+      // prefer outfits you neither own nor are already trying
+      const unowned = OUTFITS.filter((o) => !o.basic && !r.owned.includes(o.id) && o.rarity !== 'exotic');
+      const untried = unowned.filter((o) => !((r.trials[o.id] ?? 0) > this.now()));
+      const all = untried.length ? untried : unowned;
       const pool = all.filter((o) => o.rarity === w.rarity);
       const from = pool.length ? pool : all;
       let trial = null;
