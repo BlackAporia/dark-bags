@@ -67,10 +67,17 @@
   </div>
 </div>
 
+<!-- phones held upright during a raid: ask to turn sideways -->
+<div id="rotate" class="rotate" hidden role="dialog" aria-live="polite">
+  <div class="rot-ico" aria-hidden="true">📱</div>
+  <p class="rot-t" data-i18n="rot.title">Turn your phone sideways</p>
+  <p class="rot-s" data-i18n="rot.sub">The raid plays best in landscape: move on the left, Fire on the right.</p>
+  <button id="rot-anyway" class="ghost" type="button" data-i18n="rot.anyway">Play upright anyway</button>
+</div>
 <!-- touch controls -->
 <div id="touch" class="touch" hidden>
   <div id="tz-left" class="tzone left"><div class="stick"><div class="knob"></div></div><span class="thint" data-i18n="touch.move">move</span></div>
-  <div id="tz-right" class="tzone right"><div class="stick"><div class="knob"></div></div><span class="thint" data-i18n="touch.aim">aim · fire</span></div>
+  <button id="t-fire" class="tbtn fire" type="button" aria-label="Fire"><span data-i18n="touch.fire">Fire</span></button>
   <button id="t-dash" class="tbtn dash" type="button" data-i18n="hud.dash">Dash</button>
   <button id="t-bag" class="tbtn bagbtn" type="button" data-i18n="touch.bag">Bag</button>
   <button class="tbtn tbuy b1" type="button" data-buy="medkit" aria-label="Medkit"><span>✚</span><em>150</em></button>

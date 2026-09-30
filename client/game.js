@@ -130,6 +130,8 @@ export class GameClient {
     this.renderer.noExits = this.potMode; // last one standing: no exits to draw
     // no bag to bluff about in pot modes; one fixed weapon means no ladder to climb
     this.el.bluffChip.hidden = this.potMode;
+    const tBag = document.getElementById('t-bag');
+    if (tBag) tBag.hidden = this.potMode;
     const fixed = !!MODE[this.mode]?.weapon;
     this.el.ladder.hidden = fixed;
     this.el.nextWeapon.hidden = fixed;
@@ -530,8 +532,18 @@ export class GameClient {
     const mv = this.input.moveVector();
     // aim from the gun, not the feet: figures stand upright
     const sp = this.renderer.toScreen(this.pred.x + this.corr.x, this.pred.y + this.corr.y - 18);
-    const a = this.input.aimAngle(sp.x, sp.y);
+    let a = this.input.aimAngle(sp.x, sp.y);
     const f = this.input.firing();
+    // touch: the Fire button aims itself at the nearest enemy in range
+    this.aimTarget = null;
+    if (this.input.touchOn && f) {
+      const tg = this.autoTarget();
+      if (tg) {
+        a = Math.atan2(tg.a.y - this.pred.y, tg.a.x - this.pred.x);
+        this.input.lastAim = a;
+        this.aimTarget = tg.a.id;
+      }
+    }
     const d = this.input.takeDash();
     const msg = { t: 'in', s: ++this.seq, mx: r3(mv.x), my: r3(mv.y), a: r3(a), f, d };
     this.send(msg);
@@ -551,6 +563,23 @@ export class GameClient {
       this.localFireCd = wp.cd;
       if (this.meAnim) this.attackFx(this.meAnim, this.you.w ?? 0, performance.now(), true);
     }
+  }
+
+  // nearest enemy we can see within the current weapon's reach (allies never)
+  autoTarget() {
+    const wp = WEAPONS[this.you?.w ?? 0];
+    const reach = wp.melee ? wp.reach + CFG.PLAYER_R * 2 + 40 : wp.range * 0.95;
+    let best = null;
+    let bd = reach;
+    for (const f of this.lastFigures ?? []) {
+      if (f.isMe || f.ally === true || f.hp <= 0) continue;
+      const d = Math.hypot(f.a.x - this.pred.x, f.a.y - this.pred.y);
+      if (d < bd) {
+        bd = d;
+        best = f;
+      }
+    }
+    return best;
   }
 
   frame(now, dt) {
@@ -616,6 +645,7 @@ export class GameClient {
       figures.push({ a: an, color: p.c, name: p.n, ping: p.pg, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
     this.anims.prune(now);
+    this.lastFigures = figures;
     const ba = new Map(a.bullets.map((x) => [x.i, x]));
     const bullets = b.bullets.map((x) => {
       const q = ba.get(x.i);
@@ -670,6 +700,7 @@ export class GameClient {
       showArrows: true,
       gore: this.gore,
       meAlive: alive,
+      target: this.aimTarget,
     };
   }
 

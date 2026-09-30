@@ -119,7 +119,7 @@ export default {
   'feed.storm': 'The storm took you',
   'feed.droppedYou': '{name} dropped you',
   'coach.storm': "You're in the storm · get back inside the circle",
-  'coach.touch': 'Left thumb moves · right thumb aims and attacks',
+  'coach.touch': "Left thumb moves · hold Fire: it aims at the nearest enemy for you",
   'coach.keys': 'WASD to move · mouse to aim · click to attack',
   'coach.exit': 'Time to get out · stand in a green EXIT for 3 seconds · edge arrows point the way',
   'coach.loot': 'Grab the orange loot · it goes into your bag',
@@ -507,4 +507,8 @@ export default {
   'st.play': "Play your first match",
   'st.play.d': "Pick a mode and a stake, press Play, then Ready.",
   'st.play.go': "Play",
+  'touch.fire': "Fire",
+  'rot.title': "Turn your phone sideways",
+  'rot.sub': "The raid plays best in landscape: move on the left, Fire on the right.",
+  'rot.anyway': "Play upright anyway",
 };

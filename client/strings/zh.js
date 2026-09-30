@@ -114,7 +114,7 @@ export default {
   'feed.storm': '你被风暴吞没',
   'feed.droppedYou': '{name} 击倒了你',
   'coach.storm': '你在风暴中 · 回到圈内',
-  'coach.touch': '左手拇指移动 · 右手拇指瞄准和攻击',
+  'coach.touch': "左手移动 · 按住开火：自动瞄准最近的敌人",
   'coach.keys': 'WASD 移动 · 鼠标瞄准 · 点击攻击',
   'coach.exit': '该撤了 · 在绿色出口站 3 秒 · 屏幕边缘箭头指路',
   'coach.loot': '捡起橙色战利品 · 会进入你的包',
@@ -499,4 +499,8 @@ export default {
   'st.play': "开始第一局",
   'st.play.d': "选择模式和赌注，点“开始”，再点“准备”。",
   'st.play.go': "开始",
+  'touch.fire': "开火",
+  'rot.title': "请横屏",
+  'rot.sub': "横屏游玩效果最佳：左侧移动，右侧开火。",
+  'rot.anyway': "仍然竖屏游玩",
 };

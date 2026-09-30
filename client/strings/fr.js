@@ -114,7 +114,7 @@ export default {
   'feed.storm': 'La tempête vous a eu',
   'feed.droppedYou': '{name} vous a abattu',
   'coach.storm': 'Vous êtes dans la tempête · revenez dans le cercle',
-  'coach.touch': 'Pouce gauche pour bouger · pouce droit pour viser et attaquer',
+  'coach.touch': "Pouce gauche pour bouger · maintiens Tir : il vise tout seul l'ennemi le plus proche",
   'coach.keys': 'WASD pour bouger · souris pour viser · clic pour attaquer',
   'coach.exit': 'Il faut sortir · restez 3 secondes dans une SORTIE verte · les flèches au bord montrent le chemin',
   'coach.loot': 'Ramassez le butin orange · il va dans votre sac',
@@ -499,4 +499,8 @@ export default {
   'st.play': "Joue ta première partie",
   'st.play.d': "Choisis un mode et une mise, appuie sur Jouer puis Prêt.",
   'st.play.go': "Jouer",
+  'touch.fire': "Tir",
+  'rot.title': "Tourne ton téléphone",
+  'rot.sub': "Le raid se joue mieux à l'horizontale : déplacement à gauche, tir à droite.",
+  'rot.anyway': "Jouer en vertical",
 };

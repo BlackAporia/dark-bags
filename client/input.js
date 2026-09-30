@@ -1,4 +1,5 @@
-// Keyboard + mouse, and twin-stick touch controls.
+// Keyboard + mouse, and touch controls: a floating move stick on the left, one big Fire
+// button on the right (the game aims it at the nearest enemy in range), and Dash.
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
@@ -11,7 +12,8 @@ export class Input {
     this.onAnyInput = null;
     this.touchOn = false;
     this.tMove = { x: 0, y: 0 };
-    this.tAim = null; // {x, y} unit-ish vector while right stick held
+    this.tAim = null; // {x, y} unit-ish vector while right stick held (legacy twin-stick)
+    this.tFire = false; // the Fire button is held
     this.lastAim = 0;
 
     const typing = (e) => e.target instanceof HTMLInputElement;
@@ -99,11 +101,25 @@ export class Input {
       (x, y) => (this.tMove = { x, y }),
       () => (this.tMove = { x: 0, y: 0 }),
     );
-    bindStick(
-      root.querySelector('#tz-right'),
-      (x, y) => (this.tAim = { x, y }),
-      () => (this.tAim = null),
-    );
+    // Fire: hold to shoot; the game turns you toward the nearest enemy in range
+    const fire = root.querySelector('#t-fire');
+    let fid = null;
+    fire.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.onAnyInput?.();
+      fid = e.pointerId;
+      fire.setPointerCapture(fid);
+      this.tFire = true;
+      fire.classList.add('on');
+    });
+    const release = (e) => {
+      if (e.pointerId !== fid) return;
+      fid = null;
+      this.tFire = false;
+      fire.classList.remove('on');
+    };
+    fire.addEventListener('pointerup', release);
+    fire.addEventListener('pointercancel', release);
     root.querySelector('#t-dash').addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.dashQueued = true;
@@ -148,7 +164,7 @@ export class Input {
   }
 
   firing() {
-    if (this.touchOn && this.tAim) return Math.hypot(this.tAim.x, this.tAim.y) > 0.55;
+    if (this.touchOn) return this.tFire || (!!this.tAim && Math.hypot(this.tAim.x, this.tAim.y) > 0.55);
     return this.mouse.down;
   }
 

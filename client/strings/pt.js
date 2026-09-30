@@ -114,7 +114,7 @@ export default {
   'feed.storm': 'A tempestade te pegou',
   'feed.droppedYou': '{name} te derrubou',
   'coach.storm': 'Você está na tempestade · volte para o círculo',
-  'coach.touch': 'Polegar esquerdo move · direito mira e ataca',
+  'coach.touch': "Polegar esquerdo move · segure Atirar: mira sozinho no inimigo mais próximo",
   'coach.keys': 'WASD para mover · mouse para mirar · clique para atacar',
   'coach.exit': 'Hora de sair · fique 3 segundos numa SAÍDA verde · as setas na borda mostram o caminho',
   'coach.loot': 'Pegue o saque laranja · ele vai para a sua bolsa',
@@ -499,4 +499,8 @@ export default {
   'st.play': "Jogue sua primeira partida",
   'st.play.d': "Escolha modo e aposta, toque em Jogar e depois Pronto.",
   'st.play.go': "Jogar",
+  'touch.fire': "Atirar",
+  'rot.title': "Vire o celular",
+  'rot.sub': "O raid funciona melhor na horizontal: mova-se à esquerda, atire à direita.",
+  'rot.anyway': "Jogar na vertical",
 };

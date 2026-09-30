@@ -114,7 +114,7 @@ export default {
   'feed.storm': 'Fırtına seni aldı',
   'feed.droppedYou': '{name} seni indirdi',
   'coach.storm': 'Fırtınadasın · çemberin içine dön',
-  'coach.touch': 'Sol başparmak hareket · sağ başparmak nişan ve saldırı',
+  'coach.touch': "Sol başparmak hareket · Ateş'e basılı tut: en yakın düşmana kendisi nişan alır",
   'coach.keys': 'WASD hareket · fare nişan · tık saldırı',
   'coach.exit': 'Çıkma zamanı · yeşil bir ÇIKIŞTA 3 saniye dur · kenardaki oklar yolu gösterir',
   'coach.loot': 'Turuncu ganimeti topla · çantana gider',
@@ -499,4 +499,8 @@ export default {
   'st.play': "İlk maçını oyna",
   'st.play.d': "Mod ve bahis seç, Oyna'ya ve sonra Hazır'a bas.",
   'st.play.go': "Oyna",
+  'touch.fire': "Ateş",
+  'rot.title': "Telefonunu yan çevir",
+  'rot.sub': "Baskın yatay oynanınca daha iyi: solda hareket, sağda ateş.",
+  'rot.anyway': "Dikey oyna",
 };
