@@ -109,6 +109,43 @@ test('guilds: founding needs a purchase and rank 20; anyone may join; the last o
   assert.equal(lobby.social.guilds.has(gid), false);
 });
 
+test('guild chat reaches every member online, counts unread, and stays with the guild', () => {
+  const { lobby, ranks, client, last, tick } = setup();
+  const a = client('a', 'alice');
+  const b = client('b', 'bob');
+  const c = client('c', 'carol');
+  lobby.social.markPurchase(a.token);
+  ranks.add(a.token, 10_000_000);
+  lobby.handle('a', { t: 'guild_create', name: 'Night Shift', tag: 'NS' });
+  const gid = last('a', 'guildDone').id;
+  lobby.handle('b', { t: 'guild_join', id: gid });
+  lobby.handle('c', { t: 'guild_say', text: 'let me in' });
+  assert.equal(last('c', 'err').msg, 'You are not in a guild.');
+  tick(1000);
+  lobby.handle('a', { t: 'guild_say', text: 'raid at 9 <b>' });
+  const got = last('b', 'guild_msg');
+  assert.equal(got.gid, gid);
+  assert.equal(got.m.text, 'raid at 9 b', 'no markup');
+  assert.equal(got.m.n, 'alice');
+  assert.equal(got.gUnread, 1);
+  assert.equal(last('a', 'guild_msg').gUnread, 0, 'your own message is not unread');
+  assert.equal(last('c', 'guild_msg'), undefined, 'outsiders hear nothing');
+  lobby.handle('a', { t: 'guild_say', text: 'again' });
+  assert.equal(last('a', 'err').msg, 'Slow down a little.');
+  lobby.handle('b', { t: 'hello', token: b.token });
+  assert.equal(last('b', 'welcome').social.gUnread, 1);
+  lobby.handle('b', { t: 'guild_chat' });
+  assert.deepEqual(last('b', 'guild_chat').list.map((m) => m.text), ['raid at 9 b']);
+  assert.equal(lobby.social.guildUnread(b.token), 0, 'reading clears it');
+  // survives a restart
+  const again = new SocialBook({ data: JSON.parse(JSON.stringify(lobby.social)) });
+  assert.equal(again.guildChat(a.token).length, 1);
+  // the last one out closes the guild and its chat
+  lobby.handle('a', { t: 'guild_leave' });
+  lobby.handle('b', { t: 'guild_leave' });
+  assert.equal(lobby.social.gchat.has(gid), false);
+});
+
 test('invite someone online into the room you are waiting in', () => {
   const { lobby, client, last, inbox } = setup();
   client('a', 'alice');

@@ -31,6 +31,9 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     me: null, // my public id
     unread: 0,
     requests: 0,
+    gchat: null, // { gid, list } your guild's chat
+    gUnread: 0,
+    gtab: 'chat', // chat | members (your own guild)
     sent: new Set(), // invites sent from this prep screen
   };
 
@@ -38,11 +41,14 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
   const statusText = (c) => (c.st === 'off' ? t('so.seen', { t: ago(Date.now() - c.seen) }) : t(`so.st.${c.st}`));
 
   function badge() {
-    const b = document.querySelector('.nav-btn[data-page="friends"] .nav-badge');
-    if (!b) return;
-    const n = st.unread + st.requests;
-    b.hidden = !n;
-    b.textContent = n > 9 ? '9+' : String(n);
+    const set = (page, n) => {
+      const b = document.querySelector(`.nav-btn[data-page="${page}"] .nav-badge`);
+      if (!b) return;
+      b.hidden = !n;
+      b.textContent = n > 9 ? '9+' : String(n);
+    };
+    set('friends', st.unread + st.requests);
+    set('guilds', st.gUnread);
   }
 
   // one row for a player, with the actions that make sense for them
@@ -182,6 +188,32 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
 
   // --------------------------------------------------------------- guilds page
 
+  const hhmm = (at) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const gmsg = (m) =>
+    `<li class="${m.f === st.me ? 'me' : ''}">${m.f === st.me ? '' : `<button type="button" class="gd-from" data-act="profile" data-id="${esc(m.f)}">${rankBadgeSvg(m.rk ?? 1, 14)}<b>${esc(m.n ?? '?')}</b></button>`}<p>${esc(m.text)}</p><time>${hhmm(m.at)}</time></li>`;
+
+  // a new guild message: add it in place (keeps what you are typing), or count it as unread
+  function guildMsg(m) {
+    const here = isOpen('guilds') && st.guild?.mine && st.gtab === 'chat' && st.gchat?.gid === m.gid;
+    if (st.gchat?.gid === m.gid) {
+      st.gchat.list.push(m.m);
+      if (st.gchat.list.length > 150) st.gchat.list.shift();
+    }
+    const ul = $('gd-msgs');
+    if (here && ul) {
+      ul.querySelector('.so-empty')?.remove();
+      ul.insertAdjacentHTML('beforeend', gmsg(m.m));
+      for (const b of ul.lastElementChild.querySelectorAll('[data-act="profile"]')) b.addEventListener('click', () => send({ t: 'profile', id: b.dataset.id }));
+      ul.scrollTop = ul.scrollHeight;
+      if (m.m.f !== st.me) send({ t: 'guild_read' });
+      return;
+    }
+    if (m.m.f === st.me) return;
+    st.gUnread = m.gUnread ?? st.gUnread + 1;
+    badge();
+    toast(`🛡 ${m.m.n}: ${m.m.text}`);
+  }
+
   function renderGuilds() {
     const root = $('guilds-root');
     if (!root) return;
@@ -194,10 +226,15 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     let top = '';
     if (mine) {
       const g = mine.guild;
+      // your own guild opens on its chat; any other guild shows its members
+      const chat = mine.mine && st.gtab === 'chat';
       top = `<section class="gd-card">
         <div class="gd-head"><span class="gd-tag">${esc(g.tag)}</span><div><h3>${esc(g.name)}</h3><p class="fine">${esc(g.desc || '')}</p></div></div>
-        <p class="eyebrow">${t('gd.members', { n: mine.members.length })}</p>
-        <ul class="so-list">${mine.members.map((c) => row(c)).join('')}</ul>
+        ${mine.mine ? `<div class="seg-row so-tabs gd-tabs" role="tablist"><button type="button" role="tab" data-gtab="chat" aria-pressed="${chat}">${t('gd.chat')}</button><button type="button" role="tab" data-gtab="members" aria-pressed="${!chat}">${t('gd.members', { n: mine.members.length })}</button></div>` : `<p class="eyebrow">${t('gd.members', { n: mine.members.length })}</p>`}
+        ${chat ? `<div class="gd-chat">
+          <ul class="so-msgs" id="gd-msgs">${st.gchat?.gid === g.id ? st.gchat.list.map(gmsg).join('') || `<li class="so-empty">${t('gd.chatEmpty')}</li>` : '<li class="so-empty">…</li>'}</ul>
+          <form class="chat-form" id="gd-say-form"><input id="gd-say" maxlength="300" autocomplete="off" placeholder="${esc(t('gd.chatPh'))}"><button type="submit" class="cta">${t('chat.send')}</button></form>
+        </div>` : `<ul class="so-list">${mine.members.map((c) => row(c)).join('')}</ul>`}
         ${mine.mine ? `<button type="button" class="ghost" id="gd-leave">${t('gd.leave')}</button>` : G?.mine ? '' : `<button type="button" class="cta" data-act="join-guild" data-id="${g.id}">${t('gd.join')}</button>`}
         <button type="button" class="link" id="gd-back">← ${t('gd.all')}</button>
       </section>`;
@@ -220,6 +257,22 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
       <p class="eyebrow">${t('gd.list')}</p>
       <ul class="so-list">${list || `<li class="so-empty">${G ? t('gd.none') : '…'}</li>`}</ul>`;
     wire(root);
+    for (const b of root.querySelectorAll('[data-gtab]'))
+      b.addEventListener('click', () => {
+        st.gtab = b.dataset.gtab;
+        if (st.gtab === 'chat') send({ t: 'guild_chat' });
+        renderGuilds();
+      });
+    const ul = $('gd-msgs');
+    if (ul) ul.scrollTop = ul.scrollHeight;
+    $('gd-say-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = $('gd-say');
+      const text = input.value.trim();
+      if (!text) return;
+      send({ t: 'guild_say', text });
+      input.value = '';
+    });
     $('gd-leave')?.addEventListener('click', () => send({ t: 'guild_leave' }));
     $('gd-back')?.addEventListener('click', () => {
       st.guild = null;
@@ -313,6 +366,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
           st.me = sm.me;
           st.unread = sm.unread ?? 0;
           st.requests = sm.requests ?? 0;
+          st.gUnread = sm.gUnread ?? 0;
           badge();
         }
         break;
@@ -376,10 +430,26 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
         break;
       case 'guild':
         st.guild = m;
+        if (m.mine && st.gtab === 'chat') send({ t: 'guild_chat' });
         if (isOpen('guilds')) renderGuilds();
+        break;
+      case 'guild_chat':
+        st.gchat = { gid: m.gid, list: m.list };
+        st.gUnread = 0;
+        badge();
+        if (isOpen('guilds')) renderGuilds();
+        break;
+      case 'guild_msg':
+        guildMsg(m);
         break;
       case 'guildDone':
         st.guild = null;
+        st.gchat = null;
+        st.gtab = 'chat';
+        if (!m.id) {
+          st.gUnread = 0;
+          badge();
+        }
         send({ t: 'guilds' });
         if (m.id) send({ t: 'guild', id: m.id });
         break;
@@ -411,7 +481,9 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     guildsPage: {
       render: () => {
         renderGuilds();
-        if (online()) send({ t: 'guilds' });
+        if (!online()) return;
+        send({ t: 'guilds' });
+        if (st.guild?.mine && st.gtab === 'chat') send({ t: 'guild_chat' }); // fresh, and read
       },
     },
     openInvite,

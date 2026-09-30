@@ -7,13 +7,15 @@
 // Friends are mutual: "add" sends a request; the other side accepting (or adding back)
 // makes both friends. Messages go between public ids, the last DM_KEEP per pair are kept.
 // Guilds: anyone may join an open guild; creating one needs a real purchase (shop $ paid
-// in USDC/USDT) and career rank GUILD_RANK or higher.
+// in USDC/USDT) and career rank GUILD_RANK or higher. Each guild has its own chat room
+// (the last GCHAT_KEEP messages); members see what came in since they last looked.
 
 export const DM_MAX = 300; // characters per private message
 export const DM_KEEP = 100; // messages kept per conversation
 export const DM_GAP_MS = 700; // one message per 0.7 s per sender
 export const GUILD_RANK = 20;
 export const GUILD_MAX = 50; // members
+export const GCHAT_KEEP = 150; // guild chat messages kept per guild
 const NAME_RE = /^[\p{L}\p{N} _.'-]{3,24}$/u;
 const TAG_RE = /^[A-Z0-9]{2,5}$/;
 
@@ -39,11 +41,12 @@ export class SocialBook {
     this.ids = new Map([...this.players].map(([k, p]) => [p.id, k])); // public id → key
     this.dms = new Map(Object.entries(data.dms ?? {})); // "idA|idB" (sorted) → [{ f, text, at }]
     this.guilds = new Map(Object.entries(data.guilds ?? {})); // guild id → { id, name, tag, owner, members, created, desc }
+    this.gchat = new Map(Object.entries(data.gchat ?? {})); // guild id → [{ f, text, at }]
     this.lastDm = new Map(); // key → time of their last message (rate limit, not saved)
   }
 
   toJSON() {
-    return { players: Object.fromEntries(this.players), dms: Object.fromEntries(this.dms), guilds: Object.fromEntries(this.guilds) };
+    return { players: Object.fromEntries(this.players), dms: Object.fromEntries(this.dms), guilds: Object.fromEntries(this.guilds), gchat: Object.fromEntries(this.gchat) };
   }
 
   changed() {
@@ -244,6 +247,7 @@ export class SocialBook {
     if (g.members.length >= GUILD_MAX) return { error: 'That guild is full.' };
     g.members.push(me.id);
     me.guild = g.id;
+    me.gRead = this.now(); // new members start with nothing unread
     this.changed();
     return { guild: g };
   }
@@ -255,8 +259,11 @@ export class SocialBook {
     if (!me || !g) return { error: 'You are not in a guild.' };
     g.members = g.members.filter((x) => x !== me.id);
     me.guild = null;
-    if (!g.members.length) this.guilds.delete(g.id);
-    else if (g.owner === me.id) g.owner = g.members[0];
+    delete me.gRead;
+    if (!g.members.length) {
+      this.guilds.delete(g.id);
+      this.gchat.delete(g.id);
+    } else if (g.owner === me.id) g.owner = g.members[0];
     this.changed();
     return { ok: true };
   }
@@ -264,5 +271,52 @@ export class SocialBook {
   guildOf(key) {
     const me = this.players.get(key);
     return me?.guild ? this.guilds.get(me.guild) ?? null : null;
+  }
+
+  // ---------------------------------------------------------- guild chat
+
+  // post to your guild's chat: { m, guild } or { error }
+  guildSay(key, text) {
+    const me = this.players.get(key);
+    const g = this.guildOf(key);
+    if (!me || !g) return { error: 'You are not in a guild.' };
+    const body = clean(text, DM_MAX);
+    if (!body) return { error: 'Type a message.' };
+    const now = this.now();
+    if (now - (this.lastDm.get(key) ?? 0) < DM_GAP_MS) return { error: 'Slow down a little.' };
+    this.lastDm.set(key, now);
+    const list = this.gchat.get(g.id) ?? [];
+    const m = { f: me.id, text: body, at: now };
+    list.push(m);
+    if (list.length > GCHAT_KEEP) list.splice(0, list.length - GCHAT_KEEP);
+    this.gchat.set(g.id, list);
+    me.gRead = now;
+    this.changed();
+    return { m, guild: g };
+  }
+
+  // your guild's chat; reading it marks it read
+  guildChat(key) {
+    const me = this.players.get(key);
+    const g = this.guildOf(key);
+    if (!me || !g) return [];
+    const list = this.gchat.get(g.id) ?? [];
+    const last = list[list.length - 1]?.at ?? 0;
+    if (last > (me.gRead ?? 0)) {
+      me.gRead = last;
+      this.changed();
+    }
+    return list;
+  }
+
+  // messages from others since you last opened the guild chat
+  guildUnread(key) {
+    const me = this.players.get(key);
+    const g = this.guildOf(key);
+    if (!me || !g) return 0;
+    const since = me.gRead ?? 0;
+    let n = 0;
+    for (const m of this.gchat.get(g.id) ?? []) if (m.at > since && m.f !== me.id) n++;
+    return n;
   }
 }

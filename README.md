@@ -114,7 +114,7 @@ Every raid keeps a ledger and the tests assert it through full raids in every mo
 stakes + jackpot bonus + rollover in  ==  rake + payouts + rollover out + money still inside
 ```
 
-**Swap**: coins in your game balance swap instantly at the live price with a 0.3% spread (always in practice; with real tokens only when the operator sets `SWAP_INTERNAL=1`). With a Starknet wallet signed in, you can also swap inside that wallet through AVNU's aggregator (Starkzap's `AvnuSwapProvider`); you sign, the game never holds those tokens.
+**Swap**: coins in your game balance swap instantly at the live price with a 0.3% spread (always in practice and on Sepolia; on mainnet only when the operator sets `SWAP_INTERNAL=1`). With a Starknet wallet signed in, you can also swap inside that wallet through AVNU's aggregator (Starkzap's `AvnuSwapProvider`); you sign, the game never holds those tokens.
 
 **Chat**: one lobby channel, plain text, 200 characters, one message per 1.5 s.
 
@@ -162,13 +162,13 @@ A session is bound to the address. A leaked session token can play with that bal
 | `RPC_URL`, `CLIENT_RPC_URL` | Server and browser RPC (default: Starkzap's presets). |
 | `TOKENS`, `EXTRA_TOKENS` | Preset symbols (default `STRK,ETH,USDC,USDT,WBTC`) and extras as `SYMBOL:0xaddress:decimals[:btc]`, e.g. strkBTC. |
 | `FIXED_PRICES`, `PRICE_SECONDS`, `MIN_WITHDRAW_USD` | `$` per token overrides like `STRK=0.15`, feed period (60), smallest cash-out in $ (1). |
-| `SWAP_INTERNAL=1` | Allow in-game coin swaps on real tokens (the house must rebalance on chain). |
+| `SWAP_INTERNAL=1` | Allow in-game coin swaps on mainnet (the house must rebalance on chain). On Sepolia they are on unless `SWAP_INTERNAL=0`. |
 | `STRK20_VIEWING_KEY`, `STRK20_PROVER_URL`, `STRK20_POOL`, `STRK20_FEED_URL`, `STRK20_CACHE_DIR` | Private deposits need the viewing key (pool defaults to mainnet `0x0403…812a`); private cash-outs also need the prover and the house key. Needs Node 24+ and the optional `strk20-discovery` package (the Docker image has both). |
 | `PAYMASTER_API_KEY`, `PAYMASTER_URL` | AVNU paymaster for gasless house payouts and sponsored player deposits. |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_CLIENT_ID` | Privy sign-in. Add the game's origin to the app's allowed origins and enable the login methods you want. |
 | `CARTRIDGE=0` | Hides the Cartridge option. |
 | `ALLOWLIST` | Closed beta: comma-separated addresses that may sign in; transfers from anyone else are held, not credited. |
-| `MAX_BALANCE_USD`, `MAX_TOTAL_USD` | Beta caps: a deposit that would take a player (or everyone together) over this many $ is held for a manual refund (`npm run house -- held`). |
+| `MAX_BALANCE_USD`, `MAX_TOTAL_USD` | Mainnet beta caps: a deposit that would take a player (or everyone together) over this many $ is held for a manual refund (`npm run house -- held`). Ignored on Sepolia unless `SEPOLIA_CAPS=1`. |
 | `PAUSE_FILE` | The pause switch (default `<CASHIER_FILE>.paused`; `npm run house -- pause` / `resume`): no new stakes, box buys, top-ups or swaps; cash-outs always work. |
 
 On mainnet the server refuses to start without `CASHIER_FILE`, and a journal written on one network never loads on another. Step-by-step launch (Render, house wallet, Sepolia checklist, closed-beta mainnet): [docs/LAUNCH.md](docs/LAUNCH.md).

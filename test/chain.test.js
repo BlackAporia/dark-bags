@@ -118,3 +118,14 @@ test('the paymaster proxy only sponsors deposits to the house', () => {
   assert.ok(!allowedBuild(build([]), PLAYER, HOUSE, tokens), 'empty');
   assert.ok(!allowedBuild({ transaction: { type: 'deploy', deployment: { address: '0xb0b' } } }, PLAYER, HOUSE, tokens));
 });
+
+test('deposit caps apply on mainnet; Sepolia test tokens are never capped unless asked', () => {
+  const caps = { MAX_BALANCE_USD: '20', MAX_TOTAL_USD: '200' };
+  const main = readConfig({ CHAIN: 'mainnet', ...caps });
+  assert.equal(main.maxBalanceUsd, 20);
+  assert.equal(main.maxTotalUsd, 200);
+  const sep = readConfig({ CHAIN: 'sepolia', ...caps });
+  assert.equal(sep.maxBalanceUsd, 0);
+  assert.equal(sep.maxTotalUsd, 0);
+  assert.equal(readConfig({ CHAIN: 'sepolia', SEPOLIA_CAPS: '1', ...caps }).maxBalanceUsd, 20);
+});

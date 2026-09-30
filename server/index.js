@@ -96,7 +96,9 @@ const send = (cid, msg) => {
 const lobby = new Lobby({
   wallet,
   cashier: real?.cashier ?? null,
-  swap: !real || process.env.SWAP_INTERNAL === '1', // real money: in-game swaps only when the house rebalances on chain
+  // in-game swaps: always with test tokens and on Sepolia; on mainnet only when the house
+  // rebalances on chain (SWAP_INTERNAL=1). SWAP_INTERNAL=0 turns them off anywhere.
+  swap: process.env.SWAP_INTERNAL === '0' ? false : !real || real.cfg.network === 'sepolia' || process.env.SWAP_INTERNAL === '1',
   ranks,
   inventory,
   social,

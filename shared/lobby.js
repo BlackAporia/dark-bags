@@ -19,7 +19,7 @@ import { SocialBook, GUILD_RANK } from './social.js';
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
 const PAUSABLE = new Set(['ready', 'box', 'topup', 'swap']);
-const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'invite']);
+const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite']);
 
 export class Lobby {
   constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook() }) {
@@ -410,7 +410,7 @@ export class Lobby {
     const key = this.key(s);
     const p = key && this.social.get(key);
     if (!p) return null;
-    return { me: p.id, unread: this.social.unreadTotal(key), requests: p.in.length, guild: p.guild };
+    return { me: p.id, unread: this.social.unreadTotal(key), requests: p.in.length, guild: p.guild, gUnread: this.social.guildUnread(key) };
   }
 
   pushTo(key, msg) {
@@ -499,6 +499,31 @@ export class Lobby {
         if (r.error) return err(r.error);
         return reply({ t: 'guildDone', id: null });
       }
+      case 'guild_say': {
+        const r = S.guildSay(key, msg.text);
+        if (r.error) return err(r.error);
+        const m = { ...r.m, n: me.name, rk: this.ranks.get(key).rank };
+        // every member online gets it; the unread count rides along for their badge
+        for (const id of r.guild.members) {
+          const k = S.keyOf(id);
+          if (k) this.pushTo(k, { t: 'guild_msg', gid: r.guild.id, m, gUnread: k === key ? 0 : S.guildUnread(k) });
+        }
+        return;
+      }
+      case 'guild_chat': {
+        const g = S.guildOf(key);
+        if (!g) return err('You are not in a guild.');
+        const list = S.guildChat(key).map((m) => {
+          const k = S.keyOf(m.f);
+          const p = k && S.get(k);
+          return { ...m, n: p?.name ?? '?', rk: k ? this.ranks.get(k).rank : 1 };
+        });
+        return reply({ t: 'guild_chat', gid: g.id, list, gUnread: 0 });
+      }
+      case 'guild_read':
+        // the chat is on screen: new messages are read as they land
+        S.guildChat(key);
+        return;
       case 'invite': {
         // bring someone into the room you are waiting in
         const room = s.room;

@@ -16,6 +16,7 @@
 
 <!-- in-raid HUD -->
 <div id="hud" class="hud" hidden>
+  <button type="button" id="pause-btn" class="pause-btn" aria-label="Menu" data-i18n-title="pause.open" title="Menu (Esc)"><span aria-hidden="true">❚❚</span></button>
   <div class="hud-bag">
     <span class="eyebrow" data-i18n="hud.bagPrivate">Your bag · private</span>
     <span id="bag" class="bag-num">0</span>
@@ -63,6 +64,29 @@
       <button id="bluff-chip" class="chip" type="button">Bag look: medium <kbd>Q</kbd></button>
       <button id="mute-chip" class="chip" type="button" aria-pressed="false"><span data-i18n="hud.sound">Sound</span> <kbd>M</kbd></button>
       <button id="music-chip" class="chip" type="button" aria-pressed="false"><span data-i18n="hud.music">Music</span> <kbd>N</kbd></button>
+    </div>
+  </div>
+</div>
+
+<!-- Esc in a match: resume, settings, sound, leave -->
+<div id="pause" class="pause" hidden role="dialog" aria-modal="true" aria-labelledby="pause-h">
+  <div class="pause-card">
+    <p class="eyebrow" id="pause-mode"></p>
+    <h2 id="pause-h" data-i18n="pause.title">Menu</h2>
+    <p class="fine" id="pause-note"></p>
+    <div id="pause-main" class="pause-main">
+      <button type="button" id="pause-resume" class="cta" data-i18n="pause.resume">Resume</button>
+      <button type="button" id="pause-settings" class="ghost" data-i18n="pause.settings">Settings</button>
+      <div class="pause-row">
+        <button type="button" id="pause-sound" class="ghost" aria-pressed="true"></button>
+        <button type="button" id="pause-music" class="ghost" aria-pressed="true"></button>
+      </div>
+      <button type="button" id="pause-leave" class="danger" data-i18n="pause.leave">Leave match</button>
+      <p class="fine pause-keys" data-i18n="pause.keys">Esc: back to the match</p>
+    </div>
+    <div id="pause-set" class="pause-set" hidden>
+      <button type="button" id="pause-back" class="ghost" data-i18n="pause.back">← Back</button>
+      <div id="pause-set-root"></div>
     </div>
   </div>
 </div>

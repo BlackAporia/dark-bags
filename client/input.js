@@ -16,9 +16,10 @@ export class Input {
     this.tFire = false; // the Fire button is held
     this.lastAim = 0;
 
+    this.blocked = false; // the in-match menu is open: the runner stands still
     const typing = (e) => e.target instanceof HTMLInputElement;
     addEventListener('keydown', (e) => {
-      if (typing(e)) return;
+      if (typing(e) || this.blocked) return;
       this.onAnyInput?.();
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
       if (e.repeat) return;
@@ -130,7 +131,17 @@ export class Input {
     });
   }
 
+  // stop everything held (opening the menu, losing focus)
+  release() {
+    this.keys.clear();
+    this.mouse.down = false;
+    this.tFire = false;
+    this.tAim = null;
+    this.dashQueued = false;
+  }
+
   moveVector() {
+    if (this.blocked) return { x: 0, y: 0 };
     let x = 0;
     let y = 0;
     const k = this.keys;
@@ -164,6 +175,7 @@ export class Input {
   }
 
   firing() {
+    if (this.blocked) return false;
     if (this.touchOn) return this.tFire || (!!this.tAim && Math.hypot(this.tAim.x, this.tAim.y) > 0.55);
     return this.mouse.down;
   }
