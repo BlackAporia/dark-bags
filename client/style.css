@@ -1438,3 +1438,6 @@ body.touch-on .gl-cr b { font-size: 16px; }
 @media (max-width: 560px) and (min-height: 501px) {
   body.touch-on .gl-shop { top: calc(192px + var(--safe-t)); right: calc(16px + var(--safe-r)); }
 }
+
+/* weapon skins: a landscape still, as wide as the card allows */
+img.wimg { width: 100% !important; max-width: 160px; height: auto !important; aspect-ratio: 3 / 2; object-fit: contain; margin: 8px auto; display: block; }

@@ -35,6 +35,9 @@ function normalizeServer(u) {
   return url;
 }
 
+// the public game server the GitHub Pages build plays on (override with ?server=…)
+const DEFAULT_SERVER = 'wss://dark-bags.onrender.com/ws';
+
 function onlineUrl() {
   let param = null;
   try {
@@ -44,9 +47,10 @@ function onlineUrl() {
   }
   if (param) return normalizeServer(param);
   if (globalThis.DARK_BAGS_SERVER) return normalizeServer(globalThis.DARK_BAGS_SERVER);
-  // static hosts (GitHub Pages) have no game server behind them: practice unless configured
+  // GitHub Pages has no game server behind it: it plays on the public one
   const staticHost = /\.github\.io$/.test(location.hostname);
-  if (!STATIC && !staticHost && /^https?:$/.test(location.protocol)) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  if (staticHost) return DEFAULT_SERVER;
+  if (!STATIC && /^https?:$/.test(location.protocol)) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   return null;
 }
 
@@ -291,6 +295,8 @@ function renderLobby() {
   st.classList.toggle('bad', app.status === 'closed' || app.status === 'error');
   if (app.mode === 'practice') st.textContent = t('net.practice');
   else if (app.status === 'open') st.textContent = t('net.open');
+  // a free host sleeps when idle: the first connection can take up to a minute
+  else if (!app.everOpen && performance.now() - (app.connectT ?? 0) > 4000) st.textContent = t('net.waking');
   else if (app.status === 'connecting') st.textContent = t('net.connecting');
   else st.textContent = t('net.down');
 
@@ -528,6 +534,13 @@ function setMode(mode) {
   cashier.reset();
   if (mode === 'practice') $('fine').textContent = t('lobby.fine');
   store.set('darkbags.mode', mode);
+  app.connectT = performance.now();
+  app.everOpen = false;
+  if (mode === 'online') {
+    // poke the server over plain HTTP too: a sleeping free host starts waking right away
+    fetch(SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/healthz'), { mode: 'no-cors' }).catch(() => {});
+    setTimeout(() => !app.everOpen && renderLobby(), 4100);
+  }
   app.transport = mode === 'online' ? new WsTransport(SERVER, onMessage, onStatus) : new LocalTransport(onMessage, onStatus);
   if (app.screen !== 'lobby') showScreen('lobby');
   renderLobby();
@@ -537,6 +550,7 @@ function onStatus(st) {
   const wasOpen = app.status === 'open';
   app.status = st;
   if (st === 'open') {
+    app.everOpen = true;
     const token = app.mode === 'online' ? store.get('darkbags.token', null) : 'practice';
     send({ t: 'hello', token, name: app.name });
     sendPracticeCfg();
