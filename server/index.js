@@ -87,6 +87,8 @@ const lobby = new Lobby({
   bots: BOTS,
   roundSeconds: ROUND_SECONDS,
   prepSeconds: PREP_SECONDS,
+  // online rooms wait for the players (no timer) until someone presses Start or it fills up
+  waitForStart: process.env.WAIT_FOR_START !== '0',
   newToken: () => crypto.randomBytes(16).toString('hex'),
 });
 

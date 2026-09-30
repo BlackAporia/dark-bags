@@ -503,4 +503,9 @@ export default {
   'rot.title': "Telefonunu yan çevir",
   'rot.sub': "Baskın yatay oynanınca daha iyi: solda hareket, sağda ateş.",
   'rot.anyway': "Dikey oyna",
+  'prep.waiting': "Oyuncular bekleniyor",
+  'prep.waitingMe': "Süre yok: arkadaşlarını çağır, hazır olunca Başlat'a bas. Boş yerlere botlar gelir. {of} yerden {n} dolu.",
+  'prep.waitingJoin': "{of} yerden {n} dolu. Katılmak için bahis yap ve Hazır'a bas.",
+  'prep.firstWait': "Hazır'a bas: oda herkesi bekler, süre yok.",
+  'prep.start': "Şimdi başlat",
 };

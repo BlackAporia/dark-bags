@@ -20,7 +20,11 @@ import { Inventory, botLook, OUTFIT } from './cosmetics.js';
  * Transport-agnostic: the server plugs in WebSockets, offline mode a direct callback.
  */
 export class RoomCore {
-  constructor({ stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
+  // waitForStart (online): a Ready room waits with no timer until the players start it
+  // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
+  // Ready starts the prepSeconds countdown (practice, tests).
+  constructor({ stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false }) {
+    this.waitForStart = waitForStart && !practice;
     this.stake = stake;
     this.mode = MODE[mode] ? mode : 'raid';
     const m = MODE[this.mode];
@@ -106,6 +110,13 @@ export class RoomCore {
       case 'unready':
         this.unready(c);
         break;
+      case 'start':
+        // any ready player may stop waiting: a short countdown, then bots take the empty seats
+        if (c.ready && this.state === 'prep' && this.countT === null) {
+          this.countT = CFG.PREP_ALL_READY;
+          this.broadcastPrep();
+        }
+        break;
       case 'in':
         if (c.pid && this.world && this.state === 'live') this.world.queueInput(c.pid, msg);
         break;
@@ -140,7 +151,7 @@ export class RoomCore {
     c.ready = true;
     c.escrow = { asset, units, mills: this.stake };
     if (this.state === 'idle') this.openPrep();
-    if (this.state === 'prep' && this.countT === null) this.countT = this.prepSeconds;
+    if (this.state === 'prep' && this.countT === null && !this.waitForStart) this.countT = this.prepSeconds;
     this.hurry();
     this.broadcastPrep();
   }
@@ -165,7 +176,10 @@ export class RoomCore {
 
   // everyone in the room is ready (and there are at least two humans): don't make them wait
   hurry() {
-    if (this.state !== 'prep' || this.countT === null) return;
+    if (this.state !== 'prep') return;
+    // waiting rooms start by themselves once every seat is taken by a ready human
+    if (this.waitForStart && this.readyList().length >= this.botFill) this.countT = Math.min(this.countT ?? CFG.PREP_ALL_READY, CFG.PREP_ALL_READY);
+    if (this.countT === null) return;
     const all = [...this.clients.values()];
     const ready = all.filter((c) => c.ready);
     if (ready.length >= 2 && ready.length === all.length) this.countT = Math.min(this.countT, CFG.PREP_ALL_READY);
@@ -173,7 +187,7 @@ export class RoomCore {
 
   openPrep() {
     this.state = 'prep';
-    this.countT = this.readyList().length ? this.prepSeconds : null;
+    this.countT = this.readyList().length && !this.waitForStart ? this.prepSeconds : null;
     // bots for the next raid are rolled now so their icons can light up by name
     const taken = new Set();
     this.roster = [];
@@ -339,6 +353,7 @@ export class RoomCore {
       tl: this.world && this.state === 'live' ? Math.round(this.world.timeLeft) : 0,
       resT: this.state === 'results' ? Math.ceil(this.resT) : 0,
       slotsTotal: Math.max(this.botFill, ready.length),
+      waiting: this.waitForStart && this.state === 'prep' && this.countT === null, // no timer: start when you like
       bots,
       pot: (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,
     };

@@ -511,4 +511,9 @@ export default {
   'rot.title': "Turn your phone sideways",
   'rot.sub': "The raid plays best in landscape: move on the left, Fire on the right.",
   'rot.anyway': "Play upright anyway",
+  'prep.waiting': "Waiting for players",
+  'prep.waitingMe': "No timer: invite friends and press Start when you're ready. Empty seats get bots. {n} of {of} seats taken.",
+  'prep.waitingJoin': "{n} of {of} seats taken. Stake & ready to join this raid.",
+  'prep.firstWait': "Press Ready: the room waits for everyone, no timer.",
+  'prep.start': "Start now",
 };

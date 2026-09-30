@@ -20,7 +20,7 @@ import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } 
 const PAUSABLE = new Set(['ready', 'box', 'topup', 'swap']);
 
 export class Lobby {
-  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now() }) {
+  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false }) {
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
     // tokens this only runs when the operator turns it on (the house must rebalance on chain).
     this.swapOn = swap;
@@ -42,7 +42,7 @@ export class Lobby {
     this.sessions = new Map();
     // one table per mode and stake
     this.rooms = new Map();
-    for (const m of MODES) for (const stake of tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds }));
+    for (const m of MODES) for (const stake of tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds, waitForStart }));
     this.tiers = tiers;
     this.roundSeconds = roundSeconds;
   }

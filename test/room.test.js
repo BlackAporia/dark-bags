@@ -8,7 +8,7 @@ import { PriceBook, unitsAtEntryRate } from '../shared/assets.js';
 const START = 100000; // test faucet: $100 of USDC, in mills ($1 = 1,000)
 const mills = (wallet, token) => Number(wallet.balance(token, 'USDC')) / 1000; // 6 decimals: 1 mill = 1,000 units
 
-function setup({ roundSeconds = 120, bots = false } = {}) {
+function setup({ roundSeconds = 120, bots = false, waitForStart = false } = {}) {
   const inbox = new Map();
   const wallet = new MemoryWallet();
   const lobby = new Lobby({
@@ -20,6 +20,7 @@ function setup({ roundSeconds = 120, bots = false } = {}) {
     newToken: () => `tok${Math.random().toString(36).slice(2, 12)}`,
     bots,
     roundSeconds,
+    waitForStart,
   });
   const client = (cid, name = 'runner') => {
     lobby.connect(cid);
@@ -274,4 +275,39 @@ test('ping: the server measures each client, only its own latest stamp counts, r
   alice.y = bob.y;
   const seen = room.world.snapshotFor(bob.id).players.find((p) => p.n === 'alice');
   assert.equal(seen.pg, alice.ping);
+});
+
+test('online rooms wait with no timer until someone starts, the room fills, or everyone cancels', () => {
+  const { lobby, wallet, client, ticks } = setup({ waitForStart: true, bots: true });
+  const a = client('a', 'alice');
+  lobby.handle('a', { t: 'join', stake: 1000, mode: 'raid' });
+  lobby.handle('a', { t: 'ready', asset: 'USDC' });
+  const room = lobby.rooms.get('raid:1000');
+  ticks(CFG.PREP_SECONDS * 10); // ten times the old countdown: still waiting, stake held
+  assert.equal(room.state, 'prep');
+  assert.equal(a.last('prep').waiting, true);
+  assert.equal(a.last('prep').count, null);
+  assert.equal(mills(wallet, a.token), START - 1000);
+  // cancelling gives the stake back
+  lobby.handle('a', { t: 'unready' });
+  assert.equal(mills(wallet, a.token), START);
+  // Start now: a short countdown, then bots fill the empty seats
+  lobby.handle('a', { t: 'ready', asset: 'USDC' });
+  const b = client('b', 'bob');
+  lobby.handle('b', { t: 'join', stake: 1000, mode: 'raid' });
+  lobby.handle('b', { t: 'start' }); // not ready: cannot start it
+  assert.equal(room.countT, null);
+  lobby.handle('a', { t: 'start' });
+  assert.equal(room.countT, CFG.PREP_ALL_READY);
+  ticks(CFG.PREP_ALL_READY + 0.5);
+  assert.equal(room.state, 'live');
+  assert.equal(room.world.players.size, room.botFill, 'bots took the empty seats');
+  // a room full of ready humans starts by itself
+  const duel = lobby.rooms.get('duel:1000');
+  for (const c of ['c', 'd']) {
+    client(c, c);
+    lobby.handle(c, { t: 'join', stake: 1000, mode: 'duel' });
+    lobby.handle(c, { t: 'ready', asset: 'USDC' });
+  }
+  assert.equal(duel.countT, CFG.PREP_ALL_READY, 'both duel seats taken: go');
 });
