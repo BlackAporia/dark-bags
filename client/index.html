@@ -125,6 +125,10 @@
           <p id="net-status" class="net-status"></p>
         </div>
       </div>
+      <section id="starter" class="starter" hidden aria-labelledby="starter-h">
+        <div class="starter-top"><h2 id="starter-h" class="starter-h" data-i18n="st.title">Getting started</h2><span id="starter-prog" class="starter-prog num"></span></div>
+        <ol id="starter-steps" class="starter-steps"></ol>
+      </section>
       <h2 class="sec-h" data-i18n="modes.title">Game mode</h2>
       <div id="modes" class="modes" role="radiogroup"></div>
       <fieldset class="tables">
@@ -317,7 +321,9 @@
       <button type="button" class="seg" role="tab" data-tab="history">History</button>
     </div>
     <section data-pane="deposit" class="pane">
-      <div class="row"><select id="dep-token" aria-label="Token"></select><input id="dep-amount" inputmode="decimal" placeholder="Amount" aria-label="Amount"></div>
+      <div class="row"><select id="dep-token" aria-label="Token"></select><input id="dep-amount" inputmode="decimal" placeholder="Amount" aria-label="Amount"><button type="button" id="dep-max" class="link">Max</button></div>
+      <p id="dep-have" class="dep-have"></p>
+      <p id="dep-faucet" class="fine" hidden>Testnet: get free STRK for your address at <a href="https://starknet-faucet.vercel.app" target="_blank" rel="noopener">starknet-faucet.vercel.app</a>, then deposit it here.</p>
       <div id="dep-route" class="route" role="radiogroup" aria-label="How"></div>
       <p id="dep-hint" class="fine"></p>
       <button type="button" id="dep-go" class="cta">Deposit</button>

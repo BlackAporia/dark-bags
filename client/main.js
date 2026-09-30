@@ -288,7 +288,55 @@ function renderModes() {
   );
 }
 
+// ------------------------------------------------------ getting started
+// A four-step checklist for a new player on a real-token server: sign in, add funds,
+// pick the coin to stake, play the first online match. One clear action at a time;
+// it goes away once the first match is played.
+function renderStarter() {
+  const box = $('starter');
+  const show = app.mode === 'online' && !!app.chain && app.status === 'open' && !store.get('darkbags.starterDone', false);
+  box.hidden = !show;
+  if (!show) return;
+  const signed = cashier.signedIn;
+  const funded = signed && walletValue() > 0;
+  const q = quote();
+  const coin = funded && q !== null && units(app.asset) >= q;
+  const played = !!store.get('darkbags.firstOnline', false);
+  const steps = [
+    { id: 'signin', done: signed, act: () => $('connect').click() },
+    { id: 'fund', done: funded, act: () => cashier.openCashier('deposit') },
+    { id: 'coin', done: coin, act: () => $('paywith').scrollIntoView({ behavior: 'smooth', block: 'center' }) },
+    { id: 'play', done: played, act: () => $('play').click() },
+  ];
+  const cur = steps.findIndex((s) => !s.done);
+  if (cur === -1) {
+    store.set('darkbags.starterDone', true);
+    box.hidden = true;
+    return;
+  }
+  $('starter-prog').textContent = `${steps.filter((s) => s.done).length}/4`;
+  const ol = $('starter-steps');
+  ol.replaceChildren(
+    ...steps.map((s, i) => {
+      const li = document.createElement('li');
+      li.className = s.done ? 'done' : i === cur ? 'now' : 'next';
+      const extra = s.id === 'fund' && app.chain?.network === 'sepolia' ? ` ${t('st.fundTest')}` : '';
+      li.innerHTML = `<span class="st-dot" aria-hidden="true">${s.done ? '✓' : i + 1}</span><div class="st-body"><b>${esc(t(`st.${s.id}`))}</b><span>${esc(t(`st.${s.id}.d`))}${esc(extra)}</span></div>`;
+      if (i === cur) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cta st-go';
+        b.textContent = t(`st.${s.id}.go`);
+        b.addEventListener('click', s.act);
+        li.append(b);
+      }
+      return li;
+    }),
+  );
+}
+
 function renderLobby() {
+  renderStarter();
   const onlineBtn = $('mode-online');
   onlineBtn.disabled = !SERVER;
   onlineBtn.title = SERVER ? '' : 'No game server configured for this build';
@@ -302,7 +350,11 @@ function renderLobby() {
   // how many people are on the server right now (online only)
   const on = $('tb-online');
   on.hidden = !(app.mode === 'online' && app.status === 'open' && app.online);
-  if (!on.hidden) on.querySelector('b').textContent = t('net.online', { n: app.online });
+  if (!on.hidden) {
+    // phones: just the number next to the live dot; the full label on wider screens
+    on.querySelector('b').textContent = innerWidth < 560 ? String(app.online) : t('net.online', { n: app.online });
+    on.title = t('net.online', { n: app.online });
+  }
   // a free host sleeps when idle: the first connection can take up to a minute
   else if (!app.everOpen && performance.now() - (app.connectT ?? 0) > 4000) st.textContent = t('net.waking');
   else if (app.status === 'connecting') st.textContent = t('net.connecting');
@@ -650,6 +702,7 @@ function handleMessage(m) {
       break;
     case 'result':
       app.balances = m.balances ?? app.balances;
+      if (app.mode === 'online') store.set('darkbags.firstOnline', true);
       store.set('darkbags.raids', store.get('darkbags.raids', 0) + 1);
       if (m.rank) app.rank = m.rank.after;
       // went down with others still inside: watch them first, results when you want them

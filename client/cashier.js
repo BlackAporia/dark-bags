@@ -218,7 +218,37 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     fillTokens('wd-token');
     setTab(tab);
     setStatus('cash-status', '');
+    $('dep-faucet').hidden = cs.chain.network !== 'sepolia';
     $('dlg-cashier').showModal();
+    refreshWalletBal();
+  }
+
+  // What the player's own wallet holds of the chosen token, read from the chain: shown
+  // under the amount, used by Max, and checked before we ask the wallet to send.
+  const FEE_RESERVE = 10n ** 18n; // keep 1 STRK for network fees when depositing STRK
+  const isStrk = (t) => t?.symbol?.toUpperCase() === 'STRK';
+  async function refreshWalletBal() {
+    const t = token($('dep-token').value);
+    const el = $('dep-have');
+    if (!t || !cs.account) return;
+    el.textContent = `In your wallet: checking…`;
+    try {
+      const v = await vendor();
+      const bal = await v.walletBalance(cs.chain, t, cs.account);
+      cs.walletBal = { ...(cs.walletBal ?? {}), [t.id]: bal };
+      if (token($('dep-token').value)?.id !== t.id) return;
+      el.textContent = `In your wallet: ${formatUnits(bal, t.decimals, 6)} ${t.symbol}${isStrk(t) ? ' (keep ~1 STRK for network fees)' : ''}`;
+      el.classList.toggle('empty', bal === 0n);
+    } catch {
+      el.textContent = '';
+    }
+  }
+  function depositMax() {
+    const t = token($('dep-token').value);
+    const bal = t && cs.walletBal?.[t.id];
+    if (bal == null) return;
+    const max = isStrk(t) ? (bal > FEE_RESERVE ? bal - FEE_RESERVE : 0n) : bal;
+    $('dep-amount').value = formatUnits(max, t.decimals, t.decimals).replace(/,/g, '');
   }
 
   function fillTokens(id) {
@@ -286,6 +316,13 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const t = token($('dep-token').value);
     const units = t && parseUnits($('dep-amount').value, t.decimals);
     if (!units) return setStatus('cash-status', 'Type an amount.', true);
+    const bal = cs.walletBal?.[t.id];
+    if (bal != null) {
+      const room = isStrk(t) ? bal - FEE_RESERVE : bal;
+      const faucet = cs.chain.network === 'sepolia' ? ' Get free test STRK at starknet-faucet.vercel.app.' : '';
+      if (units > bal) return setStatus('cash-status', `Your wallet has only ${formatUnits(bal, t.decimals, 6)} ${t.symbol}.${faucet}`, true);
+      if (units > room) return setStatus('cash-status', `Leave about 1 STRK in your wallet for the network fee (use Max).`, true);
+    }
     $('dep-go').disabled = true;
     try {
       const f = await ensureFacade();
@@ -424,6 +461,8 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   for (const b of document.querySelectorAll('#dlg-cashier [data-tab]')) b.addEventListener('click', () => setTab(b.dataset.tab));
   for (const b of document.querySelectorAll('.dlg [data-close]')) b.addEventListener('click', () => b.closest('dialog').close());
   $('dep-go').addEventListener('click', deposit);
+  $('dep-max').addEventListener('click', depositMax);
+  $('dep-token').addEventListener('change', refreshWalletBal);
   $('wd-go').addEventListener('click', withdraw);
   $('wd-max').addEventListener('click', () => {
     const t = token($('wd-token').value);
@@ -470,5 +509,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 function friendly(e) {
   const m = String(e?.message ?? e ?? 'Something went wrong.');
   if (/user (rejected|refused|abort)|USER_REFUSED|denied/i.test(m) || e?.code === 113) return 'Cancelled in the wallet.';
+  if (/multicall failed|u256_sub Overflow|insufficient|exceeds balance|transfer amount exceeds|not enough balance/i.test(m)) return 'Your wallet could not send this: usually not enough of that token, or no STRK left for the network fee. Try a smaller amount (Max leaves room for the fee).';
+  if (/not deployed|Contract not found|account.*deploy/i.test(m)) return 'Your wallet account is not deployed on this network yet. Make any transaction in the wallet first (for example, send yourself a little STRK), then try again.';
   return m.length > 220 ? `${m.slice(0, 220)}…` : m;
 }
