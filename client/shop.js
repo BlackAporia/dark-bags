@@ -2,7 +2,7 @@
 // limited editions, and the opening show. The server decides every roll; this page
 // only stages it: the box charges up in the colour of the best drop, bursts, and the
 // cards flip one by one.
-import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY, FIRST_TOPUP_MAX, firstBonus } from '../shared/cosmetics.js';
 import { isStable } from '../shared/assets.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { boxArt, weaponStill } from './locker.js';
@@ -45,7 +45,11 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
       </header>
       <section class="packs-wrap">
         <p class="eyebrow">${t('shop.topup')}</p>
-        <div class="lk-packs">${PACKS.map((p) => `<button type="button" class="lk-pack${p.bonus ? ' bonus' : ''}" data-pack="${p.id}" ${stableCents() < p.price ? 'disabled' : ''}><b>${usd(p.price + p.bonus)}</b><span>${p.bonus ? t('lk.bonus', { n: Math.round((p.bonus / p.price) * 100) }) : t('lk.shopUsd')}</span><small>${t('lk.pay', { v: usd(p.price) })}</small></button>`).join('')}</div>
+        ${L().firstTopup ? `<p class="first-topup">🎁 ${t('shop.firstTopup', { v: usd(FIRST_TOPUP_MAX) })}</p>` : ''}
+        <div class="lk-packs">${PACKS.map((p) => {
+          const extra = L().firstTopup ? firstBonus(p.price) : 0;
+          return `<button type="button" class="lk-pack${p.bonus || extra ? ' bonus' : ''}" data-pack="${p.id}" ${stableCents() < p.price ? 'disabled' : ''}><b>${usd(p.price + p.bonus + extra)}</b><span>${p.bonus || extra ? t('lk.bonus', { n: Math.round(((p.bonus + extra) / p.price) * 100) }) : t('lk.shopUsd')}</span><small>${t('lk.pay', { v: usd(p.price) })}</small></button>`;
+        }).join('')}</div>
         <p class="fine">${t('lk.shopNote')}</p>
       </section>
       <div class="mode shop-tabs" role="tablist">

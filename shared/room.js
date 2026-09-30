@@ -23,8 +23,10 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false }) {
+  constructor({ stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
+    // online has no bots: a raid needs at least this many ready players to start
+    this.minPlayers = Math.max(1, minPlayers);
     this.stake = stake;
     this.mode = MODE[mode] ? mode : 'raid';
     const m = MODE[this.mode];
@@ -111,8 +113,10 @@ export class RoomCore {
         this.unready(c);
         break;
       case 'start':
-        // any ready player may stop waiting: a short countdown, then bots take the empty seats
-        if (c.ready && this.state === 'prep' && this.countT === null) {
+        // any ready player may stop waiting: a short countdown, then bots (practice) take the empty seats
+        if (c.ready && this.state === 'prep' && this.readyList().length < this.minPlayers) {
+          this.send(cid, { t: 'err', msg: `Waiting for more players: a raid needs at least ${this.minPlayers}.` });
+        } else if (c.ready && this.state === 'prep' && this.countT === null) {
           this.countT = CFG.PREP_ALL_READY;
           this.broadcastPrep();
         }
@@ -286,8 +290,8 @@ export class RoomCore {
       if (this.countT !== null) {
         this.countT -= dt;
         if (this.countT <= 0) {
-          if (this.readyList().length) this.startRaid();
-          else this.countT = null;
+          if (this.readyList().length >= this.minPlayers) this.startRaid();
+          else this.countT = null; // someone left during the countdown: wait again
         }
       }
       if (this.tickN % 6 === 0) this.broadcastPrep();
@@ -353,6 +357,7 @@ export class RoomCore {
       tl: this.world && this.state === 'live' ? Math.round(this.world.timeLeft) : 0,
       resT: this.state === 'results' ? Math.ceil(this.resT) : 0,
       slotsTotal: Math.max(this.botFill, ready.length),
+      min: this.minPlayers,
       waiting: this.waitForStart && this.state === 'prep' && this.countT === null, // no timer: start when you like
       bots,
       pot: (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,

@@ -39,6 +39,9 @@ export function createSettingsUi() {
         ${row('set.music', slider('music', 0, 1, 0.05))}
         ${row('set.voice', toggle('voice'), 'set.voiceNote')}
       </section>
+      <section class="set-card"><p class="eyebrow">${t('set.tour')}</p>
+        <div class="set-row"><div><p>${t('set.tourNote')}</p></div><button type="button" class="ghost" data-tour>${t('set.tourBtn')}</button></div>
+      </section>
       <section class="set-card"><p class="eyebrow">${t('set.language')}</p>
         <div class="lang-grid">${LANGS.map((l) => `<button type="button" data-lang="${l.id}" aria-pressed="${l.id === getLang()}">${l.name}</button>`).join('')}</div>
       </section>`;
@@ -51,6 +54,7 @@ export function createSettingsUi() {
     for (const i of root.querySelectorAll('[data-tog]')) i.addEventListener('change', () => setSetting(i.dataset.tog, i.checked));
     for (const i of root.querySelectorAll('[data-rng]')) i.addEventListener('input', () => setSetting(i.dataset.rng, Number(i.value)));
     for (const b of root.querySelectorAll('[data-lang]')) b.addEventListener('click', () => setLang(b.dataset.lang));
+    root.querySelector('[data-tour]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('darkbags:tour')));
   }
   return { render };
 }

@@ -19,6 +19,7 @@ import { createInventory } from './inventory.js';
 import { createSwap } from './swap.js';
 import { createChat } from './chat.js';
 import { createSettingsUi } from './settingsui.js';
+import { createTour } from './tour.js';
 import { createIntro } from './intro.js';
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES } from '../shared/modes.js';
@@ -135,6 +136,18 @@ const inventory = createInventory({ app, send, go: (p, fam) => go(p, fam), openL
 const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
 const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
 const settingsUi = createSettingsUi();
+// Nyx's first-run tour: on the first launch here, and the first time a wallet signs in
+const tour = createTour({
+  app,
+  go: (p) => go(p),
+  touch: () => input.touchOn,
+  practice: () => {
+    if (app.mode !== 'practice') setMode('practice');
+    go('play');
+    setTimeout(() => $('play').click(), 500);
+  },
+});
+document.addEventListener('darkbags:tour', () => tour.start());
 
 // ------------------------------------------------------------------ pages
 // friends, messages, profiles, guilds and room invites
@@ -178,6 +191,7 @@ const attract = new Attract(renderer);
 // ---------------------------------------------------------------- screens
 function showScreen(name) {
   app.screen = name;
+  if (name !== 'lobby') tour.close();
   if (name !== 'game' && !$('pause').hidden) closePause();
   $('lobby').hidden = name !== 'lobby';
   $('prep').hidden = name !== 'prep';
@@ -557,11 +571,11 @@ function renderPrep() {
     count.textContent = `${p.resT}`;
     status.textContent = t('prep.over');
   } else if (p.waiting && p.slots.length) {
-    // online: no timer. Wait for friends, start whenever you like; bots fill the rest
+    // online: no timer and no bots. Wait for friends, start once enough players are in
     count.textContent = t('prep.waiting');
     count.classList.remove('tick');
     count.classList.add('wait');
-    status.textContent = t(p.me?.ready ? 'prep.waitingMe' : 'prep.waitingJoin', { n: p.slots.length, of: p.slotsTotal });
+    status.textContent = p.me?.ready ? t(p.min > 1 ? 'prep.waitingPeople' : 'prep.waitingMe', { n: p.slots.length, of: p.slotsTotal, min: p.min }) : t('prep.waitingJoin', { n: p.slots.length, of: p.slotsTotal });
   } else if (p.count === null) {
     count.textContent = t('prep.readyUp');
     status.textContent = t(p.waiting ? 'prep.firstWait' : 'prep.first');
@@ -574,7 +588,7 @@ function renderPrep() {
       count.classList.add('tick');
       if (n <= 5 && n > 0) sfx.play('beep', { f: n <= 3 ? 990 : 740 });
     }
-    status.textContent = p.slots.length > 1 ? t('prep.many') : t('prep.bots');
+    status.textContent = p.min > 1 ? t('prep.people') : p.slots.length > 1 ? t('prep.many') : t('prep.bots');
     sfx.music?.set({ mode: 'prep', intensity: 0, bpm: 124 + Math.max(0, 20 - p.count) * 1.5 });
   }
 
@@ -604,6 +618,7 @@ function renderPrep() {
   }
   $('pot').textContent = money(p.pot);
   $('prep-start').hidden = !(p.waiting && p.me?.ready);
+  $('prep-start').disabled = p.slots.length < (p.min ?? 1); // online needs two players or more
   $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
   const ready = $('ready');
   const me = p.me ?? {};
@@ -674,6 +689,7 @@ function onMessage(m) {
   if (m.t !== 'locker') handleMessage(m);
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
+  if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
@@ -1096,7 +1112,12 @@ onLang(() => {
 applyI18n();
 
 // intro: a real loading bar over what the game waits for
-const intro = createIntro({ onDone: () => document.body.classList.add('ready') });
+const intro = createIntro({
+  onDone: () => {
+    document.body.classList.add('ready');
+    tour.maybeStart('device');
+  },
+});
 for (const s of ['fonts', 'world', 'connect', 'profile']) intro.need(s);
 (document.fonts?.ready ?? Promise.resolve()).then(() => intro.mark('fonts'));
 requestAnimationFrame(() => requestAnimationFrame(() => intro.mark('world')));

@@ -46,11 +46,21 @@ Every raid's ledger balances to the mill (`World.audit()`, checked by the tests 
 `scripts/sim.js`): stakes + jackpot bonus + rollover in = rake + payouts + rollover out +
 money still inside.
 
-**Bots.** Empty seats are filled by bots, and bot stakes are house money. A human who
-beats bots is paid from the house's bot stakes. This is the one place the house takes
-risk: it earns the 4% rake on humans, and wins or loses whatever the bots win or lose.
-Bots hit humans for 75% damage online (softer in practice), leave humans alone for
-their first 8 seconds, and never gang up more than two to one. See §5 for how to watch it.
+**Bots play only in practice.** Online every seat is a real player: a raid starts once
+at least two players are ready (the room waits, with no timer, until someone presses
+Start or it fills up). The house never stakes money of its own, so it cannot lose on a
+raid: its income is the 4% rake on every stake, whoever wins.
+
+We simulated the alternative before removing it (one bot-driven "player" per raid,
+100 raids per mode). With house bots in online rooms the economics were broken in
+both directions at once:
+- bots held a truce among themselves and hunted humans, so an average player extracted in
+  0% of raids and won 0% of battle royales (a player-hostile, rigged-looking game);
+- in deathmatch, guns + lasers and hardcore, the human-only advantages (softer bot hits,
+  the grace period, bots climbing the weapon ladder three times slower) let an average
+  player win 2–9× their fair share, and the house lost $0.60–$2.50 per $1 raid.
+Making bots fair fixed the first and made the second worse. Real players against real
+players has neither problem.
 
 ## 3. The shop
 
@@ -93,6 +103,11 @@ each:
   That is at most ~2% of the price on the top tier and ~15% on the $0.49 box, and only
   once a player has the whole rarity; everything else is margin.
 
+**First top-up doubles.** A player's first shop $ pack comes with the same amount again,
+up to $10 extra (the $5 pack gives $10 of shop $). Turning a free player into a paying
+one is the biggest single step in conversion, and shop $ costs nothing to mint: it can
+only be spent on boxes, never withdrawn.
+
 **Margin.** Digital goods: close to 100% gross margin, less payment and chain costs.
 
 ## 4. Other income
@@ -119,13 +134,15 @@ like this dies, and what it cannot do is supply players. Here is where it stands
   withdrawals to your own address, an auditable ledger.
 
 **What can sink it**
-1. **Liquidity.** Real-money PvP needs humans at the same table at the same time. With
-   few players, bots carry the raids and the house carries the risk. Start with the
-   $1 table only and one or two modes; open more tables as concurrency grows.
-2. **Bot risk.** If good players consistently beat bots, the house bleeds. Watch
-   `room.totals` (`stakesIn`, `paidOut`, `sponsorIn`, `rake`) per table and bot win rate
-   per player; set a daily cap on house bot exposure; prefer human-only pot modes for
-   real money (duel, teams): there the house takes only the rake and has zero risk.
+1. **Liquidity (the main risk now).** With no bots online, a raid needs two or more
+   players at the same table at the same time. 14 modes × 3 tables split a small crowd
+   into empty rooms. At launch, feature one table ($1) and two or three modes (duel,
+   battle royale, deathmatch), show where people wait (done: waiting counts, invites,
+   friends and guilds), and schedule "raid hours" so players meet. Open more tables and
+   modes as concurrency grows.
+2. **Rake is small per raid.** 4% of a $1 stake is $0.04: rake alone needs volume
+   (1,000 raids a day ≈ $40 at $1). The shop is where the margin is; the game's job is to
+   keep people playing long enough to want a look.
 3. **Regulation (the biggest risk).**
    - Staking real money on a game outcome is gambling or skill gaming in most countries:
      you need a licence (for example Malta, Isle of Man, Curaçao, or per-state in the US),
@@ -139,13 +156,23 @@ like this dies, and what it cannot do is supply players. Here is where it stands
    on liquidity in Ekubo/AVNU pools. A dead feed switches a coin off (by design).
 
 **What to measure from day one:** D1/D7/D30 retention (a good target is 35% / 12% / 5%),
-raids per daily player, human seats per raid, payer conversion and ARPPU, rake per daily
-player, house bot P&L per table, box revenue by tier, refunds and chargebacks.
+raids per daily player, players per raid and time waiting for a raid, payer conversion
+(first top-up) and ARPPU, rake per daily player, box revenue by tier, refunds and
+chargebacks.
+
+**Where the money comes from, in order:**
+1. **Shop** (bags and crates for shop $): nearly all margin, no risk. Levers in place:
+   a free first bag, $0.49 entry box, first top-up doubled, bulk (10th box free), pity,
+   limited numbered editions, share cards.
+2. **Rake** (4% house + 1% table jackpot on every stake): grows with players per raid
+   and raids per player.
+3. **Swap spread** (0.3%, in-game swaps).
 
 **Suggested launch order:** free practice + shop (lowest risk, builds a community) →
-real-money human-only duel and team modes in licensed regions → raids with bots once the
-data shows bot P&L is safe.
+public testnet with real players → real-money tables in licensed regions.
 
 **Not built yet, worth adding before real money:** spending and session limits
 (responsible gaming), self-exclusion, provably fair box seeds (commit and reveal),
-KYC/geo-blocking hooks, an operator dashboard for `room.totals`.
+KYC/geo-blocking hooks, an operator dashboard for `room.totals`, a daily login reward
+and a battle pass (retention + a second shop line that is not a loot box, which also
+lowers the regulatory risk of selling skins only through boxes).
