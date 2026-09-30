@@ -17,9 +17,19 @@ import { createStore } from '@starknet-io/get-starknet-discovery';
 import { wallets as KNOWN_WALLETS } from '@starknet-io/get-starknet-wallets';
 import { StarkZap, OnboardStrategy, Amount, fromAddress, AvnuSwapProvider, ChainId } from 'starkzap';
 import Privy, { LocalStorage } from '@privy-io/js-sdk-core';
+import { RpcProvider } from 'starknet';
 
 const hex = (v) => `0x${BigInt(v).toString(16)}`;
 const tokenOf = (t) => ({ name: t.name ?? t.symbol, symbol: t.symbol, decimals: t.decimals, address: fromAddress(t.id) });
+
+// What an address holds of a token, read straight from the chain (any sign-in kind), so
+// the cashier can show "in your wallet" and stop a deposit the wallet cannot cover.
+const providers = new Map();
+export async function walletBalance(chain, t, address) {
+  if (!providers.has(chain.rpcUrl)) providers.set(chain.rpcUrl, new RpcProvider({ nodeUrl: chain.rpcUrl }));
+  const r = await providers.get(chain.rpcUrl).callContract({ contractAddress: t.id, entrypoint: 'balanceOf', calldata: [address] });
+  return BigInt(r[0]) + (BigInt(r[1] ?? 0) << 128n);
+}
 
 // ------------------------------------------------------------ extensions
 
