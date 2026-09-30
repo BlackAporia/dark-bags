@@ -176,6 +176,18 @@ export class Renderer {
 
     // 4. runners and graves, sorted by depth
     const items = [];
+    // touch auto-aim: a red ring under the runner the Fire button is locked on
+    if (v.target != null) {
+      const f = v.figures.find((x) => x.a.id === v.target);
+      if (f) {
+        const k = this.reduced ? 1 : 0.85 + 0.15 * Math.sin(t / 90);
+        ctx.strokeStyle = 'rgba(255, 77, 94, 0.9)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.ellipse(f.a.x, f.a.y + FEET, 26 * k, 11 * k, 0, 0, TAU);
+        ctx.stroke();
+      }
+    }
     for (const f of v.figures) if (inView(f.a.x, f.a.y, 80)) items.push({ y: f.a.y + FEET, draw: () => this.drawRunner(f, t, v.gore) });
     for (const g of v.fx.graveItems(t, v.gore)) items.push(g);
     for (const o of v.turrets ?? []) if (inView(o.x, o.y, 60)) items.push({ y: o.y, draw: () => this.drawTurret(o, t) });

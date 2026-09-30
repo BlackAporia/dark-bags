@@ -114,7 +114,7 @@ export default {
   'feed.storm': 'La tormenta te atrapó',
   'feed.droppedYou': '{name} te ha tumbado',
   'coach.storm': 'Estás en la tormenta · vuelve al círculo',
-  'coach.touch': 'Pulgar izquierdo mueve · pulgar derecho apunta y ataca',
+  'coach.touch': "Pulgar izquierdo para moverte · mantén Fuego: apunta solo al enemigo más cercano",
   'coach.keys': 'WASD para moverte · ratón para apuntar · clic para atacar',
   'coach.exit': 'Hora de salir · quédate 3 segundos en una SALIDA verde · las flechas del borde marcan el camino',
   'coach.loot': 'Coge el botín naranja · va a tu bolsa',
@@ -499,4 +499,8 @@ export default {
   'st.play': "Juega tu primera partida",
   'st.play.d': "Elige modo y apuesta, pulsa Jugar y luego Listo.",
   'st.play.go': "Jugar",
+  'touch.fire': "Fuego",
+  'rot.title': "Gira el teléfono",
+  'rot.sub': "El raid se juega mejor en horizontal: muévete a la izquierda, dispara a la derecha.",
+  'rot.anyway': "Jugar en vertical",
 };

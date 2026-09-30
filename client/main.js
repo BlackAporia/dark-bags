@@ -161,6 +161,7 @@ function showScreen(name) {
   $('prep').hidden = name !== 'prep';
   $('result').hidden = name !== 'result';
   $('touch').hidden = !(name === 'game' && input.touchOn);
+  updateRotate();
   if (name === 'lobby' || name === 'prep') {
     if (game.active) game.stop();
     if (!attract.world) attract.start();
@@ -901,6 +902,29 @@ for (const b of document.querySelectorAll('#touch [data-buy]'))
 input.onMute = toggleMute;
 input.onMusic = toggleMusic;
 input.onAnyInput = () => sfx.unlock();
+
+// ---------------------------------------------------------- landscape
+// Phones play sideways. On Play we ask for fullscreen and lock landscape (Android);
+// where that is not possible (iPhone) a raid held upright shows a "turn your phone" card.
+const portrait = matchMedia('(orientation: portrait)');
+let uprightOk = false;
+function updateRotate() {
+  $('rotate').hidden = !(input.touchOn && app.screen === 'game' && portrait.matches && !uprightOk);
+}
+portrait.addEventListener?.('change', updateRotate);
+$('rot-anyway').addEventListener('click', () => {
+  uprightOk = true;
+  updateRotate();
+});
+function goLandscape() {
+  if (!input.touchOn) return;
+  const el = document.documentElement;
+  const lock = () => screen.orientation?.lock?.('landscape').catch(() => {});
+  if (document.fullscreenElement || !el.requestFullscreen) return lock();
+  el.requestFullscreen({ navigationUI: 'hide' }).then(lock, () => {});
+}
+$('play').addEventListener('click', goLandscape);
+$('ready').addEventListener('click', goLandscape);
 
 const enableTouch = () => {
   input.enableTouch($('touch'));
