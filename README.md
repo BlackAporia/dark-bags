@@ -235,7 +235,9 @@ Netcode: 30 Hz authoritative simulation, 15 Hz snapshots (~0.5 KB each), client-
 
 **Render (simplest).** `render.yaml` is a blueprint: Render → New → Blueprint → pick this repo. The free plan supports WebSockets but sleeps after ~15 idle minutes, so the first visit after a pause takes ~50 s.
 
-**Docker (Fly.io, Railway, a VPS).**
+**Railway (recommended for real play).** `railway.json` builds the Dockerfile, health-checks `/healthz` and keeps one replica. New Project → Deploy from GitHub repo, pick EU West, generate a domain, attach a volume at `/data` and set `RAILWAY_RUN_UID=0` so the server can write to it. Step by step: [docs/LAUNCH.md](docs/LAUNCH.md). (Vercel suits the static site only: it has no long-lived WebSocket server or disk.)
+
+**Docker (Fly.io, a VPS).**
 
 ```bash
 docker build -t dark-bags .
