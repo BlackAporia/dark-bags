@@ -11,6 +11,7 @@ import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
 import { createCashier } from './cashier/index.js';
 import { RankBook } from '../shared/ranks.js';
+import { Inventory } from '../shared/cosmetics.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -19,6 +20,7 @@ const PREP_SECONDS = Number(process.env.PREP_SECONDS || CFG.PREP_SECONDS);
 const BOTS = process.env.BOTS !== '0';
 const WALLET_FILE = process.env.WALLET_FILE || '';
 const RANKS_FILE = process.env.RANKS_FILE || '';
+const LOCKER_FILE = process.env.LOCKER_FILE || '';
 
 // ------------------------------------------------------------------ wallet
 // CHAIN=sepolia|mainnet: real tokens through the cashier (server/cashier). Otherwise test tokens.
@@ -53,6 +55,20 @@ const ranks = new RankBook({
   },
 });
 
+// ------------------------------------------------------------------ locker
+// Outfits, marks and luck-box pity per player key. Boxes are rolled here, never in the browser.
+let lockerTimer = null;
+const inventory = new Inventory({
+  data: LOCKER_FILE && existsSync(LOCKER_FILE) ? JSON.parse(readFileSync(LOCKER_FILE, 'utf8')) : {},
+  onChange: (inv) => {
+    if (!LOCKER_FILE || lockerTimer) return;
+    lockerTimer = setTimeout(async () => {
+      lockerTimer = null;
+      await writeFile(LOCKER_FILE, JSON.stringify(inv.toJSON())).catch((e) => console.error('locker save failed', e));
+    }, 1000);
+  },
+});
+
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
 const send = (cid, msg) => {
@@ -65,6 +81,7 @@ const lobby = new Lobby({
   wallet,
   cashier: real?.cashier ?? null,
   ranks,
+  inventory,
   send,
   bots: BOTS,
   roundSeconds: ROUND_SECONDS,
@@ -207,6 +224,7 @@ server.listen(PORT, () => {
 
 const shutdown = async () => {
   if (RANKS_FILE) await writeFile(RANKS_FILE, JSON.stringify(ranks.toJSON())).catch(() => {});
+  if (LOCKER_FILE) await writeFile(LOCKER_FILE, JSON.stringify(inventory.toJSON())).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await writeFile(WALLET_FILE, JSON.stringify(wallet.toJSON())).catch(() => {});
   process.exit(0);
