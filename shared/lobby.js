@@ -5,6 +5,7 @@ import { PriceBook, isStable } from './assets.js';
 import { RankBook } from './ranks.js';
 import { MODES, MODE } from './modes.js';
 import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
+import { SocialBook, GUILD_RANK } from './social.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -18,9 +19,11 @@ import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } 
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
 const PAUSABLE = new Set(['ready', 'box', 'topup', 'swap']);
+const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'invite']);
 
 export class Lobby {
-  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false }) {
+  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook() }) {
+    this.social = social; // players, friends, private messages, guilds
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
     // tokens this only runs when the operator turns it on (the house must rebalance on chain).
     this.swapOn = swap;
@@ -103,6 +106,7 @@ export class Lobby {
       s.name = cleanName(msg.name);
       if (this.cashier) s.account = this.cashier.accountFor(s.token);
       else this.wallet.ensure(s.token);
+      this.social.touch(this.key(s), s.name);
       this.send(cid, {
         t: 'welcome',
         token: s.token,
@@ -118,6 +122,7 @@ export class Lobby {
         swap: this.swapOn ? { fee: CFG.SWAP_FEE } : null,
         chat: this.chat,
         chain: this.cashier ? this.cashier.info() : null,
+        social: this.socialSummary(s),
         account: s.account,
         privy: this.cashier?.privyFor(s.token) ?? null,
         cfg: {
@@ -131,6 +136,7 @@ export class Lobby {
       return;
     }
     if (!s.token) return;
+    if (SOCIAL.has(msg.t)) return this.socialOp(cid, s, msg);
     // the operator's pause switch (real money): nothing new goes in; cash-outs stay open
     if (this.cashier?.paused() && PAUSABLE.has(msg.t)) {
       this.send(cid, { t: 'err', msg: 'Paused for maintenance: new stakes and purchases are off for a moment. Your balance is safe and cash-outs work.' });
@@ -203,6 +209,10 @@ export class Lobby {
         if (this.cashier) this.cashierOp(cid, s, msg);
         return;
       case 'join': {
+        if (msg.name) {
+          s.name = cleanName(msg.name);
+          this.social.touch(this.key(s), s.name);
+        }
         const room = this.rooms.get(`${MODE[msg.mode] ? msg.mode : 'raid'}:${Number(msg.stake)}`);
         if (!room) return;
         if (!this.key(s)) {
@@ -278,7 +288,13 @@ export class Lobby {
     if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
     const inv = this.inventory;
     const id = String(msg.id ?? '');
-    const pay = this.stablePay(key);
+    const stable = this.stablePay(key);
+    // a purchase paid in USDC/USDT counts toward founding a guild
+    const pay = (cents) => {
+      const ok = stable(cents);
+      if (ok) this.social.markPurchase(key);
+      return ok;
+    };
     const r =
       msg.t === 'equip' ? inv.equip(key, id)
       : msg.t === 'body' ? inv.setBody(key, id)
@@ -327,12 +343,16 @@ export class Lobby {
         const account = await c.login(s.token, msg.address, msg.signature);
         if (!alive()) return;
         s.account = account;
+        this.social.touch(account, s.name);
+        reply({ t: 'social', ...this.socialSummary(s) });
         reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
         if (!alive()) return;
         s.account = r.account;
+        this.social.touch(r.account, s.name);
+        reply({ t: 'social', ...this.socialSummary(s) });
         reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
@@ -355,6 +375,146 @@ export class Lobby {
       reply({ t: 'balance', balances: this.balances(s) });
     } finally {
       s.busy = false;
+    }
+  }
+
+  // ------------------------------------------------------------- social
+
+  sessionsOf(key) {
+    const out = [];
+    for (const [cid, x] of this.sessions) if (x.token && this.key(x) === key) out.push(cid);
+    return out;
+  }
+
+  // where a player is right now: off (not connected), lobby, waiting (ready in a room), raid
+  status(key) {
+    let best = 'off';
+    const order = { off: 0, lobby: 1, waiting: 2, raid: 3 };
+    for (const cid of this.sessionsOf(key)) {
+      const x = this.sessions.get(cid);
+      const c = x.room?.clients.get(cid);
+      const st = x.room?.inRaid?.(c) ? 'raid' : c?.ready ? 'waiting' : 'lobby';
+      if (order[st] > order[best]) best = st;
+    }
+    return best;
+  }
+
+  card(key, viewer = null) {
+    const p = this.social.get(key);
+    if (!p) return null;
+    const g = p.guild ? this.social.guilds.get(p.guild) : null;
+    return { id: p.id, n: p.name, rk: this.ranks.get(key).rank, tt: this.ranks.title(key), st: this.status(key), seen: p.seen, g: g ? g.tag : null, rel: viewer ? this.social.relation(viewer, p.id) : null };
+  }
+
+  socialSummary(s) {
+    const key = this.key(s);
+    const p = key && this.social.get(key);
+    if (!p) return null;
+    return { me: p.id, unread: this.social.unreadTotal(key), requests: p.in.length, guild: p.guild };
+  }
+
+  pushTo(key, msg) {
+    for (const cid of this.sessionsOf(key)) this.send(cid, msg);
+  }
+
+  socialOp(cid, s, msg) {
+    const key = this.key(s);
+    const reply = (m) => this.send(cid, m);
+    const err = (text) => reply({ t: 'err', msg: text });
+    if (!key || !this.social.get(key)) return err('Sign in first.');
+    const S = this.social;
+    const me = S.get(key);
+    switch (msg.t) {
+      case 'players': {
+        // everyone registered, online first; 40 at a time
+        const page = Math.max(0, Math.floor(Number(msg.page) || 0));
+        const all = S.search(msg.q, (k) => this.sessionsOf(k).length > 0).filter((x) => x.key !== key);
+        return reply({ t: 'players', q: String(msg.q ?? ''), page, total: all.length, list: all.slice(page * 40, page * 40 + 40).map((x) => this.card(x.key, key)) });
+      }
+      case 'profile': {
+        const k = S.keyOf(msg.id);
+        if (!k) return err('No such player.');
+        const c = this.ranks.career(k);
+        const g = S.guildOf(k);
+        return reply({ t: 'profile', card: this.card(k, key), stats: c.stats, done: c.achievements?.filter?.((a) => a.done).length ?? 0, look: this.inventory.look(k), guild: g ? { id: g.id, name: g.name, tag: g.tag } : null, created: S.get(k).created });
+      }
+      case 'friend': {
+        const r = S.addFriend(key, String(msg.id ?? ''));
+        if (r.error) return err(r.error);
+        reply({ t: 'rel', id: String(msg.id), rel: r.rel });
+        if (r.otherKey) this.pushTo(r.otherKey, { t: 'friendReq', from: this.card(key, r.otherKey), rel: S.relation(r.otherKey, me.id) });
+        return;
+      }
+      case 'unfriend': {
+        const r = S.dropFriend(key, String(msg.id ?? ''));
+        if (r.error) return err(r.error);
+        reply({ t: 'rel', id: String(msg.id), rel: 'none' });
+        if (r.otherKey) this.pushTo(r.otherKey, { t: 'rel', id: me.id, rel: 'none' });
+        return;
+      }
+      case 'friends': {
+        const cards = (ids) => ids.map((id) => S.keyOf(id)).filter(Boolean).map((k) => this.card(k, key));
+        const order = { raid: 3, waiting: 2, lobby: 1, off: 0 };
+        return reply({ t: 'friends', friends: cards(me.friends).sort((a, b) => order[b.st] - order[a.st]), incoming: cards(me.in), outgoing: cards(me.out) });
+      }
+      case 'dm': {
+        const r = S.dm(key, String(msg.to ?? ''), msg.text);
+        if (r.error) return err(r.error);
+        const m = { ...r.m, to: String(msg.to) };
+        for (const c of this.sessionsOf(key)) this.send(c, { t: 'dm', m });
+        this.pushTo(r.toKey, { t: 'dm', m, from: this.card(key, r.toKey), unread: S.unreadTotal(r.toKey) });
+        return;
+      }
+      case 'dms': {
+        const k = S.keyOf(msg.with);
+        if (!k) return err('No such player.');
+        return reply({ t: 'dms', with: this.card(k, key), list: S.thread(key, String(msg.with)), unread: S.unreadTotal(key) });
+      }
+      case 'inbox':
+        return reply({ t: 'inbox', list: S.inbox(key).map((c) => ({ ...c, card: this.card(S.keyOf(c.id), key) })), unread: S.unreadTotal(key) });
+      case 'guilds': {
+        const list = [...S.guilds.values()].map((g) => ({ id: g.id, name: g.name, tag: g.tag, desc: g.desc, n: g.members.length, on: g.members.filter((id) => this.sessionsOf(S.keyOf(id)).length).length }));
+        list.sort((a, b) => b.on - a.on || b.n - a.n);
+        return reply({ t: 'guilds', list, mine: me.guild, can: S.canCreateGuild(key, this.ranks.get(key).rank), need: { rank: GUILD_RANK, purchases: 1 }, rank: this.ranks.get(key).rank, purchases: me.purchases ?? 0 });
+      }
+      case 'guild': {
+        const g = S.guilds.get(String(msg.id ?? ''));
+        if (!g) return err('No such guild.');
+        const order = { raid: 3, waiting: 2, lobby: 1, off: 0 };
+        const members = g.members.map((id) => this.card(S.keyOf(id), key)).filter(Boolean).sort((a, b) => order[b.st] - order[a.st]);
+        return reply({ t: 'guild', guild: { ...g, members: undefined, ownerId: g.owner }, members, mine: me.guild === g.id });
+      }
+      case 'guild_create': {
+        const r = S.createGuild(key, { name: msg.name, tag: msg.tag, desc: msg.desc }, this.ranks.get(key).rank);
+        if (r.error) return reply({ t: 'guildErr', why: r.error });
+        return reply({ t: 'guildDone', id: r.guild.id });
+      }
+      case 'guild_join': {
+        const r = S.joinGuild(key, msg.id);
+        if (r.error) return err(r.error);
+        return reply({ t: 'guildDone', id: r.guild.id });
+      }
+      case 'guild_leave': {
+        const r = S.leaveGuild(key);
+        if (r.error) return err(r.error);
+        return reply({ t: 'guildDone', id: null });
+      }
+      case 'invite': {
+        // bring someone into the room you are waiting in
+        const room = s.room;
+        const c = room?.clients.get(cid);
+        if (!room || !c || room.state === 'live' || room.inRaid?.(c)) return err('Open a room first (press Play), then invite.');
+        const k = S.keyOf(msg.id);
+        if (!k || !this.sessionsOf(k).length) return err('That player is offline.');
+        if (this.status(k) === 'raid') return err('That player is in a raid right now.');
+        const now = this.now();
+        s.invites ??= new Map();
+        if (now - (s.invites.get(k) ?? 0) < 15000) return err('Invite sent already. Give them a moment.');
+        s.invites.set(k, now);
+        this.pushTo(k, { t: 'invited', from: this.card(key, k), mode: room.mode, stake: room.stake, waiting: room.readyList().length });
+        return reply({ t: 'invSent', id: String(msg.id) });
+      }
+      default:
     }
   }
 
