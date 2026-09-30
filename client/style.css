@@ -1633,3 +1633,6 @@ body.touch-on .pause-keys { display: none; }
 .gd-chat .so-msgs li { max-width: 86%; }
 .gd-from { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 2px; padding: 0; border: 0; background: none; color: var(--loot); font: 700 12px var(--f-ui); cursor: pointer; }
 .gd-from:hover b { text-decoration: underline; }
+
+/* shop: first top-up doubles */
+.first-topup { margin: 0 0 10px; padding: 10px 14px; border: 1px solid rgba(61, 220, 151, 0.45); border-radius: 12px; background: rgba(61, 220, 151, 0.08); color: var(--exit); font-weight: 600; }

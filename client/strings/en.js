@@ -615,4 +615,7 @@ export default {
   'gd.chatEmpty': "No messages yet. Say hi to your guild.",
   'gd.chatPh': "Message your guild…",
   'swap.min': "Smallest swap: {v}",
+  'prep.waitingPeople': "No timer: invite friends, the raid can start once {min} players are ready. Every seat is a real player. {n} of {of} seats taken.",
+  'prep.people': "Real players only: everyone here starts with a knife.",
+  'shop.firstTopup': "First top-up doubles: get the same again in shop $, up to {v} extra.",
 };

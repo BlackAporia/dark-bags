@@ -50,7 +50,7 @@ npm run dev          # server with auto-restart
 npm run house -- status   # operator console for real-token mode
 ```
 
-Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (20, the ready-room countdown), `BOTS` (`0` to disable), `WALLET_FILE` (path to persist test balances as JSON; in-memory otherwise), `RANKS_FILE` (path to persist career ranks), `LOCKER_FILE` (outfits, bags, credit and pity per player), and `CHAIN` plus the cashier settings under [Real tokens](#real-tokens).
+Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (20, the ready-room countdown), `WALLET_FILE` (path to persist test balances as JSON; in-memory otherwise), `RANKS_FILE` (path to persist career ranks), `LOCKER_FILE` (outfits, bags, credit and pity per player), and `CHAIN` plus the cashier settings under [Real tokens](#real-tokens).
 
 ## A raid
 
@@ -250,7 +250,7 @@ docker run -p 8080:8080 dark-bags
 
 1. **Sepolia first.** Everything chain-facing is tested against fakes only (see *Not verified here*). Run full cycles on Sepolia with each sign-in option.
 2. **Persistence and ops.** `CASHIER_FILE` on a persistent volume with backups; one server process per journal; alerts on `house status` shortfalls and on payouts in review. A database with idempotent payouts is the next step past a JSON journal.
-3. **Bots.** House bots must not play for real money (or must be disclosed and funded separately). Set `BOTS=0` on real-money tables.
+3. **Bots.** Bots play only in practice (in the browser). The server never runs bots: every online seat is a real player, and a raid needs two or more.
 4. **Integrity.** Anti-collusion (teaming in a free-for-all), per-IP limits, one process per region to start.
 5. **Legal.** Wagering real money on game outcomes is regulated differently by country (gambling vs skill-gaming rules, licensing, age and geo checks), and a custodial cashier adds money-transmission questions. Get advice before turning it on for real players.
 

@@ -607,4 +607,7 @@ export default {
   'gd.chatEmpty': "Henüz mesaj yok. Loncana merhaba de.",
   'gd.chatPh': "Loncana yaz…",
   'swap.min': "En küçük takas: {v}",
+  'prep.waitingPeople': "Süre yok: arkadaşlarını çağır, en az {min} oyuncu hazır olunca baskın başlayabilir. Herkes gerçek oyuncu. {of} yerden {n} dolu.",
+  'prep.people': "Sadece gerçek oyuncular: burada herkes bıçakla başlar.",
+  'shop.firstTopup': "İlk yükleme ikiye katlanır: mağaza $ olarak aynısını tekrar al, en fazla {v} ekstra.",
 };

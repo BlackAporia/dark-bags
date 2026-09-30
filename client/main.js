@@ -557,11 +557,11 @@ function renderPrep() {
     count.textContent = `${p.resT}`;
     status.textContent = t('prep.over');
   } else if (p.waiting && p.slots.length) {
-    // online: no timer. Wait for friends, start whenever you like; bots fill the rest
+    // online: no timer and no bots. Wait for friends, start once enough players are in
     count.textContent = t('prep.waiting');
     count.classList.remove('tick');
     count.classList.add('wait');
-    status.textContent = t(p.me?.ready ? 'prep.waitingMe' : 'prep.waitingJoin', { n: p.slots.length, of: p.slotsTotal });
+    status.textContent = p.me?.ready ? t(p.min > 1 ? 'prep.waitingPeople' : 'prep.waitingMe', { n: p.slots.length, of: p.slotsTotal, min: p.min }) : t('prep.waitingJoin', { n: p.slots.length, of: p.slotsTotal });
   } else if (p.count === null) {
     count.textContent = t('prep.readyUp');
     status.textContent = t(p.waiting ? 'prep.firstWait' : 'prep.first');
@@ -574,7 +574,7 @@ function renderPrep() {
       count.classList.add('tick');
       if (n <= 5 && n > 0) sfx.play('beep', { f: n <= 3 ? 990 : 740 });
     }
-    status.textContent = p.slots.length > 1 ? t('prep.many') : t('prep.bots');
+    status.textContent = p.min > 1 ? t('prep.people') : p.slots.length > 1 ? t('prep.many') : t('prep.bots');
     sfx.music?.set({ mode: 'prep', intensity: 0, bpm: 124 + Math.max(0, 20 - p.count) * 1.5 });
   }
 
@@ -604,6 +604,7 @@ function renderPrep() {
   }
   $('pot').textContent = money(p.pot);
   $('prep-start').hidden = !(p.waiting && p.me?.ready);
+  $('prep-start').disabled = p.slots.length < (p.min ?? 1); // online needs two players or more
   $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
   const ready = $('ready');
   const me = p.me ?? {};

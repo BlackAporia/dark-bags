@@ -258,6 +258,10 @@ export const PACKS = [
   { id: 'p1000', price: 100000, bonus: 30000 },
 ];
 export const PACK = Object.fromEntries(PACKS.map((p) => [p.id, p]));
+// First top-up doubles: extra shop $ equal to the price, up to $10 (the step from a free
+// player to a paying one is the one that matters most; shop $ costs the house nothing to mint)
+export const FIRST_TOPUP_MAX = 10000;
+export const firstBonus = (price) => Math.min(price, FIRST_TOPUP_MAX);
 
 // The rarity of the 72h trial outfit one rank-up pays (the only rank-up reward).
 export function rankReward(rank, rnd) {
@@ -391,6 +395,7 @@ export class Inventory {
     for (const [id, until] of Object.entries(r.trials)) if (until <= now) delete r.trials[id];
     return {
       credit: r.credit,
+      firstTopup: !r.bought, // the first top-up still doubles
       owned: r.owned,
       wowned: r.wowned,
       wequip: r.wequip,
@@ -423,10 +428,11 @@ export class Inventory {
     if (!p) return { ok: false, error: 'Unknown pack.' };
     if (!(external && external(p.price))) return { ok: false, error: `Not enough USDC or USDT (${usd(p.price)} needed).` };
     const r = this.rec(key);
-    r.credit += p.price + p.bonus;
+    const first = r.bought ? 0 : firstBonus(p.price);
+    r.credit += p.price + p.bonus + first;
     r.bought = (r.bought ?? 0) + p.price;
     this.changed();
-    return { ok: true, pack: p.id, added: p.price + p.bonus };
+    return { ok: true, pack: p.id, added: p.price + p.bonus + first, first };
   }
 
   // rank-ups: one 72h trial outfit per rank gained, nothing else

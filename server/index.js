@@ -18,7 +18,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
 const ROUND_SECONDS = Number(process.env.ROUND_SECONDS || CFG.ROUND_SECONDS);
 const PREP_SECONDS = Number(process.env.PREP_SECONDS || CFG.PREP_SECONDS);
-const BOTS = process.env.BOTS !== '0';
+// bots play only in practice (in the browser): online every seat is a real player
+const BOTS = false;
 const WALLET_FILE = process.env.WALLET_FILE || '';
 const RANKS_FILE = process.env.RANKS_FILE || '';
 const LOCKER_FILE = process.env.LOCKER_FILE || '';
@@ -104,6 +105,7 @@ const lobby = new Lobby({
   social,
   send,
   bots: BOTS,
+  minPlayers: 2,
   roundSeconds: ROUND_SECONDS,
   prepSeconds: PREP_SECONDS,
   // online rooms wait for the players (no timer) until someone presses Start or it fills up

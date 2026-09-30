@@ -607,4 +607,7 @@ export default {
   'gd.chatEmpty': "Pas encore de messages. Salue ta guilde.",
   'gd.chatPh': "Écris à ta guilde…",
   'swap.min': "Échange minimum : {v}",
+  'prep.waitingPeople': "Pas de minuteur : invite tes amis, le raid peut commencer dès que {min} joueurs sont prêts. Que des vrais joueurs. {n} places sur {of} prises.",
+  'prep.people': "Que des vrais joueurs : ici tout le monde commence au couteau.",
+  'shop.firstTopup': "La première recharge est doublée : reçois autant en $ boutique, jusqu'à {v} en plus.",
 };

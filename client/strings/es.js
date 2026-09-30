@@ -607,4 +607,7 @@ export default {
   'gd.chatEmpty': "Aún no hay mensajes. Saluda a tu gremio.",
   'gd.chatPh': "Escribe a tu gremio…",
   'swap.min': "Intercambio mínimo: {v}",
+  'prep.waitingPeople': "Sin temporizador: invita a amigos, la incursión empieza cuando haya {min} jugadores listos. Solo jugadores reales. {n} de {of} plazas ocupadas.",
+  'prep.people': "Solo jugadores reales: aquí todos empiezan con un cuchillo.",
+  'shop.firstTopup': "La primera recarga se duplica: recibe lo mismo otra vez en $ de tienda, hasta {v} extra.",
 };

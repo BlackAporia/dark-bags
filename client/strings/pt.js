@@ -607,4 +607,7 @@ export default {
   'gd.chatEmpty': "Nenhuma mensagem ainda. Diga oi para a guilda.",
   'gd.chatPh': "Escreva para a guilda…",
   'swap.min': "Troca mínima: {v}",
+  'prep.waitingPeople': "Sem cronômetro: chame amigos, a incursão começa quando {min} jogadores estiverem prontos. Só jogadores reais. {n} de {of} vagas ocupadas.",
+  'prep.people': "Só jogadores reais: aqui todos começam com uma faca.",
+  'shop.firstTopup': "A primeira recarga dobra: ganhe o mesmo valor em $ da loja, até {v} extra.",
 };

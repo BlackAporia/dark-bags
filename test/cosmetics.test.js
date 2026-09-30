@@ -103,8 +103,13 @@ test('skins come only from boxes: shop $ first, the shortfall from USDC/USDT; bo
   const pack = inv.topUp('p', 'p10', pay);
   assert.ok(pack.ok);
   assert.equal(wallet, 0);
-  assert.equal(inv.view('p').credit, 1050, 'the $10 pack gives $10.50 of shop $');
+  assert.equal(pack.first, 1000, 'the first top-up doubles');
+  assert.equal(inv.view('p').credit, 2050, 'the $10 pack gives $10.50 of shop $, plus $10 for being the first');
+  assert.equal(inv.view('p').firstTopup, false);
   assert.equal(inv.topUp('p', 'p10', pay).ok, false, 'packs need USDC/USDT');
+  wallet = 1000;
+  inv.rec('p').credit = 0;
+  assert.equal(inv.topUp('p', 'p10', pay).added, 1050, 'only the first one doubles');
   inv.rec('p').credit = 0;
   assert.equal(inv.open('p', 'genesis', pay).ok, false, 'cannot afford');
   assert.equal(inv.view('p').boxes.street, 0);
@@ -230,7 +235,7 @@ test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive wit
   assert.equal(paid.op, 'box');
   assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - BigInt(BOX.vault.price) * 10n ** 4n);
   lobby.handle(1, { t: 'topup', id: 'p5' });
-  assert.equal(last('locker').locker.credit, 500);
+  assert.equal(last('locker').locker.credit, 1000, 'the first $5 top-up doubles to $10 of shop $');
   assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - BigInt(BOX.vault.price + 500) * 10n ** 4n);
   const strk = BigInt(wallet.balance('tok00001', 'STRK'));
   assert.ok(strk > 0n);
@@ -253,7 +258,7 @@ test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive wit
   assert.ok(res.rank.after.rank > res.rank.before.rank, 'a good first raid ranks up');
   assert.equal(res.rewards.length, res.rank.after.rank - res.rank.before.rank);
   assert.ok(res.rewards.every((r) => r.trial), 'each rank-up is a trial outfit');
-  assert.equal(res.locker.credit, 500, 'rank-ups add no shop $');
+  assert.equal(res.locker.credit, 1000, 'rank-ups add no shop $');
   assert.ok(BigInt(res.balances.STRK) < strk, 'staked in STRK');
 });
 
@@ -266,4 +271,14 @@ test('the top tiers guarantee an Exotic within their pity window', () => {
     assert.equal(r.results.at(-1).rarity, 'exotic', `${id}: exotic by open ${n}`);
     assert.ok(r.results.slice(0, -1).every((x) => x.rarity !== 'exotic'));
   }
+});
+
+test('the first top-up bonus is capped at $10', async () => {
+  const { Inventory, firstBonus } = await import('../shared/cosmetics.js');
+  assert.equal(firstBonus(500), 500);
+  assert.equal(firstBonus(100000), 10000);
+  const inv = new Inventory();
+  inv.rec('w');
+  const r = inv.topUp('w', 'p100', () => true);
+  assert.equal(r.added, 10000 + 2000 + 10000);
 });

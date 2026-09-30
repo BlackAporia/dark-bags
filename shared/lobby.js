@@ -22,7 +22,7 @@ const PAUSABLE = new Set(['ready', 'box', 'topup', 'swap']);
 const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite']);
 
 export class Lobby {
-  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook() }) {
+  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
     // tokens this only runs when the operator turns it on (the house must rebalance on chain).
@@ -45,7 +45,7 @@ export class Lobby {
     this.sessions = new Map();
     // one table per mode and stake
     this.rooms = new Map();
-    for (const m of MODES) for (const stake of tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds, waitForStart }));
+    for (const m of MODES) for (const stake of tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers }));
     this.tiers = tiers;
     this.roundSeconds = roundSeconds;
   }

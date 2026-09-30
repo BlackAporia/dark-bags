@@ -607,4 +607,7 @@ export default {
   'gd.chatEmpty': "还没有消息。和公会打个招呼吧。",
   'gd.chatPh': "给公会发消息…",
   'swap.min': "最小兑换：{v}",
+  'prep.waitingPeople': "不限时：邀请好友，至少 {min} 名玩家准备好即可开始。这里全是真人玩家。已占 {n}/{of} 个位置。",
+  'prep.people': "全是真人玩家：每个人都从一把刀开始。",
+  'shop.firstTopup': "首充翻倍：再送等额商店 $，最多额外 {v}。",
 };
