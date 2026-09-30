@@ -25,8 +25,9 @@
 1. railway.com → **New Project → Deploy from GitHub repo** → `BlackAporia/dark-bags`.
    Railway збирає `main` після кожного злиття.
 2. Сервіс → **Settings → Region → EU West (Amsterdam)**.
-3. **Settings → Networking → Generate Domain**: запасна адреса `*.up.railway.app`,
-   працює одразу з HTTPS.
+3. **Settings → Networking → Generate Domain**: запасна адреса
+   `dark-bags-production.up.railway.app`, працює одразу з HTTPS. Гра підключається до
+   неї сама, поки `dark-bags.gg` не відповідає.
 4. **Свій домен `dark-bags.gg`**: Custom Domain → Railway показує два DNS-записи. Їх
    додаєш там, де купив домен (Namecheap, Cloudflare, Porkbun…):
 
