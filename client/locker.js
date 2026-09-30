@@ -2,7 +2,7 @@
 // from bags and crates in the shop (shop.js). Also draws the box art both use.
 import { OUTFIT, OUTFITS, RARITIES, FINISH, WEAPON_SKINS, WSKIN } from '../shared/cosmetics.js';
 import { WEAPONS } from '../shared/weapons.js';
-import { drawPreview, figureStill } from './stickman.js';
+import { drawPreview, figureStill, weaponArt, drawWeapon } from './stickman.js';
 import { esc } from './game.js';
 import { t } from './i18n.js';
 
@@ -57,20 +57,53 @@ export function boxArt(box, size = 120) {
 </svg>`;
 }
 
-// A still of a weapon in a skin, for cards: the runner holding it, zoomed on the gun.
+// A still of a weapon in a skin, for cards: just the weapon, tilted a little, fitted and
+// centred in the frame (its own lines give the bounds), with a soft glow in its colour.
 const wstills = new Map();
-export function weaponStill(skinId, w = 96, h = 64) {
+const TILT = -0.3;
+export function weaponStill(skinId, w = 150, h = 100) {
   const key = `${skinId}:${w}x${h}`;
   if (wstills.has(key)) return wstills.get(key);
   const s = WSKIN[skinId];
   const wi = Math.max(0, WEAPONS.findIndex((x) => x.id === s?.weapon));
+  const art = weaponArt(wi, s ? { [s.weapon]: s.finish } : null);
+  const fin = s ? FINISH[s.finish] : null;
+  // bounds of the tilted weapon, line widths included
+  const c = Math.cos(TILT);
+  const sn = Math.sin(TILT);
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const [ax, ay, bx, by, lw] of art.lines) {
+    for (const [x, y] of [[ax, ay], [bx, by]]) {
+      const rx = x * c - y * sn;
+      const ry = x * sn + y * c;
+      const pad = lw / 2 + 1.5;
+      x0 = Math.min(x0, rx - pad);
+      x1 = Math.max(x1, rx + pad);
+      y0 = Math.min(y0, ry - pad);
+      y1 = Math.max(y1, ry + pad);
+    }
+  }
+  const k = Math.min((w * 0.82) / (x1 - x0), (h * 0.72) / (y1 - y0), 6);
   const cv = document.createElement('canvas');
   const dpr = 2;
   cv.width = w * dpr;
   cv.height = h * dpr;
   const ctx = cv.getContext('2d');
   ctx.scale(dpr, dpr);
-  drawPreview(ctx, { outfit: 'basic-0', body: 'm', ws: s ? { [s.weapon]: s.finish } : null }, { x: w * 0.3, y: h * 1.25, scale: 2.4, t: 800, w: wi, aim: 0 });
+  if (fin?.color) {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.5);
+    g.addColorStop(0, `${fin.color}55`);
+    g.addColorStop(1, `${fin.color}00`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.translate(w / 2 - ((x0 + x1) / 2) * k, h / 2 - ((y0 + y1) / 2) * k);
+  ctx.scale(k, k);
+  ctx.lineCap = 'round';
+  drawWeapon(ctx, { art, grip: { x: 0, y: 0 }, aim: TILT }, false, fin, 800);
   const url = cv.toDataURL();
   wstills.set(key, url);
   return url;
@@ -213,7 +246,7 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
     b.type = 'button';
     b.className = `lk-item r-${o.rarity}${s.cls === 'locked' || s.cls === 'lim' ? ' locked' : ''}${sel ? ' sel' : ''}${o.limited ? ' limited' : ''}`;
     b.style.setProperty('--r', RARITIES[o.rarity].color);
-    b.innerHTML = `<span class="lk-shine"></span><img alt="" src="${img}"><span class="lk-name">${esc(o.name)}</span><span class="lk-state ${s.cls}">${esc(s.text)}</span>`;
+    b.innerHTML = `<span class="lk-shine"></span><img alt=""${WSKIN[o.id] ? ' class="wimg"' : ''} src="${img}"><span class="lk-name">${esc(o.name)}</span><span class="lk-state ${s.cls}">${esc(s.text)}</span>`;
     b.addEventListener('click', onClick);
     return b;
   }

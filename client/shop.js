@@ -29,7 +29,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
   };
   const reach = () => (L()?.credit ?? 0) + stableCents();
   const itemOf = (res) => (res.kind === 'weapon' ? WSKIN[res.item] : OUTFIT[res.item]);
-  const imgOf = (res, w = 84, h = 112) => (res.kind === 'weapon' ? weaponStill(res.item, w, Math.round(w * 0.66)) : figureStill({ outfit: res.item, body: L()?.body ?? 'm' }, w, h));
+  const imgOf = (res, w = 84, h = 112) => (res.kind === 'weapon' ? weaponStill(res.item, Math.max(150, w), Math.round(Math.max(150, w) * 0.66)) : figureStill({ outfit: res.item, body: L()?.body ?? 'm' }, w, h));
 
   // ------------------------------------------------------------- the page
 
@@ -102,7 +102,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     const sup = L().supply?.[o.id] ?? { of: o.limited, minted: 0 };
     const img = WSKIN[o.id] ? weaponStill(o.id) : figureStill({ outfit: o.id, body: 'm' }, 84, 112);
     const out = sup.minted >= sup.of;
-    return `<div class="lim-card${out ? ' out' : ''}" style="--r:${RARITIES[o.rarity].color}"><img alt="" src="${img}"><b>${esc(o.name)}</b><span class="num">${out ? t('shop.soldOut') : t('lk.minted', { a: sup.minted, b: sup.of })}</span><div class="lim-bar"><i style="width:${(sup.minted / sup.of) * 100}%"></i></div></div>`;
+    return `<div class="lim-card${out ? ' out' : ''}" style="--r:${RARITIES[o.rarity].color}"><img alt=""${WSKIN[o.id] ? ' class="wimg"' : ''} src="${img}"><b>${esc(o.name)}</b><span class="num">${out ? t('shop.soldOut') : t('lk.minted', { a: sup.minted, b: sup.of })}</span><div class="lim-bar"><i style="width:${(sup.minted / sup.of) * 100}%"></i></div></div>`;
   }
 
   function wireBox(el) {
@@ -259,7 +259,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     return `<div class="op-card r-${res.rarity}${big ? ' big' : ''}" style="--r:${r.color}">
       <div class="op-face op-back">${boxArt(BOX[st.last?.id] ?? BOXES[0], 64)}</div>
       <div class="op-face op-front">
-        ${big && res.kind === 'outfit' ? '<canvas class="op-live"></canvas>' : `<img alt="" src="${imgOf(res, big ? 160 : 84, big ? 214 : 112)}">`}
+        ${big && res.kind === 'outfit' ? '<canvas class="op-live"></canvas>' : `<img alt=""${res.kind === 'weapon' ? ' class="wimg"' : ''} src="${imgOf(res, big ? 160 : 84, big ? 214 : 112)}">`}
         <p class="op-rar">${esc(rn(res.rarity))}${res.pity ? ` · ${t('lk.pityDrop')}` : ''}</p>
         <p class="op-name">${esc(o.name)}</p>${lim}${tag}
       </div>

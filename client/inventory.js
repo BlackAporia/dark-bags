@@ -55,7 +55,7 @@ export function createInventory({ app, go, openLocker, openCashier, send }) {
           ${stat('lk.weapons', `${(L?.wowned ?? []).length}/${WEAPON_SKINS.length}`)}
           ${stat('inv.opened', fmt(L?.opened ?? 0))}
         </div>
-        ${lim.length ? `<p class="eyebrow">${t('shop.limited')}</p><div class="lim-row">${lim.map((id) => { const o = OUTFIT[id] ?? WSKIN[id]; return `<div class="lim-card" style="--r:${RARITIES[o.rarity].color}"><img alt="" src="${OUTFIT[id] ? figureStill({ outfit: id, body: L.body }, 84, 112) : weaponStill(id)}"><b>${esc(o.name)}</b><span class="num">#${L.serials?.[id] ?? '?'}/${o.limited}</span></div>`; }).join('')}</div>` : ''}
+        ${lim.length ? `<p class="eyebrow">${t('shop.limited')}</p><div class="lim-row">${lim.map((id) => { const o = OUTFIT[id] ?? WSKIN[id]; return `<div class="lim-card" style="--r:${RARITIES[o.rarity].color}"><img alt=""${OUTFIT[id] ? '' : ' class="wimg"'} src="${OUTFIT[id] ? figureStill({ outfit: id, body: L.body }, 84, 112) : weaponStill(id)}"><b>${esc(o.name)}</b><span class="num">#${L.serials?.[id] ?? '?'}/${o.limited}</span></div>`; }).join('')}</div>` : ''}
         <div class="inv-actions"><button type="button" class="ghost" data-go="locker">${t('lobby.locker')}</button></div>
       </section>
       <section class="inv-card">
