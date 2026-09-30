@@ -78,8 +78,18 @@ export class Renderer {
   }
 
   // Adaptive quality: drop resolution and effects when frames get slow, restore when fast.
+  // settings: 'auto' adapts, or pin low/medium/high (0/1/2)
+  setQuality(q) {
+    this.lockQuality = q;
+    if (q !== null && q !== undefined && q !== this.quality) {
+      this.quality = q;
+      this.resize();
+    }
+  }
+
   measure(dtMs) {
     this.ema += (dtMs - this.ema) * 0.05;
+    if (this.lockQuality !== null && this.lockQuality !== undefined) return; // the player picked a quality
     if (this.ema > 24) {
       this.slowT += dtMs;
       this.fastT = 0;
@@ -151,7 +161,7 @@ export class Renderer {
     this.layer.draw(ctx, vb, this.quality >= 1 ? 2 : 1);
 
     // 2. exits: live state on top of the painted pads
-    for (const e of map.extracts) {
+    for (const e of this.noExits ? [] : map.extracts) {
       if (!inView(e.x, e.y, e.r + 20)) continue;
       const st = v.exitStates?.[e.id] ?? 'open';
       this.drawExit(e, st, t);
@@ -196,7 +206,7 @@ export class Renderer {
     if (v.zone) this.drawStorm(v.zone, t, vb);
 
     // 8. crisp overlays: exit labels, names and health, floaters
-    for (const e of map.extracts) {
+    for (const e of this.noExits ? [] : map.extracts) {
       if (!inView(e.x, e.y, e.r + 60)) continue;
       const st = v.exitStates?.[e.id] ?? 'open';
       const label = st === 'last' ? `LAST EXIT · ${e.name.toUpperCase()}` : st === 'closed' ? `CLOSED · ${e.name.toUpperCase()}` : `EXIT · ${e.name.toUpperCase()}${st === 'closing' ? ' · CLOSING' : ''}`;
@@ -411,9 +421,10 @@ export class Renderer {
     ctx.fillRect(p.head.x - w / 2 - 1, top - 1, w + 2, 6);
     ctx.fillStyle = hpColor(frac);
     ctx.fillRect(p.head.x - w / 2, top, w * frac, 4);
-    {
+    if (f.isMe || !f.noName) {
       // your own name too, in gold, so you can find yourself in a fight
-      ctx.fillStyle = f.isMe ? '#ffd166' : 'rgba(235, 229, 214, 0.9)';
+      // team modes: allies green, enemies red
+      ctx.fillStyle = f.isMe ? '#ffd166' : f.ally === true ? '#3ddc97' : f.ally === false ? '#ff6b6b' : 'rgba(235, 229, 214, 0.9)';
       ctx.font = `600 11px ${F_UI}`;
       ctx.textAlign = 'center';
       const label = `${f.name}${f.pr ? ` ${'★'.repeat(Math.min(3, f.pr))}` : ''}`;
@@ -541,7 +552,7 @@ export class Renderer {
     const right = this.w - 40;
     const cx = (left + right) / 2;
     const cy = (top + bottom) / 2;
-    for (const e of this.map.extracts) {
+    for (const e of this.noExits ? [] : this.map.extracts) {
       const st = states?.[e.id] ?? 'open';
       if (st === 'closed') continue;
       const p = this.toScreen(e.x, e.y);
@@ -654,7 +665,7 @@ export class Renderer {
       m.setLineDash([]);
     }
     const pulse = this.reduced ? 0 : Math.sin(t / 300) * 1.5;
-    for (const e of this.map.extracts) {
+    for (const e of this.noExits ? [] : this.map.extracts) {
       const st = states?.[e.id] ?? 'open';
       m.fillStyle = st === 'last' ? C.gold : st === 'closed' ? 'rgba(255,77,94,0.5)' : st === 'closing' ? C.amber : C.exit;
       m.beginPath();

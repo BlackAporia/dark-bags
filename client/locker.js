@@ -1,80 +1,97 @@
-// The locker: your character, outfits, the shop and luck boxes.
-// Everything is decided on the server (prices, rolls, pity); this file renders it and
-// stages the moments: try-ons on a lit stage, a roulette that slows onto your drop,
-// and a reveal you can post.
-import { OUTFIT, OUTFITS, BOX, BOXES, RARITIES, RARITY_ORDER, PITY, PACKS, usd } from '../shared/cosmetics.js';
-import { isStable } from '../shared/assets.js';
+// The locker: your character, your outfits and weapon skins. Equip only: skins come
+// from bags and crates in the shop (shop.js). Also draws the box art both use.
+import { OUTFIT, OUTFITS, RARITIES, FINISH, WEAPON_SKINS, WSKIN } from '../shared/cosmetics.js';
+import { WEAPONS } from '../shared/weapons.js';
+import { drawPreview, figureStill } from './stickman.js';
+import { esc } from './game.js';
 import { t } from './i18n.js';
 
-const rn = (k) => t(`r.${k}`);
-import { drawPreview, figureStill } from './stickman.js';
-import { esc, fmt } from './game.js';
-
 const $ = (id) => document.getElementById(id);
+const rn = (k) => t(`r.${k}`);
 
 // ------------------------------------------------------------- box art
 
-// Crates drawn in SVG: steel street box, blue vault with a dial, gold box with ₿.
-export function boxArt(id, size = 120) {
-  const p = {
-    street: { body: '#3a4150', lid: '#4b5466', strap: '#ff9f1c', trim: '#1f242e', mark: 'DB' },
-    vault: { body: '#1e2d4a', lid: '#2a3d63', strap: '#4cc9f0', trim: '#0e1628', mark: 'dial' },
-    golden: { body: '#b8860b', lid: '#e0a526', strap: '#fff1b8', trim: '#6b4b06', mark: '₿' },
-  }[id];
-  const uid = `bx${id}${Math.random().toString(36).slice(2, 7)}`;
-  const emblem =
-    p.mark === 'dial'
-      ? `<circle cx="60" cy="74" r="11" fill="${p.trim}" stroke="${p.strap}" stroke-width="2.4"/><path d="M60 66 V74 L66 78" stroke="${p.strap}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
-      : p.mark === '₿'
-        ? `<circle cx="60" cy="74" r="12" fill="${p.trim}"/><text x="60" y="80.5" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="18" text-anchor="middle" fill="${p.strap}">₿</text>`
-        : `<rect x="46" y="66" width="28" height="16" rx="2" fill="${p.trim}"/><text x="60" y="78.5" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="11" text-anchor="middle" fill="${p.strap}">DB</text>`;
-  return `<svg viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
-  <defs>
-    <linearGradient id="${uid}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.body}"/><stop offset="1" stop-color="${p.trim}"/></linearGradient>
-    <linearGradient id="${uid}l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${p.lid}"/><stop offset="1" stop-color="${p.body}"/></linearGradient>
-    <radialGradient id="${uid}g" cx=".5" cy=".55" r=".55"><stop offset="0" stop-color="${p.strap}" stop-opacity=".35"/><stop offset="1" stop-color="${p.strap}" stop-opacity="0"/></radialGradient>
-  </defs>
-  <ellipse cx="60" cy="104" rx="44" ry="8" fill="#000" opacity=".45"/>
-  <circle cx="60" cy="64" r="56" fill="url(#${uid}g)"/>
-  <path d="M18 46 L60 30 L102 46 L60 62 Z" fill="url(#${uid}l)" stroke="${p.trim}" stroke-width="2"/>
+// Box and crate art in SVG, one palette per tier: bags are soft sacks with a
+// drawstring, crates are hard cases with latches. The dearer the tier, the richer.
+const TIER_PAL = [
+  { body: '#3a4150', lid: '#4b5466', strap: '#ff9f1c', trim: '#1f242e', glow: '#ff9f1c' },
+  { body: '#1e2d4a', lid: '#2a3d63', strap: '#4cc9f0', trim: '#0e1628', glow: '#4cc9f0' },
+  { body: '#b8860b', lid: '#e0a526', strap: '#fff1b8', trim: '#6b4b06', glow: '#ffd166' },
+  { body: '#4c1d95', lid: '#6d28d9', strap: '#c4b5fd', trim: '#2e1065', glow: '#b37bff' },
+  { body: '#0e7490', lid: '#22d3ee', strap: '#ecfeff', trim: '#083344', glow: '#9fe8ff' },
+  { body: '#0b0b0f', lid: '#1f1f2a', strap: '#ff3d7f', trim: '#000000', glow: '#ff3d7f' },
+  { body: '#7f1d1d', lid: '#b91c1c', strap: '#ffd166', trim: '#450a0a', glow: '#ffd166' },
+  { body: '#111827', lid: '#e5e7eb', strap: '#00f0ff', trim: '#030712', glow: '#00f0ff' },
+  { body: '#f7931a', lid: '#ffd166', strap: '#ffffff', trim: '#7c2d12', glow: '#ffffff' },
+];
+export function boxArt(box, size = 120) {
+  const tier = (box?.tier ?? 1) - 1;
+  const p = TIER_PAL[tier] ?? TIER_PAL[0];
+  const crate = box?.family === 'weapon';
+  const uid = `bx${box?.id ?? 'x'}${Math.random().toString(36).slice(2, 7)}`;
+  const rays = tier >= 5 ? `<g opacity=".5" stroke="${p.glow}" stroke-width="2">${Array.from({ length: 12 }, (_, i) => `<line x1="60" y1="64" x2="${60 + Math.cos((i / 12) * Math.PI * 2) * 60}" y2="${64 + Math.sin((i / 12) * Math.PI * 2) * 60}"/>`).join('')}</g>` : '';
+  const gem = tier >= 3 ? `<path d="M60 58 l7 7 -7 10 -7 -10z" fill="${p.strap}" stroke="${p.trim}" stroke-width="1.5"/>` : `<circle cx="60" cy="68" r="6" fill="${p.trim}" stroke="${p.strap}" stroke-width="2"/>`;
+  const shape = crate
+    ? `<path d="M18 46 L60 30 L102 46 L60 62 Z" fill="url(#${uid}l)" stroke="${p.trim}" stroke-width="2"/>
   <path d="M18 46 L60 62 L60 104 L18 88 Z" fill="url(#${uid}f)" stroke="${p.trim}" stroke-width="2"/>
   <path d="M102 46 L60 62 L60 104 L102 88 Z" fill="${p.trim}" opacity=".9"/>
   <path d="M102 46 L60 62 L60 104 L102 88 Z" fill="url(#${uid}f)" opacity=".55" stroke="${p.trim}" stroke-width="2"/>
-  <path d="M39 38 L81 54 L81 96" fill="none" stroke="${p.strap}" stroke-width="5" opacity=".9"/>
-  <path d="M18 60 L60 76 L102 60" fill="none" stroke="${p.strap}" stroke-width="3" opacity=".55"/>
-  <g transform="translate(-21 -4) skewY(20.8) translate(0 -10)" opacity=".95">${emblem}</g>
-  <path d="M60 30 L102 46" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+  <path d="M18 60 L60 76 L102 60" fill="none" stroke="${p.strap}" stroke-width="3" opacity=".8"/>
+  <rect x="30" y="66" width="8" height="10" rx="1.5" fill="${p.strap}" transform="skewY(20.8) translate(0 -12)"/>
+  <rect x="82" y="66" width="8" height="10" rx="1.5" fill="${p.strap}" transform="skewY(-20.8) translate(0 44)"/>`
+    : `<path d="M30 52 Q24 100 60 104 Q96 100 90 52 Q60 42 30 52Z" fill="url(#${uid}f)" stroke="${p.trim}" stroke-width="2"/>
+  <path d="M40 50 Q60 30 80 50" fill="none" stroke="${p.strap}" stroke-width="4" stroke-linecap="round"/>
+  <path d="M30 52 Q60 62 90 52" fill="none" stroke="${p.trim}" stroke-width="3"/>
+  <path d="M34 60 Q60 70 86 60" fill="none" stroke="${p.strap}" stroke-width="2" opacity=".6"/>`;
+  return `<svg viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true" class="box-svg t${tier + 1}">
+  <defs>
+    <linearGradient id="${uid}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.lid}"/><stop offset="1" stop-color="${p.body}"/></linearGradient>
+    <linearGradient id="${uid}l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${p.lid}"/><stop offset="1" stop-color="${p.body}"/></linearGradient>
+    <radialGradient id="${uid}g" cx=".5" cy=".55" r=".55"><stop offset="0" stop-color="${p.glow}" stop-opacity=".45"/><stop offset="1" stop-color="${p.glow}" stop-opacity="0"/></radialGradient>
+  </defs>
+  ${rays}
+  <ellipse cx="60" cy="106" rx="44" ry="7" fill="#000" opacity=".5"/>
+  <circle cx="60" cy="66" r="56" fill="url(#${uid}g)"/>
+  ${shape}
+  ${gem}
 </svg>`;
+}
+
+// A still of a weapon in a skin, for cards: the runner holding it, zoomed on the gun.
+const wstills = new Map();
+export function weaponStill(skinId, w = 96, h = 64) {
+  const key = `${skinId}:${w}x${h}`;
+  if (wstills.has(key)) return wstills.get(key);
+  const s = WSKIN[skinId];
+  const wi = Math.max(0, WEAPONS.findIndex((x) => x.id === s?.weapon));
+  const cv = document.createElement('canvas');
+  const dpr = 2;
+  cv.width = w * dpr;
+  cv.height = h * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+  drawPreview(ctx, { outfit: 'basic-0', body: 'm', ws: s ? { [s.weapon]: s.finish } : null }, { x: w * 0.3, y: h * 1.25, scale: 2.4, t: 800, w: wi, aim: 0 });
+  const url = cv.toDataURL();
+  wstills.set(key, url);
+  return url;
 }
 
 // ------------------------------------------------------------ the locker
 
-export function createLocker({ app, send, sfx, toast, share }) {
-  const st = {
-    tab: 'outfits',
-    selected: null, // outfit id on the stage (try-on)
-    filter: 'all',
-    rolling: false,
-    lastBox: null,
-    raf: 0,
-  };
+export function createLocker({ app, send, sfx, toast, openShop }) {
+  const st = { tab: 'outfits', selected: null, wsel: null, weapon: 'knife', filter: 'all', raf: 0 };
   const L = () => app.locker;
   const trialLeft = (id) => Math.max(0, (L()?.trials?.[id] ?? 0) - Date.now());
   const owns = (id) => OUTFIT[id]?.basic || L()?.owned.includes(id) || trialLeft(id) > 0;
-  // USDC/USDT the player could top shop $ up from, in cents
-  const stableCents = () => {
-    let c = 0n;
-    for (const a of app.assets ?? []) {
-      if (!isStable(a) || a.decimals < 2) continue;
-      c += BigInt(app.balances?.[a.id] ?? '0') / 10n ** BigInt(a.decimals - 2);
-    }
-    return Number(c);
-  };
-  // what a purchase can reach: shop $ first, the shortfall topped up from USDC/USDT
-  const dollars = () => (L()?.credit ?? 0) + stableCents();
   const bagsHeld = () => Object.values(L()?.boxes ?? {}).reduce((a, b) => a + b, 0);
   const left = (ms) => (ms > 86400000 ? `${Math.ceil(ms / 86400000)}d` : `${Math.ceil(ms / 3600000)}h`);
-  const lookOf = (id = null) => ({ outfit: id ?? L()?.outfit ?? 'basic-0', body: L()?.body ?? 'm' });
+  const myWs = () => L()?.wequip ?? {};
+  const lookOf = (id = null, extra = {}) => ({ outfit: id ?? L()?.outfit ?? 'basic-0', body: L()?.body ?? 'm', ws: myWs(), ...extra });
+  const serial = (id) => {
+    const o = OUTFIT[id] ?? WSKIN[id];
+    const n = L()?.serials?.[id];
+    return o?.limited && n ? ` #${n}/${o.limited}` : '';
+  };
 
   // ------------------------------------------------------------ lobby tile
 
@@ -82,27 +99,33 @@ export function createLocker({ app, send, sfx, toast, share }) {
     const tile = $('locker-tile');
     if (!tile) return;
     tile.hidden = !L();
-    $('open-locker').hidden = !L();
     $('lt-marks').hidden = !L();
     if (!L()) return;
     const o = OUTFIT[L().outfit] ?? OUTFIT['basic-0'];
     const r = RARITIES[o.rarity];
-    $('lt-name').textContent = o.name;
+    $('lt-name').textContent = o.name + serial(o.id);
     $('lt-name').style.color = r.color;
     $('lt-rarity').textContent = `${rn(o.rarity)} · ${L().body === 'f' ? t('lk.her') : t('lk.him')}`;
     const bags = bagsHeld();
-    $('lt-marks').textContent = `${L().credit > 0 ? ` · shop ${usd(L().credit)}` : ''}${bags ? ` · ${bags} ${bags === 1 ? 'bag' : 'bags'} to open` : ''}`;
-    $('open-locker').classList.toggle('glow', bags > 0);
+    $('lt-marks').textContent = bags ? t('lk.toOpen', { n: bags }) : '';
+    $('tb-credit-v').textContent = usdCents(L().credit);
+    document.querySelector('.nav-btn[data-page="shop"] .nav-badge').hidden = !bags;
+    document.querySelector('.nav-btn[data-page="shop"] .nav-badge').textContent = bags ? String(bags) : '';
     tile.style.setProperty('--r', r.color);
   }
+  const usdCents = (c) => `$${(c / 100).toLocaleString('en-US', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
   // one loop drives the lobby tile and the locker stage while they are on screen
   function loop(now) {
     st.raf = requestAnimationFrame(loop);
     const tileCv = $('lt-canvas');
-    if (tileCv && !$('locker-tile').hidden && !$('lobby').hidden) paint(tileCv, lookOf(), now, 0.95);
+    if (tileCv && !$('locker-tile').hidden && !$('lobby').hidden && !document.querySelector('.page-play').hidden) paint(tileCv, lookOf(), now, 0.95);
     const stage = $('lk-stage');
-    if (stage && $('dlg-locker').open) paint(stage, lookOf(st.selected), now, 1, true);
+    if (stage && $('dlg-locker').open) {
+      const ws = st.wsel ? { ...myWs(), [WSKIN[st.wsel].weapon]: WSKIN[st.wsel].finish } : myWs();
+      const w = st.tab === 'weapons' ? WEAPONS.findIndex((x) => x.id === st.weapon) : undefined;
+      paint(stage, lookOf(st.selected, { ws, w }), now, 1, true);
+    }
   }
 
   function paint(cv, look, now, zoom = 1, big = false) {
@@ -142,13 +165,15 @@ export function createLocker({ app, send, sfx, toast, share }) {
     const cycle = Math.floor(now / 2600);
     const aim = big ? Math.sin(now / 1900) * 0.35 - 0.15 + (cycle % 4 === 3 ? Math.PI : 0) : -0.2;
     const scale = ((h * 0.78) / 70) * zoom;
-    drawPreview(ctx, look, { x: w / 2, y: floorY, scale, t: now, w: big ? cycle % 6 : 0, aim, attackT: big && now % 2600 < 400 ? now - (now % 2600) + 100 : -1e9 });
+    const wpn = look.w ?? (big ? cycle % 6 : 0);
+    drawPreview(ctx, look, { x: w / 2, y: floorY, scale, t: now, w: wpn, aim, attackT: big && now % 2600 < 400 ? now - (now % 2600) + 100 : -1e9 });
   }
 
   // --------------------------------------------------------------- dialog
 
   function open(tab = st.tab) {
     st.selected = null;
+    st.wsel = null;
     setTab(tab);
     $('dlg-locker').showModal();
     sfx.unlock?.();
@@ -163,19 +188,15 @@ export function createLocker({ app, send, sfx, toast, share }) {
 
   function render() {
     if (!L()) return;
-    $('lk-marks').textContent = usd(L().credit);
-    $('lk-bonus').textContent = t('lk.topupFrom', { v: usd(stableCents()) });
+    $('lk-marks').textContent = usdCents(L().credit);
+    $('lk-bonus').textContent = '';
     for (const b of document.querySelectorAll('#lk-body [data-body]')) b.setAttribute('aria-checked', String(b.dataset.body === L().body));
-    renderDetail();
-    if (st.tab === 'outfits') renderGrid('lk-grid', OUTFITS.filter((o) => st.filter === 'all' || (st.filter === 'owned' ? owns(o.id) : o.rarity === st.filter)));
-    if (st.tab === 'shop') {
-      renderPacks();
-      renderGrid('lk-shop', OUTFITS.filter((o) => o.price));
-    }
-    if (st.tab === 'boxes') renderBoxes();
-    const total = OUTFITS.length;
-    const have = OUTFITS.filter((o) => owns(o.id)).length;
-    $('lk-count').textContent = t('lk.collected', { a: have, b: total });
+    if (st.tab === 'outfits') {
+      renderDetail();
+      renderGrid(OUTFITS.filter((o) => st.filter === 'all' || (st.filter === 'owned' ? owns(o.id) : o.rarity === st.filter)));
+      const have = OUTFITS.filter((o) => owns(o.id)).length;
+      $('lk-count').textContent = t('lk.collected', { a: have, b: OUTFITS.length });
+    } else renderWeapons();
   }
 
   function status(o) {
@@ -183,27 +204,29 @@ export function createLocker({ app, send, sfx, toast, share }) {
     if (L().outfit === o.id) return { text: trial ? `${t('lk.equipped')} · ${left(trialLeft(o.id))}` : t('lk.equipped'), cls: 'on' };
     if (trial) return { text: t('lk.trialLeft', { t: left(trialLeft(o.id)) }), cls: 'trial' };
     if (owns(o.id)) return { text: t('lk.owned'), cls: 'own' };
-    if (o.price) return { text: usd(o.price), cls: 'price' };
-    return { text: usd(o.price), cls: 'price' };
+    if (o.limited) return { text: t('lk.limited', { n: o.limited }), cls: 'lim' };
+    return { text: rn(o.rarity), cls: 'locked' };
   }
 
-  function renderGrid(id, list) {
-    const grid = $(id);
-    grid.replaceChildren(
-      ...list.map((o) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = `lk-item r-${o.rarity}${owns(o.id) ? '' : ' locked'}${st.selected === o.id ? ' sel' : ''}`;
-        b.style.setProperty('--r', RARITIES[o.rarity].color);
-        const s = status(o);
-        b.innerHTML = `<span class="lk-shine"></span><img alt="" src="${figureStill(lookOf(o.id), 84, 112)}"><span class="lk-name">${esc(o.name)}</span><span class="lk-state ${s.cls}">${esc(s.text)}</span>`;
-        b.addEventListener('click', () => {
+  function card(o, img, s, onClick, sel) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `lk-item r-${o.rarity}${s.cls === 'locked' || s.cls === 'lim' ? ' locked' : ''}${sel ? ' sel' : ''}${o.limited ? ' limited' : ''}`;
+    b.style.setProperty('--r', RARITIES[o.rarity].color);
+    b.innerHTML = `<span class="lk-shine"></span><img alt="" src="${img}"><span class="lk-name">${esc(o.name)}</span><span class="lk-state ${s.cls}">${esc(s.text)}</span>`;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function renderGrid(list) {
+    $('lk-grid').replaceChildren(
+      ...list.map((o) =>
+        card(o, figureStill(lookOf(o.id), 84, 112), status(o), () => {
           st.selected = o.id;
           sfx.play('beep', { f: 1320, dur: 0.03 });
           render();
-        });
-        return b;
-      }),
+        }, st.selected === o.id),
+      ),
     );
   }
 
@@ -217,174 +240,48 @@ export function createLocker({ app, send, sfx, toast, share }) {
     let action = '';
     if (L().outfit === id) action = `<span class="lk-tag">${t('lk.equipped')}</span>`;
     else if (owns(id)) action = `<button type="button" class="cta" data-act="equip">${t('lk.equip')}</button>`;
-    if (!o.basic && !L().owned.includes(id)) action += `<button type="button" class="${owns(id) ? 'ghost' : 'cta'}" data-act="buy" ${dollars() < o.price ? 'disabled' : ''}>${t('lk.buy')} · ${usd(o.price)}</button>`;
-    const how = trial
-      ? t('lk.trialHow', { t: left(trialLeft(id)) })
-      : owns(id)
-        ? o.basic
-          ? t('lk.free')
-          : t('lk.inCollection')
-        : t('lk.buyOrBag');
-    d.innerHTML = `<p class="lk-rar">${esc(rn(o.rarity))}${[o.fx, o.fx2].filter(Boolean).length ? ` · <span>${esc([o.fx, o.fx2].filter(Boolean).map(fxName).join(' + '))}${o.cape ? ' + cape' : ''}</span>` : o.cape ? ' · <span>cape</span>' : ''}</p><h3>${esc(o.name)}</h3><p class="fine">${esc(how)}${st.selected && !owns(id) ? ` ${t('lk.tryingOn')}` : ''}</p><div class="lk-actions">${action}</div>`;
-    for (const b of d.querySelectorAll('[data-act]')) b.addEventListener('click', () => send({ t: b.dataset.act, id }));
+    const how = trial ? t('lk.trialHow2', { t: left(trialLeft(id)) }) : owns(id) ? (o.basic ? t('lk.free') : t('lk.inCollection')) : t('lk.fromBags');
+    const fx = [o.fx, o.fx2].filter(Boolean).map((x) => t(`fx.${x}`));
+    if (o.cape) fx.push(t('fx.cape'));
+    const sup = o.limited ? L().supply?.[o.id] : null;
+    d.innerHTML = `<p class="lk-rar">${esc(rn(o.rarity))}${fx.length ? ` · <span>${esc(fx.join(' + '))}</span>` : ''}</p><h3>${esc(o.name)}${esc(serial(id))}</h3>${sup ? `<p class="lk-supply">${t('lk.minted', { a: sup.minted, b: sup.of })}</p>` : ''}<p class="fine">${esc(how)}${st.selected && !owns(id) ? ` ${t('lk.tryingOn')}` : ''}</p><div class="lk-actions">${action}</div>`;
+    for (const b of d.querySelectorAll('[data-act]')) b.addEventListener('click', () => send({ t: 'equip', id }));
   }
 
-  function renderPacks() {
-    $('lk-packs').replaceChildren(
-      ...PACKS.map((p) => {
+  // weapon skins: pick a weapon, see every finish for it, equip the ones you own
+  function renderWeapons() {
+    $('lk-wtabs').replaceChildren(
+      ...WEAPONS.map((w) => {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = `lk-pack${p.bonus ? ' bonus' : ''}`;
-        b.disabled = stableCents() < p.price;
-        b.innerHTML = `<b>${usd(p.price + p.bonus)}</b><span>${p.bonus ? t('lk.bonus', { n: Math.round((p.bonus / p.price) * 100) }) : t('lk.shopUsd')}</span><small>${t('lk.pay', { v: usd(p.price) })}</small>`;
-        b.addEventListener('click', () => send({ t: 'topup', id: p.id }));
+        b.setAttribute('aria-pressed', String(w.id === st.weapon));
+        b.textContent = t(`w.${w.name}`);
+        b.addEventListener('click', () => {
+          st.weapon = w.id;
+          st.wsel = null;
+          render();
+        });
         return b;
       }),
     );
-  }
-
-  function renderBoxes() {
-    const wrap = $('lk-boxes');
-    wrap.replaceChildren(
-      ...BOXES.map((bx) => {
-        const pity = L().pity[bx.id] ?? { sinceEpic: 0, sinceLegendary: 0 };
-        const el = document.createElement('article');
-        el.className = `lk-box b-${bx.id}`;
-        const odds = RARITY_ORDER.filter((k) => bx.odds[k] > 0)
-          .map((k) => `<li style="--r:${RARITIES[k].color}"><span>${rn(k)}</span><b>${bx.odds[k]}%</b></li>`)
-          .join('');
-        const meter = (label, n, max) => `<div class="pity"><span>${label}</span><div class="pity-bar"><i style="width:${(n / max) * 100}%"></i></div><b>${max - n}</b></div>`;
-        el.innerHTML = `<div class="lk-box-art">${boxArt(bx.id, 132)}</div>
-          <h4>${esc(bx.name)}</h4>
-          <p class="fine">${t('lk.jackpot')}: <b style="color:${RARITIES[bx.jackpot].color}">${rn(bx.jackpot)}</b></p>
-          <ul class="odds">${odds}</ul>
-          ${meter(t('lk.epicIn'), pity.sinceEpic, PITY.epic)}
-          ${meter(t('lk.legIn'), pity.sinceLegendary, PITY.legendary)}
-          ${(L().boxes?.[bx.id] ?? 0) > 0 ? `<button type="button" class="cta">${t('lk.openFree')} <span class="held">×${L().boxes[bx.id]}</span></button>` : `<button type="button" class="cta" ${dollars() < bx.price ? 'disabled' : ''}>${t('lk.buyOpen')} · ${usd(bx.price)}</button>`}`;
-        el.querySelector('button').addEventListener('click', () => openBox(bx.id));
-        return el;
-      }),
-    );
-  }
-
-  // ------------------------------------------------------------- the roll
-
-  function openBox(id) {
-    if (st.rolling) return;
-    st.rolling = true;
-    st.lastBox = id;
-    sfx.play('ready');
-    send({ t: 'box', id });
-  }
-
-  // strip of cards weighted like the box, with the real drop placed under the marker
-  function roulette(result) {
-    const box = BOX[result.box];
-    const ov = $('lk-roll');
-    const strip = $('lk-strip');
-    const N = 46;
-    const at = 38;
-    const cards = [];
-    for (let i = 0; i < N; i++) {
-      let o;
-      if (i === at) o = OUTFIT[result.item];
-      else {
-        let r = Math.random() * 100;
-        let rar = 'common';
-        for (const k of RARITY_ORDER) {
-          if (r < (box.odds[k] ?? 0)) {
-            rar = k;
-            break;
-          }
-          r -= box.odds[k] ?? 0;
-        }
-        // tease: near the stop, put a jackpot or two just either side
-        if ((i === at - 1 || i === at + 2) && Math.random() < 0.7) rar = box.jackpot;
-        const pool = OUTFITS.filter((x) => x.rarity === rar && !x.basic);
-        o = pool[Math.floor(Math.random() * pool.length)] ?? OUTFIT[result.item];
-      }
-      cards.push(`<div class="rl-card" style="--r:${RARITIES[o.rarity].color}"><img alt="" src="${figureStill(lookOf(o.id), 84, 112)}"><span>${esc(o.name)}</span></div>`);
-    }
-    strip.innerHTML = cards.join('');
-    strip.style.transition = 'none';
-    strip.style.transform = 'translateX(0)';
-    $('lk-reveal').hidden = true;
-    $('lk-roll-inner').hidden = false;
-    ov.hidden = false;
-    ov.style.setProperty('--r', RARITIES[result.rarity].color);
-    ov.classList.remove('flash');
-    const cardW = strip.children[0].getBoundingClientRect().width + 8;
-    const view = $('lk-window').clientWidth;
-    const jitter = (Math.random() - 0.5) * cardW * 0.6;
-    const target = at * cardW - view / 2 + cardW / 2 + jitter;
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        strip.style.transition = 'transform 6.2s cubic-bezier(0.08, 0.72, 0.12, 1)';
-        strip.style.transform = `translateX(${-target}px)`;
-      }),
-    );
-    // tick each time a card passes the marker
-    let lastIdx = -1;
-    const t0 = performance.now();
-    const tick = () => {
-      const m = new DOMMatrixReadOnly(getComputedStyle(strip).transform);
-      const idx = Math.floor((-m.m41 + view / 2) / cardW);
-      if (idx !== lastIdx) {
-        lastIdx = idx;
-        sfx.play('beep', { f: 2400, dur: 0.018 });
-      }
-      if (performance.now() - t0 < 6300) requestAnimationFrame(tick);
-      else reveal(result);
-    };
-    requestAnimationFrame(tick);
-  }
-
-  function reveal(result) {
-    const o = OUTFIT[result.item];
-    const r = RARITIES[o.rarity];
-    const ov = $('lk-roll');
-    ov.classList.add('flash');
-    sfx.play(result.jackpot ? 'level' : 'coin');
-    if (result.jackpot) setTimeout(() => sfx.play('level'), 180);
-    const box = BOX[result.box];
-    setTimeout(() => {
-      $('lk-roll-inner').hidden = true;
-      const rv = $('lk-reveal');
-      rv.hidden = false;
-      rv.style.setProperty('--r', r.color);
-      rv.innerHTML = `<p class="rv-kicker">${esc(box.name)}${result.pity ? ` · ${t('lk.pityDrop')}` : ''}</p>
-        <div class="rv-stage"><canvas id="rv-canvas"></canvas></div>
-        <p class="rv-rar">${esc(rn(result.rarity))}</p>
-        <h3 class="rv-name">${esc(o.name)}</h3>
-        <p class="rv-note">${result.dup ? t('lk.dup', { v: `<b>+${usd(result.refund)}</b>` }) : t('lk.new')}${result.jackpot ? '' : ` · ${t('lk.jackpotIs', { r: esc(rn(box.jackpot)) })}`}</p>
-        <div class="rv-actions">
-          ${!result.dup && L().outfit !== o.id ? `<button type="button" class="cta" data-rv="equip">${t('lk.equip')}</button>` : ''}
-          <button type="button" class="ghost share" data-rv="share">${result.jackpot ? t('lk.showOff') : t('lk.postMiss')}</button>
-          <button type="button" class="ghost" data-rv="again" ${(L().boxes?.[box.id] ?? 0) === 0 && dollars() < box.price ? 'disabled' : ''}>${t('lk.another')} · ${(L().boxes?.[box.id] ?? 0) > 0 ? `${t('lk.free1')} ×${L().boxes[box.id]}` : usd(box.price)}</button>
-          <button type="button" class="link" data-rv="close">${t('lk.back')}</button>
-        </div>`;
-      const cv = $('rv-canvas');
-      const spin = (now) => {
-        if (rv.hidden || !cv.isConnected) return;
-        paint(cv, lookOf(o.id), now, 1.05, true);
-        requestAnimationFrame(spin);
-      };
-      requestAnimationFrame(spin);
-      rv.querySelector('[data-rv="equip"]')?.addEventListener('click', (e) => {
-        send({ t: 'equip', id: o.id });
-        e.target.remove();
-      });
-      rv.querySelector('[data-rv="share"]').addEventListener('click', () => share(result.jackpot ? 'boxHit' : 'boxMiss', { result, outfit: o, box, look: lookOf(o.id) }));
-      rv.querySelector('[data-rv="again"]').addEventListener('click', () => {
-        ov.hidden = true;
-        openBox(result.box);
-      });
-      rv.querySelector('[data-rv="close"]').addEventListener('click', () => {
-        ov.hidden = true;
+    const list = WEAPON_SKINS.filter((s) => s.weapon === st.weapon);
+    const on = myWs()[st.weapon] ?? 'default';
+    const plain = { id: `${st.weapon}.default`, name: t('lk.plain'), rarity: 'common' };
+    const cards = [plain, ...list].map((s) => {
+      const own = s.id.endsWith('.default') || L().wowned.includes(s.id);
+      const eq = s.id === `${st.weapon}.${on}`;
+      const stt = eq ? { text: t('lk.equipped'), cls: 'on' } : own ? { text: t('lk.owned'), cls: 'own' } : s.limited ? { text: t('lk.limited', { n: s.limited }), cls: 'lim' } : { text: rn(s.rarity), cls: 'locked' };
+      return card(s, weaponStill(s.id), stt, () => {
+        st.wsel = s.id.endsWith('.default') ? null : s.id;
+        if (own && !eq) send({ t: 'wequip', id: s.id });
+        else if (!own) toast(t('lk.fromCrates'));
+        sfx.play('beep', { f: 1320, dur: 0.03 });
         render();
-      });
-      st.rolling = false;
-    }, 380);
+      }, st.wsel === s.id);
+    });
+    $('lk-wgrid').replaceChildren(...cards);
+    const f = FINISH[on];
+    $('lk-detail').innerHTML = `<p class="lk-rar">${esc(f ? rn(f.rarity) : '')}</p><h3>${esc(f ? `${f.name} ${t(`w.${WEAPONS.find((w) => w.id === st.weapon).name}`)}` : t('lk.plain'))}</h3><p class="fine">${esc(t('lk.weaponHow'))}</p>`;
   }
 
   // ------------------------------------------------------------- messages
@@ -397,38 +294,23 @@ export function createLocker({ app, send, sfx, toast, share }) {
     }
     if (m.t === 'balance' || m.t === 'tables') {
       renderTile();
-      if ($('dlg-locker').open && !st.rolling) render();
-      return;
-    }
-    if (m.t === 'err' && st.rolling) {
-      st.rolling = false;
       return;
     }
     if (m.t !== 'locker') return;
     app.locker = m.locker;
     if (m.balances) app.balances = m.balances;
     renderTile();
-    const r = m.result;
-    if (m.op === 'box') {
-      roulette(r);
-      return;
-    }
-    if (m.op === 'buy') {
-      sfx.play('coin');
-      toast(t('lk.yours', { n: OUTFIT[r.item].name }));
-      st.selected = r.item;
-    }
-    if (m.op === 'equip') sfx.play('bag');
-    if (m.op === 'topup') {
-      sfx.play('coin');
-      toast(`+${usd(r.added)} ${t('lk.shopUsd')}`);
-    }
+    if (m.op === 'equip' || m.op === 'wequip') sfx.play('bag');
     if ($('dlg-locker').open) render();
   }
 
   // --------------------------------------------------------------- wiring
   $('open-locker').addEventListener('click', () => open('outfits'));
   $('lt-canvas').addEventListener('click', () => open('outfits'));
+  $('lk-to-shop').addEventListener('click', () => {
+    $('dlg-locker').close();
+    openShop?.();
+  });
   for (const b of document.querySelectorAll('#dlg-locker [data-lt]')) b.addEventListener('click', () => setTab(b.dataset.lt));
   for (const b of document.querySelectorAll('#lk-body [data-body]')) b.addEventListener('click', () => send({ t: 'body', id: b.dataset.body }));
   for (const b of document.querySelectorAll('#lk-filter [data-f]'))
@@ -437,10 +319,7 @@ export function createLocker({ app, send, sfx, toast, share }) {
       for (const x of document.querySelectorAll('#lk-filter [data-f]')) x.setAttribute('aria-pressed', String(x === b));
       render();
     });
-  $('dlg-locker').addEventListener('close', () => ($('lk-roll').hidden = true));
   st.raf = requestAnimationFrame(loop);
 
-  return { onMessage, renderTile, open };
+  return { onMessage, renderTile, open, lookOf, serial };
 }
-
-const fxName = (fx) => ({ glow: 'aura', pulse: 'pulsing aura', ghost: 'spectral', laser: 'laser eyes', rainbow: 'prismatic', fire: 'burning', gold: 'liquid gold', holo: 'hologram', glitch: 'glitch', lightning: 'lightning', galaxy: 'galaxy', sparks: 'sparks', frost: 'frost', money: 'money rain', matrix: 'code rain', shadow: 'shadow smoke' })[fx] ?? fx;

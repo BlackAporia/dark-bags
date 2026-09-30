@@ -18,6 +18,7 @@
     "house": "node scripts/house.js"
   },
   "dependencies": {
+    "@avnu/avnu-sdk": "^4.2.0",
     "@fatsolutions/tongo-sdk": "^1.5.0",
     "@privy-io/node": "^0.35.0",
     "starknet": "^10.8.0",

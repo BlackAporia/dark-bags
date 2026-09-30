@@ -13,6 +13,14 @@ import { figureStill } from './stickman.js';
 import { openShare, wireShare } from './sharecard.js';
 import { OUTFIT } from '../shared/cosmetics.js';
 import { createAchievements, achName } from './achievements.js';
+import { createShop } from './shop.js';
+import { createInventory } from './inventory.js';
+import { createSwap } from './swap.js';
+import { createChat } from './chat.js';
+import { createSettingsUi } from './settingsui.js';
+import { createIntro } from './intro.js';
+import { settings, setSetting, onSetting, QUALITY } from './settings.js';
+import { MODE, MODES } from '../shared/modes.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -87,7 +95,9 @@ const app = {
   stake: CFG.TIERS.includes(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
   name: store.get('darkbags.name', ''),
   skin: SKINS.includes(store.get('darkbags.skin', '')) ? store.get('darkbags.skin') : SKINS[Math.floor(Math.random() * SKINS.length)],
-  gore: store.get('darkbags.gore', false),
+  gore: settings.gore,
+  gameMode: store.get('darkbags.gmode', 'raid'),
+  page: 'play',
   screen: 'lobby',
   prep: null,
   locker: null, // { marks, scrap, owned, outfit, body, pity }
@@ -104,11 +114,34 @@ function shareMoment(kind, data = {}) {
 }
 wireShare();
 
-// locker: outfits, shop, luck boxes
-const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
-const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m) });
 // real-token mode (server started with CHAIN=…): sign-in, deposits, cash-outs
 const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: () => renderLobby(), base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href });
+// the menu pages
+const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
+const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
+const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }) });
+const inventory = createInventory({ app, send, go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
+const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
+const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
+const settingsUi = createSettingsUi();
+
+// ------------------------------------------------------------------ pages
+const PAGES = { shop, inventory, swap, chat, settings: settingsUi };
+function go(page, extra) {
+  if (!document.querySelector(`.page[data-page="${page}"]`)) page = 'play';
+  app.page = page;
+  store.set('darkbags.page', page);
+  for (const p of document.querySelectorAll('.page')) p.hidden = p.dataset.page !== page;
+  for (const b of document.querySelectorAll('.nav-btn')) b.setAttribute('aria-current', String(b.dataset.page === page));
+  if (page === 'achievements') ach.renderList();
+  if (page === 'shop' && extra) shop.family?.(extra);
+  PAGES[page]?.render();
+  document.querySelector('.pages').scrollTo?.({ top: 0 });
+  sfx.play('beep', { f: 990, dur: 0.02 });
+}
+for (const b of document.querySelectorAll('.nav-btn')) b.addEventListener('click', () => go(b.dataset.page));
+$('tb-wallet').addEventListener('click', () => go('inventory'));
+$('tb-credit').addEventListener('click', () => go('shop'));
 const attract = new Attract(renderer);
 
 // ---------------------------------------------------------------- screens
@@ -217,7 +250,32 @@ function renderAssets() {
 
 // ------------------------------------------------------------------ lobby
 function tableInfo(stake) {
-  return app.tables.find((t) => t.stake === stake);
+  return app.tables.find((x) => x.stake === stake && (x.mode ?? 'raid') === app.gameMode);
+}
+
+// the mode picker: a card per mode with what it is and how the money works
+const MODE_ICON = { raid: '🎒', br: '👑', duel: '⚔️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
+function renderModes() {
+  const box = $('modes');
+  box.replaceChildren(
+    ...MODES.map((m) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `mode-card k-${m.kind}`;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(m.id === app.gameMode));
+      const live = app.tables.filter((x) => x.mode === m.id).reduce((s, x) => s + (x.humans ?? 0) + (x.ready ?? 0), 0);
+      const size = m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
+      b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>`;
+      b.addEventListener('click', () => {
+        app.gameMode = m.id;
+        store.set('darkbags.gmode', m.id);
+        sfx.play('beep', { f: 1180, dur: 0.03 });
+        renderLobby();
+      });
+      return b;
+    }),
+  );
 }
 
 function renderLobby() {
@@ -274,6 +332,7 @@ function renderLobby() {
   pickUsableAsset();
   renderAssets();
   renderRankCard();
+  renderModes();
   renderPracticeCfg();
   locker.renderTile();
   const play = $('play');
@@ -479,6 +538,7 @@ function onStatus(st) {
     const token = app.mode === 'online' ? store.get('darkbags.token', null) : 'practice';
     send({ t: 'hello', token, name: app.name });
     sendPracticeCfg();
+    intro.mark('connect');
   } else if (wasOpen && app.screen !== 'lobby') {
     toast(t('net.lost'));
     app.inRoom = false;
@@ -489,16 +549,22 @@ function onStatus(st) {
 
 // the locker owns its own messages, and sees everything else after the app has updated
 function onMessage(m) {
-  if (m.t === 'locker') return locker.onMessage(m);
-  handleMessage(m);
+  if (m.t !== 'locker') handleMessage(m);
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
+  if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
+  if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
+  if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
+  if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
+  if (app.page === 'shop' && (m.t === 'balance' || m.t === 'welcome')) shop.render();
 }
 
 function handleMessage(m) {
   if (cashier.onMessage(m) && m.t !== 'welcome') return;
   switch (m.t) {
     case 'welcome':
+      intro.mark('profile');
+      app.swap = m.swap ?? null;
       app.token = m.token;
       if (app.mode === 'online') store.set('darkbags.token', m.token);
       app.assets = m.assets ?? [];
@@ -555,10 +621,11 @@ function handleMessage(m) {
       store.set('darkbags.raids', store.get('darkbags.raids', 0) + 1);
       if (m.rank) app.rank = m.rank.after;
       // went down with others still inside: watch them first, results when you want them
-      if (game.active && m.status === 'dead' && app.prep?.state === 'live') {
+      if (game.active && m.status === 'dead' && app.prep?.state === 'live' && !app.wantResult) {
         app.pendingResult = m;
         break;
       }
+      app.wantResult = false;
       showResult(m);
       break;
     case 'err':
@@ -571,7 +638,15 @@ function handleMessage(m) {
 // ------------------------------------------------------------- spectating
 function finishSpectating() {
   const m = app.pendingResult;
-  if (!m) return;
+  if (!m) {
+    // pot modes settle at the end: show the result the moment it lands
+    if (game.active && game.dead && !app.wantResult) {
+      app.wantResult = true;
+      send({ t: 'watch', d: 0 });
+      toast(t('spect.settling'));
+    }
+    return;
+  }
   app.pendingResult = null;
   send({ t: 'watch', d: 0 });
   showResult(m);
@@ -592,7 +667,20 @@ function showResult(m) {
   const amt = $('res-amount');
   const det = $('res-detail');
   const inside = t('res.inside', { k: m.kills, t: mmss(m.secs) });
-  if (m.status === 'extracted') {
+  const pot = MODE[m.mode]?.kind && MODE[m.mode].kind !== 'raid';
+  if (pot && m.won) {
+    k.textContent = t(MODE[m.mode].kind === 'team' ? 'res.teamWon' : 'res.victory');
+    k.className = 'res-kicker win';
+    amt.textContent = money(m.payout);
+    amt.className = 'res-amount win';
+    det.innerHTML = `${t('res.wonText', { p: `<b>${money(m.payout)}</b>`, s: `<b>${money(m.stake)}</b>` })} ${inside}.`;
+  } else if (pot) {
+    k.textContent = t(m.cause === 'storm' ? 'res.storm' : 'res.defeated');
+    k.className = 'res-kicker loss';
+    amt.textContent = `−${money(m.stake)}`;
+    amt.className = 'res-amount';
+    det.innerHTML = `${t(MODE[m.mode].kind === 'team' ? 'res.teamLost' : 'res.lostPot')} ${inside}.`;
+  } else if (m.status === 'extracted') {
     const pnl = m.payout - m.stake;
     const pct = Math.round((pnl / m.stake) * 100);
     k.textContent = t('res.extracted');
@@ -630,7 +718,7 @@ function goToTable() {
   sfx.unlock();
   app.name = $('name').value.trim();
   store.set('darkbags.name', app.name);
-  send({ t: 'join', stake: app.stake, name: app.name || 'runner', skin: app.skin });
+  send({ t: 'join', stake: app.stake, mode: app.gameMode, name: app.name || 'runner', skin: app.skin });
   app.inRoom = true;
   showScreen('prep');
 }
@@ -645,10 +733,23 @@ $('name').value = app.name;
 $('name').addEventListener('change', () => store.set('darkbags.name', $('name').value.trim()));
 $('name').addEventListener('keydown', (e) => e.key === 'Enter' && !$('play').disabled && goToTable());
 $('play').addEventListener('click', goToTable);
-$('gore').addEventListener('change', (e) => {
-  app.gore = e.target.checked;
-  store.set('darkbags.gore', app.gore);
-});
+$('gore').addEventListener('change', (e) => setSetting('gore', e.target.checked));
+// settings apply the moment they change
+function applySetting(k) {
+  if (k === 'quality') renderer.setQuality(settings.quality === 'auto' ? null : QUALITY[settings.quality]);
+  if (k === 'sound') sfx.setVolume(settings.sound);
+  if (k === 'music') sfx.setMusicVolume(settings.music);
+  if (k === 'gore') {
+    app.gore = settings.gore;
+    game.gore = settings.gore;
+    $('gore').checked = settings.gore;
+  }
+  if (k === 'stick') document.documentElement.style.setProperty('--stick', settings.stick);
+  if (k === 'lefty') $('touch').classList.toggle('lefty', settings.lefty);
+  if (k === 'motion') document.documentElement.classList.toggle('no-motion', !settings.motion);
+}
+onSetting(applySetting);
+for (const k of ['quality', 'sound', 'music', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
 $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 $('mode-online').addEventListener('click', () => app.mode !== 'online' && setMode('online'));
 $('mode-practice').addEventListener('click', () => app.mode !== 'practice' && setMode('practice'));
@@ -662,7 +763,7 @@ $('prep-back').addEventListener('click', () => {
 $('res-share').addEventListener('click', () => {
   const m = app.lastResult;
   if (!m) return;
-  shareMoment(m.status === 'extracted' ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
+  shareMoment(m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
@@ -722,6 +823,7 @@ globalThis.__darkbags = { app, game, input, renderer, sfx, cashier };
 
 attract.start();
 showScreen('lobby');
+go(store.get('darkbags.page', 'play'));
 // language: picker in the lobby header, everything re-renders on a switch
 const langSel = $('lang');
 langSel.replaceChildren(...LANGS.map((l) => Object.assign(document.createElement('option'), { value: l.id, textContent: l.name })));
@@ -730,9 +832,19 @@ langSel.addEventListener('change', () => setLang(langSel.value));
 onLang(() => {
   renderLobby();
   ach.renderProfile();
+  PAGES[app.page]?.render();
+  if (app.page === 'achievements') ach.renderList();
   if (app.screen === 'prep') renderPrep();
+  langSel.value = getLang();
 });
 applyI18n();
+
+// intro: a real loading bar over what the game waits for
+const intro = createIntro({ onDone: () => document.body.classList.add('ready') });
+for (const s of ['fonts', 'world', 'connect', 'profile']) intro.need(s);
+(document.fonts?.ready ?? Promise.resolve()).then(() => intro.mark('fonts'));
+requestAnimationFrame(() => requestAnimationFrame(() => intro.mark('world')));
+globalThis.__darkbags.intro = intro;
 
 setMode(SERVER && store.get('darkbags.mode', 'online') === 'online' ? 'online' : 'practice');
 requestAnimationFrame(loop);

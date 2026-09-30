@@ -3,7 +3,9 @@
 //
 // Every way in ends up as the same small facade:
 //   { kind, name, icon, address, strk20, signTypedData(td), depositPublic(t, units, house),
-//     depositPrivate(t, units, house), balance(t), send(t, to, units), disconnect() }
+//     depositPrivate(t, units, house), balance(t), send(t, to, units), execute(calls), disconnect() }
+// and swaps in the player's own wallet go through AVNU (Starkzap's AvnuSwapProvider):
+//   avnuQuote(chain, facade, tIn, tOut, units)  avnuSwap(chain, facade, tIn, tOut, units, slippageBps)
 //
 //   extension  any Starknet wallet found by get-starknet v6: wallet-standard wallets
 //              (Ready, Braavos, Xverse, OKX, Keplr, …), injected window.starknet_* and
@@ -13,7 +15,7 @@
 //              Privy server wallet that our server signs with (Starkzap PrivySigner)
 import { createStore } from '@starknet-io/get-starknet-discovery';
 import { wallets as KNOWN_WALLETS } from '@starknet-io/get-starknet-wallets';
-import { StarkZap, OnboardStrategy, Amount, fromAddress } from 'starkzap';
+import { StarkZap, OnboardStrategy, Amount, fromAddress, AvnuSwapProvider, ChainId } from 'starkzap';
 import Privy, { LocalStorage } from '@privy-io/js-sdk-core';
 
 const hex = (v) => `0x${BigInt(v).toString(16)}`;
@@ -87,6 +89,12 @@ export async function connectExtension(entry) {
     },
     balance: null, // extensions show balances themselves
     send: null,
+    async execute(calls) {
+      const r = await request('wallet_addInvokeTransaction', {
+        calls: calls.map((c) => ({ contract_address: c.contractAddress, entry_point: c.entrypoint, calldata: (c.calldata ?? []).map((x) => hex(x)) })),
+      });
+      return r.transaction_hash;
+    },
     disconnect: async () => w.features['standard:disconnect']?.disconnect?.(),
   };
   return facade;
@@ -123,6 +131,11 @@ function starkzapFacade(kind, name, wallet, chain) {
     async send(t, to, units) {
       await wallet.ensureReady({ deploy: 'if_needed' });
       const tx = await wallet.transfer(tokenOf(t), [{ to: fromAddress(to), amount: Amount.fromRaw(units, tokenOf(t)) }]);
+      return tx.hash;
+    },
+    async execute(calls) {
+      await wallet.ensureReady({ deploy: 'if_needed', ...(feeMode ? { feeMode } : {}) });
+      const tx = await wallet.execute(calls, feeMode ? { feeMode } : undefined);
       return tx.hash;
     },
     disconnect: async () => wallet.disconnect?.(),
@@ -190,4 +203,28 @@ export async function connectPrivy(chain, session, { walletId, publicKey }, base
     },
   });
   return starkzapFacade('privy', 'Privy', wallet, chain);
+}
+
+// ------------------------------------------------------------------ AVNU
+// Swaps between tokens in the player's own wallet, routed by AVNU across Starknet DEXs.
+let avnu = null;
+const avnuRequest = (chain, facade, tIn, tOut, units, slippageBps = 50n) => ({
+  chainId: chain.network === 'mainnet' ? ChainId.MAINNET : ChainId.SEPOLIA,
+  takerAddress: fromAddress(facade.address),
+  tokenIn: tokenOf(tIn),
+  tokenOut: tokenOf(tOut),
+  amountIn: Amount.fromRaw(BigInt(units), tokenOf(tIn)),
+  slippageBps: BigInt(slippageBps),
+});
+
+export async function avnuQuote(chain, facade, tIn, tOut, units) {
+  avnu ??= new AvnuSwapProvider();
+  const q = await avnu.getQuote(avnuRequest(chain, facade, tIn, tOut, units));
+  return { in: q.amountInBase, out: q.amountOutBase, impactBps: q.priceImpactBps ?? null };
+}
+
+export async function avnuSwap(chain, facade, tIn, tOut, units, slippageBps = 50n) {
+  avnu ??= new AvnuSwapProvider();
+  const prepared = await avnu.prepareSwap(avnuRequest(chain, facade, tIn, tOut, units, slippageBps));
+  return { tx: await facade.execute(prepared.calls), out: prepared.quote.amountOutBase };
 }

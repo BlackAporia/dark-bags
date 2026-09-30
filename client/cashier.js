@@ -425,7 +425,27 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     if (t) $('wd-amount').value = formatUnits(ledger(t.id), t.decimals, t.decimals).replace(/,/g, '');
   });
 
+  // AVNU swaps inside the player's own wallet (tokens that never touched the house)
+  const tokenById = (id) => cs.chain?.tokens?.find((x) => x.id === id);
+  const avnu = {
+    get ready() {
+      return !!cs.chain && !!cs.account && app.mode === 'online';
+    },
+    tokens: () => cs.chain?.tokens ?? [],
+    async quote(from, to, units) {
+      const v = await vendor();
+      return v.avnuQuote(cs.chain, await ensureFacade(), tokenById(from), tokenById(to), units);
+    },
+    async swap(from, to, units, slippageBps = 50n) {
+      const v = await vendor();
+      return v.avnuSwap(cs.chain, await ensureFacade(), tokenById(from), tokenById(to), units, slippageBps);
+    },
+    open: () => openCashier(),
+  };
+
   return {
+    avnu,
+    openCashier: () => cs.account && openCashier(),
     onMessage,
     render,
     get active() {

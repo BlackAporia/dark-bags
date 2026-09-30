@@ -1,7 +1,9 @@
 import { CFG } from '../shared/config.js';
 import { OUTFIT } from '../shared/cosmetics.js';
+import { MODE } from '../shared/modes.js';
 import { usdText } from '../shared/assets.js';
 import { t } from './i18n.js';
+import { settings } from './settings.js';
 
 const usdTextCents = (c) => usdText(c * 10, 1000); // cents → "$x.xx"
 import { stepMovement, sanitizeInput } from '../shared/movement.js';
@@ -112,6 +114,19 @@ export class GameClient {
     this.pid = start.pid;
     this.stake = start.stake;
     this.golden = start.golden;
+    // pot modes: no bag and no exits; the HUD shows the prize pot and who is left
+    this.mode = start.mode ?? 'raid';
+    this.potMode = (MODE[this.mode]?.kind ?? 'raid') !== 'raid';
+    this.teamMode = MODE[this.mode]?.kind === 'team';
+    const bagLabel = document.querySelector('.hud-bag .eyebrow');
+    if (bagLabel) bagLabel.textContent = t(this.potMode ? 'hud.pot' : 'hud.bagPrivate');
+    this.renderer.noExits = this.potMode; // last one standing: no exits to draw
+    // no bag to bluff about in pot modes; one fixed weapon means no ladder to climb
+    this.el.bluffChip.hidden = this.potMode;
+    const fixed = !!MODE[this.mode]?.weapon;
+    this.el.ladder.hidden = fixed;
+    this.el.nextWeapon.hidden = fixed;
+    document.querySelector('.xp')?.toggleAttribute('hidden', fixed);
     this.skin = OUTFIT[this.outfit.outfit]?.color ?? skin;
     this.snaps = [];
     this.pending = [];
@@ -152,8 +167,8 @@ export class GameClient {
     el.extract.hidden = true;
     this.updateBluffChip();
     this.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
-    if (start.golden) this.banner(t('hud.goldenStart'), 'gold', 3000);
-    else this.banner(t('hud.start'), 'money', 2600);
+    if (start.golden) this.banner(t(this.potMode ? 'hud.goldenPot' : 'hud.goldenStart'), 'gold', 3000);
+    else this.banner(t(this.teamMode ? 'hud.startTeam' : this.potMode ? 'hud.startPot' : 'hud.start'), 'money', 2600);
   }
 
   stop() {
@@ -322,12 +337,13 @@ export class GameClient {
               this.anims.map.delete(ev.vid);
             }
           }
-          const how = ev.cause === 'storm' ? 'was eaten by the storm' : null;
-          if (ev.kid === this.pid) this.feed(`You dropped <b>${esc(ev.victim)}</b>`, 'me');
+          const how = ev.cause === 'storm';
+          const b = (n) => `<b>${esc(n)}</b>`;
+          if (ev.kid === this.pid) this.feed(t('feed.youDropped', { name: b(ev.victim) }), 'me');
           else if (ev.vid === this.pid) this.feed(how ? t('feed.storm') : t('feed.droppedYou', { name: `<b>${esc(ev.killer ?? 'The dark')}</b>` }), 'me');
-          else if (how) this.feed(`<b>${esc(ev.victim)}</b> ${how}`);
-          else if (ev.killer) this.feed(`<b>${esc(ev.killer)}</b> dropped <b>${esc(ev.victim)}</b>`);
-          else this.feed(`<b>${esc(ev.victim)}</b> went down`);
+          else if (how) this.feed(t('feed.stormTook', { name: b(ev.victim) }));
+          else if (ev.killer) this.feed(t('feed.dropped', { a: b(ev.killer), b: b(ev.victim) }));
+          else this.feed(t('feed.down', { name: b(ev.victim) }));
           break;
         }
         case 'extract': {
@@ -336,19 +352,19 @@ export class GameClient {
             this.fx.ring(a.x, a.y + FEET, '#3ddc97');
             this.fx.dust(a.x, a.y + FEET, 8, 'rgba(61,220,151,0.35)');
           }
-          if (ev.pid !== this.pid) this.feed(`<b>${esc(ev.name)}</b> extracted`, 'exit');
+          if (ev.pid !== this.pid) this.feed(t('feed.extracted', { name: `<b>${esc(ev.name)}</b>` }), 'exit');
           break;
         }
         case 'warn':
-          this.banner(ev.text, 'warn', 2400);
+          this.banner(t(ev.text), 'warn', 2400);
           this.sfx.play('beep', { f: 660 });
           break;
         case 'storm':
-          this.banner(ev.text, 'warn', 2600);
+          this.banner(t(ev.text), 'warn', 2600);
           this.sfx.play('storm');
           break;
         case 'exitClosed':
-          this.feed(`Exit <b>${esc(ev.name)}</b> is closed`, 'warnline');
+          this.feed(t('feed.exitClosed', { name: `<b>${esc(ev.name)}</b>` }), 'warnline');
           break;
         case 'level': {
           const wp = WEAPONS[ev.w];
@@ -512,9 +528,10 @@ export class GameClient {
       const x = q ? lerp(q.x, p.x, t) : p.x;
       const y = q ? lerp(q.y, p.y, t) : p.y;
       const aim = q ? lerpAngle(q.a, p.a, t) : p.a;
-      const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c, outfit: p.o, body: p.g });
+      const skins = settings.skins === 'all'; // settings: draw others' outfits and weapon skins?
+      const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c, outfit: skins ? p.o : null, body: p.g, ws: skins ? p.ws : null });
       this.woundCheck(an, p.h, now);
-      figures.push({ a: an, color: p.c, name: p.n, title: p.tt ? t(`ach.${p.tt}`) : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
+      figures.push({ a: an, color: p.c, name: p.n, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
     this.anims.prune(now);
     const ba = new Map(a.bullets.map((x) => [x.i, x]));
@@ -531,7 +548,7 @@ export class GameClient {
       const y = this.pred.y + this.corr.y;
       const me = (this.meAnim = this.animSelf(x, y, dt, now));
       this.woundCheck(me, you.hp, now);
-      figures.push({ a: me, color: this.skin, name: this.myName || 'you', rk: this.myRank, title: this.myTitle, hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
+      figures.push({ a: me, color: this.skin, name: this.myName || 'you', rk: this.myRank, title: settings.titles ? this.myTitle : null, hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
       eye = { x, y };
       // look a little ahead of where you aim
       const la = Math.min(1, 1 - Math.exp(-dt * 6));
@@ -563,7 +580,7 @@ export class GameClient {
       golden: last.golden,
       zone,
       exitStates,
-      shake: this.shake,
+      shake: settings.shake ? this.shake : 0,
       hurt: this.hurt,
       storm: alive && you.storm,
       showArrows: true,
@@ -574,7 +591,7 @@ export class GameClient {
 
   animSelf(x, y, dt, now) {
     const you = this.you;
-    return this.anims.update(-1, x, y, this.aim, dt, now, { w: you.w ?? 0, bluff: this.bluff, color: this.skin, id: -1, outfit: this.outfit.outfit, body: this.outfit.body });
+    return this.anims.update(-1, x, y, this.aim, dt, now, { w: you.w ?? 0, bluff: this.bluff, color: this.skin, id: -1, outfit: settings.skins === 'none' ? null : this.outfit.outfit, body: this.outfit.body, ws: settings.skins === 'none' ? null : this.outfit.ws });
   }
 
   footsteps(me, now) {
@@ -597,6 +614,7 @@ export class GameClient {
       this.bagStart ??= you.bag;
       const touch = this.input.touchOn;
       if (you.storm) hint = t('coach.storm');
+      else if (this.potMode && inside >= 7) hint = t(this.teamMode ? 'coach.team' : 'coach.pot');
       else if (inside < 7) hint = touch ? t('coach.touch') : t('coach.keys');
       else if (tl < 75 || you.bag >= this.stake) hint = t('coach.exit');
       else if (you.bag <= this.bagStart) hint = t('coach.loot');
@@ -611,6 +629,17 @@ export class GameClient {
     const el = this.el;
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
+    if (this.potMode) {
+      el.bag.textContent = this.money(you.pot ?? 0);
+      el.pnl.textContent = t(this.teamMode ? 'hud.teamsLeft' : 'hud.left', { n: you.sides ?? 0, s: this.money(this.stake) });
+      el.pnl.className = 'pnl';
+    } else this.updateBag(you, alive);
+    const tl = Math.max(0, this.recvTl.tl - (now - this.recvTl.at) / 1000);
+    this.updateRest(now, view, you, alive, tl);
+  }
+
+  updateBag(you, alive) {
+    const el = this.el;
     el.bag.textContent = this.money(alive ? you.bag : 0);
     const pnl = (alive ? you.bag : 0) - this.stake;
     // from rounded cents, so bag and profit always add up on screen
@@ -619,7 +648,10 @@ export class GameClient {
     const d = cents(alive ? you.bag : 0) - cents(this.stake);
     el.pnl.textContent = t('hud.pnl', { d: `${d >= 0 ? '+' : '−'}${usdTextCents(Math.abs(d))}`, s: this.money(this.stake) });
     el.pnl.className = `pnl ${pnl > 0 ? 'up' : pnl < 0 ? 'down' : ''}`;
-    const tl = Math.max(0, this.recvTl.tl - (now - this.recvTl.at) / 1000);
+  }
+
+  updateRest(now, view, you, alive, tl) {
+    const el = this.el;
     el.timer.textContent = mmss(tl);
     el.timer.classList.toggle('hot', tl <= 30);
     if (alive && tl <= 10 && tl > 0 && Math.floor(tl) !== this.lastTick) {
@@ -716,6 +748,7 @@ export class Attract {
   }
 
   start() {
+    this.renderer.noExits = false;
     this.world = new World({ stake: 1000, seed: (Math.random() * 2 ** 32) >>> 0, roundSeconds: 900 });
     this.world.step();
     this.renderer.setMap(this.world.map);
@@ -764,7 +797,7 @@ export class Attract {
     this.cam.y += (p.y - this.cam.y) * 0.08;
     const figures = [];
     for (const q of [{ i: p.id, n: p.name, c: p.skin, x: p.x, y: p.y, a: p.aim, h: Math.ceil(p.hp), b: p.bluff, e: p.ext, s: 0, w: p.w, fc: p.fc, pr: p.prestige, rk: p.rank, o: p.outfit, g: p.body }, ...s.players]) {
-      const a = this.anims.update(q.i, q.x, q.y, q.a, dt, now, { w: q.w, bluff: q.b, color: q.c, outfit: q.o, body: q.g });
+      const a = this.anims.update(q.i, q.x, q.y, q.a, dt, now, { w: q.w, bluff: q.b, color: q.c, outfit: q.o, body: q.g, ws: q.ws });
       if (this.fcs.get(q.i) !== undefined && this.fcs.get(q.i) !== q.fc) a.attackT = now;
       this.fcs.set(q.i, q.fc);
       figures.push({ a, color: q.c, name: q.n, hp: q.h, isMe: false, flash: false, shield: 0, ext: q.e, pr: q.pr, rk: q.rk, laser: WEAPONS[q.w]?.laser });

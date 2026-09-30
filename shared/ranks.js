@@ -66,7 +66,10 @@ export function raidXp(p, { practice = false } = {}) {
   const multi = [0, 0, 20, 40, 70, 120][Math.min(5, p.bestMulti ?? 0)];
   if (multi) add(['', '', 'Double kill', 'Triple kill', 'Rampage', 'Godlike'][Math.min(5, p.bestMulti)], multi);
   if (p.prestige) add('Full arsenal', p.prestige * 150);
-  if (p.status === 'extracted') {
+  if (p.won) {
+    add('Victory', 150);
+    add('Profit', Math.min(200, (60 * Math.max(0, p.payout - p.stake)) / Math.max(1, p.stake)));
+  } else if (p.status === 'extracted') {
     add('Extracted', 120);
     add('Profit', Math.min(200, (60 * Math.max(0, p.payout - p.stake)) / Math.max(1, p.stake)));
   }

@@ -57,6 +57,13 @@ export class PriceBook {
     return (num + a.priceMicro - 1n) / a.priceMicro;
   }
 
+  // token base units that `mills` buys (rounded down, for payouts and swaps)
+  unitsFor(id, mills) {
+    const a = this.assets.get(id);
+    if (!a || a.priceMicro <= 0n) return null;
+    return (BigInt(mills) * 10n ** BigInt(a.decimals) * PRICE_SCALE) / a.priceMicro;
+  }
+
   // value of `units` in mills (rounded down)
   value(id, units) {
     const a = this.assets.get(id);

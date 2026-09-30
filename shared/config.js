@@ -53,6 +53,11 @@ export const CFG = {
   TIERS: [100, 1000, 10000],
   RAKE: 0.05,             // house fee taken from each stake
   BAG_SHARE: 0.5,         // share of the net stake you carry in; the rest is scattered as loot
+  SWAP_FEE: 0.003,        // in-game swaps: 0.3% spread to the house
+  SWAP_MIN: 100,          // smallest swap, in mills ($0.10)
+  CHAT_MAX: 200,          // characters per chat message
+  CHAT_GAP_MS: 1500,      // one message per 1.5 s per player
+  CHAT_KEEP: 60,          // messages a newcomer sees
   JACKPOT_SHARE: 0.2,     // share of the rake on players' stakes that feeds the room's jackpot (1% of each stake)
   GOLDEN_EVERY: 4,        // every Nth raid is golden if the jackpot can pay for it
   GOLDEN_BONUS: 3,        // a golden raid adds up to this × stake from the jackpot to the loot pool

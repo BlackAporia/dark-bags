@@ -1,32 +1,37 @@
-// Cosmetics: characters, outfits, the shop and luck boxes.
+// Cosmetics: characters, outfits, weapon skins and luck boxes.
 //
-// Built on the Warface model (a shop plus random "luck boxes"), with the parts that
-// make players feel cheated taken out:
+// Skins come only out of boxes (and rank-up trials): nothing is sold directly.
+// Two families, always sold separately:
+//   outfit bags   for your runner (looks, headgear, capes, auras, particles)
+//   weapon crates for your guns and knife (finishes per weapon)
+// Each family has nine tiers from $0.99 to $999; the dearer the box, the better the
+// odds, up to a 30% shot at an Exotic in the $999 tier. A few Exotics are limited
+// editions: only a fixed number will ever drop, each one numbered.
+//
+// What keeps it fair:
 //   - odds are published on every box, and the roll happens on the server
-//   - pity: every box guarantees an Epic-or-better within 15 opens and a
-//     Legendary-or-better within 60, and the counter shows how close you are
-//   - smart drops: while you are missing items of the rolled rarity, you get one
-//     you don't own; duplicates only happen once you own them all
-//   - a duplicate pays part of its price back as $ credit
-//   - every outfit can also be bought outright, so nothing is locked behind luck
-//   - bought items are permanent; timed outfits only come free, as rank-up trials
+//   - pity: Epic-or-better within 15 opens and Legendary-or-better within 60, per box
+//   - smart drops: you get something you don't own while that rarity has any left;
+//     a duplicate pays 10% of its rarity's value back as shop $
+//   - buy one or many at once; boxes you hold are used first
 //
-// One shop currency: shop $, bought 1:1 with USDC/USDT (packs add a bonus). It can
-// only be spent here, never withdrawn. A purchase spends shop $ first and tops up
-// the exact difference from the player's USDC/USDT if they are short.
-// Rank-ups pay one thing: a random outfit to try for 72 hours. Rank is XP only.
-// Nothing here changes how a runner plays. It's all looks.
+// One shop currency: shop $, bought 1:1 with USDC/USDT (packs add a bonus). It only
+// spends here and cannot be withdrawn. A purchase spends shop $ first and tops up the
+// exact difference from the player's USDC/USDT.
+// Rank-ups pay one thing: a random outfit to try for 72 hours. Nothing here changes
+// how a runner plays. It is all looks.
+import { WEAPONS } from './weapons.js';
 
 export const BODIES = ['m', 'f'];
 
 export const RARITIES = {
-  // price and duplicate refund in US cents
-  common: { name: 'Common', color: '#b8bfcc', price: 49, refund: 5 },
-  rare: { name: 'Rare', color: '#4cc9f0', price: 149, refund: 15 },
-  epic: { name: 'Epic', color: '#b37bff', price: 399, refund: 40 },
-  legendary: { name: 'Legendary', color: '#f7931a', price: 999, refund: 100 },
-  mythic: { name: 'Mythic', color: '#ff3d7f', price: 1999, refund: 200 },
-  exotic: { name: 'Exotic', color: '#00f0ff', price: 4999, refund: 500 },
+  // value: what the rarity is worth in cents (duplicates refund 10% of it)
+  common: { name: 'Common', color: '#b8bfcc', value: 49, refund: 5 },
+  rare: { name: 'Rare', color: '#4cc9f0', value: 149, refund: 15 },
+  epic: { name: 'Epic', color: '#b37bff', value: 399, refund: 40 },
+  legendary: { name: 'Legendary', color: '#f7931a', value: 999, refund: 100 },
+  mythic: { name: 'Mythic', color: '#ff3d7f', value: 1999, refund: 200 },
+  exotic: { name: 'Exotic', color: '#00f0ff', value: 4999, refund: 500 },
 };
 export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic', 'exotic'];
 const rank = (r) => RARITY_ORDER.indexOf(r);
@@ -37,9 +42,10 @@ const rank = (r) => RARITY_ORDER.indexOf(r);
 // fx (aura): glow, pulse, ghost (translucent), laser (eye beams), rainbow (hue cycles),
 //     fire, gold (shimmering gold), holo (flickering hologram), glitch (RGB split)
 // fx2 (particles): lightning, galaxy, sparks, frost, money, matrix, shadow
-// cape: a colour for a cape off the shoulders
+// cape: a colour for a cape off the shoulders; limited: how many will ever exist
 // Names are original archetypes (crypto memes, comics, cartoons, sci-fi); no real
 // characters or brands.
+
 const BASIC = ['#ff5a5f', '#4cc9f0', '#b5e48c', '#f72585', '#ffd166', '#9b5de5', '#00f5d4', '#ff9f1c'];
 const BASIC_NAMES = ['Red', 'Sky', 'Moss', 'Magenta', 'Sun', 'Violet', 'Mint', 'Tangerine'];
 
@@ -114,28 +120,89 @@ export const OUTFITS = [
   { id: 'money-printer', name: 'Money Printer', rarity: 'mythic', color: '#22c55e', accent: '#14532d', head: 'visor', fx: 'gold', fx2: 'money' },
   { id: 'stark-pioneer', name: 'Stark Pioneer', rarity: 'mythic', color: '#ec796b', accent: '#0c0c4f', head: 'astro', fx: 'holo', fx2: 'galaxy', cape: '#0c0c4f' },
   // exotics: the rarest in the game, everything at once
-  { id: 'golden-bull', name: 'Golden Bull', rarity: 'exotic', color: '#ffd166', accent: '#fff3c4', head: 'horns', fx: 'gold', fx2: 'money', cape: '#8a6508' },
-  { id: 'genesis-ghost', name: 'Genesis Ghost', rarity: 'exotic', color: '#a5f3fc', accent: '#0e7490', head: 'hood', fx: 'holo', fx2: 'matrix', cape: '#083344' },
-  { id: 'multiverse-prime', name: 'Multiverse Prime', rarity: 'exotic', color: '#ffffff', head: 'halo', fx: 'rainbow', fx2: 'lightning', cape: '#f8fafc' },
+  { id: 'golden-bull', name: 'Golden Bull', rarity: 'exotic', limited: 500, color: '#ffd166', accent: '#fff3c4', head: 'horns', fx: 'gold', fx2: 'money', cape: '#8a6508' },
+  { id: 'genesis-ghost', name: 'Genesis Ghost', rarity: 'exotic', limited: 250, color: '#a5f3fc', accent: '#0e7490', head: 'hood', fx: 'holo', fx2: 'matrix', cape: '#083344' },
+  { id: 'multiverse-prime', name: 'Multiverse Prime', rarity: 'exotic', limited: 100, color: '#ffffff', head: 'halo', fx: 'rainbow', fx2: 'lightning', cape: '#f8fafc' },
   { id: 'void-emperor', name: 'Void Emperor', rarity: 'exotic', color: '#c084fc', accent: '#000000', head: 'crown', fx: 'glitch', fx2: 'galaxy', cape: '#050008' },
+  // more exotics, open supply
+  { id: 'celestial', name: 'Celestial Knight', rarity: 'exotic', color: '#fef3c7', accent: '#f59e0b', head: 'helmet', fx: 'gold', fx2: 'galaxy', cape: '#1e3a8a' },
+  { id: 'neon-samurai', name: 'Neon Samurai', rarity: 'exotic', color: '#f472b6', accent: '#22d3ee', head: 'kabuto', fx: 'glitch', fx2: 'lightning', cape: '#0f172a' },
+  { id: 'phoenix', name: 'Phoenix', rarity: 'exotic', color: '#fb923c', accent: '#fde047', head: 'crown', fx: 'fire', fx2: 'sparks', cape: '#b91c1c' },
+  // limited editions: a fixed number will ever exist, numbered as they drop
+  { id: 'first-block', name: 'First Block #1', rarity: 'exotic', limited: 21, color: '#ffffff', accent: '#f7931a', head: 'diamond', fx: 'gold', fx2: 'money', cape: '#f7931a' },
+  { id: 'singularity', name: 'Singularity', rarity: 'exotic', limited: 50, color: '#111111', accent: '#a855f7', head: 'halo', fx: 'glitch', fx2: 'galaxy', cape: '#000000' },
 ];
-for (const o of OUTFITS) if (!o.basic) o.price = RARITIES[o.rarity].price;
+
 export const OUTFIT = Object.fromEntries(OUTFITS.map((o) => [o.id, o]));
 export const DEFAULT_OUTFIT = 'basic-0';
 
-// odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss)
-// prices are in US cents
+// ------------------------------------------------------------ weapon skins
+// Finishes, each available on every weapon. fx: glow, shimmer, rainbow, fire, ice,
+// galaxy, plasma; pattern: camo, tiger, carbon, digital (drawn as stripes on the art).
+export const FINISHES = [
+  { id: 'field', name: 'Field', rarity: 'common', color: '#6b7c4b' },
+  { id: 'sand', name: 'Sand', rarity: 'common', color: '#c8a870' },
+  { id: 'urban', name: 'Urban', rarity: 'common', color: '#8a929c' },
+  { id: 'arctic', name: 'Arctic', rarity: 'common', color: '#e9f1f7' },
+  { id: 'crimson', name: 'Crimson', rarity: 'common', color: '#b3242f' },
+  { id: 'woodland', name: 'Woodland', rarity: 'rare', color: '#556b2f', accent: '#2f3b1d', pattern: 'camo' },
+  { id: 'tiger', name: 'Tiger', rarity: 'rare', color: '#f59e0b', accent: '#111111', pattern: 'tiger' },
+  { id: 'carbon', name: 'Carbon', rarity: 'rare', color: '#2b2b2b', accent: '#5a5a5a', pattern: 'carbon' },
+  { id: 'cobalt', name: 'Cobalt', rarity: 'rare', color: '#2563eb', accent: '#93c5fd' },
+  { id: 'digital', name: 'Digital', rarity: 'rare', color: '#64748b', accent: '#cbd5e1', pattern: 'digital' },
+  { id: 'neon', name: 'Neon', rarity: 'epic', color: '#ff2dd4', accent: '#00f5ff', fx: 'glow' },
+  { id: 'toxic', name: 'Toxic', rarity: 'epic', color: '#9ef01a', accent: '#1b4332', fx: 'glow' },
+  { id: 'blood', name: 'Bloodline', rarity: 'epic', color: '#7f1d1d', accent: '#ef4444', pattern: 'tiger' },
+  { id: 'hazard', name: 'Hazard', rarity: 'epic', color: '#facc15', accent: '#111111', pattern: 'digital' },
+  { id: 'gold', name: 'Gold', rarity: 'legendary', color: '#ffd166', accent: '#fff3c4', fx: 'shimmer' },
+  { id: 'chrome', name: 'Chrome', rarity: 'legendary', color: '#e5e7eb', accent: '#9ca3af', fx: 'shimmer' },
+  { id: 'ice', name: 'Glacier', rarity: 'legendary', color: '#bae6fd', accent: '#e0f2fe', fx: 'ice' },
+  { id: 'inferno', name: 'Inferno', rarity: 'legendary', color: '#f97316', accent: '#fde047', fx: 'fire' },
+  { id: 'galaxy', name: 'Galaxy', rarity: 'mythic', color: '#7c3aed', accent: '#f0abfc', fx: 'galaxy' },
+  { id: 'plasma', name: 'Plasma', rarity: 'mythic', color: '#22d3ee', accent: '#a78bfa', fx: 'plasma' },
+  { id: 'diamond', name: 'Diamond', rarity: 'mythic', color: '#9fe8ff', accent: '#ffffff', fx: 'shimmer' },
+  { id: 'prism', name: 'Prism', rarity: 'exotic', color: '#ffffff', fx: 'rainbow' },
+  { id: 'void', name: 'Void', rarity: 'exotic', color: '#0b0014', accent: '#a855f7', fx: 'plasma' },
+  { id: 'genesis', name: 'Genesis', rarity: 'exotic', limited: 100, color: '#f7931a', accent: '#fff3c4', fx: 'rainbow' },
+];
+export const FINISH = Object.fromEntries(FINISHES.map((f) => [f.id, f]));
+export const WEAPON_SKINS = WEAPONS.flatMap((w) =>
+  FINISHES.map((f) => ({ id: `${w.id}.${f.id}`, weapon: w.id, finish: f.id, name: `${f.name} ${w.name}`, rarity: f.rarity, ...(f.limited ? { limited: f.limited } : {}) })),
+);
+export const WSKIN = Object.fromEntries(WEAPON_SKINS.map((s) => [s.id, s]));
+
+// ------------------------------------------------------------------ boxes
+// odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss);
+// prices in US cents; tier drives the odds and the share of limited editions
+const TIERS = [
+  { price: 99, odds: { common: 80, rare: 16.5, epic: 3, legendary: 0.5 }, jackpot: 'legendary' },
+  { price: 299, odds: { common: 50, rare: 36, epic: 11, legendary: 2.7, mythic: 0.3 }, jackpot: 'legendary' },
+  { price: 799, odds: { rare: 60, epic: 30, legendary: 8.2, mythic: 1.5, exotic: 0.3 }, jackpot: 'mythic' },
+  { price: 1999, odds: { rare: 35, epic: 45, legendary: 16, mythic: 3.3, exotic: 0.7 }, jackpot: 'mythic' },
+  { price: 4999, odds: { epic: 55, legendary: 35, mythic: 8.5, exotic: 1.5 }, jackpot: 'mythic' },
+  { price: 9900, odds: { epic: 30, legendary: 50, mythic: 16, exotic: 4 }, jackpot: 'mythic' },
+  // the top tiers also guarantee an Exotic within `exoticPity` opens
+  { price: 24900, odds: { legendary: 60, mythic: 32, exotic: 8 }, jackpot: 'exotic', exoticPity: 12 },
+  { price: 49900, odds: { legendary: 40, mythic: 45, exotic: 15 }, jackpot: 'exotic', exoticPity: 7 },
+  { price: 99900, odds: { legendary: 20, mythic: 50, exotic: 30 }, jackpot: 'exotic', exoticPity: 4 },
+];
+const BAG_IDS = ['street', 'vault', 'golden', 'elite', 'diamond', 'obsidian', 'royal', 'apex', 'genesis'];
+const BAG_NAMES = ['Street Bag', 'Vault Bag', 'Golden Bag', 'Elite Bag', 'Diamond Bag', 'Obsidian Bag', 'Royal Bag', 'Apex Bag', 'Genesis Bag'];
+const CRATE_IDS = ['w-scrap', 'w-armory', 'w-brass', 'w-specops', 'w-diamond', 'w-obsidian', 'w-royal', 'w-apex', 'w-genesis'];
+const CRATE_NAMES = ['Scrap Crate', 'Armory Crate', 'Brass Crate', 'Spec Ops Crate', 'Diamond Crate', 'Obsidian Crate', 'Royal Crate', 'Apex Crate', 'Genesis Crate'];
 export const BOXES = [
-  { id: 'street', name: 'Street Bag', price: 99, odds: { common: 80, rare: 16.5, epic: 3, legendary: 0.5, mythic: 0 }, jackpot: 'legendary' },
-  { id: 'vault', name: 'Vault Bag', price: 299, odds: { common: 50, rare: 36, epic: 11, legendary: 2.7, mythic: 0.3 }, jackpot: 'legendary' },
-  { id: 'golden', name: 'Golden Bag', price: 799, odds: { common: 0, rare: 60, epic: 30, legendary: 8.2, mythic: 1.5, exotic: 0.3 }, jackpot: 'mythic' },
+  ...TIERS.map((t, i) => ({ id: BAG_IDS[i], family: 'outfit', tier: i + 1, name: BAG_NAMES[i], ...t })),
+  ...TIERS.map((t, i) => ({ id: CRATE_IDS[i], family: 'weapon', tier: i + 1, name: CRATE_NAMES[i], ...t })),
 ];
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
 export const PITY = { epic: 15, legendary: 60 }; // guaranteed at or better, by the Nth open of a box
+export const MAX_OPEN = 100; // boxes per purchase
+// how often an Exotic from this tier is one of the limited editions (while any are left)
+const limitedShare = (tier) => (tier >= 9 ? 0.5 : tier >= 7 ? 0.3 : tier >= 5 ? 0.12 : 0.03);
 
-export const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
+export const usd = (cents) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const TRIAL_MS = 72 * 3600 * 1000;
-export const START_BOXES = { street: 1 }; // a welcome bag for every new runner
+export const START_BOXES = { street: 1, 'w-scrap': 1 }; // a welcome bag and crate for every new runner
 
 // Shop $ packs: paid in USDC/USDT, credited as shop $ with a bonus on the bigger ones.
 export const PACKS = [
@@ -143,6 +210,9 @@ export const PACKS = [
   { id: 'p10', price: 1000, bonus: 50 },
   { id: 'p25', price: 2500, bonus: 250 },
   { id: 'p50', price: 5000, bonus: 750 },
+  { id: 'p100', price: 10000, bonus: 2000 },
+  { id: 'p500', price: 50000, bonus: 12500 },
+  { id: 'p1000', price: 100000, bonus: 30000 },
 ];
 export const PACK = Object.fromEntries(PACKS.map((p) => [p.id, p]));
 
@@ -156,51 +226,75 @@ export function rankReward(rank, rnd) {
 // ------------------------------------------------------------------ rolls
 
 export function rollRarity(box, pity, rnd) {
-  const fromPity = (pity?.sinceLegendary ?? 0) + 1 >= PITY.legendary ? 'legendary' : (pity?.sinceEpic ?? 0) + 1 >= PITY.epic ? 'epic' : null;
+  const fromPity =
+    box.exoticPity && (pity?.sinceExotic ?? 0) + 1 >= box.exoticPity ? 'exotic'
+    : (pity?.sinceLegendary ?? 0) + 1 >= PITY.legendary ? 'legendary'
+    : (pity?.sinceEpic ?? 0) + 1 >= PITY.epic ? 'epic'
+    : null;
   let r = rnd() * 100;
-  let rolled = 'common';
+  let rolled = null;
+  let last = null;
   for (const k of RARITY_ORDER) {
     const p = box.odds[k] ?? 0;
-    if (p > 0 && r < p) {
+    if (p <= 0) continue;
+    last = k;
+    if (r < p) {
       rolled = k;
       break;
     }
     r -= p;
-    rolled = k; // floating-point remainder lands on the last rarity with odds
   }
-  while ((box.odds[rolled] ?? 0) === 0 && rank(rolled) > 0) rolled = RARITY_ORDER[rank(rolled) - 1];
+  rolled ??= last; // floating-point remainder lands on the last rarity with odds
   if (fromPity && rank(rolled) < rank(fromPity)) return { rarity: fromPity, pity: true };
   return { rarity: rolled, pity: false };
 }
 
-// pick an outfit of that rarity, preferring ones the player is missing
-export function pickOutfit(rarity, owned, rnd) {
-  const pool = OUTFITS.filter((o) => o.rarity === rarity && !o.basic);
-  const fresh = pool.filter((o) => !owned.has(o.id));
-  const from = fresh.length ? fresh : pool;
-  return from[Math.floor(rnd() * from.length)];
+// Pick an item of that rarity from a catalog, preferring ones the player is missing.
+// Limited editions that are sold out never drop; the rest drop at the tier's share.
+export function pickItem(catalog, rarity, owned, rnd, { tier = 1, minted = {} } = {}) {
+  for (let ri = rank(rarity); ri >= 0; ri--) {
+    const pool = catalog.filter((o) => o.rarity === RARITY_ORDER[ri] && !o.basic && !(o.limited && (minted[o.id] ?? 0) >= o.limited));
+    if (!pool.length) continue;
+    const limited = pool.filter((o) => o.limited);
+    const open = pool.filter((o) => !o.limited);
+    const fromLimited = limited.length && (!open.length || rnd() < limitedShare(tier));
+    const from = fromLimited ? limited : open;
+    const fresh = from.filter((o) => !owned.has(o.id));
+    const list = fresh.length ? fresh : from;
+    return list[Math.floor(rnd() * list.length)];
+  }
+  return null;
 }
+export const pickOutfit = (rarity, owned, rnd, opts) => pickItem(OUTFITS, rarity, owned, rnd, opts);
 
 // believable looks for bots: mostly basic and common, now and then something shiny
 export function botLook(rnd) {
   const r = rnd();
   const rarity = r < 0.55 ? null : r < 0.8 ? 'common' : r < 0.93 ? 'rare' : r < 0.985 ? 'epic' : 'legendary';
-  const o = rarity ? pickOutfit(rarity, new Set(), rnd) : OUTFITS[Math.floor(rnd() * BASIC.length)];
-  return { outfit: o.id, body: rnd() < 0.5 ? 'm' : 'f' };
+  const o = rarity ? pickItem(OUTFITS.filter((x) => !x.limited), rarity, new Set(), rnd) : OUTFITS[Math.floor(rnd() * BASIC.length)];
+  const look = { outfit: o.id, body: rnd() < 0.5 ? 'm' : 'f' };
+  if (rnd() < 0.35) {
+    const f = FINISHES.filter((x) => rank(x.rarity) <= 2);
+    look.ws = { [WEAPONS[Math.floor(rnd() * WEAPONS.length)].id]: f[Math.floor(rnd() * f.length)].id };
+  }
+  return look;
 }
 
 // ------------------------------------------------------------- inventory
 
-// Saves from before scrap was retired: turn leftover scrap into $ bonus at its old crafting value
-// (100 scrap crafted a $0.49 common), so nobody loses what they had.
+// Saves from before scrap was retired: turn leftover scrap into shop $ at its old
+// crafting value (100 scrap crafted a $0.49 common), so nobody loses what they had.
 function migrate(r) {
   if (r.scrap > 0) r.credit = (r.credit ?? 0) + Math.round(r.scrap / 2);
   delete r.scrap;
+  r.wowned ??= [];
+  r.wequip ??= {};
+  r.serials ??= {};
   return r;
 }
 
 function fresh() {
-  return { credit: 0, owned: [], trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
+  return { credit: 0, owned: [], wowned: [], wequip: {}, serials: {}, trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
 }
 
 /**
@@ -213,6 +307,9 @@ export class Inventory {
     this.onChange = onChange;
     this.rnd = rnd;
     this.now = now;
+    // limited editions minted so far, across every player
+    this.minted = {};
+    for (const r of this.data.values()) for (const id of [...r.owned, ...r.wowned]) if ((OUTFIT[id] ?? WSKIN[id])?.limited) this.minted[id] = (this.minted[id] ?? 0) + 1;
   }
 
   rec(key) {
@@ -226,7 +323,7 @@ export class Inventory {
     return !!o && (o.basic || r.owned.includes(id) || (r.trials[id] ?? 0) > this.now());
   }
 
-  // Pay `cents`: $ credit first, the rest through `external(cents)` (USDC/USDT), all or nothing.
+  // Pay `cents`: shop $ first, the rest through `external(cents)` (USDC/USDT), all or nothing.
   charge(key, cents, external) {
     const r = this.rec(key);
     const fromCredit = Math.min(r.credit, cents);
@@ -237,6 +334,13 @@ export class Inventory {
     return { fromCredit, external: rest };
   }
 
+  // supply left of every limited edition
+  supply() {
+    const out = {};
+    for (const o of [...OUTFITS, ...WEAPON_SKINS]) if (o.limited) out[o.id] = { of: o.limited, minted: this.minted[o.id] ?? 0 };
+    return out;
+  }
+
   // what the client needs to render the locker
   view(key) {
     const r = this.rec(key);
@@ -245,19 +349,25 @@ export class Inventory {
     return {
       credit: r.credit,
       owned: r.owned,
+      wowned: r.wowned,
+      wequip: r.wequip,
+      serials: r.serials,
       trials: r.trials,
       boxes: r.boxes,
       outfit: r.outfit,
       body: r.body,
       opened: r.opened,
-      pity: Object.fromEntries(BOXES.map((b) => [b.id, { sinceEpic: r.pity[b.id]?.sinceEpic ?? 0, sinceLegendary: r.pity[b.id]?.sinceLegendary ?? 0 }])),
+      supply: this.supply(),
+      pity: Object.fromEntries(BOXES.map((b) => [b.id, { sinceEpic: r.pity[b.id]?.sinceEpic ?? 0, sinceLegendary: r.pity[b.id]?.sinceLegendary ?? 0, sinceExotic: r.pity[b.id]?.sinceExotic ?? 0 }])),
     };
   }
 
   // what others see in a raid
   look(key) {
     const r = this.rec(key);
-    return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm' };
+    const ws = {};
+    for (const [w, f] of Object.entries(r.wequip)) if (r.wowned.includes(`${w}.${f}`)) ws[w] = f;
+    return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm', ws };
   }
 
   changed() {
@@ -282,8 +392,7 @@ export class Inventory {
     const out = [];
     for (let rank = fromRank + 1; rank <= toRank; rank++) {
       const w = rankReward(rank, this.rnd);
-      // a trial of something you don't have yet (any rarity if you own them all)
-      // prefer outfits you neither own nor are already trying
+      // prefer outfits you neither own nor are already trying; never exotics
       const unowned = OUTFITS.filter((o) => !o.basic && !r.owned.includes(o.id) && o.rarity !== 'exotic');
       const untried = unowned.filter((o) => !((r.trials[o.id] ?? 0) > this.now()));
       const all = untried.length ? untried : unowned;
@@ -308,6 +417,18 @@ export class Inventory {
     return { ok: true };
   }
 
+  // wear a weapon skin ("knife.gold"), or "knife.default" for the plain one
+  equipWeapon(key, id) {
+    const [w, f] = String(id).split('.');
+    if (!WEAPONS.some((x) => x.id === w)) return { ok: false, error: 'Unknown weapon.' };
+    const r = this.rec(key);
+    if (f === 'default') delete r.wequip[w];
+    else if (!r.wowned.includes(id)) return { ok: false, error: 'You do not own that skin.' };
+    else r.wequip[w] = f;
+    this.changed();
+    return { ok: true };
+  }
+
   setBody(key, body) {
     if (!BODIES.includes(body)) return { ok: false, error: 'Unknown character.' };
     this.rec(key).body = body;
@@ -315,46 +436,49 @@ export class Inventory {
     return { ok: true };
   }
 
-  buy(key, id, external) {
-    const o = OUTFIT[id];
-    const r = this.rec(key);
-    if (!o || !o.price) return { ok: false, error: 'That outfit is not sold in the shop.' };
-    if (r.owned.includes(id) || o.basic) return { ok: false, error: 'You already own it.' };
-    const paid = this.charge(key, o.price, external);
-    if (!paid) return { ok: false, error: `Not enough $ (${usd(o.price)} needed).` };
-    r.owned.push(id);
-    delete r.trials[id];
-    this.changed();
-    return { ok: true, item: id };
-  }
-
-  // a bag you hold opens free; otherwise it is bought at its price
-  open(key, boxId, external) {
+  // Open `count` boxes: the ones you hold go first (free), the rest are bought in one charge.
+  open(key, boxId, external, count = 1) {
     const box = BOX[boxId];
     const r = this.rec(key);
-    if (!box) return { ok: false, error: 'Unknown bag.' };
-    let free = false;
-    if ((r.boxes[boxId] ?? 0) > 0) {
-      r.boxes[boxId]--;
-      free = true;
-    } else if (!this.charge(key, box.price, external)) return { ok: false, error: `Not enough $ (${usd(box.price)} needed).` };
-    const p = (r.pity[boxId] ??= { sinceEpic: 0, sinceLegendary: 0 });
+    if (!box) return { ok: false, error: 'Unknown box.' };
+    count = Math.max(1, Math.min(MAX_OPEN, Math.floor(Number(count) || 1)));
+    const held = r.boxes[boxId] ?? 0;
+    const free = Math.min(held, count);
+    const paid = count - free;
+    if (paid > 0 && !this.charge(key, paid * box.price, external)) return { ok: false, error: `Not enough $ (${usd(paid * box.price)} needed).` };
+    r.boxes[boxId] = held - free;
+    const results = [];
+    for (let i = 0; i < count; i++) results.push({ ...this.roll(r, box), free: i < free });
+    this.changed();
+    return { ...results[0], ok: true, box: boxId, count, held: free, bought: paid, results };
+  }
+
+  roll(r, box) {
+    const p = (r.pity[box.id] ??= { sinceEpic: 0, sinceLegendary: 0 });
+    p.sinceExotic ??= 0;
     const roll = rollRarity(box, p, this.rnd);
-    const item = pickOutfit(roll.rarity, new Set(r.owned), this.rnd);
-    const dup = r.owned.includes(item.id);
+    const weapon = box.family === 'weapon';
+    const mine = weapon ? r.wowned : r.owned;
+    const item = pickItem(weapon ? WEAPON_SKINS : OUTFITS, roll.rarity, new Set(mine), this.rnd, { tier: box.tier, minted: this.minted });
+    const dup = mine.includes(item.id);
     let refund = 0;
+    let serial = null;
     if (dup) {
       refund = RARITIES[item.rarity].refund;
       r.credit += refund;
     } else {
-      r.owned.push(item.id);
-      delete r.trials[item.id];
+      mine.push(item.id);
+      if (!weapon) delete r.trials[item.id];
+      if (item.limited) {
+        serial = this.minted[item.id] = (this.minted[item.id] ?? 0) + 1;
+        r.serials[item.id] = serial;
+      }
     }
     p.sinceEpic = rank(item.rarity) >= rank('epic') ? 0 : p.sinceEpic + 1;
     p.sinceLegendary = rank(item.rarity) >= rank('legendary') ? 0 : p.sinceLegendary + 1;
+    p.sinceExotic = rank(item.rarity) >= rank('exotic') ? 0 : p.sinceExotic + 1;
     r.opened++;
-    this.changed();
-    return { ok: true, box: boxId, item: item.id, rarity: item.rarity, dup, refund, free, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
+    return { kind: box.family, item: item.id, rarity: item.rarity, dup, refund, serial, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
   }
 
   toJSON() {

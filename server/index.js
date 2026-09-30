@@ -80,6 +80,7 @@ const send = (cid, msg) => {
 const lobby = new Lobby({
   wallet,
   cashier: real?.cashier ?? null,
+  swap: !real || process.env.SWAP_INTERNAL === '1', // real money: in-game swaps only when the house rebalances on chain
   ranks,
   inventory,
   send,

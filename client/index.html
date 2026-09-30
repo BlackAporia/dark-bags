@@ -68,42 +68,58 @@
 </div>
 
 <!-- lobby -->
-<section id="lobby" class="screen lobby">
-  <div class="lobby-col">
-    <header class="brand">
+<!-- intro: logo, loading, then the menu -->
+<div id="intro" class="intro" aria-live="polite">
+  <canvas id="intro-canvas" class="intro-canvas" aria-hidden="true"></canvas>
+  <div class="intro-center">
+    <h1 class="intro-logo" aria-label="Dark Bags"><span class="il-dark">DARK</span><span class="il-bags">BAGS</span></h1>
+    <p class="intro-tag" data-i18n="intro.tag">Stake. Loot. Get out.</p>
+    <div class="intro-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i id="intro-fill"></i></div>
+    <p id="intro-step" class="intro-step"></p>
+    <button id="intro-go" class="cta intro-go" type="button" hidden data-i18n="intro.go">Enter</button>
+  </div>
+</div>
+
+<!-- main menu -->
+<section id="lobby" class="screen menu">
+  <header class="topbar">
+    <div class="tb-brand" aria-hidden="true">DARK<b>BAGS</b></div>
+    <div class="tb-right">
+      <button id="tb-wallet" class="tb-chip money" type="button" data-i18n-title="tb.wallet"><span class="tb-k" data-i18n="tb.wallet">Wallet</span><b id="balance" class="num">—</b></button>
+      <button id="tb-credit" class="tb-chip shop" type="button" data-i18n-title="tb.shop"><span class="tb-k" data-i18n="tb.shop">Shop $</span><b id="tb-credit-v" class="num">$0</b></button>
       <label class="lang-pick"><span aria-hidden="true">🌐</span><select id="lang" aria-label="Language"></select></label>
-      <h1 class="logo">Dark<br>Bags</h1>
-      <p class="tagline" data-i18n-html="lobby.tagline">Stake. Loot. Get out before the storm. <b>Nobody sees what's in your bag.</b></p>
-    </header>
-
-    <!-- you: look, name, rank, money -->
-    <div class="profile">
-      <div id="locker-tile" class="pf-look" hidden>
-        <canvas id="lt-canvas" aria-label="Your runner (opens the locker)"></canvas>
-        <p id="lt-name" class="lt-name"></p>
-        <p id="lt-rarity" class="lt-rarity" hidden></p>
-      </div>
-      <div class="pf-main">
-        <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your runner name" data-i18n-ph="lobby.namePh" aria-label="Runner name">
-        <p id="pf-title" class="pf-title" hidden></p>
-        <div id="rank-card" class="rank-card" hidden></div>
-        <p class="pf-money"><b id="balance" class="num">—</b><span id="lt-marks" class="lt-marks"></span><button id="faucet" class="link" type="button" hidden data-i18n="lobby.refill">Refill test tokens</button></p>
-        <div class="pf-buttons"><button id="open-locker" class="ghost pf-locker" type="button" data-i18n="lobby.locker">Locker · skins · bags</button><button id="open-ach" class="ghost pf-ach" type="button" hidden></button></div>
-      </div>
     </div>
-
-    <div class="mode" role="tablist" aria-label="Mode">
-      <button id="mode-online" class="seg" role="tab" type="button" data-i18n="lobby.online">Online</button>
-      <button id="mode-practice" class="seg" role="tab" type="button" data-i18n="lobby.practice">Practice vs bots</button>
-    </div>
-    <p id="net-status" class="net-status"></p>
-
-    <fieldset class="tables">
-      <legend class="eyebrow" data-i18n="lobby.stakePer">Stake per raid</legend>
-      <div id="tables" class="table-list"></div>
-    </fieldset>
-
-    <details id="pcfg" class="pcfg" hidden>
+  </header>
+  <nav id="menu-nav" class="menu-nav" aria-label="Menu"><button type="button" class="nav-btn" data-page="play"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span data-i18n="nav.play">Play</span><i class="nav-badge" hidden></i></button><button type="button" class="nav-btn" data-page="shop"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M4 8h16l-1.5 12h-13z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg><span data-i18n="nav.shop">Shop</span><i class="nav-badge" hidden></i></button><button type="button" class="nav-btn" data-page="inventory"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><rect x="3" y="7" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 7V5h8v2M3 12h18" fill="none" stroke="currentColor" stroke-width="2"/></svg><span data-i18n="nav.inventory">Inventory</span><i class="nav-badge" hidden></i></button><button type="button" class="nav-btn" data-page="swap"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7 7h11l-3-3M17 17H6l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="nav.swap">Swap</span><i class="nav-badge" hidden></i></button><button type="button" class="nav-btn" data-page="chat"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span data-i18n="nav.chat">Chat</span><i class="nav-badge" hidden></i></button><button type="button" class="nav-btn" data-page="achievements"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7 4h10v5a5 5 0 0 1-10 0zM12 14v4M8 20h8M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span data-i18n="nav.achievements">Achievements</span><i class="nav-badge" hidden></i></button><button type="button" class="nav-btn" data-page="settings"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="nav.settings">Settings</span><i class="nav-badge" hidden></i></button></nav>
+  <main class="pages">
+    <section class="page page-play" data-page="play">
+      <div class="hero">
+        <div id="locker-tile" class="hero-look" hidden>
+          <canvas id="lt-canvas" aria-label="Your runner (opens the locker)"></canvas>
+          <p id="lt-name" class="lt-name"></p>
+          <p id="lt-rarity" class="lt-rarity" hidden></p>
+          <button id="open-locker" class="ghost hero-locker" type="button" data-i18n="lobby.locker">Locker</button>
+        </div>
+        <div class="hero-main">
+          <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your runner name" data-i18n-ph="lobby.namePh" aria-label="Runner name">
+          <p id="pf-title" class="pf-title" hidden></p>
+          <div id="rank-card" class="rank-card" hidden></div>
+          <p class="pf-money"><span id="lt-marks" class="lt-marks"></span><button id="faucet" class="link" type="button" hidden data-i18n="lobby.refill">Refill test coins</button></p>
+          <button id="open-ach" class="ghost pf-ach" type="button" hidden></button>
+          <div class="mode" role="tablist" aria-label="Online or practice">
+            <button id="mode-online" class="seg" role="tab" type="button" data-i18n="lobby.online">Online</button>
+            <button id="mode-practice" class="seg" role="tab" type="button" data-i18n="lobby.practice">Practice vs bots</button>
+          </div>
+          <p id="net-status" class="net-status"></p>
+        </div>
+      </div>
+      <h2 class="sec-h" data-i18n="modes.title">Game mode</h2>
+      <div id="modes" class="modes" role="radiogroup"></div>
+      <fieldset class="tables">
+        <legend class="eyebrow" data-i18n="lobby.stakePer">Stake per raid</legend>
+        <div id="tables" class="table-list"></div>
+      </fieldset>
+      <details id="pcfg" class="pcfg" hidden>
       <summary><span class="eyebrow" data-i18n="pcfg.title">Practice settings</span> <span id="pcfg-sum" class="fine"></span></summary>
       <div class="pcfg-rows">
         <label><span data-i18n="pcfg.difficulty">Bots</span>
@@ -114,11 +130,11 @@
           <input id="pcfg-time" type="range" min="60" max="600" step="30"></label>
       </div>
     </details>
-    <fieldset id="paywith" class="coins">
+      <fieldset id="paywith" class="coins">
       <legend class="eyebrow" data-i18n-html="lobby.stakeWith">Stake with <span class="fine">any coin · shown in $ · winnings come back in the same coin</span></legend>
       <div id="assets" class="asset-list"></div>
     </fieldset>
-    <div id="cashier" class="cashier" hidden>
+      <div id="cashier" class="cashier" hidden>
       <div class="acct">
         <span id="acct-label" class="acct-label">Not signed in</span>
         <button id="connect" class="ghost" type="button">Sign in</button>
@@ -127,11 +143,11 @@
       </div>
       <p id="cashier-status" class="fine"></p>
     </div>
-
-    <button id="play" class="cta" type="button">Play</button>
-    <p id="quote" class="quote"></p>
-
-    <details class="how">
+      <div class="play-dock">
+        <button id="play" class="cta" type="button">Play</button>
+        <p id="quote" class="quote"></p>
+      </div>
+      <details class="how">
       <summary data-i18n="lobby.how">How to play</summary>
       <ol class="how-steps">
         <li data-i18n-html="how.1"><b>Stake and ready up.</b> Everyone drops in together with a knife and 100 health. Half your stake rides in your bag, half is scattered as loot.</li>
@@ -141,9 +157,23 @@
       <p class="keys" data-i18n-html="how.keys"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> fake your bag size · <kbd>M</kbd> sound · <kbd>N</kbd> music</p>
       <p class="fine" data-i18n="how.fine">Every raid and every achievement pays rank XP. Every rank-up lends you a new skin for 3 days.</p>
     </details>
-    <label class="gore" for="gore"><input id="gore" type="checkbox"> <span data-i18n-html="lobby.gore"><b>18+ mode.</b> Limbs come off, blood stays on the floor.</span></label>
-    <p id="fine" class="fine">Test build. All money here is play money.</p>
-  </div>
+      <p id="fine" class="fine">Test build. All money here is play money.</p>
+    </section>
+    <section class="page" data-page="shop" hidden><div id="shop-root" class="shop"></div></section>
+    <section class="page" data-page="inventory" hidden><div id="inv-root" class="inv"></div></section>
+    <section class="page" data-page="swap" hidden><div id="swap-root" class="swap"></div></section>
+    <section class="page" data-page="chat" hidden><div id="chat-root" class="chat"></div></section>
+    <section class="page" data-page="achievements" hidden>
+      <h2 class="sec-h" data-i18n="ach.title">Achievements</h2>
+      <p class="fine" data-i18n="ach.intro">Each one pays rank XP once and unlocks its name as a title you can wear.</p>
+      <p id="ach-sum" class="ach-sum"></p>
+      <ul id="ach-list" class="ach-list"></ul>
+    </section>
+    <section class="page" data-page="settings" hidden>
+      <div id="settings-root" class="settings"></div>
+      <label class="gore" for="gore"><input id="gore" type="checkbox"> <span data-i18n-html="lobby.gore"><b>18+ mode.</b> Limbs come off, blood stays on the floor.</span></label>
+    </section>
+  </main>
 </section>
 
 <!-- ready room -->
@@ -217,8 +247,7 @@
       <section class="lk-right">
         <div class="mode lk-tabs" role="tablist">
           <button type="button" class="seg" role="tab" data-lt="outfits" data-i18n="lk.outfits">Outfits</button>
-          <button type="button" class="seg" role="tab" data-lt="shop" data-i18n="lk.shop">Shop</button>
-          <button type="button" class="seg" role="tab" data-lt="boxes" data-i18n="lk.bags">Luck bags</button>
+          <button type="button" class="seg" role="tab" data-lt="weapons" data-i18n="lk.weapons">Weapon skins</button>
         </div>
         <div data-lp="outfits" class="lk-pane">
           <div class="lk-bar"><div id="lk-filter" class="lk-filter">
@@ -226,34 +255,14 @@
           </div><span id="lk-count" class="fine"></span></div>
           <div id="lk-grid" class="lk-grid"></div>
         </div>
-        <div data-lp="shop" class="lk-pane" hidden>
-          <p class="fine" data-i18n="lk.shopNote">Top up shop $ with USDC or USDT (bigger packs add a bonus). Shop $ only spends here and can't be withdrawn. Short on shop $? The difference comes from your USDC/USDT.</p>
-          <div id="lk-packs" class="lk-packs"></div>
-          <div id="lk-shop" class="lk-grid"></div>
+        <div data-lp="weapons" class="lk-pane" hidden>
+          <div id="lk-wtabs" class="lk-filter lk-wtabs"></div>
+          <div id="lk-wgrid" class="lk-grid"></div>
         </div>
-        <div data-lp="boxes" class="lk-pane" hidden>
-          <p class="fine" data-i18n="lk.bagsNote">Exact odds, rolled on the server. No duplicates until you own a whole rarity, and a duplicate pays 10% of its price back in shop $. Pity guarantees Epic+ within 15 opens and Legendary+ within 60.</p>
-          <div id="lk-boxes" class="lk-boxes"></div>
-        </div>
+        <p class="fine lk-note" data-i18n="lk.onlyBags">Skins come only from bags and crates in the shop.</p>
+        <button id="lk-to-shop" type="button" class="cta" data-i18n="lk.toShop">Open the shop</button>
       </section>
     </div>
-    <div id="lk-roll" class="lk-roll" hidden>
-      <div id="lk-roll-inner" class="rl">
-        <p class="rl-kicker">Opening…</p>
-        <div id="lk-window" class="rl-window"><div id="lk-strip" class="rl-strip"></div><i class="rl-marker"></i></div>
-      </div>
-      <div id="lk-reveal" class="rv" hidden></div>
-    </div>
-  </div>
-</dialog>
-
-<!-- achievements and titles -->
-<dialog id="dlg-ach" class="dlg dlg-ach" aria-labelledby="dlg-ach-title">
-  <div class="dlg-inner">
-    <header class="dlg-head"><h2 id="dlg-ach-title" data-i18n="ach.title">Achievements</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
-    <p class="fine" data-i18n="ach.intro">Each one pays rank XP once and unlocks its name as a title you can wear.</p>
-    <p id="ach-sum" class="ach-sum"></p>
-    <ul id="ach-list" class="ach-list"></ul>
   </div>
 </dialog>
 
@@ -314,6 +323,12 @@
   </div>
 </dialog>
 
+<!-- opening bags and crates -->
+<div id="opening" class="opening" hidden>
+  <canvas id="op-fx" class="op-fx" aria-hidden="true"></canvas>
+  <div id="op-stage" class="op-stage"></div>
+  <div id="op-actions" class="op-actions"></div>
+</div>
 <div id="toast" class="toast" role="status" hidden></div>
 <script type="module" src="main.js"></script>
 <!--@end-->

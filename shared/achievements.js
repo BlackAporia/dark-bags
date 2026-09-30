@@ -43,6 +43,9 @@ export const ACHIEVEMENTS = [
   { id: 'gold_rush', stat: 'golden', goal: 1, xp: 400 },
   { id: 'last_one_out', stat: 'lastExit', goal: 1, xp: 300 },
   { id: 'pacifist', stat: 'pacifist', goal: 1, xp: 300 },
+  // winning pot modes (battle royale, duel, weapon modes, teams)
+  { id: 'champion', stat: 'wins', goal: 1, xp: 150 },
+  { id: 'warlord', stat: 'wins', goal: 25, xp: 1500 },
   // career rank (titles only: rank already paid its way)
   { id: 'seasoned', stat: 'rank', goal: 10, xp: 0 },
   { id: 'officer', stat: 'rank', goal: 30, xp: 0 },
@@ -60,8 +63,9 @@ const MAX_STATS = new Set(['bestKills', 'bestMulti', 'bestReturn', 'rank', 'outf
 
 // What one finished raid adds to the career counters. p is the world's player record.
 export function raidStats(p, { golden = false, lastExit = false } = {}) {
-  const out = p.status === 'extracted';
+  const out = p.status === 'extracted' || !!p.won;
   return {
+    wins: p.won ? 1 : 0,
     raids: 1,
     extracts: out ? 1 : 0,
     kills: p.kills ?? 0,

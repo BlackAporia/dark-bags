@@ -77,7 +77,7 @@ test('the countdown starts the raid for everyone who is ready, at once', () => {
   ticks(CFG.BOT_REVEAL);
   assert.ok(a.last('start') && b.last('start'), 'both ready runners entered');
   assert.equal(watcher.last('start'), undefined, 'the one who never readied did not');
-  const w = lobby.rooms.get(1000).world;
+  const w = lobby.rooms.get('raid:1000').world;
   lobby.tick();
   assert.equal(w.players.size, CFG.BOT_FILL, 'bots fill the raid to size');
   const names = [...w.players.values()].filter((p) => p.isBot).map((p) => p.name);
@@ -103,7 +103,7 @@ test('extracting credits the wallet with the bag', () => {
   lobby.handle(1, { t: 'join', stake: 1000 });
   lobby.handle(1, { t: 'ready' });
   ticks(CFG.PREP_SECONDS + 0.1);
-  const room = lobby.rooms.get(1000);
+  const room = lobby.rooms.get('raid:1000');
   const p = room.world.players.get(c.last('start').pid);
   const e = room.world.map.extracts.find((x) => x.id === room.world.zonePlan.finalExit);
   const extra = 2500 - p.bag;
@@ -158,7 +158,7 @@ test('leaving the ready room refunds; leaving a raid leaves the body behind', ()
   lobby.handle(2, { t: 'join', stake: 1000 });
   lobby.handle(2, { t: 'ready' });
   ticks(CFG.PREP_SECONDS + 0.1);
-  const room = lobby.rooms.get(1000);
+  const room = lobby.rooms.get('raid:1000');
   const pid = b.last('start').pid;
   lobby.disconnect(2);
   assert.equal(room.world.players.get(pid).status, 'alive');
@@ -178,7 +178,7 @@ test('any token can be staked: the $ stake is quoted in it, paid out at the entr
   assert.equal(mills(wallet, c.token), START, 'USDC untouched');
   assert.ok(prices.value('STRK', quote) >= 1000, 'the quote covers the stake');
   ticks(CFG.PREP_SECONDS + 0.1);
-  const room = lobby.rooms.get(1000);
+  const room = lobby.rooms.get('raid:1000');
   const p = room.world.players.get(c.last('start').pid);
   const e = room.world.map.extracts.find((x) => x.id === room.world.zonePlan.finalExit);
   room.world.ledger.sponsorIn += 3000 - p.bag;
@@ -209,4 +209,34 @@ test('price book rounds quotes up and values down', () => {
   assert.equal(q, 6666666666666666667n);
   assert.ok(pb.value('X', q) >= 1000);
   assert.equal(pb.value('X', q - 1n), 999);
+});
+
+test('in-game swap at the feed price minus the fee; chat is plain, short and rate limited', () => {
+  const { lobby, wallet, client } = setup();
+  const c = client(1, 'swapper');
+  const usdc = wallet.balance(c.token, 'USDC');
+  const strk = wallet.balance(c.token, 'STRK');
+  lobby.handle(1, { t: 'swap', from: 'USDC', to: 'STRK', units: '10000000' }); // $10
+  const r = c.last('swapped');
+  assert.ok(r);
+  assert.equal(wallet.balance(c.token, 'USDC'), usdc - 10_000_000n);
+  // $10 less 0.3% at $0.15 a STRK = 66.46… STRK
+  assert.equal(r.mills, 10_000);
+  assert.equal(r.fee, 30);
+  assert.equal(wallet.balance(c.token, 'STRK') - strk, BigInt(r.out));
+  assert.ok(lobby.prices.value('STRK', BigInt(r.out)) <= 9_970, 'never more than the fee-adjusted value');
+  lobby.handle(1, { t: 'swap', from: 'USDC', to: 'STRK', units: '1' });
+  assert.match(c.last('err').msg, /too small/);
+  lobby.handle(1, { t: 'swap', from: 'USDC', to: 'STRK', units: String(usdc * 10n) });
+  assert.match(c.last('err').msg, /Not enough/);
+
+  const d = client(2, 'other');
+  lobby.handle(1, { t: 'chat', text: '  gm <script>alert(1)</script>\u0007 raiders  ' });
+  const m = d.last('chat').m;
+  assert.equal(m.text, 'gm scriptalert(1)/script raiders');
+  assert.equal(m.n, 'swapper');
+  lobby.handle(1, { t: 'chat', text: 'again' });
+  assert.match(c.last('err').msg, /Slow down/);
+  assert.equal(lobby.chat.length, 1);
+  lobby.handle(1, { t: 'chat', text: 'x'.repeat(500) });
 });

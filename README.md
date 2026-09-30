@@ -10,7 +10,7 @@ A browser extraction game played for dollars. Think Escape from Tarkov crossed w
 
 **In the browser: <https://blackaporia.github.io/dark-bags/>** (practice vs bots, runs entirely in the page). GitHub Pages serves it straight from `main` (Settings → Pages → Deploy from a branch: `main` / root; the root `index.html` forwards to `client/`).
 
-The lobby is one screen: your runner, name, rank and balance, the stake, a big **Play** button. Your first three raids show short hints in the raid (controls, loot, when and how to get out). For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
+It opens with a short intro and a real loading bar, then the menu: **Play** (your runner, rank, mode, stake, coin), **Shop** (bags and crates), **Inventory**, **Swap**, **Chat**, **Achievements** and **Settings**; a side rail on desktop, a bottom tab bar on phones. The UI speaks English, 中文, हिन्दी, Español, Français, العربية (right to left), Português, Українська, Русский and Türkçe. Your first three raids show short hints (controls, loot, when and how to get out). For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
 
 ## Run it
 
@@ -22,14 +22,26 @@ npm start            # http://localhost:8080
 The lobby has two modes:
 
 - **Online**: humans on the same server share raids; bots fill each raid to ~10 runners.
-- **Practice vs bots**: the same game code running entirely in your browser tab. Works with no server. Every bot is for itself (they fight each other from the first second), they are softer (slower to react, sloppier aim, bursts with pauses, half damage on you) and the raid ends the moment you die or get out.
+- **Practice vs bots**: the same game code running entirely in your browser tab. Works with no server. Every bot is for itself. Settings: bot difficulty (easy, normal, hard), how many runners (2–20) and raid length (1–10 minutes). When you go down you watch the survivors (◀ ▶ to switch) until you ask for your results.
+
+Game modes, each at every stake:
+
+| Mode | Runners | How the money works |
+|---|---|---|
+| Raid | 10 | Extraction: half your stake rides in your bag, half is loot; keep what you carry out |
+| Battle Royale | up to 20 | One prize pot; the last runner standing takes it |
+| Duel | 1 v 1 | The winner takes both stakes |
+| Knives / Pistols / Shotguns / Rifles / Snipers only | 12 | Battle royale with one weapon for everyone, all raid |
+| Team 2 v 2, 4 v 4, 8 v 8 | 4 / 8 / 16 | Every stake grows one team pot; the last team standing splits it equally, fallen teammates included; no friendly fire |
+
+Every mode takes the same 5% rake (4% house, 1% into the table's jackpot that pays for golden raids). See [docs/TOKENOMICS.md](docs/TOKENOMICS.md).
 
 Other commands:
 
 ```bash
 npm test             # rules, economy, privacy, netcode, rooms (node:test, no deps)
 npm run sim -- 4     # headless bot raids, prints the ledger per raid
-npm run build        # dist/index.html: the whole game in one ~190 KB file (practice mode)
+npm run build        # dist/index.html: the whole game in one ~700 KB file (practice mode)
 npm run build:wallets # client/vendor/wallets.js: the wallet layer for real-token mode
 npm run dev          # server with auto-restart
 npm run house -- status   # operator console for real-token mode
@@ -59,25 +71,24 @@ Controls: `WASD` move · mouse aim · click attack · `Space` dash · `Q` bag lo
 
 **18+ mode** (lobby checkbox, off by default): as health drops a runner loses one leg, then the other and crawls; the head pops on death; blood stays on the floor. Off, hits throw sparks and armour chips instead. Either way the dead are dragged into a grave that cracks open under them.
 
-## Locker, shop and luck bags
+## Locker, shop and boxes
 
-Your runner is **him or her** (free to switch) in one of 31 outfits across five rarities, from free basics to Mythic: line colour, headgear (cap, beanie, bandana, helmet, gas mask, hood, horns, kabuto, top hat, crown, halo) and effects (aura, pulse, spectral, laser eyes, prismatic, fire). Everyone in a raid sees what you wear; bots dress up too. Looks only, never stats.
-
-The model is Warface's shop plus luck boxes, minus what makes players feel cheated:
+Your runner is **him or her** in one of **80 outfits** across six rarities (Common, Rare, Epic, Legendary, Mythic, Exotic): crypto memes, comic heroes, cartoon animals, sci-fi and multiverse gods, all original names. Headgear (caps, helmets, hoods, visors, ears, wizard hats, viking horns, astronaut domes, pumpkin and skull masks, frog eyes, a floating diamond, …), capes, auras (glow, pulse, spectral, liquid gold, hologram, glitch, fire, prismatic, laser eyes) and particles (lightning, galaxy, sparks, frost, money rain, code rain, shadow smoke). **144 weapon skins**: 24 finishes on every weapon (camo, tiger, carbon, digital, neon, gold, chrome, glacier, inferno, galaxy, plasma, diamond, prism, void, …), drawn on the weapon in your hands. Everyone in a raid sees them; bots dress up too. Looks only, never stats.
 
 | | |
 |---|---|
-| **One currency: $** | Pegged 1:1 to USDC/USDT. A purchase spends shop credit first, then USDC or USDT from the same balance you stake with. |
-| **Rank-ups pay** | Every rank gained: a luck bag (better ones as you climb), $ credit (shop-only, never withdrawable, so ranks can't be farmed into cash) and a random outfit you don't own, yours for 72 hours. New runners start with one Street Bag. |
-| **Luck bags** | Street $0.99, Vault $2.99, Golden $7.99. Exact odds printed on every bag and rolled on the server. |
-| **Pity** | Every bag guarantees Epic-or-better within 10 opens and Legendary-or-better within 40, with meters showing how close you are. |
-| **Smart drops** | While you are missing outfits of the rolled rarity you get one you don't own. Duplicates only once a rarity is complete, and they pay $ credit back (Common $0.10 up to Mythic $4). |
-| **Permanent** | Bought and dropped outfits are yours for good; only the rank-up trials are timed. |
-| **Shop** | Every outfit can be bought outright: Common $0.49, Rare $1.49, Epic $3.99, Legendary $9.99, Mythic $19.99. No dead ends. |
+| **Boxes only** | Skins drop only from boxes (and rank-up trials). **Outfit bags** and **weapon crates** are sold separately, nine tiers each, from $0.99 to $999: the dearer the box, the better the odds, up to 30% Exotic. |
+| **Fair** | Exact odds on every box, rolled on the server. Pity: Epic+ within 15 opens, Legendary+ within 60; the $249, $499 and $999 tiers guarantee an Exotic within 12, 7 and 4 opens. Smart drops: something you don't own while that rarity has any left; a duplicate refunds 10% of its value. |
+| **Limited editions** | A few Exotics have a fixed supply (21, 50, 100, 250, 500), numbered as they drop (#12/100), never over-minted. The top tiers drop them most. |
+| **Buy many** | 1 to 100 boxes at once, one charge; boxes you hold go first. |
+| **Shop $** | Bought 1:1 with USDC/USDT, with bonus packs ($5 to $1,000, up to +30%). Spends only in the shop; never withdrawable. |
+| **Rank-ups** | Only a random outfit to try for 72 hours. XP only moves your rank. |
 
-Opening a bag spins a roulette of real items that slows onto your drop, then reveals it on a lit stage. **Share cards** (1200×675, the size X shows uncropped) exist for nearly everything: an extraction, a death ("DROPPED"), a bag hit, a bag miss ("SO CLOSE"), a rank-up. "Post on X" copies the card to the clipboard and opens the post (X links can't carry images), "Share…" hands the image to a phone's share sheet, "Save PNG" downloads it.
+Opening is a show: the box charges up and glows through the rarities up to your best drop, bursts in its colour (god rays and particles; screen shake for Exotics), then the cards flip one by one. Tap to skip. A single drop shows your runner alive in the new outfit. **Share cards** (1200×675) exist for nearly everything: a win, an extraction, a death, a box hit or miss, a rank-up.
 
-Paid random rewards are regulated in some countries (loot boxes are banned in Belgium and restricted in the Netherlands, others require age gates and disclosed odds). Odds are disclosed here; check the rules where you launch before selling bags for real stablecoins.
+**Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
+
+Paid random rewards are regulated in some countries; skins only through boxes, with boxes up to $999, is the riskiest version of that model. Read [docs/TOKENOMICS.md](docs/TOKENOMICS.md) before selling boxes for real stablecoins.
 
 ## Look and sound
 
@@ -87,17 +98,19 @@ Paid random rewards are regulated in some countries (loot boxes are banned in Be
 
 ## Economy
 
-**Players only ever see dollars.** Every amount in the game (tables, bag, loot, payouts, shop, share cards) is shown in $ at the live USDC/USDT rate; rank is the only other number, in XP. Under the hood tables are priced in sats; with the real cashier you can pay in any token you hold. At the moment you press Ready the stake is quoted in your token (rounded up, so the house is never short) and escrowed at that rate; an extraction pays back in the same token at that same entry rate, so price moves during a raid change nothing. Without a cashier (practice, GitHub Pages) there is one play-money balance and shop purchases come out of it; in real-token mode the list and prices are live (see below).
+**Players only ever see dollars.** Every amount (tables, bag, loot, pot, shop, share cards) is shown in $; every coin is shown at its $ value. Internally values are integer mills ($0.001) and tokens are priced in $ from USDC swap quotes. Pick any coin to stake with: at the moment you press Ready the $ stake is quoted in that coin (rounded up, so the house is never short) and escrowed at that rate; winnings come back in the same coin at the same entry rate, so price moves during a raid change nothing.
 
-Inside the raid everything is integer sats and conserved. For a 1,000 stake: 50 rake, 475 in your bag, 475 into the loot pool.
-
-Every raid keeps a ledger and the tests assert, tick by tick through full bot raids:
+Every raid keeps a ledger and the tests assert it through full raids in every mode:
 
 ```
-stakes + sponsor bonus + rollover in  ==  rake + payouts + rollover out + sats still inside
+stakes + jackpot bonus + rollover in  ==  rake + payouts + rollover out + money still inside
 ```
 
-What leaves a raid unclaimed (bags of runners who didn't make it, loot on the floor, unspawned pool) rolls into the next raid at that table, so pots grow when people get greedy. All tuning lives in [`shared/config.js`](shared/config.js).
+**Swap**: coins in your game balance swap instantly at the live price with a 0.3% spread (always in practice; with real tokens only when the operator sets `SWAP_INTERNAL=1`). With a Starknet wallet signed in, you can also swap inside that wallet through AVNU's aggregator (Starkzap's `AvnuSwapProvider`); you sign, the game never holds those tokens.
+
+**Chat**: one lobby channel, plain text, 200 characters, one message per 1.5 s.
+
+All tuning lives in [`shared/config.js`](shared/config.js); the full model, the numbers and an honest commercial assessment are in [docs/TOKENOMICS.md](docs/TOKENOMICS.md).
 
 ## Privacy model
 
@@ -129,7 +142,7 @@ A session is bound to the address. A leaked session token can play with that bal
 - **Private (STRK20).** From a privacy wallet (Ready, Xverse) the deposit is a private transfer inside the STRK20 pool (`wallet_strk20InvokeTransaction`). Observers see an encrypted note, not who paid the house or how much. The house discovers its notes with its viewing key (`strk20-discovery`, which verifies the pool state it downloads against the chain) and credits each note to its sender. Private cash-outs are private transfers from the house, built and proved with the official Privacy SDK; the player must be registered in the pool.
 - **Public.** A plain ERC-20 `transfer` to the house from any wallet (Starkzap for Cartridge and Privy). The client reports the tx hash; the server reads the receipt, and each `Transfer` into the house is credited once, always to its sender, never to whoever reported it. With a paymaster key, Privy and Cartridge deposits are gasless through `POST /api/paymaster`, which keeps the key on the server and only sponsors deploys and transfers of table tokens to the house (20 a day per account).
 - **Cash-outs** are debited first and paid one at a time. The journal entry is on disk before anything is signed. A payout that failed before sending (preflight or proof error) is refunded; one that may have reached the chain is held as *review* and never retried automatically, so nothing is paid twice. `npm run house -- review` lists them.
-- **Prices.** Every minute each token is quoted against WBTC through Ekubo (Starkzap swap provider, no API key): WBTC base units are sats. BTC wrappers sit at par unless the pool says otherwise within ±10%. A price older than 10 minutes switches that token off for staking. `FIXED_PRICES` overrides the feed (useful on Sepolia).
+- **Prices.** Every minute each token is quoted in USDC through Ekubo (Starkzap swap provider, no API key), as dollars per token. Stablecoins stay on their $1 peg unless a quote is within ±5%; other BTC wrappers follow WBTC unless their pool agrees within ±10%. A price older than 10 minutes switches that token off for staking. `FIXED_PRICES` overrides the feed (useful on Sepolia).
 
 ### Settings
 
@@ -140,7 +153,8 @@ A session is bound to the address. A leaked session token can play with that bal
 | `CASHIER_FILE` | JSON journal: balances, sessions, deposits, payouts. Required for anything real; put it on a persistent disk (`/data` in Docker). |
 | `RPC_URL`, `CLIENT_RPC_URL` | Server and browser RPC (default: Starkzap's presets). |
 | `TOKENS`, `EXTRA_TOKENS` | Preset symbols (default `STRK,ETH,USDC,USDT,WBTC`) and extras as `SYMBOL:0xaddress:decimals[:btc]`, e.g. strkBTC. |
-| `FIXED_PRICES`, `PRICE_SECONDS`, `MIN_WITHDRAW_SATS` | `STRK=150,USDC=1000`, feed period (60), smallest cash-out (100 sats). |
+| `FIXED_PRICES`, `PRICE_SECONDS`, `MIN_WITHDRAW_USD` | `$` per token overrides like `STRK=0.15`, feed period (60), smallest cash-out in $ (1). |
+| `SWAP_INTERNAL=1` | Allow in-game coin swaps on real tokens (the house must rebalance on chain). |
 | `STRK20_VIEWING_KEY`, `STRK20_PROVER_URL`, `STRK20_POOL`, `STRK20_FEED_URL`, `STRK20_CACHE_DIR` | Private deposits need the viewing key (pool defaults to mainnet `0x0403…812a`); private cash-outs also need the prover and the house key. Needs Node 24+ and the optional `strk20-discovery` package (the Docker image has both). |
 | `PAYMASTER_API_KEY`, `PAYMASTER_URL` | AVNU paymaster for gasless house payouts and sponsored player deposits. |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_CLIENT_ID` | Privy sign-in. Add the game's origin to the app's allowed origins and enable the login methods you want. |
@@ -173,25 +187,28 @@ This was built without network access to Starknet RPCs, Ekubo, Privy or the STRK
 ```
 shared/            runs identically on server and in the browser
   config.js        every tunable number
-  world.js         one raid: movement, weapons, loot, storm, extraction, streaks, ledger, per-player snapshots
+  modes.js         the 11 game modes (raid, battle royale, duel, weapon-only, teams)
+  world.js         one raid: movement, weapons, loot, storm, extraction or prize pot, teams, streaks, ledger, spectating, per-player snapshots
   weapons.js       the Arms Race ladder and experience values
-  ranks.js         career ranks 1-90, the XP curve, what a raid is worth
-  cosmetics.js     outfits, characters, luck bags (odds, pity, smart drops), $ pricing, rank-up rewards
+  ranks.js         career ranks 1-90, the XP curve, what a raid is worth, titles
+  achievements.js  39 achievements over career counters
+  cosmetics.js     outfits, weapon skins, 18 boxes (odds, pity, smart drops, limited editions), shop $ packs, rank-up trials
   zone.js          the storm plan: nested circles collapsing onto the last exit
   movement.js      deterministic movement, shared with client prediction
   bot.js, nav.js   bots (vision-limited, A* on a grid) that farm, fight, flee and extract
   map.js           seeded procedural maps: vaults, cover, 3 of 8 exits
-  room.js          a table: ready room → raid → results, stake escrow, message routing
-  lobby.js         sessions + tables; the whole client protocol (including the cashier messages)
+  room.js          a table (mode × stake): ready room → raid → results, stake escrow, jackpot, message routing
+  lobby.js         sessions + tables; the whole client protocol (cashier, shop, swap, chat)
   wallet.js        test wallet, also the ledger behind the real cashier
-  assets.js        tokens, prices, sats ↔ token units
+  assets.js        tokens, $ prices, mills ↔ token units
 server/index.js    static files + WebSocket + 30 Hz loop + /api routes
 server/cashier/    real tokens: cashier.js (ledger, sign-in, deposits, payouts), starknet.js (Starkzap),
                    strk20.js (private pool), privy.js, prices.js, config.js, index.js (journal, HTTP)
 client/            canvas renderer, stick figures, fx (blood, graves, sparks), textures + chunked map layer,
                    synthesized sfx and music, prediction/interpolation, HUD, touch controls,
                    cashier.js (sign-in and cashier UI), rankbadge.js (rank insignia as SVG),
-                   locker.js (locker, shop, bag roulette), sharecard.js (cards for X)
+                   intro.js, shop.js (boxes and the opening show), locker.js, inventory.js, swap.js (in-game + AVNU),
+                   chat.js, settings.js + settingsui.js, achievements.js, i18n.js + strings/ (10 languages), sharecard.js
 client/chain/      wallet layer (get-starknet, Starkzap, Cartridge, Privy) → client/vendor/wallets.js
 test/              node:test suites
 scripts/           headless sim, single-file build, wallet bundle, house console
@@ -223,6 +240,7 @@ docker run -p 8080:8080 dark-bags
 ## Next up
 
 - Playtest the numbers: bot lethality, rake, bag share, loot curve (`npm run sim` helps).
-- Golden raids sold to sponsors.
-- Seasonal outfits and limited bags.
+- Spending and session limits, self-exclusion, provably fair box seeds (see docs/TOKENOMICS.md).
+- Parties (queue with friends into the same team), ranked seasons.
+- Rank names in every language (they are English today; everything else is translated).
 - Raid replays/clips for streamers.

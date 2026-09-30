@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CFG } from '../shared/config.js';
-import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, TRIAL_MS, rollRarity, botLook } from '../shared/cosmetics.js';
+import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, TRIAL_MS, WEAPON_SKINS, WSKIN, MAX_OPEN, rollRarity, botLook } from '../shared/cosmetics.js';
 import { RoomCore } from '../shared/room.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
@@ -77,50 +77,111 @@ test('smart drops: no duplicates until a rarity is complete, then duplicates pay
     seen.push(r);
   }
   assert.equal(firstDup, commons, 'the first common duplicate comes only after all commons are owned');
-  for (const o of OUTFITS) if (!o.basic) assert.equal(o.price, RARITIES[o.rarity].price, `${o.id} can be bought outright`);
+  for (const o of OUTFITS) assert.equal(o.price, undefined, `${o.id} is not sold outright: bags only`);
   const old = new Inventory({ data: { p: { scrap: 300, credit: 5 } } });
   assert.equal(old.view('p').credit, 155, 'leftover scrap from old saves becomes $ bonus');
   assert.ok(!('scrap' in old.rec('p')));
 });
 
-test('shop $: spent first, the shortfall comes from USDC/USDT; packs add a bonus; bags you hold open free', () => {
+test('skins come only from boxes: shop $ first, the shortfall from USDC/USDT; boxes you hold open free', () => {
   let now = 1_000_000;
   const inv = new Inventory({ now: () => now, rnd: seeded(5) });
   let wallet = 500; // cents of stablecoin the player holds
   const pay = (c) => (wallet >= c ? ((wallet -= c), true) : false);
-  assert.equal(inv.view('p').credit, 0);
-  assert.equal(inv.view('p').boxes.street, 1, 'a welcome bag');
+  assert.equal(inv.buy, undefined, 'there is no direct purchase');
+  assert.deepEqual(inv.view('p').boxes, { street: 1, 'w-scrap': 1 }, 'a welcome bag and crate');
   const first = inv.open('p', 'street', pay);
   assert.ok(first.ok && first.free);
   assert.equal(wallet, 500, 'the welcome bag cost nothing');
-
-  assert.equal(inv.equip('p', 'satoshi').ok, false);
-  assert.equal(inv.buy('p', 'satoshi', pay).ok, false, 'a legendary costs more than the player has');
   inv.rec('p').credit = 30;
-  const olive = inv.buy('p', 'olive', pay);
-  assert.ok(olive.ok);
-  assert.equal(inv.view('p').credit, 0, 'credit goes first');
-  assert.equal(wallet, 500 - (OUTFIT.olive.price - 30), 'then the stablecoin');
-  assert.equal(inv.buy('p', 'olive', pay).ok, false, 'no double buy');
+  const bag = inv.open('p', 'street', pay);
+  assert.ok(bag.ok && !bag.free);
+  assert.equal(inv.view('p').credit, bag.refund, 'shop $ goes first');
+  assert.equal(wallet, 500 - (BOX.street.price - 30), 'then the stablecoin');
   wallet = 1000;
+  inv.rec('p').credit = 0;
   const pack = inv.topUp('p', 'p10', pay);
   assert.ok(pack.ok);
   assert.equal(wallet, 0);
   assert.equal(inv.view('p').credit, 1050, 'the $10 pack gives $10.50 of shop $');
   assert.equal(inv.topUp('p', 'p10', pay).ok, false, 'packs need USDC/USDT');
   inv.rec('p').credit = 0;
-  wallet = 0;
-  assert.equal(inv.open('p', 'golden', pay).ok, false, 'cannot afford');
+  assert.equal(inv.open('p', 'genesis', pay).ok, false, 'cannot afford');
   assert.equal(inv.view('p').boxes.street, 0);
 
-  assert.ok(inv.equip('p', 'olive').ok);
+  assert.ok(inv.equip('p', first.item).ok, 'what you pulled can be worn');
   assert.ok(inv.equip('p', 'basic-3').ok, 'basic outfits are free for everyone');
+  assert.equal(inv.equip('p', 'golden-bull').ok, false);
   assert.ok(inv.setBody('p', 'f').ok);
   assert.equal(inv.setBody('p', 'x').ok, false);
-  assert.deepEqual(inv.look('p'), { outfit: 'basic-3', body: 'f' });
+  assert.equal(inv.look('p').outfit, 'basic-3');
   const saved = new Inventory({ data: JSON.parse(JSON.stringify(inv.toJSON())), now: () => now });
   assert.deepEqual(saved.view('p'), inv.view('p'));
   for (let i = 0; i < 100; i++) assert.ok(OUTFIT[botLook(Math.random).outfit]);
+});
+
+test('buy many at once: one charge, held boxes first, a result per box', () => {
+  const inv = new Inventory({ rnd: seeded(21) });
+  let wallet = 10_000;
+  const pay = (c) => (wallet >= c ? ((wallet -= c), true) : false);
+  const r = inv.open('p', 'street', pay, 10);
+  assert.ok(r.ok);
+  assert.equal(r.results.length, 10);
+  assert.equal(r.held, 1, 'the welcome bag went first');
+  assert.equal(r.bought, 9);
+  assert.equal(wallet, 10_000 - 9 * BOX.street.price, 'nine paid, in one charge');
+  assert.ok(r.results[0].free && !r.results[1].free);
+  assert.equal(inv.open('p', 'street', () => false, 5).ok, false, 'all or nothing');
+  inv.rec('p').credit = 1e9;
+  assert.equal(inv.open('p', 'street', pay, 10_000).results.length, MAX_OPEN, 'capped per purchase');
+});
+
+test('dearer boxes have better odds; weapon crates drop weapon skins you can wear', () => {
+  const bags = BOXES.filter((b) => b.family === 'outfit').sort((a, b) => a.tier - b.tier);
+  const ev = (b) => RARITY_ORDER.reduce((s, k, i) => s + (b.odds[k] ?? 0) * i, 0);
+  for (let i = 1; i < bags.length; i++) assert.ok(ev(bags[i]) > ev(bags[i - 1]), `${bags[i].id} beats ${bags[i - 1].id}`);
+  assert.equal(bags[0].price, 99);
+  assert.equal(bags.at(-1).price, 99900);
+  assert.ok(bags.at(-1).odds.exotic >= 30);
+  assert.equal(BOXES.filter((b) => b.family === 'weapon').length, 9, 'weapon crates sold separately');
+
+  const inv = new Inventory({ rnd: seeded(4) });
+  inv.rec('p').credit = 1e9;
+  const r = inv.open('p', 'w-diamond', null, 20);
+  assert.ok(r.results.every((x) => x.kind === 'weapon' && WSKIN[x.item]));
+  const got = r.results[0].item;
+  assert.ok(inv.view('p').wowned.includes(got));
+  assert.equal(inv.view('p').owned.length, 0, 'crates never drop outfits');
+  assert.ok(inv.equipWeapon('p', got).ok);
+  const [w, f] = got.split('.');
+  assert.equal(inv.look('p').ws[w], f, 'others see your weapon skin');
+  assert.equal(inv.equipWeapon('p', 'knife.prism').ok, inv.view('p').wowned.includes('knife.prism'));
+  assert.ok(inv.equipWeapon('p', `${w}.default`).ok);
+  assert.equal(inv.look('p').ws[w], undefined);
+  assert.ok(WEAPON_SKINS.length >= 100);
+});
+
+test('limited editions: a fixed supply, numbered, never over-minted', () => {
+  const inv = new Inventory({ rnd: seeded(8) });
+  const lim = OUTFITS.filter((o) => o.limited);
+  assert.ok(lim.length >= 3);
+  let players = 0;
+  // many whales opening the $999 tier until the smallest edition sells out
+  const smallest = lim.reduce((a, b) => (a.limited < b.limited ? a : b));
+  while ((inv.minted[smallest.id] ?? 0) < smallest.limited && players < 3000) {
+    const k = `whale${players++}`;
+    inv.rec(k).credit = 1e9;
+    inv.open(k, 'genesis', null, 5);
+  }
+  assert.equal(inv.minted[smallest.id], smallest.limited, 'sold out');
+  const serials = [...inv.data.values()].filter((r) => r.serials[smallest.id]).map((r) => r.serials[smallest.id]).sort((a, b) => a - b);
+  assert.deepEqual(serials, Array.from({ length: smallest.limited }, (_, i) => i + 1), 'numbered 1..N, no gaps, no repeats');
+  inv.rec('late').credit = 1e9;
+  const late = inv.open('late', 'genesis', null, 100);
+  assert.ok(!late.results.some((x) => x.item === smallest.id), 'no drops after it sells out');
+  const reloaded = new Inventory({ data: JSON.parse(JSON.stringify(inv.toJSON())) });
+  assert.equal(reloaded.minted[smallest.id], smallest.limited, 'the count survives a restart');
+  assert.equal(inv.view('late').supply[smallest.id].minted, smallest.limited);
 });
 
 test('a rank-up pays only a 72h trial outfit, which expires', () => {
@@ -129,7 +190,7 @@ test('a rank-up pays only a 72h trial outfit, which expires', () => {
   const got = inv.rankUp('p', 1, 4);
   assert.equal(got.length, 3);
   const v = inv.view('p');
-  assert.equal(Object.values(v.boxes).reduce((a, b) => a + b, 0), 1, 'no bags, just the welcome bag');
+  assert.equal(Object.values(v.boxes).reduce((a, b) => a + b, 0), 2, 'no boxes beyond the welcome bag and crate');
   assert.equal(v.credit, 0, 'no shop $');
   assert.deepEqual(Object.keys(got[0]).sort(), ['rank', 'trial']);
   const trial = got[0].trial.id;
@@ -171,7 +232,7 @@ test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive wit
 
   lobby.handle(1, { t: 'join', stake: 100 });
   lobby.handle(1, { t: 'ready', asset: 'STRK' });
-  const room = lobby.rooms.get(100);
+  const room = lobby.rooms.get('raid:100');
   for (let i = 0; i < CFG.TICK_RATE * 2 && room.state !== 'live'; i++) lobby.tick();
   const me = room.world.players.get(room.clients.get(1).pid);
   assert.equal(me.outfit, paid.result.item, 'the equipped outfit goes into the raid');
@@ -186,4 +247,15 @@ test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive wit
   assert.ok(res.rewards.every((r) => r.trial), 'each rank-up is a trial outfit');
   assert.equal(res.locker.credit, 500, 'rank-ups add no shop $');
   assert.ok(BigInt(res.balances.STRK) < strk, 'staked in STRK');
+});
+
+test('the top tiers guarantee an Exotic within their pity window', () => {
+  const inv = new Inventory({ rnd: () => 0 }); // always the worst roll
+  inv.rec('p').credit = 1e9;
+  for (const id of ['royal', 'apex', 'genesis']) {
+    const n = BOX[id].exoticPity;
+    const r = inv.open('p', id, null, n);
+    assert.equal(r.results.at(-1).rarity, 'exotic', `${id}: exotic by open ${n}`);
+    assert.ok(r.results.slice(0, -1).every((x) => x.rarity !== 'exotic'));
+  }
 });

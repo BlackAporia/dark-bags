@@ -5,6 +5,7 @@ import { botName } from './bot.js';
 import { PriceBook, unitsAtEntryRate } from './assets.js';
 import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
+import { MODE } from './modes.js';
 import { Inventory, botLook, OUTFIT } from './cosmetics.js';
 
 /**
@@ -19,8 +20,11 @@ import { Inventory, botLook, OUTFIT } from './cosmetics.js';
  * Transport-agnostic: the server plugs in WebSockets, offline mode a direct callback.
  */
 export class RoomCore {
-  constructor({ stake, wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
+  constructor({ stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS }) {
     this.stake = stake;
+    this.mode = MODE[mode] ? mode : 'raid';
+    const m = MODE[this.mode];
+    if (m.seconds) roundSeconds = m.seconds;
     this.ranks = ranks;
     this.inventory = inventory;
     this.practice = practice;
@@ -30,7 +34,7 @@ export class RoomCore {
     this.bots = bots;
     this.roundSeconds = roundSeconds;
     this.prepSeconds = prepSeconds;
-    this.botFill = CFG.BOT_FILL;
+    this.botFill = m.size; // runners per raid; bots fill the empty spots
     this.difficulty = null; // practice only
     this.clients = new Map();
     this.accounts = new Map(); // pid -> { token, asset, units, mills }: who paid what, at which rate
@@ -207,6 +211,7 @@ export class RoomCore {
       practice: this.practice,
       difficulty: this.difficulty,
       botFill: this.botFill,
+      mode: this.mode,
     });
     this.world = w;
     this.rollover = 0;
@@ -234,6 +239,8 @@ export class RoomCore {
         map: w.map,
         zone: w.zonePlan,
         stake: this.stake,
+        mode: this.mode,
+        teamSize: w.teamSize,
         round: this.roundNo,
         golden: w.golden,
         duration: w.duration,
@@ -292,6 +299,8 @@ export class RoomCore {
     if (w && this.state === 'live') for (const p of w.players.values()) if (!p.isBot && p.status === 'alive') humans++;
     return {
       stake: this.stake,
+      mode: this.mode,
+      size: this.botFill,
       state: this.state,
       tl: w && this.state === 'live' ? Math.round(w.timeLeft) : 0,
       count: this.countT === null ? null : Math.max(0, Math.ceil(this.countT)),
@@ -379,6 +388,8 @@ export class RoomCore {
       if (!c.pid || c.reported) continue;
       const p = w.players.get(c.pid);
       if (!p || p.status === 'alive') continue;
+      // pot modes: the fallen learn the outcome when the raid is settled (they watch meanwhile)
+      if (w.potMode && p.status === 'dead' && w.phase !== 'ended') continue;
       c.reported = true;
       // career rank: every raid pays, win or lose
       const earned = raidXp(p, { practice: this.practice });
@@ -399,6 +410,8 @@ export class RoomCore {
         achievements: done.map((a) => a.id),
         career: this.ranks.career(c.token),
         status: p.status,
+        mode: this.mode,
+        won: !!p.won,
         payout: p.payout,
         lost: p.lostBag,
         stake: p.stake,

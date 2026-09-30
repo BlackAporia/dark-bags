@@ -236,8 +236,8 @@ export function moment(kind, d) {
       const pnl = d.payout - d.stake;
       const pct = Math.round((pnl / d.stake) * 100);
       return {
-        spec: { accent: '#3ddc97', kicker: 'Extracted', title: usdText(d.payout), titleGlow: true, sub: `Walked out of the dark on a ${usdText(d.stake)} stake. Nobody saw what I was carrying.`, chips: [['Profit', `${pnl >= 0 ? '+' : '−'}${Math.abs(pct)}%`], ['Kills', String(d.kills)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon },
-        text: `Got out with ${usdText(d.payout)} on a ${usdText(d.stake)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Nobody saw what I was carrying. ${tag}`,
+        spec: { accent: '#3ddc97', kicker: d.won ? 'Victory' : 'Extracted', title: usdText(d.payout), titleGlow: true, sub: d.won ? `Last one standing on a ${usdText(d.stake)} stake. The pot is mine.` : `Walked out of the dark on a ${usdText(d.stake)} stake. Nobody saw what I was carrying.`, chips: [['Profit', `${pnl >= 0 ? '+' : '−'}${Math.abs(pct)}%`], ['Kills', String(d.kills)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon },
+        text: d.won ? `Won ${usdText(d.payout)} on a ${usdText(d.stake)} stake, ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Last one standing. ${tag}` : `Got out with ${usdText(d.payout)} on a ${usdText(d.stake)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Nobody saw what I was carrying. ${tag}`,
       };
     }
     case 'loss': {

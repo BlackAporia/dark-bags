@@ -2,7 +2,7 @@
 // a walk cycle, weapons held at the aim. Figures stand upright on the map
 // (billboards), with their feet on the runner's position.
 import { WEAPONS } from '../shared/weapons.js';
-import { OUTFIT } from '../shared/cosmetics.js';
+import { OUTFIT, FINISH } from '../shared/cosmetics.js';
 
 export const FEET = 16; // world units from the runner's centre down to the feet
 const THIGH = 10;
@@ -784,24 +784,105 @@ export function drawFigure(ctx, a, p, o) {
     ctx.arc(p.neck.x, p.neck.y, 3, 0, Math.PI * 2);
     ctx.fill();
   }
-  drawWeapon(ctx, p, flash);
+  drawWeapon(ctx, p, flash, FINISH[a.ws?.[WEAPONS[a.w]?.id]], t);
 }
 
-export function drawWeapon(ctx, p, flash) {
+// the body colour of a weapon finish at time t (animated finishes shift over time)
+function finishColor(f, t) {
+  if (!f) return '#cfd4de';
+  if (f.fx === 'rainbow') return `hsl(${(t / 10) % 360}, 95%, 68%)`;
+  if (f.fx === 'shimmer' && Math.sin(t / 240) > 0.85) return f.accent ?? f.color; // a flash of light off the metal
+  if (f.fx === 'plasma') return Math.sin(t / 140) > 0 ? f.color : f.accent ?? f.color;
+  return f.color;
+}
+
+// A weapon in the runner's hands, in its skin: finish colour, a pattern over the body,
+// and for the premium finishes a glow or particles.
+export function drawWeapon(ctx, p, flash, finish = null, t = performance.now()) {
   const { art, grip, aim } = p;
   const mirror = Math.cos(aim) < 0 ? -1 : 1;
+  const body = flash ? '#fff' : finishColor(finish, t);
   ctx.save();
   ctx.translate(grip.x, grip.y);
   ctx.rotate(aim);
   ctx.scale(1, mirror);
+  const line = (x1, y1, x2, y2) => {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  };
+  // premium glow under the weapon
+  if (finish?.fx && !flash) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = finish.fx === 'glow' || finish.fx === 'plasma' ? 0.35 + 0.15 * Math.sin(t / 200) : 0.22;
+    ctx.strokeStyle = finish.fx === 'fire' ? '#ff7a1a' : finish.fx === 'ice' ? '#bfe9ff' : finish.accent ?? body;
+    for (const [x1, y1, x2, y2, w] of art.lines) {
+      ctx.lineWidth = w + 5;
+      line(x1, y1, x2, y2);
+    }
+    ctx.restore();
+  }
   for (const pass of [0, 1]) {
     for (const [x1, y1, x2, y2, w] of art.lines) {
-      ctx.strokeStyle = pass ? (flash ? '#fff' : '#cfd4de') : OUTLINE;
+      ctx.strokeStyle = pass ? body : OUTLINE;
       ctx.lineWidth = pass ? w : w + 2.4;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+      line(x1, y1, x2, y2);
+    }
+  }
+  if (finish && !flash) {
+    // the pattern and sparkle ride on the longest line (the barrel or blade)
+    const [x1, y1, x2, y2, w] = art.lines.reduce((a, b) => (Math.hypot(b[2] - b[0], b[3] - b[1]) > Math.hypot(a[2] - a[0], a[3] - a[1]) ? b : a));
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    const ux = (x2 - x1) / len;
+    const uy = (y2 - y1) / len;
+    ctx.strokeStyle = finish.accent ?? '#111';
+    ctx.lineWidth = Math.max(0.8, w * 0.45);
+    if (finish.pattern === 'tiger' || finish.pattern === 'camo') {
+      for (let d = 3; d < len - 2; d += finish.pattern === 'tiger' ? 4 : 6) {
+        const cx = x1 + ux * d;
+        const cy = y1 + uy * d;
+        line(cx - uy * w * 0.5, cy + ux * w * 0.5, cx + ux * 1.6 + uy * w * 0.5, cy + uy * 1.6 - ux * w * 0.5);
+      }
+    } else if (finish.pattern === 'carbon' || finish.pattern === 'digital') {
+      ctx.setLineDash(finish.pattern === 'carbon' ? [1, 1] : [2, 2.5]);
+      line(x1, y1, x2, y2);
+      ctx.setLineDash([]);
+    }
+    if (finish.fx === 'shimmer' || finish.fx === 'rainbow' || finish.fx === 'galaxy' || finish.fx === 'ice') {
+      // a glint sliding along the barrel, and stars for galaxy
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ((t / 700) % 1.6) * len;
+      if (g < len) {
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath();
+        ctx.arc(x1 + ux * g, y1 + uy * g, w * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (finish.fx === 'galaxy') {
+        for (let i = 0; i < 4; i++) {
+          const d = ((i * 7 + t / 90) % len);
+          ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t / 110 + i);
+          ctx.fillStyle = i % 2 ? '#f0abfc' : '#ffffff';
+          ctx.fillRect(x1 + ux * d, y1 + uy * d - 0.5, 1, 1);
+        }
+      }
+      ctx.restore();
+    }
+    if (finish.fx === 'fire') {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) {
+        const life = (t / 5 + i * 9) % 10;
+        ctx.globalAlpha = 0.7 * (1 - life / 10);
+        ctx.fillStyle = i % 2 ? '#ffd166' : '#ff5a1f';
+        ctx.beginPath();
+        ctx.arc(x2 - ux * (i * 3), y2 - life - 1, 1.6 - life / 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
   }
   ctx.restore();
@@ -831,7 +912,7 @@ export function hpColor(frac) {
 // A runner outside the raid (locker, lineup, share cards): same drawing code, posed.
 // (x, y) is where the feet stand; one unit ≈ scale px. The figure is ~64 units tall.
 export function drawPreview(ctx, look, { x, y, scale = 3, t = 0, w = 0, aim = -0.2, phase = 0, moveK = 0, attackT = -1e9 } = {}) {
-  const a = { id: 7, x: 0, y: -FEET, aim, facing: Math.cos(aim) >= 0 ? 1 : -1, phase, moveK, wounds: 0, attackT, w, bluff: 0, outfit: look?.outfit ?? null, body: look?.body ?? 'm' };
+  const a = { id: 7, x: 0, y: -FEET, aim, facing: Math.cos(aim) >= 0 ? 1 : -1, phase, moveK, wounds: 0, attackT, w, bluff: 0, outfit: look?.outfit ?? null, body: look?.body ?? 'm', ws: look?.ws ?? null };
   const p = pose(a, t, false);
   ctx.save();
   ctx.translate(x, y);

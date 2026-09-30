@@ -14,7 +14,7 @@ export function achDesc(a) {
   return t(`achd.${a.stat}`, { n: fmt(n) });
 }
 
-export function createAchievements({ app, send, toast, sfx }) {
+export function createAchievements({ app, send, toast, sfx, open: openPage }) {
   const C = () => app.career;
 
   function renderProfile() {
@@ -69,15 +69,15 @@ export function createAchievements({ app, send, toast, sfx }) {
     sfx?.play('beep', { f: 1760, dur: 0.2 });
   }
 
+  const isOpen = () => !document.querySelector('.page[data-page="achievements"]')?.hidden;
   function open() {
-    renderList();
-    $('dlg-ach').showModal();
+    openPage();
   }
 
   function onMessage(m) {
     if (m.career !== undefined) app.career = m.career;
     if (m.t === 'result') renderResult(m);
-    if (m.t === 'career' && $('dlg-ach').open) renderList();
+    if (m.t === 'career' && isOpen()) renderList();
     if (m.t === 'career') toast?.(m.career.title ? `${t('ach.wearing')} ${achName(m.career.title)}` : t('ach.noTitle'));
     renderProfile();
   }
