@@ -458,4 +458,6 @@ export default {
   'set.language': "Language",
   'shop.exoticIn': "Exotic+ in",
   'shop.guarantee': "Guaranteed Exotic within {n} opens",
+  'set.voice': "Announcer",
+  'set.voiceNote': "First blood, double kill and more, spoken in your language.",
 };

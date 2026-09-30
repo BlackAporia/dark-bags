@@ -450,4 +450,6 @@ export default {
   'set.language': "语言",
   'shop.exoticIn': "异域还需",
   'shop.guarantee': "{n} 次内必出异域",
+  'set.voice': "播报员",
+  'set.voiceNote': "第一滴血、双杀等，用你的语言播报。",
 };

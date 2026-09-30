@@ -450,4 +450,6 @@ export default {
   'set.language': "Idioma",
   'shop.exoticIn': "Exótico en",
   'shop.guarantee': "Exótico garantizado en {n} aperturas",
+  'set.voice': "Locutor",
+  'set.voiceNote': "Primera sangre, doble baja y más, en tu idioma.",
 };

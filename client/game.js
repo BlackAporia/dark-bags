@@ -1,8 +1,8 @@
 import { CFG } from '../shared/config.js';
-import { OUTFIT } from '../shared/cosmetics.js';
+import { OUTFIT, FINISH, RARITY_ORDER, modelFor } from '../shared/cosmetics.js';
 import { MODE } from '../shared/modes.js';
 import { usdText } from '../shared/assets.js';
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 import { settings } from './settings.js';
 
 const usdTextCents = (c) => usdText(c * 10, 1000); // cents → "$x.xx"
@@ -246,11 +246,15 @@ export class GameClient {
     const p = pose(a, now + 30, this.gore);
     const opts = mine ? {} : { x: a.x, y: a.y };
     this.sfx.play(wp.id, opts);
+    // a weapon skin from rare up tints the flash and the swing in its neon
+    const fin = FINISH[a.ws?.[wp.id]];
+    const tint = fin && RARITY_ORDER.indexOf(fin.rarity) >= 1 ? (fin.fx === 'rainbow' ? `hsl(${(now / 3) % 360}, 100%, 65%)` : fin.color) : null;
     if (wp.melee) {
-      this.fx.slash(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.aim, a.facing);
+      const big = ['axe', 'katana', 'scythe', 'hammer', 'esword', 'dual'].includes(fin ? modelFor(wp.id, fin.id) : '');
+      this.fx.slash(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.aim, a.facing, tint, big);
       return;
     }
-    this.fx.muzzle(p.muzzle.x, a.y + FEET, a.y + FEET - p.muzzle.y, p.aim, wp.id === 'shotgun' || wp.id === 'sniper', now);
+    this.fx.muzzle(p.muzzle.x, a.y + FEET, a.y + FEET - p.muzzle.y, p.aim, wp.id === 'shotgun' || wp.id === 'sniper', now, tint);
     this.fx.casing(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.facing);
     if (mine) this.shake = Math.max(this.shake, wp.id === 'sniper' ? 9 : wp.id === 'shotgun' ? 7 : 2.5);
   }
@@ -361,6 +365,7 @@ export class GameClient {
           break;
         case 'storm':
           this.banner(t(ev.text), 'warn', 2600);
+          if (/final/i.test(ev.text) && !this.dead) this.sfx.say?.(t(ev.text).split('·')[0].trim(), 3, getLang());
           this.sfx.play('storm');
           break;
         case 'exitClosed':
@@ -412,7 +417,7 @@ export class GameClient {
     clearTimeout(this.streakT);
     this.streakT = setTimeout(() => (el.hidden = true), 2600);
     this.sfx.sting?.(tier);
-    this.sfx.say?.(who ? `${who}, ${s.voice}` : s.voice, tier);
+    this.sfx.say?.(who ? `${who}, ${t(`streak.${tier}`)}` : t(`streak.${tier}`), tier, getLang());
     if (tier >= 4) this.shake = Math.max(this.shake, 10);
   }
 

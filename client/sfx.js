@@ -389,19 +389,26 @@ export class Sfx {
     }
   }
 
-  // Announcer voice through the browser's speech engine, pitched down. Best effort.
-  say(text, tier = 1) {
-    if (this.muted || !('speechSynthesis' in window)) return;
+  // Announcer voice through the browser's speech engine, in the player's language, pitched
+  // down, with the best voice the device has (neural/online voices first). Best effort.
+  say(text, tier = 1, lang = 'en') {
+    if (this.muted || this.voiceOff || !('speechSynthesis' in window)) return;
+    const LOCALE = { en: 'en-US', uk: 'uk-UA', ru: 'ru-RU', es: 'es-ES', fr: 'fr-FR', pt: 'pt-BR', tr: 'tr-TR', zh: 'zh-CN', hi: 'hi-IN', ar: 'ar-SA' };
     setTimeout(() => {
       try {
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'en-US';
-        u.pitch = [0.3, 0.2, 0.35, 0.45, 0.15, 0.05][tier] ?? 0.3;
-        u.rate = tier >= 4 ? 0.8 : 0.92;
-        u.volume = 1;
+        u.lang = LOCALE[lang] ?? 'en-US';
+        u.pitch = [0.6, 0.5, 0.6, 0.55, 0.45, 0.35][tier] ?? 0.55;
+        u.rate = tier >= 4 ? 0.82 : 0.95;
+        u.volume = Math.min(1, 0.4 + (this.volume ?? 1));
         const voices = speechSynthesis.getVoices();
-        const pick = voices.find((v) => /en/i.test(v.lang) && /male|daniel|fred|alex|google uk english male/i.test(v.name)) || voices.find((v) => /en/i.test(v.lang));
-        if (pick) u.voice = pick;
+        const mine = voices.filter((v) => v.lang?.toLowerCase().startsWith(lang));
+        const rank = (v) => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 3 : 0) + (/google|microsoft|siri/i.test(v.name) ? 2 : 0) + (/male|daniel|fred|alex|dmitri|pavel|jorge|thomas|yuri|maxim/i.test(v.name) ? 1 : 0);
+        const pick = mine.sort((a, b) => rank(b) - rank(a))[0] ?? voices.find((v) => /^en/i.test(v.lang));
+        if (pick) {
+          u.voice = pick;
+          if (!mine.length) u.lang = pick.lang;
+        }
         speechSynthesis.cancel();
         speechSynthesis.speak(u);
       } catch {
