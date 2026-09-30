@@ -6,6 +6,10 @@ A browser extraction game played for sats. Think Escape from Tarkov crossed with
 
 > **Test build by default.** Without `CHAIN` set, every token is play money: no deposits, no withdrawals. With `CHAIN=sepolia` or `mainnet` the server runs a real cashier on Starknet (see [Real tokens](#real-tokens)); read [Before real money](#before-real-money) first.
 
+## Play it
+
+**In the browser: <https://blackaporia.github.io/dark-bags/>** (practice vs bots, runs entirely in the page). GitHub Pages publishes it from `main` on every push once Pages is on: Settings → Pages → Source: **GitHub Actions**. For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
+
 ## Run it
 
 ```bash
@@ -29,7 +33,7 @@ npm run dev          # server with auto-restart
 npm run house -- status   # operator console for real-token mode
 ```
 
-Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (20, the ready-room countdown), `BOTS` (`0` to disable), `WALLET_FILE` (path to persist test balances as JSON; in-memory otherwise), `RANKS_FILE` (path to persist career ranks), and `CHAIN` plus the cashier settings under [Real tokens](#real-tokens).
+Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (20, the ready-room countdown), `BOTS` (`0` to disable), `WALLET_FILE` (path to persist test balances as JSON; in-memory otherwise), `RANKS_FILE` (path to persist career ranks), `LOCKER_FILE` (outfits, bags, credit and pity per player), and `CHAIN` plus the cashier settings under [Real tokens](#real-tokens).
 
 ## A raid
 
@@ -52,6 +56,27 @@ Env vars for the server: `PORT` (8080), `ROUND_SECONDS` (180), `PREP_SECONDS` (2
 Controls: `WASD` move · mouse aim · click attack · `Space` dash · `Q` bag look · `M` sound · `N` music. On phones: left thumb moves, right thumb aims and fires.
 
 **18+ mode** (lobby checkbox, off by default): as health drops a runner loses one leg, then the other and crawls; the head pops on death; blood stays on the floor. Off, hits throw sparks and armour chips instead. Either way the dead are dragged into a grave that cracks open under them.
+
+## Locker, shop and luck bags
+
+Your runner is **him or her** (free to switch) in one of 31 outfits across five rarities, from free basics to Mythic: line colour, headgear (cap, beanie, bandana, helmet, gas mask, hood, horns, kabuto, top hat, crown, halo) and effects (aura, pulse, spectral, laser eyes, prismatic, fire). Everyone in a raid sees what you wear; bots dress up too. Looks only, never stats.
+
+The model is Warface's shop plus luck boxes, minus what makes players feel cheated:
+
+| | |
+|---|---|
+| **One currency: $** | Pegged 1:1 to USDC/USDT. A purchase spends shop credit first, then USDC or USDT from the same balance you stake with. |
+| **Rank-ups pay** | Every rank gained: a luck bag (better ones as you climb), $ credit (shop-only, never withdrawable, so ranks can't be farmed into cash) and a random outfit you don't own, yours for 72 hours. New runners start with one Street Bag. |
+| **Luck bags** | Street $0.99, Vault $2.99, Golden $7.99. Exact odds printed on every bag and rolled on the server. |
+| **Pity** | Every bag guarantees Epic-or-better within 10 opens and Legendary-or-better within 40, with meters showing how close you are. |
+| **Smart drops** | While you are missing outfits of the rolled rarity you get one you don't own. Duplicates only once a rarity is complete, and they turn into scrap. |
+| **Scrap crafts anything** | Pick the outfit you want and craft it. No dead ends. |
+| **Permanent** | Bought and dropped outfits are yours for good; only the rank-up trials are timed. |
+| **Shop** | Commons $0.49, Rares $1.49. Epic and up: bags or scrap. |
+
+Opening a bag spins a roulette of real items that slows onto your drop, then reveals it on a lit stage. **Share cards** (1200×675, the size X shows uncropped) exist for nearly everything: an extraction, a death ("DROPPED"), a bag hit, a bag miss ("SO CLOSE"), a rank-up. "Post on X" copies the card to the clipboard and opens the post (X links can't carry images), "Share…" hands the image to a phone's share sheet, "Save PNG" downloads it.
+
+Paid random rewards are regulated in some countries (loot boxes are banned in Belgium and restricted in the Netherlands, others require age gates and disclosed odds). Odds are disclosed here; check the rules where you launch before selling bags for real stablecoins.
 
 ## Look and sound
 
@@ -150,6 +175,7 @@ shared/            runs identically on server and in the browser
   world.js         one raid: movement, weapons, loot, storm, extraction, streaks, ledger, per-player snapshots
   weapons.js       the Arms Race ladder and experience values
   ranks.js         career ranks 1-90, the XP curve, what a raid is worth
+  cosmetics.js     outfits, characters, luck bags (odds, pity, smart drops), $ pricing, rank-up rewards
   zone.js          the storm plan: nested circles collapsing onto the last exit
   movement.js      deterministic movement, shared with client prediction
   bot.js, nav.js   bots (vision-limited, A* on a grid) that farm, fight, flee and extract
@@ -163,7 +189,8 @@ server/cashier/    real tokens: cashier.js (ledger, sign-in, deposits, payouts),
                    strk20.js (private pool), privy.js, prices.js, config.js, index.js (journal, HTTP)
 client/            canvas renderer, stick figures, fx (blood, graves, sparks), textures + chunked map layer,
                    synthesized sfx and music, prediction/interpolation, HUD, touch controls,
-                   cashier.js (sign-in and cashier UI), rankbadge.js (rank insignia as SVG)
+                   cashier.js (sign-in and cashier UI), rankbadge.js (rank insignia as SVG),
+                   locker.js (locker, shop, bag roulette), sharecard.js (cards for X)
 client/chain/      wallet layer (get-starknet, Starkzap, Cartridge, Privy) → client/vendor/wallets.js
 test/              node:test suites
 scripts/           headless sim, single-file build, wallet bundle, house console
@@ -195,6 +222,6 @@ docker run -p 8080:8080 dark-bags
 ## Next up
 
 - Playtest the numbers: bot lethality, rake, bag share, loot curve (`npm run sim` helps).
-- Skins as the first cosmetic purchase; golden raids sold to sponsors.
-- Share cards: a generated image of your best extraction for X.
+- Golden raids sold to sponsors.
+- Seasonal outfits and limited bags.
 - Raid replays/clips for streamers.

@@ -1,9 +1,10 @@
-import { CFG, SKINS } from './config.js';
+import { CFG } from './config.js';
 import { mulberry32, hasLOS, segWalls, segCircle } from './geom.js';
 import { generateMap, findSpawn, randomLootPoint } from './map.js';
 import { stepMovement, sanitizeInput } from './movement.js';
 import { BotBrain, botName } from './bot.js';
 import { botRank } from './ranks.js';
+import { botLook, OUTFIT } from './cosmetics.js';
 import { planZone, zoneAt, exitState, outsideZone } from './zone.js';
 import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 
@@ -108,7 +109,7 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1 }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm' }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
     const rake = Math.floor(stake * CFG.RAKE);
@@ -128,6 +129,8 @@ export class World {
       skin,
       isBot,
       rank, // career rank, shown on the name tag
+      outfit, // cosmetic outfit id and character (m/f): looks only
+      body,
       x: pos.x,
       y: pos.y,
       vx: 0,
@@ -549,10 +552,10 @@ export class World {
     const pre = this.botRoster?.find((b) => !taken.has(b.name));
     if (pre) {
       this.botRoster.splice(this.botRoster.indexOf(pre), 1);
-      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true, rank: pre.rank ?? botRank(this.rnd) });
+      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true, rank: pre.rank ?? botRank(this.rnd), outfit: pre.outfit ?? null, body: pre.body ?? 'm' });
     }
-    const skin = SKINS[Math.floor(this.rnd() * SKINS.length)];
-    return this.addPlayer({ name: botName(this.rnd, taken), skin, isBot: true, rank: botRank(this.rnd) });
+    const look = botLook(this.rnd);
+    return this.addPlayer({ name: botName(this.rnd, taken), skin: OUTFIT[look.outfit].color, isBot: true, rank: botRank(this.rnd), ...look });
   }
 
   announce() {
@@ -667,6 +670,8 @@ export class World {
         fc: p.fc,
         pr: p.prestige,
         rk: p.rank,
+        o: p.outfit,
+        g: p.body,
       });
     }
     const orbs = [];

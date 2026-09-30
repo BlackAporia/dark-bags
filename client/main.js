@@ -8,6 +8,10 @@ import { store } from './store.js';
 import { PriceBook, formatUnits } from '../shared/assets.js';
 import { createCashierUi } from './cashier.js';
 import { rankBadgeSvg } from './rankbadge.js';
+import { createLocker } from './locker.js';
+import { figureStill } from './stickman.js';
+import { openShare, wireShare } from './sharecard.js';
+import { OUTFIT, BOX, usd } from '../shared/cosmetics.js';
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -30,7 +34,9 @@ function onlineUrl() {
   }
   if (param) return normalizeServer(param);
   if (globalThis.DARK_BAGS_SERVER) return normalizeServer(globalThis.DARK_BAGS_SERVER);
-  if (!STATIC && /^https?:$/.test(location.protocol)) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  // static hosts (GitHub Pages) have no game server behind them: practice unless configured
+  const staticHost = /\.github\.io$/.test(location.hostname);
+  if (!STATIC && !staticHost && /^https?:$/.test(location.protocol)) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   return null;
 }
 
@@ -80,12 +86,22 @@ const app = {
   gore: store.get('darkbags.gore', false),
   screen: 'lobby',
   prep: null,
+  locker: null, // { marks, scrap, owned, outfit, body, pity }
   rank: null, // { rank, name, xp, into, need, toNext, max } for this mode (practice ranks live in the browser)
   lastCount: null,
   inRoom: false,
 };
 const send = (m) => app.transport?.send(m);
 const game = new GameClient({ renderer, input, sfx, send, el });
+// share cards: everything that happens can be posted
+const myLook = () => ({ outfit: app.locker?.outfit ?? 'basic-0', body: app.locker?.body ?? 'm' });
+function shareMoment(kind, data = {}) {
+  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, ...data });
+}
+wireShare();
+
+// locker: outfits, shop, luck boxes
+const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
 // real-token mode (server started with CHAIN=…): sign-in, deposits, cash-outs
 const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: () => renderLobby(), base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href });
 const attract = new Attract(renderer);
@@ -219,30 +235,12 @@ function renderLobby() {
     }),
   );
 
-  const skins = $('skins');
-  if (!skins.children.length) {
-    for (const c of SKINS.slice(0, 6)) {
-      const s = document.createElement('button');
-      s.type = 'button';
-      s.className = 'skin';
-      s.style.background = c;
-      s.setAttribute('role', 'radio');
-      s.setAttribute('aria-label', `Colour ${c}`);
-      s.dataset.skin = c;
-      s.addEventListener('click', () => {
-        app.skin = c;
-        store.set('darkbags.skin', c);
-        renderLobby();
-      });
-      skins.append(s);
-    }
-  }
-  for (const s of skins.children) s.setAttribute('aria-checked', String(s.dataset.skin === app.skin));
   $('gore').checked = app.gore;
 
   pickUsableAsset();
   renderAssets();
   renderRankCard();
+  locker.renderTile();
   cashier.render();
   const real = cashier.active;
   $('balance').textContent = app.balances === null ? '—' : `≈${fmt(totalSats())}`;
@@ -293,6 +291,29 @@ function renderRankResult(res) {
   );
 }
 
+// rank-up rewards on the result card: bags, $ credit, a trial outfit
+function renderRewards(m) {
+  const el = $('res-rewards');
+  const list = m.rewards ?? [];
+  el.hidden = !list.length;
+  if (!list.length) return;
+  const bags = {};
+  let credit = 0;
+  const trials = [];
+  for (const r of list) {
+    bags[r.box] = (bags[r.box] ?? 0) + 1;
+    credit += r.credit;
+    if (r.trial) trials.push(r.trial);
+  }
+  el.innerHTML = `<p class="eyebrow">Rank-up rewards</p><ul>${Object.entries(bags)
+    .map(([b, n]) => `<li><span class="rw-ico bag"></span><b>${n > 1 ? `${n}× ` : ''}${esc(BOX[b].name)}</b><span class="fine">waiting in your locker</span></li>`)
+    .join('')}<li><span class="rw-ico cash"></span><b>+${usd(credit)}</b><span class="fine">shop credit</span></li>${trials
+    .map((t) => `<li><span class="rw-ico trial"></span><b>${esc(OUTFIT[t.id].name)}</b><span class="fine">72-hour trial</span></li>`)
+    .join('')}</ul><div class="rw-actions"><button type="button" class="ghost" data-rw="locker">Open the locker</button><button type="button" class="ghost share" data-rw="share">Share rank-up</button></div>`;
+  el.querySelector('[data-rw="locker"]').addEventListener('click', () => locker.open('boxes'));
+  el.querySelector('[data-rw="share"]').addEventListener('click', () => shareMoment('rankUp', { rank: m.rank.after.rank, rewards: list }));
+}
+
 // ------------------------------------------------------------- ready room
 const figureSvg = (color) =>
   `<svg viewBox="0 0 40 56" aria-hidden="true"><g fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="10" r="7"/><path d="M20 17 V34 M20 22 L10 31 M20 22 L32 25 M20 34 L12 51 M20 34 L28 51"/></g></svg>`;
@@ -338,13 +359,13 @@ function renderPrep() {
         const d = document.createElement('div');
         if (!s) {
           d.className = 'slot';
-          d.innerHTML = `${figureSvg('#283042')}<span class="sn">open</span>`;
+          d.innerHTML = `${figureSvg('#283042')}<span class="sn">open</span>`; // empty spot
           return d;
         }
         d.className = `slot lit ${s.kind === 'me' ? 'me' : ''} ${s.kind === 'bot' ? 'bot' : ''}`;
         d.style.color = s.c;
         d.dataset.key = `${s.kind}:${s.n}`;
-        d.innerHTML = `${figureSvg(s.c)}<span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>`;
+        d.innerHTML = `<img class="fig" alt="" src="${figureStill({ outfit: s.o, body: s.g }, 60, 84)}"><span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>`;
         return d;
       }),
     );
@@ -396,7 +417,14 @@ function onStatus(st) {
   renderLobby();
 }
 
+// the locker owns its own messages, and sees everything else after the app has updated
 function onMessage(m) {
+  if (m.t === 'locker') return locker.onMessage(m);
+  handleMessage(m);
+  locker.onMessage(m);
+}
+
+function handleMessage(m) {
   if (cashier.onMessage(m) && m.t !== 'welcome') return;
   switch (m.t) {
     case 'welcome':
@@ -435,7 +463,7 @@ function onMessage(m) {
       app.balances = m.balances ?? app.balances;
       attract.stop();
       sfx.play('beep', { f: 1320, dur: 0.3 });
-      game.begin(m, app.skin, app.gore);
+      game.begin(m, app.skin, app.gore, app.locker);
       renderer.prewarm(m.map.w / 2, m.map.h / 2);
       showScreen('game');
       break;
@@ -462,8 +490,6 @@ function showResult(m) {
   const k = $('res-kicker');
   const amt = $('res-amount');
   const det = $('res-detail');
-  const share = $('res-share');
-  share.hidden = true;
   const inside = `${m.kills} ${m.kills === 1 ? 'kill' : 'kills'} · ${mmss(m.secs)} inside`;
   if (m.status === 'extracted') {
     const pnl = m.payout - m.stake;
@@ -474,12 +500,6 @@ function showResult(m) {
     amt.className = 'res-amount win';
     const paid = m.asset && m.asset !== 'SATS' ? ` Paid out <b>${esc(tokenAmount(m.asset, m.payoutUnits ?? '0'))}</b> at your entry rate.` : '';
     det.innerHTML = `Out with <b>${fmt(m.payout)}</b> sats on a <b>${fmt(m.stake)}</b> stake: <b>${pnl >= 0 ? '+' : '−'}${fmt(Math.abs(pnl))} (${pct >= 0 ? '+' : '−'}${Math.abs(pct)}%)</b>.${paid} ${inside}.`;
-    if (pnl > 0) {
-      const text = `Walked out of the dark with ${fmt(m.payout)} sats on a ${fmt(m.stake)} stake (+${pct}%). Nobody saw what I was carrying. #DARKBAGS`;
-      const url = !IN_ARTIFACT && /^https?:$/.test(location.protocol) ? `&url=${encodeURIComponent(location.origin + location.pathname)}` : '';
-      share.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}${url}`;
-      share.hidden = false;
-    }
   } else if (m.status === 'dead') {
     k.textContent = m.cause === 'storm' ? 'Eaten by the storm' : 'Dropped';
     k.className = 'res-kicker loss';
@@ -496,6 +516,8 @@ function showResult(m) {
     det.innerHTML = `The raid closed with you still in it. Your <b>${fmt(m.lost)} sats</b> rolled into the next raid's loot. ${inside}.`;
   }
   renderRankResult(m.rank);
+  renderRewards(m);
+  app.lastResult = m;
   const q = quote(m.stake);
   $('res-again').textContent = q === null ? 'Ready for the next raid' : `Ready for the next raid · ${tokenAmount(app.asset, q)}`;
   $('res-again').disabled = q === null || units(app.asset) < q;
@@ -535,6 +557,11 @@ $('prep-back').addEventListener('click', () => {
   send({ t: 'leave' });
   app.inRoom = false;
   showScreen('lobby');
+});
+$('res-share').addEventListener('click', () => {
+  const m = app.lastResult;
+  if (!m) return;
+  shareMoment(m.status === 'extracted' ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();

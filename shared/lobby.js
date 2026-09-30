@@ -3,6 +3,7 @@ import { RoomCore } from './room.js';
 import { cleanName } from './wallet.js';
 import { PriceBook } from './assets.js';
 import { RankBook } from './ranks.js';
+import { Inventory, OUTFITS, BOXES, RARITIES, PITY } from './cosmetics.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -16,7 +17,7 @@ import { RankBook } from './ranks.js';
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
 export class Lobby {
-  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS }) {
+  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS }) {
     this.cashier = cashier;
     if (cashier) {
       wallet = cashier.ledger;
@@ -26,11 +27,12 @@ export class Lobby {
     this.wallet = wallet;
     this.prices = prices;
     this.ranks = ranks;
+    this.inventory = inventory;
     this.practice = practice;
     this.send = send;
     this.newToken = newToken;
     this.sessions = new Map();
-    this.rooms = new Map(tiers.map((stake) => [stake, new RoomCore({ stake, wallet, send, prices, ranks, practice, bots, roundSeconds, prepSeconds })]));
+    this.rooms = new Map(tiers.map((stake) => [stake, new RoomCore({ stake, wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds })]));
     this.roundSeconds = roundSeconds;
   }
 
@@ -78,6 +80,8 @@ export class Lobby {
         tables: this.tables(),
         assets: this.prices.list(),
         rank: this.key(s) ? this.ranks.get(this.key(s)) : null,
+        locker: this.key(s) ? this.inventory.view(this.key(s)) : null,
+        catalog: { outfits: OUTFITS, boxes: BOXES, rarities: RARITIES, pity: PITY },
         practice: this.practice,
         chain: this.cashier ? this.cashier.info() : null,
         account: s.account,
@@ -104,6 +108,13 @@ export class Lobby {
         if (this.cashier) return;
         this.wallet.faucet(s.token);
         this.send(cid, { t: 'balance', balances: this.balances(s) });
+        return;
+      case 'equip':
+      case 'body':
+      case 'buy':
+      case 'craft':
+      case 'box':
+        this.lockerOp(cid, s, msg);
         return;
       case 'auth_start':
       case 'auth':
@@ -141,6 +152,36 @@ export class Lobby {
     }
   }
 
+  // Locker: cosmetics bought with marks. The server rolls every box.
+  lockerOp(cid, s, msg) {
+    const key = this.key(s);
+    if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
+    const inv = this.inventory;
+    const id = String(msg.id ?? '');
+    const pay = this.stablePay(key);
+    const r =
+      msg.t === 'equip' ? inv.equip(key, id)
+      : msg.t === 'body' ? inv.setBody(key, id)
+      : msg.t === 'buy' ? inv.buy(key, id, pay)
+      : msg.t === 'craft' ? inv.craft(key, id)
+      : inv.open(key, id, pay);
+    if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
+    this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
+    if (s.room && (msg.t === 'equip' || msg.t === 'body')) s.room.broadcastPrep();
+  }
+
+  // $ in the shop is USDC or USDT, 1:1: pay the rest of a price from whichever covers it
+  stablePay(key) {
+    return (cents) => {
+      for (const a of this.prices.list()) {
+        if (!/^(USDC|USDT)$/i.test(a.symbol) || a.decimals < 2) continue;
+        const units = BigInt(cents) * 10n ** BigInt(a.decimals - 2);
+        if (this.wallet.debit(key, a.id, units)) return true;
+      }
+      return false;
+    };
+  }
+
   // Real-token operations are async (signature checks, RPC, proving). One at a time per session.
   async cashierOp(cid, s, msg) {
     const c = this.cashier;
@@ -166,13 +207,13 @@ export class Lobby {
         const account = await c.login(s.token, msg.address, msg.signature);
         if (!alive()) return;
         s.account = account;
-        reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account) });
+        reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account), locker: this.inventory.view(account) });
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
         if (!alive()) return;
         s.account = r.account;
-        reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account) });
+        reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), locker: this.inventory.view(r.account) });
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
         let r;
