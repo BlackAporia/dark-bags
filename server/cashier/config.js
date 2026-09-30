@@ -66,8 +66,10 @@ export function readConfig(env = process.env) {
     // launch guards: closed-beta address list, $ caps per player and for the whole house,
     // and the pause switch file (defaults to <CASHIER_FILE>.paused)
     allow: list(env.ALLOWLIST),
-    maxBalanceUsd: Number(env.MAX_BALANCE_USD || 0),
-    maxTotalUsd: Number(env.MAX_TOTAL_USD || 0),
+    // the $ caps guard real money: Sepolia test tokens are worth nothing, so there deposits
+    // are never capped (set SEPOLIA_CAPS=1 to rehearse the mainnet caps on testnet)
+    maxBalanceUsd: network === 'sepolia' && env.SEPOLIA_CAPS !== '1' ? 0 : Number(env.MAX_BALANCE_USD || 0),
+    maxTotalUsd: network === 'sepolia' && env.SEPOLIA_CAPS !== '1' ? 0 : Number(env.MAX_TOTAL_USD || 0),
     pauseFile: env.PAUSE_FILE || (env.CASHIER_FILE ? `${env.CASHIER_FILE}.paused` : null),
     strk20: {
       pool: env.STRK20_POOL || (network === 'mainnet' ? STRK20_POOL_MAINNET : null),

@@ -14,8 +14,8 @@ export function createSettingsUi() {
   const slider = (key, min, max, step) => `<input type="range" data-rng="${key}" min="${min}" max="${max}" step="${step}" value="${settings[key]}">`;
   const row = (label, ctl, note = '') => `<div class="set-row"><div><p>${t(label)}</p>${note ? `<p class="fine">${t(note)}</p>` : ''}</div>${ctl}</div>`;
 
-  function render() {
-    const root = $('settings-root');
+  // the settings page, or the same controls inside the in-match menu
+  function render(root = $('settings-root')) {
     if (!root) return;
     root.innerHTML = `
       <h2 class="sec-h">${t('nav.settings')}</h2>
@@ -46,7 +46,7 @@ export function createSettingsUi() {
     for (const b of root.querySelectorAll('[data-set]'))
       b.addEventListener('click', () => {
         setSetting(b.dataset.set, b.dataset.v);
-        render();
+        render(root);
       });
     for (const i of root.querySelectorAll('[data-tog]')) i.addEventListener('change', () => setSetting(i.dataset.tog, i.checked));
     for (const i of root.querySelectorAll('[data-rng]')) i.addEventListener('input', () => setSetting(i.dataset.rng, Number(i.value)));

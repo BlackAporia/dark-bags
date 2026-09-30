@@ -132,8 +132,13 @@ export class LocalTransport {
     this.last = performance.now();
     this.acc = 0;
     const STEP = 1000 / CFG.TICK_RATE;
+    this.paused = false; // practice only: the in-match menu stops the clock
     this.pump = setInterval(() => {
       const now = performance.now();
+      if (this.paused) {
+        this.last = now;
+        return;
+      }
       this.acc += now - this.last;
       this.last = now;
       let n = 0;

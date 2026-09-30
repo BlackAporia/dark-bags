@@ -755,7 +755,9 @@ export class GameClient {
       el.pnl.textContent = t(this.teamMode ? 'hud.teamsLeft' : 'hud.left', { n: you.sides ?? 0, s: this.money(this.stake) });
       el.pnl.className = 'pnl';
     } else this.updateBag(you, alive);
-    const tl = Math.max(0, this.recvTl.tl - (now - this.recvTl.at) / 1000);
+    // count down between snapshots, but not past a second: with none coming (practice paused, a
+    // stalled link) the clock holds instead of running ahead and jumping back
+    const tl = Math.max(0, this.recvTl.tl - Math.min(1, (now - this.recvTl.at) / 1000));
     this.updateRest(now, view, you, alive, tl);
   }
 

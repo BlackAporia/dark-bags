@@ -178,6 +178,7 @@ const attract = new Attract(renderer);
 // ---------------------------------------------------------------- screens
 function showScreen(name) {
   app.screen = name;
+  if (name !== 'game' && !$('pause').hidden) closePause();
   $('lobby').hidden = name !== 'lobby';
   $('prep').hidden = name !== 'prep';
   $('result').hidden = name !== 'result';
@@ -661,7 +662,7 @@ function onStatus(st) {
 }
 
 // the locker owns its own messages, and sees everything else after the app has updated
-const SOCIAL_MSGS = new Set(['welcome', 'social', 'players', 'friends', 'inbox', 'dms', 'dm', 'friendReq', 'rel', 'profile', 'guilds', 'guild', 'guildDone', 'guildErr', 'invited', 'invSent']);
+const SOCIAL_MSGS = new Set(['welcome', 'social', 'players', 'friends', 'inbox', 'dms', 'dm', 'friendReq', 'rel', 'profile', 'guilds', 'guild', 'guildDone', 'guildErr', 'guild_chat', 'guild_msg', 'invited', 'invSent']);
 function onMessage(m) {
   if (SOCIAL_MSGS.has(m.t)) social.onMessage(m);
   // ping probe: echo the server's stamp straight back, before anything else
@@ -779,11 +780,94 @@ $('sp-prev').addEventListener('click', () => send({ t: 'watch', d: -1 }));
 $('sp-next').addEventListener('click', () => send({ t: 'watch', d: 1 }));
 $('sp-done').addEventListener('click', finishSpectating);
 addEventListener('keydown', (e) => {
-  if (!app.pendingResult || !game.active) return;
+  if (!app.pendingResult || !game.active || pauseOpen()) return;
   if (e.code === 'ArrowLeft' || e.code === 'KeyQ') send({ t: 'watch', d: -1 });
   else if (e.code === 'ArrowRight' || e.code === 'KeyE') send({ t: 'watch', d: 1 });
-  else if (e.code === 'Enter' || e.code === 'Escape') finishSpectating();
+  else if (e.code === 'Enter') finishSpectating();
 });
+
+// ------------------------------------------------------- in-match menu
+// Esc (or the ❚❚ button on phones) in any mode: resume, settings, sound, leave. Online the
+// match keeps going behind it; practice stops the clock. Leaving alive leaves the runner
+// behind and the stake with the raid, so that asks twice; once you are down it is free.
+const pauseEl = $('pause');
+const pauseOpen = () => !pauseEl.hidden;
+let leaveArmed = false;
+function pauseState() {
+  const alive = game.active && !game.dead;
+  const practice = app.mode === 'practice';
+  return { alive, practice, risky: alive && !practice };
+}
+function paintPause() {
+  const { alive, practice, risky } = pauseState();
+  const m = MODE[app.gameMode];
+  $('pause-mode').textContent = m ? t(`mode.${app.gameMode}`) : '';
+  $('pause-note').textContent = practice ? t(alive ? 'pause.practice' : 'pause.practiceDead') : t(alive ? 'pause.alive' : 'pause.dead');
+  const leave = $('pause-leave');
+  leave.textContent = leaveArmed ? t('pause.leaveSure') : t(risky ? 'pause.leaveLose' : 'pause.leave');
+  leave.classList.toggle('armed', leaveArmed);
+  const snd = $('pause-sound');
+  snd.textContent = `${t('hud.sound')}: ${t(sfx.muted ? 'pause.off' : 'pause.on')}`;
+  snd.setAttribute('aria-pressed', String(!sfx.muted));
+  const mus = $('pause-music');
+  mus.textContent = `${t('hud.music')}: ${t(sfx.musicOn ? 'pause.on' : 'pause.off')}`;
+  mus.setAttribute('aria-pressed', String(!!sfx.musicOn));
+}
+function openPause() {
+  if (app.screen !== 'game' || pauseOpen()) return;
+  leaveArmed = false;
+  input.release();
+  input.blocked = true;
+  if (app.mode === 'practice' && app.transport) app.transport.paused = true;
+  $('pause-main').hidden = false;
+  $('pause-set').hidden = true;
+  paintPause();
+  pauseEl.hidden = false;
+  $('pause-resume').focus();
+}
+function closePause() {
+  if (!pauseOpen()) return;
+  pauseEl.hidden = true;
+  input.blocked = false;
+  if (app.transport) app.transport.paused = false;
+}
+function leaveMatch() {
+  const { risky } = pauseState();
+  if (risky && !leaveArmed) {
+    leaveArmed = true;
+    paintPause();
+    return;
+  }
+  closePause();
+  app.pendingResult = null;
+  app.wantResult = false;
+  send({ t: 'leave' });
+  app.inRoom = false;
+  showScreen('lobby');
+}
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape' || app.screen !== 'game') return;
+  e.preventDefault();
+  if (!pauseOpen()) openPause();
+  else if (!$('pause-set').hidden) {
+    $('pause-set').hidden = true;
+    $('pause-main').hidden = false;
+  } else closePause();
+});
+$('pause-btn').addEventListener('click', openPause);
+$('pause-resume').addEventListener('click', closePause);
+$('pause-leave').addEventListener('click', leaveMatch);
+$('pause-settings').addEventListener('click', () => {
+  $('pause-main').hidden = true;
+  $('pause-set').hidden = false;
+  settingsUi.render($('pause-set-root'));
+});
+$('pause-back').addEventListener('click', () => {
+  $('pause-set').hidden = true;
+  $('pause-main').hidden = false;
+  paintPause();
+});
+pauseEl.addEventListener('click', (e) => e.target === pauseEl && closePause());
 
 // ----------------------------------------------------------------- result
 function showResult(m) {
@@ -921,6 +1005,7 @@ const musicChip = $('music-chip');
 const syncAudio = () => {
   muteChip.setAttribute('aria-pressed', String(sfx.muted));
   musicChip.setAttribute('aria-pressed', String(!sfx.musicOn));
+  if (pauseOpen()) paintPause();
 };
 const toggleMute = () => {
   sfx.toggle();
@@ -932,6 +1017,8 @@ const toggleMusic = () => {
   syncAudio();
 };
 muteChip.addEventListener('click', toggleMute);
+$('pause-sound').addEventListener('click', toggleMute);
+$('pause-music').addEventListener('click', toggleMusic);
 musicChip.addEventListener('click', toggleMusic);
 syncAudio();
 input.onBluff = () => game.cycleBluff();
