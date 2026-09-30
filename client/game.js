@@ -567,7 +567,14 @@ export class GameClient {
     this.shake = Math.max(0, this.shake - dt * 40);
     this.fx.update(dt, now);
     const view = this.buildView(now, dt);
-    if (view) this.renderer.draw(view);
+    // one bad frame must never freeze the raid: log it once and keep the game (and HUD) running
+    try {
+      if (view) this.renderer.draw(view);
+    } catch (e) {
+      if (!this.drawErr) console.error('frame draw failed', e);
+      this.drawErr = true;
+      this.fx.clear();
+    }
     this.renderer.measure(dt * 1000);
     this.fx.setQuality(this.renderer.quality);
     if (now - this.lastHud > 90) {

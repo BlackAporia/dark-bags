@@ -34,7 +34,7 @@ export class Fx {
 
   add(p) {
     if (this.parts.length >= this.max) this.parts.shift();
-    this.parts.push({ age: 0, rest: false, rot: 0, spin: 0, z: 0, vz: 0, ...p });
+    this.parts.push({ age: 0, rest: false, rot: 0, spin: 0, z: 0, vx: 0, vy: 0, vz: 0, ...p });
   }
 
   decal(d, now) {
