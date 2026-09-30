@@ -47,7 +47,9 @@ export async function connectExtension(entry) {
   const w = entry.wallet;
   const api = w.features['starknet:walletApi'];
   const request = (type, params) => api.request(params === undefined ? { type } : { type, params });
-  await w.features['standard:connect'].connect();
+  // wallet-standard connect takes an input object; some wallets (Ready X) destructure it
+  // without a default and throw on a bare connect()
+  await w.features['standard:connect'].connect({ silent: false });
   const [address] = await request('wallet_requestAccounts', {});
   if (!address) throw new Error('The wallet shared no account.');
   let strk20 = null; // unknown until tried; set on first use

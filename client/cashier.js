@@ -26,8 +26,8 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     waiter: null, // resolves with the login challenge
     vendor: null,
     tab: 'deposit',
-    depRoute: 'private',
-    wdRoute: 'private',
+    depRoute: 'public', // plain transfers work with every wallet; private is an opt-in extra
+    wdRoute: 'public',
   };
 
   const vendor = async () => {
@@ -79,6 +79,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const d = $('dlg-connect');
     $('login-cartridge').hidden = !cs.chain.login.cartridge;
     $('login-privy').hidden = !cs.chain.login.privy;
+    $('login-private-note').hidden = !cs.chain.routes?.includes('private');
     setStatus('connect-status', '');
     d.showModal();
     try {
@@ -248,8 +249,8 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const out = [];
     // Cartridge and Privy accounts are not registered in the STRK20 pool
     const privateOk = !/^(cartridge|privy)$/.test(cs.kind ?? '') && (kind === 'deposit' ? i.routes.includes('private') : i.cashOut.private);
-    if (privateOk) out.push({ id: 'private', label: 'Private · STRK20', sub: kind === 'deposit' ? 'from your shielded balance; nobody sees the amount' : 'into your shielded balance; your address must be registered in the pool' });
-    if (kind === 'deposit' || i.cashOut.public) out.push({ id: 'public', label: 'Public transfer', sub: kind === 'deposit' ? 'a plain token transfer to the house' : 'a plain token transfer to your address' });
+    if (kind === 'deposit' || i.cashOut.public) out.push({ id: 'public', label: 'Transfer', sub: kind === 'deposit' ? 'any wallet: a plain token transfer to the house' : 'a plain token transfer to your address' });
+    if (privateOk) out.push({ id: 'private', label: 'Private · STRK20 (optional)', sub: kind === 'deposit' ? 'Ready or Xverse only: from your shielded balance, nobody sees the amount' : 'into your shielded balance; your address must be registered in the pool' });
     return out;
   }
 
