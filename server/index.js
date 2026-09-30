@@ -12,6 +12,7 @@ import { MemoryWallet } from '../shared/wallet.js';
 import { createCashier } from './cashier/index.js';
 import { RankBook } from '../shared/ranks.js';
 import { Inventory } from '../shared/cosmetics.js';
+import { SocialBook } from '../shared/social.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -21,6 +22,8 @@ const BOTS = process.env.BOTS !== '0';
 const WALLET_FILE = process.env.WALLET_FILE || '';
 const RANKS_FILE = process.env.RANKS_FILE || '';
 const LOCKER_FILE = process.env.LOCKER_FILE || '';
+// players, friends, messages, guilds: on the data volume when there is one
+const SOCIAL_FILE = process.env.SOCIAL_FILE || (existsSync('/data') ? '/data/social.json' : '');
 
 // ------------------------------------------------------------------ wallet
 // CHAIN=sepolia|mainnet: real tokens through the cashier (server/cashier). Otherwise test tokens.
@@ -69,6 +72,19 @@ const inventory = new Inventory({
   },
 });
 
+// ------------------------------------------------------------------ social
+let socialTimer = null;
+const social = new SocialBook({
+  data: SOCIAL_FILE && existsSync(SOCIAL_FILE) ? JSON.parse(readFileSync(SOCIAL_FILE, 'utf8')) : {},
+  onChange: (sb) => {
+    if (!SOCIAL_FILE || socialTimer) return;
+    socialTimer = setTimeout(async () => {
+      socialTimer = null;
+      await writeFile(SOCIAL_FILE, JSON.stringify(sb.toJSON())).catch((e) => console.error('social save failed', e));
+    }, 1500);
+  },
+});
+
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
 const send = (cid, msg) => {
@@ -83,6 +99,7 @@ const lobby = new Lobby({
   swap: !real || process.env.SWAP_INTERNAL === '1', // real money: in-game swaps only when the house rebalances on chain
   ranks,
   inventory,
+  social,
   send,
   bots: BOTS,
   roundSeconds: ROUND_SECONDS,

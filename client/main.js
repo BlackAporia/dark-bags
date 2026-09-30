@@ -1,3 +1,4 @@
+import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
@@ -136,7 +137,26 @@ const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.sc
 const settingsUi = createSettingsUi();
 
 // ------------------------------------------------------------------ pages
-const PAGES = { shop, inventory, swap, chat, settings: settingsUi };
+// friends, messages, profiles, guilds and room invites
+const social = createSocial({
+  app,
+  send,
+  toast: (m) => toast(m),
+  isOpen: (page) => app.screen === 'lobby' && app.page === page,
+  joinRoom: (mode, stake) => {
+    if (app.inRoom) {
+      send({ t: 'unready' });
+      send({ t: 'leave' });
+    }
+    app.gameMode = mode;
+    app.stake = stake;
+    store.set('darkbags.gmode', mode);
+    store.set('darkbags.stake', stake);
+    go('play');
+    goToTable();
+  },
+});
+const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage };
 function go(page, extra) {
   if (!document.querySelector(`.page[data-page="${page}"]`)) page = 'play';
   app.page = page;
@@ -150,6 +170,7 @@ function go(page, extra) {
   sfx.play('beep', { f: 990, dur: 0.02 });
 }
 for (const b of document.querySelectorAll('.nav-btn')) b.addEventListener('click', () => go(b.dataset.page));
+app.go = go;
 $('tb-wallet').addEventListener('click', () => go('inventory'));
 $('tb-credit').addEventListener('click', () => go('shop'));
 const attract = new Attract(renderer);
@@ -275,9 +296,11 @@ function renderModes() {
       b.className = `mode-card k-${m.kind}`;
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(m.id === app.gameMode));
-      const live = app.tables.filter((x) => x.mode === m.id).reduce((s, x) => s + (x.humans ?? 0) + (x.ready ?? 0), 0);
+      const rows = app.tables.filter((x) => x.mode === m.id);
+      const waiting = rows.reduce((s, x) => s + (x.state === 'prep' ? x.ready ?? 0 : 0), 0);
+      const live = rows.reduce((s, x) => s + (x.humans ?? 0), 0);
       const size = m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
-      b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>`;
+      b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>${waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: waiting }))}</span>` : ''}`;
       b.addEventListener('click', () => {
         app.gameMode = m.id;
         store.set('darkbags.gmode', m.id);
@@ -377,6 +400,10 @@ function renderLobby() {
       } else if (tb?.state === 'prep' && tb.count !== null && tb.count !== undefined) {
         state = t('tb.ready', { n: tb.ready, s: tb.count });
         cls = 'live';
+      } else if (tb?.state === 'prep' && tb.ready) {
+        // players sitting in this room waiting for more: the best reason to join it
+        state = t('tb.readyWait', { n: tb.ready });
+        cls = 'wait';
       } else if (tb?.state === 'prep' && tb.watching) state = t('tb.waiting', { n: tb.watching });
       if (tb?.nextGolden && tb.state !== 'live') {
         state = t('tb.golden');
@@ -576,6 +603,7 @@ function renderPrep() {
   }
   $('pot').textContent = money(p.pot);
   $('prep-start').hidden = !(p.waiting && p.me?.ready);
+  $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
   const ready = $('ready');
   const me = p.me ?? {};
   const q = quote(p.stake);
@@ -633,7 +661,9 @@ function onStatus(st) {
 }
 
 // the locker owns its own messages, and sees everything else after the app has updated
+const SOCIAL_MSGS = new Set(['welcome', 'social', 'players', 'friends', 'inbox', 'dms', 'dm', 'friendReq', 'rel', 'profile', 'guilds', 'guild', 'guildDone', 'guildErr', 'invited', 'invSent']);
 function onMessage(m) {
+  if (SOCIAL_MSGS.has(m.t)) social.onMessage(m);
   // ping probe: echo the server's stamp straight back, before anything else
   if (m.t === 'probe') return send({ t: 'probe', s: m.s });
   if (m.t === 'ping') {
@@ -858,6 +888,7 @@ $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 $('mode-online').addEventListener('click', () => app.mode !== 'online' && setMode('online'));
 $('mode-practice').addEventListener('click', () => app.mode !== 'practice' && setMode('practice'));
 $('ready').addEventListener('click', toggleReady);
+$('prep-invite').addEventListener('click', () => social.openInvite());
 $('prep-start').addEventListener('click', () => {
   send({ t: 'start' });
   sfx.play('ready');
