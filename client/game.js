@@ -1,4 +1,5 @@
 import { CFG } from '../shared/config.js';
+import { OUTFIT } from '../shared/cosmetics.js';
 import { stepMovement, sanitizeInput } from '../shared/movement.js';
 import { World } from '../shared/world.js';
 import { WEAPONS, XP_PER_LEVEL } from '../shared/weapons.js';
@@ -93,15 +94,16 @@ export class GameClient {
     this.gore = false;
   }
 
-  begin(start, skin, gore) {
+  begin(start, skin, gore, look = null) {
     this.active = true;
+    this.look = start.look ?? look ?? { outfit: null, body: 'm' };
     this.gore = gore;
     this.map = start.map;
     this.plan = start.zone;
     this.pid = start.pid;
     this.stake = start.stake;
     this.golden = start.golden;
-    this.skin = skin;
+    this.skin = OUTFIT[this.look.outfit]?.color ?? skin;
     this.snaps = [];
     this.pending = [];
     this.seq = 0;
@@ -499,7 +501,7 @@ export class GameClient {
       const x = q ? lerp(q.x, p.x, t) : p.x;
       const y = q ? lerp(q.y, p.y, t) : p.y;
       const aim = q ? lerpAngle(q.a, p.a, t) : p.a;
-      const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c });
+      const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c, outfit: p.o, body: p.g });
       this.woundCheck(an, p.h, now);
       figures.push({ a: an, color: p.c, name: p.n, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
@@ -561,7 +563,7 @@ export class GameClient {
 
   animSelf(x, y, dt, now) {
     const you = this.you;
-    return this.anims.update(-1, x, y, this.aim, dt, now, { w: you.w ?? 0, bluff: this.bluff, color: this.skin, id: -1 });
+    return this.anims.update(-1, x, y, this.aim, dt, now, { w: you.w ?? 0, bluff: this.bluff, color: this.skin, id: -1, outfit: this.look.outfit, body: this.look.body });
   }
 
   footsteps(me, now) {
@@ -725,8 +727,8 @@ export class Attract {
     this.cam.x += (p.x - this.cam.x) * 0.08;
     this.cam.y += (p.y - this.cam.y) * 0.08;
     const figures = [];
-    for (const q of [{ i: p.id, n: p.name, c: p.skin, x: p.x, y: p.y, a: p.aim, h: Math.ceil(p.hp), b: p.bluff, e: p.ext, s: 0, w: p.w, fc: p.fc, pr: p.prestige, rk: p.rank }, ...s.players]) {
-      const a = this.anims.update(q.i, q.x, q.y, q.a, dt, now, { w: q.w, bluff: q.b, color: q.c });
+    for (const q of [{ i: p.id, n: p.name, c: p.skin, x: p.x, y: p.y, a: p.aim, h: Math.ceil(p.hp), b: p.bluff, e: p.ext, s: 0, w: p.w, fc: p.fc, pr: p.prestige, rk: p.rank, o: p.outfit, g: p.body }, ...s.players]) {
+      const a = this.anims.update(q.i, q.x, q.y, q.a, dt, now, { w: q.w, bluff: q.b, color: q.c, outfit: q.o, body: q.g });
       if (this.fcs.get(q.i) !== undefined && this.fcs.get(q.i) !== q.fc) a.attackT = now;
       this.fcs.set(q.i, q.fc);
       figures.push({ a, color: q.c, name: q.n, hp: q.h, isMe: false, flash: false, shield: 0, ext: q.e, pr: q.pr, rk: q.rk, laser: WEAPONS[q.w]?.laser });

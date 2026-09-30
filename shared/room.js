@@ -219,6 +219,7 @@ export class RoomCore {
         duration: w.duration,
         time: w.time,
         asset: this.accounts.get(p.id).asset,
+        look,
         balances: this.wallet.balances(c.token),
       });
     }
