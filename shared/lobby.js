@@ -158,15 +158,28 @@ export class Lobby {
     if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
     const inv = this.inventory;
     const id = String(msg.id ?? '');
+    const pay = this.stablePay(key);
     const r =
       msg.t === 'equip' ? inv.equip(key, id)
       : msg.t === 'body' ? inv.setBody(key, id)
-      : msg.t === 'buy' ? inv.buy(key, id)
+      : msg.t === 'buy' ? inv.buy(key, id, pay)
       : msg.t === 'craft' ? inv.craft(key, id)
-      : inv.open(key, id);
+      : inv.open(key, id, pay);
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
-    this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key) });
+    this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (s.room && (msg.t === 'equip' || msg.t === 'body')) s.room.broadcastPrep();
+  }
+
+  // $ in the shop is USDC or USDT, 1:1: pay the rest of a price from whichever covers it
+  stablePay(key) {
+    return (cents) => {
+      for (const a of this.prices.list()) {
+        if (!/^(USDC|USDT)$/i.test(a.symbol) || a.decimals < 2) continue;
+        const units = BigInt(cents) * 10n ** BigInt(a.decimals - 2);
+        if (this.wallet.debit(key, a.id, units)) return true;
+      }
+      return false;
+    };
   }
 
   // Real-token operations are async (signature checks, RPC, proving). One at a time per session.

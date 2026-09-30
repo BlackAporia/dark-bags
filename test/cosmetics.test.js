@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CFG } from '../shared/config.js';
-import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, START_MARKS, rollRarity, botLook, raidMarks } from '../shared/cosmetics.js';
+import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, TRIAL_MS, rollRarity, botLook } from '../shared/cosmetics.js';
 import { RoomCore } from '../shared/room.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
@@ -49,7 +49,7 @@ test('published odds match what boxes actually drop', () => {
 test('pity guarantees Epic within 10 and Legendary within 40 opens, even on bad luck', () => {
   const unlucky = () => 0; // always the worst roll (commons first)
   const inv = new Inventory({ rnd: unlucky });
-  inv.addMarks('p', 1e9);
+  inv.rec('p').credit = 1e9;
   const got = [];
   for (let i = 0; i < 40; i++) got.push(inv.open('p', 'street'));
   assert.ok(got.slice(0, 10).some((r) => r.rarity === 'epic' && r.pity), 'epic by the 10th open');
@@ -63,7 +63,7 @@ test('pity guarantees Epic within 10 and Legendary within 40 opens, even on bad 
 
 test('smart drops: no duplicates until a rarity is complete, then scrap crafts what you want', () => {
   const inv = new Inventory({ rnd: seeded(3) });
-  inv.addMarks('p', 1e9);
+  inv.rec('p').credit = 1e9;
   const commons = OUTFITS.filter((o) => o.rarity === 'common' && !o.basic).length;
   const seen = [];
   let firstDup = null;
@@ -85,29 +85,58 @@ test('smart drops: no duplicates until a rarity is complete, then scrap crafts w
   }
 });
 
-test('shop, equip and character: marks spent once, only owned outfits can be worn', () => {
-  const inv = new Inventory();
-  assert.equal(inv.view('p').marks, START_MARKS);
+test('shop in $: credit first, then USDC/USDT; bags you hold open free', () => {
+  let now = 1_000_000;
+  const inv = new Inventory({ now: () => now, rnd: seeded(5) });
+  let wallet = 500; // cents of stablecoin the player holds
+  const pay = (c) => (wallet >= c ? ((wallet -= c), true) : false);
+  assert.equal(inv.view('p').credit, 0);
+  assert.equal(inv.view('p').boxes.street, 1, 'a welcome bag');
+  const first = inv.open('p', 'street', pay);
+  assert.ok(first.ok && first.free);
+  assert.equal(wallet, 500, 'the welcome bag cost nothing');
+
   assert.equal(inv.equip('p', 'satoshi').ok, false);
-  assert.equal(inv.buy('p', 'satoshi').ok, false, 'legendaries are not in the shop');
-  assert.equal(inv.buy('p', 'night-ops').ok, false, 'not enough marks');
-  assert.ok(inv.buy('p', 'olive').ok);
-  assert.equal(inv.view('p').marks, START_MARKS - OUTFIT.olive.price);
-  assert.equal(inv.buy('p', 'olive').ok, false, 'no double buy');
+  assert.equal(inv.buy('p', 'satoshi', pay).ok, false, 'legendaries are not in the shop');
+  inv.rec('p').credit = 30;
+  const olive = inv.buy('p', 'olive', pay);
+  assert.ok(olive.ok);
+  assert.equal(inv.view('p').credit, 0, 'credit goes first');
+  assert.equal(wallet, 500 - (OUTFIT.olive.price - 30), 'then the stablecoin');
+  assert.equal(inv.buy('p', 'olive', pay).ok, false, 'no double buy');
+  wallet = 0;
+  assert.equal(inv.open('p', 'golden', pay).ok, false, 'cannot afford');
+  assert.equal(inv.view('p').boxes.street, 0);
+
   assert.ok(inv.equip('p', 'olive').ok);
   assert.ok(inv.equip('p', 'basic-3').ok, 'basic outfits are free for everyone');
   assert.ok(inv.setBody('p', 'f').ok);
   assert.equal(inv.setBody('p', 'x').ok, false);
   assert.deepEqual(inv.look('p'), { outfit: 'basic-3', body: 'f' });
-  assert.equal(inv.open('p', 'golden').ok, false, 'cannot afford');
-  assert.equal(inv.view('p').marks, START_MARKS - OUTFIT.olive.price, 'a refused box costs nothing');
-  const saved = new Inventory({ data: JSON.parse(JSON.stringify(inv.toJSON())) });
+  const saved = new Inventory({ data: JSON.parse(JSON.stringify(inv.toJSON())), now: () => now });
   assert.deepEqual(saved.view('p'), inv.view('p'));
   for (let i = 0; i < 100; i++) assert.ok(OUTFIT[botLook(Math.random).outfit]);
-  assert.ok(raidMarks(0) > 0);
 });
 
-test('raids pay marks, and the lobby handles locker messages end to end', () => {
+test('every rank-up pays a bag, $ credit and a 72h trial outfit that expires', () => {
+  let now = 5_000_000;
+  const inv = new Inventory({ now: () => now, rnd: seeded(9) });
+  const got = inv.rankUp('p', 1, 4);
+  assert.equal(got.length, 3);
+  const v = inv.view('p');
+  assert.equal(Object.values(v.boxes).reduce((a, b) => a + b, 0), 1 + 3);
+  assert.ok(v.credit > 0);
+  const trial = got[0].trial.id;
+  assert.ok(!OUTFIT[trial].basic && !v.owned.includes(trial));
+  assert.ok(inv.equip('p', trial).ok, 'a trial can be worn');
+  assert.equal(inv.look('p').outfit, trial);
+  now += TRIAL_MS + 1;
+  assert.equal(inv.look('p').outfit, 'basic-0', 'expired trials come off');
+  assert.equal(inv.equip('p', trial).ok, false);
+  assert.ok(!(trial in inv.view('p').trials));
+});
+
+test('the lobby sells for USDC/USDT, and rank-ups arrive with the result', () => {
   const out = [];
   const wallet = new MemoryWallet();
   const lobby = new Lobby({ wallet, send: (cid, m) => out.push(m), newToken: () => 'tok00001', bots: false, prepSeconds: 1, practice: true });
@@ -115,14 +144,16 @@ test('raids pay marks, and the lobby handles locker messages end to end', () => 
   lobby.connect(1);
   lobby.handle(1, { t: 'hello', name: 'me' });
   const w = last('welcome');
-  assert.equal(w.locker.marks, START_MARKS);
-  assert.ok(w.catalog.boxes.length === BOXES.length);
+  assert.equal(w.locker.boxes.street, 1);
+  assert.equal(w.catalog.boxes.length, BOXES.length);
   lobby.handle(1, { t: 'box', id: 'street' });
-  const opened = last('locker');
-  assert.equal(opened.op, 'box');
-  assert.ok(OUTFIT[opened.result.item]);
-  assert.equal(opened.locker.marks, START_MARKS - BOX.street.price);
-  lobby.handle(1, { t: 'equip', id: opened.result.item });
+  assert.ok(last('locker').result.free);
+  const usdc = BigInt(wallet.balance('tok00001', 'USDC'));
+  lobby.handle(1, { t: 'box', id: 'vault' });
+  const paid = last('locker');
+  assert.equal(paid.op, 'box');
+  assert.equal(BigInt(wallet.balance('tok00001', 'USDC')), usdc - BigInt(BOX.vault.price) * 10n ** 4n, 'USDC has 6 decimals: cents × 10⁴');
+  lobby.handle(1, { t: 'equip', id: paid.result.item });
   lobby.handle(1, { t: 'body', id: 'f' });
   assert.equal(last('locker').locker.body, 'f');
 
@@ -131,11 +162,14 @@ test('raids pay marks, and the lobby handles locker messages end to end', () => 
   const room = lobby.rooms.get(100);
   for (let i = 0; i < CFG.TICK_RATE * 2 && room.state !== 'live'; i++) lobby.tick();
   const me = room.world.players.get(room.clients.get(1).pid);
-  assert.equal(me.outfit, opened.result.item, 'the equipped outfit goes into the raid');
+  assert.equal(me.outfit, paid.result.item, 'the equipped outfit goes into the raid');
   assert.equal(me.body, 'f');
-  room.world.kill(me, null, 'storm');
+  me.kills = 3;
+  me.status = 'alive';
+  room.world.extract(me);
   lobby.tick();
   const res = last('result');
-  assert.ok(res.marks.gained > 0);
-  assert.equal(res.marks.total, START_MARKS - BOX.street.price + res.marks.gained);
+  assert.ok(res.rank.after.rank > res.rank.before.rank, 'a good first raid ranks up');
+  assert.equal(res.rewards.length, res.rank.after.rank - res.rank.before.rank);
+  assert.ok(res.locker.credit > 0);
 });

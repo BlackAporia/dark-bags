@@ -4,7 +4,7 @@ import { cleanName } from './wallet.js';
 import { botName } from './bot.js';
 import { PriceBook, unitsAtEntryRate } from './assets.js';
 import { RankBook, botRank, raidXp } from './ranks.js';
-import { Inventory, botLook, raidMarks, RANK_UP_MARKS, OUTFIT } from './cosmetics.js';
+import { Inventory, botLook, OUTFIT } from './cosmetics.js';
 
 /**
  * A table at one stake level.
@@ -362,12 +362,12 @@ export class RoomCore {
       // career rank: every raid pays, win or lose
       const earned = raidXp(p, { practice: this.practice });
       const { before, after } = this.ranks.add(c.token, earned.total);
-      // marks for the locker: a share of the rank XP, plus a bonus per rank gained
-      const marksGained = raidMarks(earned.total) + (after.rank - before.rank) * RANK_UP_MARKS;
-      const marks = this.inventory.addMarks(c.token, marksGained);
+      // every rank gained pays a luck bag, $ credit and a 72h trial outfit
+      const rewards = this.inventory.rankUp(c.token, before.rank, after.rank);
       this.send(c.cid, {
         t: 'result',
-        marks: { gained: marksGained, total: marks },
+        rewards,
+        locker: this.inventory.view(c.token),
         rank: { gained: earned.total, parts: earned.parts, before, after },
         status: p.status,
         payout: p.payout,

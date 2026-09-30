@@ -8,9 +8,12 @@
 //   - smart drops: while you are missing items of the rolled rarity, you get one
 //     you don't own; duplicates only happen once you own them all
 //   - duplicates turn into scrap, and scrap crafts any outfit you choose
-//   - everything is permanent: no 7-day rentals
-//   - boxes cost marks, earned by playing (raids, rank-ups), never real tokens:
-//     paid random rewards are gambling law in many places
+//   - bought items are permanent; timed outfits only come free, as rank-up trials
+//
+// One currency: $, pegged 1:1 to USDC/USDT. A purchase spends $ credit first (bonus
+// money from rank-ups, shop-only, never withdrawable), then the player's USDC or
+// USDT balance. Every rank-up pays a luck box ("bag"), some $ credit and a random
+// outfit to try for 72 hours.
 // Nothing here changes how a runner plays. It's all looks.
 
 export const BODIES = ['m', 'f'];
@@ -33,17 +36,17 @@ const BASIC_NAMES = ['Red', 'Sky', 'Moss', 'Magenta', 'Sun', 'Violet', 'Mint', '
 
 export const OUTFITS = [
   ...BASIC.map((color, i) => ({ id: `basic-${i}`, name: `${BASIC_NAMES[i]} Runner`, rarity: 'common', color, head: 'none', basic: true })),
-  { id: 'olive', name: 'Olive Drab', rarity: 'common', color: '#8a9a5b', head: 'cap', price: 150 },
-  { id: 'slate', name: 'Slate', rarity: 'common', color: '#8c9aab', head: 'beanie', price: 150 },
-  { id: 'rust', name: 'Rust', rarity: 'common', color: '#c4561c', head: 'bandana', price: 150 },
-  { id: 'denim', name: 'Denim', rarity: 'common', color: '#5b82c4', head: 'cap', price: 150 },
-  { id: 'khaki', name: 'Khaki', rarity: 'common', color: '#c3b091', head: 'helmet', price: 150 },
-  { id: 'night-ops', name: 'Night Ops', rarity: 'rare', color: '#6f8fe8', accent: '#1d2745', head: 'helmet', price: 450 },
-  { id: 'hazard', name: 'Hazard', rarity: 'rare', color: '#ffb000', accent: '#1a1a1a', head: 'beanie', price: 450 },
-  { id: 'arctic', name: 'Arctic', rarity: 'rare', color: '#e8f1ff', accent: '#9fd3ff', head: 'beanie', price: 450 },
-  { id: 'toxic', name: 'Toxic', rarity: 'rare', color: '#9ef01a', accent: '#2b2b2b', head: 'mask', price: 450 },
-  { id: 'desert', name: 'Desert Storm', rarity: 'rare', color: '#d9b77e', accent: '#7a5a2a', head: 'helmet', price: 450 },
-  { id: 'neon', name: 'Neon Pink', rarity: 'rare', color: '#ff4fd8', accent: '#ffffff', head: 'bandana', price: 450 },
+  { id: 'olive', name: 'Olive Drab', rarity: 'common', color: '#8a9a5b', head: 'cap', price: 49 },
+  { id: 'slate', name: 'Slate', rarity: 'common', color: '#8c9aab', head: 'beanie', price: 49 },
+  { id: 'rust', name: 'Rust', rarity: 'common', color: '#c4561c', head: 'bandana', price: 49 },
+  { id: 'denim', name: 'Denim', rarity: 'common', color: '#5b82c4', head: 'cap', price: 49 },
+  { id: 'khaki', name: 'Khaki', rarity: 'common', color: '#c3b091', head: 'helmet', price: 49 },
+  { id: 'night-ops', name: 'Night Ops', rarity: 'rare', color: '#6f8fe8', accent: '#1d2745', head: 'helmet', price: 149 },
+  { id: 'hazard', name: 'Hazard', rarity: 'rare', color: '#ffb000', accent: '#1a1a1a', head: 'beanie', price: 149 },
+  { id: 'arctic', name: 'Arctic', rarity: 'rare', color: '#e8f1ff', accent: '#9fd3ff', head: 'beanie', price: 149 },
+  { id: 'toxic', name: 'Toxic', rarity: 'rare', color: '#9ef01a', accent: '#2b2b2b', head: 'mask', price: 149 },
+  { id: 'desert', name: 'Desert Storm', rarity: 'rare', color: '#d9b77e', accent: '#7a5a2a', head: 'helmet', price: 149 },
+  { id: 'neon', name: 'Neon Pink', rarity: 'rare', color: '#ff4fd8', accent: '#ffffff', head: 'bandana', price: 149 },
   { id: 'ghost', name: 'Ghost', rarity: 'epic', color: '#dfe7ff', head: 'hood', fx: 'ghost' },
   { id: 'blood-moon', name: 'Blood Moon', rarity: 'epic', color: '#e0233a', accent: '#ffb3b3', head: 'horns', fx: 'glow' },
   { id: 'circuit', name: 'Circuit', rarity: 'epic', color: '#00f5d4', accent: '#0b3d36', head: 'helmet', fx: 'pulse' },
@@ -60,18 +63,29 @@ export const OUTFIT = Object.fromEntries(OUTFITS.map((o) => [o.id, o]));
 export const DEFAULT_OUTFIT = 'basic-0';
 
 // odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss)
+// prices are in US cents
 export const BOXES = [
-  { id: 'street', name: 'Street Box', price: 120, odds: { common: 70, rare: 24, epic: 5, legendary: 1, mythic: 0 }, jackpot: 'legendary' },
-  { id: 'vault', name: 'Vault Box', price: 400, odds: { common: 35, rare: 43, epic: 16, legendary: 5.5, mythic: 0.5 }, jackpot: 'legendary' },
-  { id: 'golden', name: 'Golden Box', price: 1200, odds: { common: 0, rare: 45, epic: 35, legendary: 17, mythic: 3 }, jackpot: 'mythic' },
+  { id: 'street', name: 'Street Bag', price: 99, odds: { common: 70, rare: 24, epic: 5, legendary: 1, mythic: 0 }, jackpot: 'legendary' },
+  { id: 'vault', name: 'Vault Bag', price: 299, odds: { common: 35, rare: 43, epic: 16, legendary: 5.5, mythic: 0.5 }, jackpot: 'legendary' },
+  { id: 'golden', name: 'Golden Bag', price: 799, odds: { common: 0, rare: 45, epic: 35, legendary: 17, mythic: 3 }, jackpot: 'mythic' },
 ];
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
 export const PITY = { epic: 10, legendary: 40 }; // guaranteed at or better, by the Nth open of a box
 
-// marks: the soft currency. Earned, never bought.
-export const START_MARKS = 300; // enough for two Street Boxes on day one
-export const RANK_UP_MARKS = 150;
-export const raidMarks = (rankXp) => Math.max(5, Math.round(rankXp * 0.3));
+export const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
+export const TRIAL_MS = 72 * 3600 * 1000;
+export const START_BOXES = { street: 1 }; // a welcome bag for every new runner
+
+// What one rank-up pays: a luck box (better ones as you climb), $ credit, a 72h trial outfit.
+export function rankReward(rank, rnd) {
+  const g = Math.min(1, rank / 90);
+  const r = rnd();
+  const box = r < 0.05 + g * 0.2 ? 'golden' : r < 0.3 + g * 0.35 ? 'vault' : 'street';
+  const credit = Math.round(10 + rank * 2 + rnd() * (20 + rank * 3)); // cents
+  const tr = rnd();
+  const rarity = tr < 0.55 ? 'rare' : tr < 0.85 ? 'epic' : tr < 0.97 ? 'legendary' : 'mythic';
+  return { box, credit, rarity };
+}
 
 // ------------------------------------------------------------------ rolls
 
@@ -112,7 +126,7 @@ export function botLook(rnd) {
 // ------------------------------------------------------------- inventory
 
 function fresh() {
-  return { marks: START_MARKS, scrap: 0, owned: [], outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, totalMarks: 0 };
+  return { credit: 0, scrap: 0, owned: [], trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
 }
 
 /**
@@ -120,10 +134,11 @@ function fresh() {
  * { ok: true, ... } or { ok: false, error } and never throws on player input.
  */
 export class Inventory {
-  constructor({ data = {}, onChange = null, rnd = Math.random } = {}) {
+  constructor({ data = {}, onChange = null, rnd = Math.random, now = () => Date.now() } = {}) {
     this.data = new Map(Object.entries(data).map(([k, v]) => [k, { ...fresh(), ...v }]));
     this.onChange = onChange;
     this.rnd = rnd;
+    this.now = now;
   }
 
   rec(key) {
@@ -133,16 +148,32 @@ export class Inventory {
 
   owns(key, id) {
     const o = OUTFIT[id];
-    return !!o && (o.basic || this.rec(key).owned.includes(id));
+    const r = this.rec(key);
+    return !!o && (o.basic || r.owned.includes(id) || (r.trials[id] ?? 0) > this.now());
+  }
+
+  // Pay `cents`: $ credit first, the rest through `external(cents)` (USDC/USDT), all or nothing.
+  charge(key, cents, external) {
+    const r = this.rec(key);
+    const fromCredit = Math.min(r.credit, cents);
+    const rest = cents - fromCredit;
+    if (rest > 0 && !(external && external(rest))) return false;
+    r.credit -= fromCredit;
+    r.spent += cents;
+    return { fromCredit, external: rest };
   }
 
   // what the client needs to render the locker
   view(key) {
     const r = this.rec(key);
+    const now = this.now();
+    for (const [id, until] of Object.entries(r.trials)) if (until <= now) delete r.trials[id];
     return {
-      marks: r.marks,
+      credit: r.credit,
       scrap: r.scrap,
       owned: r.owned,
+      trials: r.trials,
+      boxes: r.boxes,
       outfit: r.outfit,
       body: r.body,
       opened: r.opened,
@@ -160,13 +191,28 @@ export class Inventory {
     this.onChange?.(this);
   }
 
-  addMarks(key, n) {
+  // rank-ups: one reward per rank gained
+  rankUp(key, fromRank, toRank) {
     const r = this.rec(key);
-    const add = Math.max(0, Math.floor(n));
-    r.marks += add;
-    r.totalMarks += add;
-    this.changed();
-    return r.marks;
+    const out = [];
+    for (let rank = fromRank + 1; rank <= toRank; rank++) {
+      const w = rankReward(rank, this.rnd);
+      r.boxes[w.box] = (r.boxes[w.box] ?? 0) + 1;
+      r.credit += w.credit;
+      // a trial of something you don't have yet (any rarity if you own them all)
+      const all = OUTFITS.filter((o) => !o.basic && !r.owned.includes(o.id));
+      const pool = all.filter((o) => o.rarity === w.rarity);
+      const from = pool.length ? pool : all;
+      let trial = null;
+      if (from.length) {
+        const o = from[Math.floor(this.rnd() * from.length)];
+        r.trials[o.id] = Math.max(r.trials[o.id] ?? 0, this.now()) + TRIAL_MS;
+        trial = { id: o.id, until: r.trials[o.id] };
+      }
+      out.push({ rank, box: w.box, credit: w.credit, trial });
+    }
+    if (out.length) this.changed();
+    return out;
   }
 
   equip(key, id) {
@@ -183,14 +229,15 @@ export class Inventory {
     return { ok: true };
   }
 
-  buy(key, id) {
+  buy(key, id, external) {
     const o = OUTFIT[id];
     const r = this.rec(key);
     if (!o || !o.price) return { ok: false, error: 'That outfit is not sold in the shop.' };
-    if (this.owns(key, id)) return { ok: false, error: 'You already own it.' };
-    if (r.marks < o.price) return { ok: false, error: `Not enough marks (${o.price} needed).` };
-    r.marks -= o.price;
+    if (r.owned.includes(id) || o.basic) return { ok: false, error: 'You already own it.' };
+    const paid = this.charge(key, o.price, external);
+    if (!paid) return { ok: false, error: `Not enough $ (${usd(o.price)} needed).` };
     r.owned.push(id);
+    delete r.trials[id];
     this.changed();
     return { ok: true, item: id };
   }
@@ -199,21 +246,26 @@ export class Inventory {
     const o = OUTFIT[id];
     const r = this.rec(key);
     if (!o || o.basic) return { ok: false, error: 'That cannot be crafted.' };
-    if (this.owns(key, id)) return { ok: false, error: 'You already own it.' };
+    if (r.owned.includes(id)) return { ok: false, error: 'You already own it.' };
     const cost = RARITIES[o.rarity].craft;
     if (r.scrap < cost) return { ok: false, error: `Not enough scrap (${cost} needed).` };
     r.scrap -= cost;
     r.owned.push(id);
+    delete r.trials[id];
     this.changed();
     return { ok: true, item: id };
   }
 
-  open(key, boxId) {
+  // a bag you hold opens free; otherwise it is bought at its price
+  open(key, boxId, external) {
     const box = BOX[boxId];
     const r = this.rec(key);
-    if (!box) return { ok: false, error: 'Unknown box.' };
-    if (r.marks < box.price) return { ok: false, error: `Not enough marks (${box.price} needed).` };
-    r.marks -= box.price;
+    if (!box) return { ok: false, error: 'Unknown bag.' };
+    let free = false;
+    if ((r.boxes[boxId] ?? 0) > 0) {
+      r.boxes[boxId]--;
+      free = true;
+    } else if (!this.charge(key, box.price, external)) return { ok: false, error: `Not enough $ (${usd(box.price)} needed).` };
     const p = (r.pity[boxId] ??= { sinceEpic: 0, sinceLegendary: 0 });
     const roll = rollRarity(box, p, this.rnd);
     const item = pickOutfit(roll.rarity, new Set(r.owned), this.rnd);
@@ -222,12 +274,15 @@ export class Inventory {
     if (dup) {
       scrap = RARITIES[item.rarity].scrap;
       r.scrap += scrap;
-    } else r.owned.push(item.id);
+    } else {
+      r.owned.push(item.id);
+      delete r.trials[item.id];
+    }
     p.sinceEpic = rank(item.rarity) >= rank('epic') ? 0 : p.sinceEpic + 1;
     p.sinceLegendary = rank(item.rarity) >= rank('legendary') ? 0 : p.sinceLegendary + 1;
     r.opened++;
     this.changed();
-    return { ok: true, box: boxId, item: item.id, rarity: item.rarity, dup, scrap, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
+    return { ok: true, box: boxId, item: item.id, rarity: item.rarity, dup, scrap, free, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
   }
 
   toJSON() {

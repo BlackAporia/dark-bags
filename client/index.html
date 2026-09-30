@@ -104,7 +104,15 @@
     <div class="who">
       <label for="name" class="eyebrow">Runner name</label>
       <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="runner">
-      <div id="skins" class="skins" role="radiogroup" aria-label="Colour"></div>
+      <div id="locker-tile" class="locker-tile" hidden>
+        <canvas id="lt-canvas" aria-label="Your runner"></canvas>
+        <div class="lt-body">
+          <p class="eyebrow">Wearing</p>
+          <p id="lt-name" class="lt-name"></p>
+          <p id="lt-rarity" class="fine"></p>
+          <p class="lt-foot"><b id="lt-marks" class="lt-marks"></b><button id="open-locker" class="ghost" type="button">Locker · shop · bags</button></p>
+        </div>
+      </div>
       <div id="rank-card" class="rank-card" hidden></div>
     </div>
 
@@ -154,13 +162,79 @@
     <p id="res-amount" class="res-amount">+0</p>
     <p id="res-detail" class="res-detail"></p>
     <div id="res-rank" class="res-rank" hidden></div>
+    <div id="res-rewards" class="res-rewards" hidden></div>
     <div class="res-actions">
       <button id="res-again" class="cta" type="button">Ready for the next raid</button>
       <button id="res-tables" class="ghost" type="button">Tables</button>
-      <a id="res-share" class="ghost share" href="#" target="_blank" rel="noopener" hidden>Post on X</a>
+      <button id="res-share" class="ghost share" type="button">Share card</button>
     </div>
   </div>
 </section>
+
+<!-- share card for X -->
+<dialog id="dlg-share" class="dlg dlg-share" aria-labelledby="share-title">
+  <div class="dlg-inner">
+    <header class="dlg-head"><h2 id="share-title">Share</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <img id="share-img" class="share-img" alt="Your share card">
+    <div class="share-actions">
+      <button id="share-x" type="button" class="cta">Post on 𝕏</button>
+      <button id="share-copy" type="button" class="ghost">Copy image</button>
+      <a id="share-save" class="ghost" href="#" download>Save PNG</a>
+      <button id="share-native" type="button" class="ghost" hidden>Share…</button>
+      <button id="share-close" type="button" class="link">Close</button>
+    </div>
+    <p id="share-status" class="dlg-status"></p>
+  </div>
+</dialog>
+
+<!-- locker: character, outfits, shop, luck boxes -->
+<dialog id="dlg-locker" class="dlg dlg-locker" aria-labelledby="lk-title">
+  <div class="lk">
+    <header class="lk-head">
+      <h2 id="lk-title">Locker</h2>
+      <p class="lk-wallet"><span title="Shop credit from rank-ups: spent first, shop only">Credit <b id="lk-marks">$0.00</b></span><span title="USDC + USDT in your balance, 1:1 with $">USDC/USDT <b id="lk-stable">$0.00</b></span><span title="Scrap: from duplicate drops, crafts any outfit">⬡ <b id="lk-scrap">0</b></span></p>
+      <button type="button" class="x" data-close aria-label="Close">×</button>
+    </header>
+    <div class="lk-main">
+      <section class="lk-left">
+        <canvas id="lk-stage" class="lk-stage" aria-label="Your runner"></canvas>
+        <div id="lk-body" class="mode lk-bodysel" role="radiogroup" aria-label="Character">
+          <button type="button" class="seg" role="radio" data-body="m">Him</button>
+          <button type="button" class="seg" role="radio" data-body="f">Her</button>
+        </div>
+        <div id="lk-detail" class="lk-detail"></div>
+      </section>
+      <section class="lk-right">
+        <div class="mode lk-tabs" role="tablist">
+          <button type="button" class="seg" role="tab" data-lt="outfits">Outfits</button>
+          <button type="button" class="seg" role="tab" data-lt="shop">Shop</button>
+          <button type="button" class="seg" role="tab" data-lt="boxes">Luck bags</button>
+        </div>
+        <div data-lp="outfits" class="lk-pane">
+          <div class="lk-bar"><div id="lk-filter" class="lk-filter">
+            <button type="button" data-f="all" aria-pressed="true">All</button><button type="button" data-f="owned">Owned</button><button type="button" data-f="common">Common</button><button type="button" data-f="rare">Rare</button><button type="button" data-f="epic">Epic</button><button type="button" data-f="legendary">Legendary</button><button type="button" data-f="mythic">Mythic</button>
+          </div><span id="lk-count" class="fine"></span></div>
+          <div id="lk-grid" class="lk-grid"></div>
+        </div>
+        <div data-lp="shop" class="lk-pane" hidden>
+          <p class="fine">Straight buys in $ (shop credit first, then USDC or USDT). Epic and up come from luck bags or scrap.</p>
+          <div id="lk-shop" class="lk-grid"></div>
+        </div>
+        <div data-lp="boxes" class="lk-pane" hidden>
+          <p class="fine">Odds are exact and rolled on the server. Every bag has pity, you never get a duplicate until you own a whole rarity, and duplicates become scrap to craft what you want. Every rank-up gives you a bag, $ credit and a 72-hour trial outfit.</p>
+          <div id="lk-boxes" class="lk-boxes"></div>
+        </div>
+      </section>
+    </div>
+    <div id="lk-roll" class="lk-roll" hidden>
+      <div id="lk-roll-inner" class="rl">
+        <p class="rl-kicker">Opening…</p>
+        <div id="lk-window" class="rl-window"><div id="lk-strip" class="rl-strip"></div><i class="rl-marker"></i></div>
+      </div>
+      <div id="lk-reveal" class="rv" hidden></div>
+    </div>
+  </div>
+</dialog>
 
 <!-- real-token mode: sign in -->
 <dialog id="dlg-connect" class="dlg" aria-labelledby="dlg-connect-title">
