@@ -484,4 +484,5 @@ export default {
   'net.waking': "Sunucu uyanıyor (ücretsiz barındırma kimse oynamazken uyur, bir dakikaya kadar)… Bu sırada antrenman çalışır.",
   'shop.bulk': "Her {n}. kutu bedava",
   'shop.bulkOn': "Dahil bedava kutu: {n}",
+  'net.online': "{n} çevrimiçi",
 };

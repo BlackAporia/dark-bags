@@ -75,6 +75,7 @@ const el = {
   extName: $('ext-name'),
   extBar: $('ext-bar'),
   spect: $('spect'),
+  ping: $('ping'),
   glShop: $('gl-shop'),
   glCr: $('gl-cr'),
   spText: $('sp-text'),
@@ -115,6 +116,7 @@ const app = {
 };
 const send = (m) => app.transport?.send(m);
 const game = new GameClient({ renderer, input, sfx, send, el });
+game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
 // share cards: everything that happens can be posted
 const myLook = () => ({ outfit: app.locker?.outfit ?? 'basic-0', body: app.locker?.body ?? 'm' });
 function shareMoment(kind, data = {}) {
@@ -297,6 +299,10 @@ function renderLobby() {
   st.classList.toggle('bad', app.status === 'closed' || app.status === 'error');
   if (app.mode === 'practice') st.textContent = t('net.practice');
   else if (app.status === 'open') st.textContent = t('net.open');
+  // how many people are on the server right now (online only)
+  const on = $('tb-online');
+  on.hidden = !(app.mode === 'online' && app.status === 'open' && app.online);
+  if (!on.hidden) on.querySelector('b').textContent = t('net.online', { n: app.online });
   // a free host sleeps when idle: the first connection can take up to a minute
   else if (!app.everOpen && performance.now() - (app.connectT ?? 0) > 4000) st.textContent = t('net.waking');
   else if (app.status === 'connecting') st.textContent = t('net.connecting');
@@ -567,6 +573,12 @@ function onStatus(st) {
 
 // the locker owns its own messages, and sees everything else after the app has updated
 function onMessage(m) {
+  // ping probe: echo the server's stamp straight back, before anything else
+  if (m.t === 'probe') return send({ t: 'probe', s: m.s });
+  if (m.t === 'ping') {
+    app.ping = m.ms;
+    return;
+  }
   if (m.t !== 'locker') handleMessage(m);
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
@@ -589,12 +601,14 @@ function handleMessage(m) {
       app.prices = new PriceBook(app.assets);
       app.balances = m.balances ?? {};
       app.tables = m.tables;
+      app.online = m.online ?? null;
       app.rank = m.rank ?? null;
       app.chain = m.chain ?? null; // real-token server, or null for play money
       renderLobby();
       break;
     case 'tables':
       app.tables = m.tables;
+      if (m.online != null) app.online = m.online;
       app.balances = m.balances ?? app.balances;
       if (m.assets) {
         app.assets = m.assets; // live prices in real-token mode

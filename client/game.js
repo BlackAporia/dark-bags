@@ -613,7 +613,7 @@ export class GameClient {
       const skins = settings.skins === 'all'; // settings: draw others' outfits and weapon skins?
       const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c, outfit: skins ? p.o : null, body: p.g, ws: skins ? p.ws : null });
       this.woundCheck(an, p.h, now);
-      figures.push({ a: an, color: p.c, name: p.n, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
+      figures.push({ a: an, color: p.c, name: p.n, ping: p.pg, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
     this.anims.prune(now);
     const ba = new Map(a.bullets.map((x) => [x.i, x]));
@@ -750,6 +750,13 @@ export class GameClient {
     }
     const last = this.snaps[this.snaps.length - 1];
     if (last) el.alive.textContent = t('hud.alive', { n: last.alive });
+    // your round trip to the server (online only; practice runs in this tab)
+    const ms = this.ping?.();
+    el.ping.hidden = ms == null;
+    if (ms != null) {
+      el.ping.textContent = `${ms} ms`;
+      el.ping.className = `ping-chip ${ms < 80 ? 'good' : ms < 160 ? 'ok' : 'bad'}`;
+    }
     const hp = Math.max(0, you.hp);
     el.hpBar.style.width = `${hp}%`;
     el.hpBar.style.background = hpColor(hp / 100);

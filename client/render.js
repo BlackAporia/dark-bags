@@ -647,6 +647,13 @@ export class Renderer {
     ctx.fillRect(p.head.x - w / 2 - 1, top - 1, w + 2, 6);
     ctx.fillStyle = hpColor(frac);
     ctx.fillRect(p.head.x - w / 2, top, w * frac, 4);
+    if (f.ping != null) {
+      // their round trip to the server, right of the health bar
+      ctx.font = `700 8px ${F_UI}`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = f.ping < 80 ? '#3ddc97' : f.ping < 160 ? '#ffd166' : '#ff6b6b';
+      ctx.fillText(`${f.ping}ms`, p.head.x + w / 2 + 3, top + 4);
+    }
     if (f.isMe || !f.noName) {
       // your own name too, in gold, so you can find yourself in a fight
       // team modes: allies green, enemies red

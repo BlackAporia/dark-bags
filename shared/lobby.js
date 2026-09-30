@@ -51,6 +51,25 @@ export class Lobby {
     return [...this.rooms.values()].map((r) => r.info());
   }
 
+  // people connected right now (every signed session, in a raid or browsing)
+  online() {
+    let n = 0;
+    for (const s of this.sessions.values()) if (s.token) n++;
+    return n;
+  }
+
+  // Ping: every couple of seconds the server stamps a probe with its own clock and the
+  // client echoes it straight back. Only the latest stamp counts, so a client can make its
+  // ping look worse (by waiting) but never better. The value is shown to everyone in a raid.
+  probe() {
+    const now = this.now();
+    for (const [cid, s] of this.sessions) {
+      if (!s.token) continue;
+      s.probeAt = now;
+      this.send(cid, { t: 'probe', s: now });
+    }
+  }
+
   connect(cid) {
     this.sessions.set(cid, { token: null, account: null, name: 'runner', room: null, busy: false });
   }
@@ -89,6 +108,7 @@ export class Lobby {
         token: s.token,
         balances: this.balances(s),
         tables: this.tables(),
+        online: this.online(),
         assets: this.prices.list(),
         rank: this.key(s) ? this.ranks.get(this.key(s)) : null,
         career: this.key(s) ? this.ranks.career(this.key(s)) : null,
@@ -118,6 +138,15 @@ export class Lobby {
     }
 
     switch (msg.t) {
+      case 'probe': {
+        if (s.probeAt == null || msg.s !== s.probeAt) break;
+        const rtt = Math.max(0, Math.min(9999, this.now() - s.probeAt));
+        s.probeAt = null;
+        s.ping = s.ping == null ? Math.round(rtt) : Math.round(s.ping * 0.6 + rtt * 0.4);
+        s.room?.setPing?.(cid, s.ping);
+        this.send(cid, { t: 'ping', ms: s.ping });
+        break;
+      }
       case 'ping':
         this.send(cid, { t: 'pong', c: msg.c });
         return;
@@ -336,8 +365,9 @@ export class Lobby {
   // periodic refresh for people browsing tables
   broadcastTables() {
     const t = this.tables();
+    const online = this.online();
     for (const [cid, s] of this.sessions) {
-      if (s.token && !s.room) this.send(cid, { t: 'tables', tables: t, balances: this.balances(s), assets: this.cashier ? this.prices.list() : undefined });
+      if (s.token && !s.room) this.send(cid, { t: 'tables', tables: t, online, balances: this.balances(s), assets: this.cashier ? this.prices.list() : undefined });
     }
   }
 }
