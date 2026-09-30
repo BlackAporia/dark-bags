@@ -77,6 +77,13 @@ export class RoomCore {
     return [...this.clients.values()].filter((c) => c.ready);
   }
 
+  // the lobby measured this client's round trip: runners in the raid show it over their head
+  setPing(cid, ms) {
+    const c = this.clients.get(cid);
+    const p = c?.pid && this.world && this.state === 'live' ? this.world.players.get(c.pid) : null;
+    if (p) p.ping = ms;
+  }
+
   inRaid(c) {
     const p = c.pid && this.world && this.state === 'live' ? this.world.players.get(c.pid) : null;
     return !!p && p.status === 'alive';

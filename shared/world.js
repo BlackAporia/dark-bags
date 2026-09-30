@@ -1063,6 +1063,7 @@ export class World {
         ...(p.title ? { tt: p.title } : {}),
         ...(this.teamSize ? { tm: p.team } : {}),
         ...(p.ws ? { ws: p.ws } : {}),
+        ...(p.ping != null ? { pg: p.ping } : {}),
         o: p.outfit,
         g: p.body,
       });

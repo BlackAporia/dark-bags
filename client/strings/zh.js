@@ -484,4 +484,5 @@ export default {
   'net.waking': "正在唤醒服务器（免费主机无人游玩时会休眠，最多一分钟）…… 练习模式可以照常游玩。",
   'shop.bulk': "每 {n} 个箱子送 1 个",
   'shop.bulkOn': "已含免费箱子：{n}",
+  'net.online': "{n} 人在线",
 };

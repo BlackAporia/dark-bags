@@ -492,4 +492,5 @@ export default {
   'net.waking': "Waking the server up (free hosting sleeps when nobody plays, up to a minute)… Practice works meanwhile.",
   'shop.bulk': "Every {n}th box free",
   'shop.bulkOn': "Includes {n} free",
+  'net.online': "{n} online",
 };

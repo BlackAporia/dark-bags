@@ -1109,12 +1109,14 @@ body.ready #lobby { animation: menu-in 0.6s ease both; }
 .tb-brand { font: 900 26px/1 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; }
 .tb-brand b { color: var(--loot); margin-inline-start: 4px; }
 .tb-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tb-right > * { flex-shrink: 0; }
 .tb-chip { white-space: nowrap; display: inline-flex; align-items: baseline; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--glass); cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
 .tb-chip:hover { border-color: var(--dust); }
 .tb-chip .tb-k { font: 600 10px/1 var(--f-ui); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dust); }
 .tb-chip b { font-size: 15px; }
 .tb-chip.money b { color: var(--paper); }
 .tb-chip.shop b { color: #b5e48c; }
+.tb-chip.shop { flex-direction: row; gap: 8px; } /* not the .shop page layout */
 .tb-chip.pop { animation: chip-pop 0.6s ease; }
 @keyframes chip-pop { 30% { transform: scale(1.12); border-color: #b5e48c; box-shadow: 0 0 24px -4px #b5e48c; } }
 .topbar .lang-pick { position: static; }
@@ -1445,3 +1447,12 @@ img.wimg { width: 100% !important; max-width: 160px; height: auto !important; as
 .bulk-note { margin: 2px 0 6px; font-size: 11px; color: var(--dust); text-align: center; }
 .bulk-note.on { color: #3ddc97; font-weight: 700; }
 .box-go s { opacity: 0.55; font-weight: 500; margin-right: 2px; }
+
+/* live player count and ping */
+.tb-online { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid rgba(61, 220, 151, 0.35); border-radius: 999px; background: rgba(61, 220, 151, 0.08); font: 700 12px/1 var(--f-num); color: #bff5dc; white-space: nowrap; }
+.tb-online .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #3ddc97; box-shadow: 0 0 8px #3ddc97; display: inline-block; }
+.ping-chip { font: 700 11px/1 var(--f-num); letter-spacing: 0.04em; opacity: 0.9; }
+.ping-chip.good { color: #3ddc97; }
+.ping-chip.ok { color: #ffd166; }
+.ping-chip.bad { color: #ff6b6b; }
+@media (max-width: 560px) { .tb-online { padding: 5px 8px; font-size: 11px; } }

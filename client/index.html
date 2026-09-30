@@ -25,6 +25,7 @@
     <span id="timer" class="timer">3:00</span>
     <span id="storm" class="storm-line">Storm moves in 0:30</span>
     <span id="alive" class="eyebrow">0 runners inside</span>
+    <span id="ping" class="ping-chip" hidden></span>
     <span id="golden" class="golden-tag" hidden data-i18n="hud.golden">Golden raid</span>
   </div>
   <canvas id="minimap" class="minimap" width="150" height="150" aria-label="Map with exits and the storm"></canvas>
@@ -95,6 +96,7 @@
   <header class="topbar">
     <div class="tb-brand" aria-hidden="true">DARK<b>BAGS</b></div>
     <div class="tb-right">
+      <span id="tb-online" class="tb-online" hidden><i class="live-dot" aria-hidden="true"></i><b></b></span>
       <button id="tb-wallet" class="tb-chip money" type="button" data-i18n-title="tb.wallet"><span class="tb-k" data-i18n="tb.wallet">Wallet</span><b id="balance" class="num">—</b></button>
       <button id="tb-credit" class="tb-chip shop" type="button" data-i18n-title="tb.shop"><span class="tb-k" data-i18n="tb.shop">Shop $</span><b id="tb-credit-v" class="num">$0</b></button>
       <label class="lang-pick"><span aria-hidden="true">🌐</span><select id="lang" aria-label="Language"></select></label>

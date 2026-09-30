@@ -217,6 +217,7 @@ function loop() {
 }
 loop();
 setInterval(() => lobby.broadcastTables(), 2000);
+setInterval(() => lobby.probe(), 2000);
 
 server.listen(PORT, () => {
   console.log(`DARK BAGS on http://localhost:${PORT}  (bots ${BOTS ? 'on' : 'off'}, raid ${ROUND_SECONDS}s, ${real ? `${real.cfg.network} tokens` : 'test tokens'})`);

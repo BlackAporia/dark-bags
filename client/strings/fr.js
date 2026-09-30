@@ -484,4 +484,5 @@ export default {
   'net.waking': "Réveil du serveur (l'hébergement gratuit s'endort quand personne ne joue, jusqu'à une minute)… L'entraînement marche en attendant.",
   'shop.bulk': "Une boîte sur {n} offerte",
   'shop.bulkOn': "Boîtes offertes incluses : {n}",
+  'net.online': "{n} en ligne",
 };

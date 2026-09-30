@@ -484,4 +484,5 @@ export default {
   'net.waking': "Despertando el servidor (el hosting gratuito se duerme cuando nadie juega, hasta un minuto)… Mientras tanto, la práctica funciona.",
   'shop.bulk': "Cada caja n.º {n} gratis",
   'shop.bulkOn': "Cajas gratis incluidas: {n}",
+  'net.online': "{n} en línea",
 };

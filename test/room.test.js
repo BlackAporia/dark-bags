@@ -240,3 +240,38 @@ test('in-game swap at the feed price minus the fee; chat is plain, short and rat
   assert.equal(lobby.chat.length, 1);
   lobby.handle(1, { t: 'chat', text: 'x'.repeat(500) });
 });
+
+test('ping: the server measures each client, only its own latest stamp counts, runners carry it', () => {
+  let clock = 1_000;
+  const { lobby, client, ticks } = setup();
+  lobby.now = () => clock;
+  const a = client('a', 'alice');
+  const b = client('b', 'bob');
+  assert.equal(a.last('welcome').online, 1, 'alice alone at first');
+  assert.equal(b.last('welcome').online, 2, 'then bob makes two');
+  lobby.probe();
+  const stamp = a.last('probe').s;
+  clock += 40;
+  lobby.handle('a', { t: 'probe', s: stamp - 30 }); // a forged, earlier stamp is ignored
+  assert.equal(a.last('ping'), undefined);
+  lobby.handle('a', { t: 'probe', s: stamp });
+  assert.equal(a.last('ping').ms, 40);
+  lobby.handle('a', { t: 'probe', s: stamp }); // replaying the same stamp does nothing
+  // in a raid, the measured ping rides on the runner and reaches the other players' snapshots
+  for (const c of ['a', 'b']) {
+    lobby.handle(c, { t: 'join', stake: 1000, mode: 'raid' });
+    lobby.handle(c, { t: 'ready', asset: 'USDC' });
+  }
+  ticks(CFG.PREP_SECONDS + 1);
+  lobby.probe();
+  clock += 70;
+  lobby.handle('a', { t: 'probe', s: a.last('probe').s });
+  const room = [...lobby.rooms.values()].find((r) => r.world);
+  const alice = [...room.world.players.values()].find((p) => p.name === 'alice');
+  assert.equal(alice.ping, Math.round(40 * 0.6 + 70 * 0.4));
+  const bob = [...room.world.players.values()].find((p) => p.name === 'bob');
+  alice.x = bob.x + 40;
+  alice.y = bob.y;
+  const seen = room.world.snapshotFor(bob.id).players.find((p) => p.n === 'alice');
+  assert.equal(seen.pg, alice.ping);
+});
