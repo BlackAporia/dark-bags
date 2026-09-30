@@ -19,32 +19,24 @@
 
 Сервер гри живе на Railway: не засинає, має диск для журналу грошей, регіон у Європі.
 Налаштування збірки в `railway.json` (Dockerfile, перевірка `/healthz`, одна копія).
-Сайт гри й далі на GitHub Pages і підключається до `wss://dark-bags.gg`. Vercel для
+Сайт гри й далі на GitHub Pages і підключається до `wss://dark-bags-production.up.railway.app`. Vercel для
 сервера не підходить: там немає постійних WebSocket-з'єднань і диска.
 
 1. railway.com → **New Project → Deploy from GitHub repo** → `BlackAporia/dark-bags`.
    Railway збирає `main` після кожного злиття.
 2. Сервіс → **Settings → Region → EU West (Amsterdam)**.
-3. **Settings → Networking → Generate Domain**: запасна адреса
-   `dark-bags-production.up.railway.app`, працює одразу з HTTPS. Гра підключається до
-   неї сама, поки `dark-bags.gg` не відповідає.
-4. **Свій домен `dark-bags.gg`**: Custom Domain → Railway показує два DNS-записи. Їх
-   додаєш там, де купив домен (Namecheap, Cloudflare, Porkbun…):
-
-   | Тип | Ім'я (Host) | Значення |
-   |---|---|---|
-   | CNAME | `@` (сам `dark-bags.gg`) | те, що показує Railway, напр. `ou1q5zqg.up.railway.app` |
-   | TXT | `_railway-verify` | `railway-verify=…` з Railway |
-
-   Для кореня домену (`@`) деякі реєстратори не дозволяють CNAME: тоді тип **ALIAS** або
-   **ANAME** (Namecheap, Porkbun), а в Cloudflare CNAME на корінь працює сам (CNAME
-   flattening; хмарку «Proxy» вимкни, лиши «DNS only»). Поки записи не поширяться
-   (від хвилин до кількох годин), Railway пише «Waiting for DNS update».
+3. **Settings → Networking → Generate Domain**: адреса
+   `dark-bags-production.up.railway.app`, працює одразу з HTTPS. Саме до неї
+   підключається гра.
+4. **Свій домен** (пізніше, коли купиш): Custom Domain → Railway покаже CNAME і TXT
+   записи, які додаєш у реєстратора домену. Потім домен прописується в гру
+   (`client/main.js`, `DEFAULT_SERVER`). Не вписуй у гру домен, який ще не твій: хто
+   його купить, отримає підключення всіх гравців.
 5. Правий клік на сервіс → **Attach Volume**, Mount Path `/data`. Образ сам віддає диск
    користувачу `node` при старті, нічого додатково вмикати не треба.
 6. **Variables**: поки `CHAIN=off`, `BOTS=1`. Реальні змінні з кроку 3 додаємо, коли онлайн
    на тестових токенах запрацює.
-7. `https://dark-bags.gg/healthz` має відповісти `"ok"`.
+7. `https://dark-bags-production.up.railway.app/healthz` має відповісти `"ok"`.
 
 Команди оператора (`npm run house -- …`): встанови Railway CLI
 (`npm i -g @railway/cli`), `railway login`, `railway link`, потім
@@ -79,7 +71,7 @@
 `PAYMASTER_API_KEY` (оплата газу за гравців), `STRK20_*` (приватні депозити). Без них
 працюють звичайні гаманці, Cartridge і публічні депозити.
 
-Після збереження змінних Railway перезапустить сервіс. Відкрий `https://dark-bags.gg/healthz`:
+Після збереження змінних Railway перезапустить сервіс. Відкрий `https://dark-bags-production.up.railway.app/healthz`:
 там має бути `"ok"`, а в логах (Deployments → View logs) рядок `cashier: sepolia, house 0x…`.
 
 Якщо хтось увійде з адреси, якої немає в `ALLOWLIST`, гра покаже йому його адресу.

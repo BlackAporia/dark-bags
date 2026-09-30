@@ -235,7 +235,7 @@ Netcode: 30 Hz authoritative simulation, 15 Hz snapshots (~0.5 KB each), client-
 
 **Render (simplest).** `render.yaml` is a blueprint: Render → New → Blueprint → pick this repo. The free plan supports WebSockets but sleeps after ~15 idle minutes, so the first visit after a pause takes ~50 s.
 
-**Railway (the live server).** `railway.json` builds the Dockerfile, health-checks `/healthz` and keeps one replica (the journal lives on one volume). New Project → Deploy from GitHub repo, region EU West, a volume at `/data`, and the domain `dark-bags.gg` (CNAME and TXT records at the registrar, as Railway shows them). The image starts as root only to hand the mounted volume to the `node` user, then drops privileges. The Pages build plays on `wss://dark-bags.gg`. Step by step (Ukrainian): [docs/LAUNCH.md](docs/LAUNCH.md). Vercel suits the static site only: no long-lived WebSocket server or disk.
+**Railway (the live server).** `railway.json` builds the Dockerfile, health-checks `/healthz` and keeps one replica (the journal lives on one volume). New Project → Deploy from GitHub repo, region EU West, a volume at `/data`, and a generated domain (a custom one later: CNAME and TXT records at the registrar, as Railway shows them). The image starts as root only to hand the mounted volume to the `node` user, then drops privileges. The Pages build plays on `wss://dark-bags-production.up.railway.app`. Step by step (Ukrainian): [docs/LAUNCH.md](docs/LAUNCH.md). Vercel suits the static site only: no long-lived WebSocket server or disk.
 
 **Docker (any VPS).**
 
