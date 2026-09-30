@@ -62,9 +62,27 @@ export const CFG = {
   GOLDEN_EVERY: 4,        // every Nth raid is golden if the jackpot can pay for it
   GOLDEN_BONUS: 3,        // a golden raid adds up to this × stake from the jackpot to the loot pool
 
+  // deathmatch modes
+  RESPAWN: 3,             // seconds dead before you're back in (deathmatch, guns + lasers)
+
   // population
   BOT_FILL: 10,           // bots keep the raid at roughly this many runners
   MAX_PLAYERS: 24,
+};
+
+// Guns + Lasers: in-match credits (not money, gone at the end of the match) buy a
+// medkit, a sentry turret or a laser tripmine. Kills pay credits; so does wrecking
+// someone's turret.
+export const GL = {
+  START: 400,
+  KILL: 300,
+  WRECK: 100,             // destroying an enemy turret or mine
+  MAX: 9999,
+  ITEMS: {
+    medkit: { cost: 150, heal: 60 },
+    turret: { cost: 600, hp: 80, life: 60, range: 470, dmg: 12, cd: 0.25, turn: 7, max: 1 },
+    mine: { cost: 350, dmg: 120, r: 110, len: 620, arm: 1.5, max: 2 },
+  },
 };
 
 export const SKINS = ['#ff5a5f', '#4cc9f0', '#b5e48c', '#f72585', '#ffd166', '#9b5de5', '#00f5d4', '#ff9f1c'];

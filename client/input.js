@@ -6,6 +6,7 @@ export class Input {
     this.mouse = { x: innerWidth / 2 + 100, y: innerHeight / 2, down: false };
     this.dashQueued = false;
     this.onBluff = null;
+    this.onBuy = null; // guns + lasers: 1 medkit, 2 turret, 3 laser mine
     this.onMute = null;
     this.onAnyInput = null;
     this.touchOn = false;
@@ -22,6 +23,8 @@ export class Input {
       this.keys.add(e.code);
       if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.dashQueued = true;
       if (e.code === 'KeyQ') this.onBluff?.();
+      const buy = { Digit1: 'medkit', Digit2: 'turret', Digit3: 'mine', Numpad1: 'medkit', Numpad2: 'turret', Numpad3: 'mine' }[e.code];
+      if (buy) this.onBuy?.(buy);
       if (e.code === 'KeyM') this.onMute?.();
       if (e.code === 'KeyN') this.onMusic?.();
     });

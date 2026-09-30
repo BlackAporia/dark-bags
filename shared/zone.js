@@ -89,3 +89,16 @@ export function exitState(plan, zone, e) {
   if (Math.hypot(e.x - n.x, e.y - n.y) > n.r - e.r * 0.25 && (zone.shrinking || zone.until < 20)) return 'closing';
   return 'open';
 }
+
+// Deathmatch: no storm. One circle that covers the whole map and never moves or hurts.
+export function staticZone(map, duration) {
+  const c = { x: map.w / 2, y: map.h / 2, r: Math.ceil(Math.hypot(map.w, map.h)) };
+  return {
+    circles: ZONE_RADII.map(() => ({ ...c })),
+    times: ZONE_STAGES.map(() => [duration + 1, duration + 2]),
+    dps: ZONE_DPS.map(() => 0),
+    finalExit: map.extracts[0].id,
+    duration,
+    none: true,
+  };
+}

@@ -25,14 +25,17 @@ Every entry pays the table stake ($0.10, $1 or $10), escrowed in the coin the pl
 picked at that moment's price. Winnings go back in the same coin at the **entry** rate,
 so price moves during a raid change nothing.
 
-| | Raid (extraction) | Pot modes (battle royale, duel, weapon modes, teams) |
+| | Raid (extraction) | Pot modes (battle royale, duel, deathmatch, guns + lasers, hardcore, weapon modes, teams) |
 |---|---|---|
 | Rake | 5% of each stake | 5% of each stake |
 | of which house | 4% | 4% |
 | of which room jackpot | 1% (players' stakes only) | 1% |
 | The other 95% | half in your bag, half scattered as loot | one prize pot |
-| Who gets paid | whoever extracts, with what they carry | the last player (or team) standing; a team splits the pot equally, fallen teammates included |
-| Unclaimed money | rolls into the next raid at that table | rolls into the next raid (only if nobody survives) |
+| Who gets paid | whoever extracts, with what they carry | the last player (or team) standing; a team splits the pot equally, fallen teammates included. Deathmatch modes: the most kills when time runs out (a tie splits it) |
+| Unclaimed money | rolls into the next raid at that table | rolls into the next raid (only if nobody survives, or nobody in a deathmatch scores a kill) |
+
+Guns + Lasers credits (for medkits, turrets and tripmines) are earned only by kills inside
+the match, cannot be bought, and vanish at the end: no pay-to-win, and nothing to cash out.
 
 Golden raids (every 4th raid) add up to 3× the stake to the loot/pot, **paid from the
 room jackpot**, never by the house. Before this change the house paid that bonus out of
@@ -95,7 +98,7 @@ like this dies, and what it cannot do is supply players. Here is where it stands
 - Retention systems players already understand: 90 ranks, 39 achievements with titles,
   a collection of 80 outfits and 144 weapon skins with limited editions, and share cards
   for X on every big moment (cheap growth).
-- 11 modes on the same engine, 10 languages, runs on a phone browser with no install.
+- 14 modes on the same engine (including deathmatch, a CSDM-style guns + lasers mode and hardcore), 10 languages, runs on a phone browser with no install.
 - Trust signals: published odds, server-side rolls, pity, numbered limited editions,
   withdrawals to your own address, an auditable ledger.
 

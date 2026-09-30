@@ -95,6 +95,14 @@ export class Fx {
     this.add({ kind: 'slash', x, y, z, aim, f, life: big ? 0.24 : 0.16, float: true, color, big });
   }
 
+  // a tripmine going off: a fireball, a shock ring, a flash that lights the dark
+  boom(x, y) {
+    this.add({ kind: 'boom', x, y, z: 10, life: 0.55, float: true });
+    this.add({ kind: 'ring', x, y, z: 4, life: 0.6, color: '#ff4d5e', float: true, big: true });
+    this.lights.push({ x, y, r: 320, t0: performance.now(), life: 260 });
+    for (let i = 0; i < 16; i++) this.add({ kind: 'spark', x, y, z: 12, vx: rand(-420, 420), vy: rand(-420, 420), vz: rand(80, 360), life: rand(0.3, 0.7), color: i % 2 ? '#ffb347' : '#ff4d5e' });
+  }
+
   ring(x, y, color) {
     this.add({ kind: 'ring', x, y, z: 4, life: 0.5, color, float: true });
   }
@@ -276,6 +284,19 @@ export class Fx {
         case 'casing':
           drawCasing(ctx, { ...p, y: sy });
           break;
+        case 'boom': {
+          const k = p.age / p.life;
+          const r = 24 + k * 90;
+          const g = ctx.createRadialGradient(p.x, sy, 0, p.x, sy, r);
+          g.addColorStop(0, `rgba(255,245,210,${0.95 * (1 - k)})`);
+          g.addColorStop(0.35, `rgba(255,150,60,${0.8 * (1 - k)})`);
+          g.addColorStop(1, 'rgba(255,60,70,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(p.x, sy, r, 0, TAU);
+          ctx.fill();
+          break;
+        }
         case 'flash': {
           ctx.save();
           ctx.translate(p.x, sy);
@@ -327,7 +348,7 @@ export class Fx {
           ctx.globalAlpha = Math.max(0, a);
           ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.ellipse(p.x, sy, 8 + p.age * 90, (8 + p.age * 90) * 0.5, 0, 0, TAU);
+          ctx.ellipse(p.x, sy, 8 + p.age * (p.big ? 260 : 90), (8 + p.age * (p.big ? 260 : 90)) * 0.5, 0, 0, TAU);
           ctx.stroke();
           ctx.globalAlpha = 1;
           break;

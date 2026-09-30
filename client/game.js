@@ -1,4 +1,4 @@
-import { CFG } from '../shared/config.js';
+import { CFG, GL } from '../shared/config.js';
 import { OUTFIT, FINISH, RARITY_ORDER, modelFor } from '../shared/cosmetics.js';
 import { MODE } from '../shared/modes.js';
 import { usdText } from '../shared/assets.js';
@@ -118,6 +118,13 @@ export class GameClient {
     this.mode = start.mode ?? 'raid';
     this.potMode = (MODE[this.mode]?.kind ?? 'raid') !== 'raid';
     this.teamMode = MODE[this.mode]?.kind === 'team';
+    this.dmMode = MODE[this.mode]?.kind === 'dm'; // respawns, most kills wins, no storm
+    this.shopMode = !!MODE[this.mode]?.shop; // guns + lasers
+    this.hardcore = !!MODE[this.mode]?.hardcore;
+    this.el.glShop.hidden = !this.shopMode;
+    document.body.classList.toggle('gl-on', this.shopMode);
+    this.el.spect.classList.toggle('respawn', this.dmMode);
+    this.prevGadgets = new Map();
     const bagLabel = document.querySelector('.hud-bag .eyebrow');
     if (bagLabel) bagLabel.textContent = t(this.potMode ? 'hud.pot' : 'hud.bagPrivate');
     this.renderer.noExits = this.potMode; // last one standing: no exits to draw
@@ -168,11 +175,12 @@ export class GameClient {
     this.updateBluffChip();
     this.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
     if (start.golden) this.banner(t(this.potMode ? 'hud.goldenPot' : 'hud.goldenStart'), 'gold', 3000);
-    else this.banner(t(this.teamMode ? 'hud.startTeam' : this.potMode ? 'hud.startPot' : 'hud.start'), 'money', 2600);
+    else this.banner(t(this.shopMode ? 'hud.startGl' : this.dmMode ? 'hud.startDm' : this.hardcore ? 'hud.startHc' : this.teamMode ? 'hud.startTeam' : this.potMode ? 'hud.startPot' : 'hud.start'), 'money', 2600);
   }
 
   stop() {
     this.active = false;
+    document.body.classList.remove('gl-on');
     this.el.hud.hidden = true;
     this.el.streak.hidden = true;
     this.sfx.setStorm(0);
@@ -192,6 +200,16 @@ export class GameClient {
     const you = s.you;
     const wasAlive = this.you?.st === 'alive';
     this.you = you;
+    if (this.dead && you.st === 'alive') {
+      // deathmatch: back in. Fresh body, fresh prediction.
+      this.dead = false;
+      this.pred = null;
+      this.pending = [];
+      this.corr = { x: 0, y: 0 };
+      this.anims.map.delete(-1);
+      this.meAnim = null;
+      this.hurt = 0;
+    }
     if (you.st === 'alive') {
       this.pending = this.pending.filter((i) => i.s > you.ack);
       const old = this.pred;
@@ -224,6 +242,15 @@ export class GameClient {
       if (p.fc !== q.fc) this.attackFx(a, p.w, now, false);
       if (p.h < q.h - 0.5) this.hitFx(a, now, q.h - p.h);
       if (p.d && !q.d) a.dashT = now;
+    }
+    // turrets that fired since the last snapshot: a flash and a shot you can place
+    for (const o of s.turrets ?? []) {
+      const q = prev.turrets?.find((x) => x.i === o.i);
+      if (!q || q.fc === o.fc) continue;
+      const mx = o.x + Math.cos(o.a) * 20;
+      const my = o.y + Math.sin(o.a) * 20;
+      this.fx.muzzle(mx, my, 22, o.a, false, now, o.o === 1 ? '#3ddc97' : '#ff4d5e');
+      this.sfx.play('smg', { x: o.x, y: o.y });
     }
     // bullets that vanished next to a wall: sparks and a ricochet
     const cur = new Set(s.bullets.map((b) => b.i));
@@ -342,11 +369,12 @@ export class GameClient {
             }
           }
           const how = ev.cause === 'storm';
+          if (ev.kid === this.pid && this.shopMode) this.fx.floater(this.pred?.x ?? 0, (this.pred?.y ?? 0) - 40, `+${GL.KILL} CR`, '#3ddc97', 18, 1.2);
           const b = (n) => `<b>${esc(n)}</b>`;
           if (ev.kid === this.pid) this.feed(t('feed.youDropped', { name: b(ev.victim) }), 'me');
           else if (ev.vid === this.pid) this.feed(how ? t('feed.storm') : t('feed.droppedYou', { name: `<b>${esc(ev.killer ?? 'The dark')}</b>` }), 'me');
           else if (how) this.feed(t('feed.stormTook', { name: b(ev.victim) }));
-          else if (ev.killer) this.feed(t('feed.dropped', { a: b(ev.killer), b: b(ev.victim) }));
+          else if (ev.killer) this.feed(`${t('feed.dropped', { a: b(ev.killer), b: b(ev.victim) })}${ev.cause === 'turret' ? ' ◈' : ev.cause === 'mine' ? ' ⌁' : ''}`);
           else this.feed(t('feed.down', { name: b(ev.victim) }));
           break;
         }
@@ -365,7 +393,7 @@ export class GameClient {
           break;
         case 'storm':
           this.banner(t(ev.text), 'warn', 2600);
-          if (/final/i.test(ev.text) && !this.dead) this.sfx.say?.(t(ev.text).split('·')[0].trim(), 3, getLang());
+          if (/final/i.test(ev.text) && !this.dead) this.sfx.say?.('final', getLang());
           this.sfx.play('storm');
           break;
         case 'exitClosed':
@@ -382,6 +410,43 @@ export class GameClient {
           break;
         case 'streak':
           if (ev.tier === 1 || ev.pid === this.pid) this.showStreak(ev.tier, ev.pid === this.pid ? null : ev.name);
+          break;
+        case 'respawn':
+          this.banner(t('hud.respawned'), 'money', 1200);
+          this.sfx.play('ready');
+          break;
+        case 'lead':
+          this.banner(t('hud.tookLead'), 'gold', 2000);
+          this.sfx.say?.('lead', getLang(), 0.9);
+          break;
+        case 'lostLead':
+          this.banner(t('hud.lostLead'), 'warn', 2000);
+          this.sfx.say?.('lostLead', getLang(), 0.9);
+          break;
+        case 'leader':
+          if (ev.pid !== this.pid) this.feed(t('feed.leader', { name: `<b>${esc(ev.name)}</b>`, k: ev.kills }), 'warnline');
+          break;
+        case 'bought':
+          this.sfx.play('coin', { tier: 1 });
+          this.fx.ring(ev.x, ev.y, '#3ddc97');
+          this.banner(t(`gl.${ev.item}`), 'money', 900);
+          break;
+        case 'buyFail':
+          this.banner(t(`gl.no.${ev.why}`), 'warn', 1200);
+          this.sfx.play('beep', { f: 220, dur: 0.08 });
+          break;
+        case 'wreck':
+          this.fx.sparks(ev.x, ev.y, 16, 14);
+          this.fx.dust(ev.x, ev.y, 6, 'rgba(180,180,190,0.35)');
+          this.sfx.play('impact', { x: ev.x, y: ev.y });
+          if (ev.by === this.pid) this.fx.floater(ev.x, ev.y, `+${GL.WRECK} CR`, '#3ddc97', 16, 1);
+          break;
+        case 'boom':
+          this.fx.boom?.(ev.x, ev.y);
+          this.fx.sparks(ev.x, ev.y, 10, 26, '#ff4d5e');
+          this.fx.dust(ev.x, ev.y, 12, 'rgba(255,90,60,0.35)');
+          this.sfx.play('boom', { x: ev.x, y: ev.y });
+          if (this.pred && Math.hypot(ev.x - this.pred.x, ev.y - this.pred.y) < 400) this.shake = Math.max(this.shake, 14);
           break;
         case 'streakFeed':
           if (ev.pid !== this.pid) this.feed(`<b>${esc(ev.name)}</b> is on a ${STREAKS[ev.tier].title.toLowerCase()}`, 'warnline');
@@ -417,7 +482,7 @@ export class GameClient {
     clearTimeout(this.streakT);
     this.streakT = setTimeout(() => (el.hidden = true), 2600);
     this.sfx.sting?.(tier);
-    this.sfx.say?.(who ? `${who}, ${t(`streak.${tier}`)}` : t(`streak.${tier}`), tier, getLang());
+    this.sfx.say?.(`s${tier}`, getLang(), tier === 1 ? 0.35 : 0.15);
     if (tier >= 4) this.shake = Math.max(this.shake, 10);
   }
 
@@ -439,6 +504,11 @@ export class GameClient {
     b.hidden = false;
     clearTimeout(this.bannerT);
     this.bannerT = setTimeout(() => (b.hidden = true), ms);
+  }
+
+  buy(item) {
+    if (!this.active || !this.shopMode || this.you?.st !== 'alive') return;
+    this.send({ t: 'buy', item });
   }
 
   cycleBluff() {
@@ -569,7 +639,7 @@ export class GameClient {
       this.cam.y += (eye.y - this.cam.y) * 0.1;
     }
     this.sfx.setListener(eye.x, eye.y);
-    const zone = this.plan ? zoneAt(this.plan, Math.max(0, rt / 1000)) : null;
+    const zone = this.plan && !this.plan.none ? zoneAt(this.plan, Math.max(0, rt / 1000)) : null;
     const exitStates = zone ? Object.fromEntries(this.map.extracts.map((e) => [e.id, exitState(this.plan, zone, e)])) : null;
     this.zone = zone;
     this.exitStates = exitStates;
@@ -580,6 +650,8 @@ export class GameClient {
       orbs: last.orbs,
       drops: last.drops,
       bullets,
+      turrets: last.turrets,
+      mines: last.mines,
       fx: this.fx,
       time: now,
       golden: last.golden,
@@ -619,6 +691,8 @@ export class GameClient {
       this.bagStart ??= you.bag;
       const touch = this.input.touchOn;
       if (you.storm) hint = t('coach.storm');
+      else if (this.shopMode && inside >= 4 && inside < 30) hint = t('coach.gl');
+      else if (this.dmMode && inside >= 7) hint = t('coach.dm');
       else if (this.potMode && inside >= 7) hint = t(this.teamMode ? 'coach.team' : 'coach.pot');
       else if (inside < 7) hint = touch ? t('coach.touch') : t('coach.keys');
       else if (tl < 75 || you.bag >= this.stake) hint = t('coach.exit');
@@ -634,7 +708,11 @@ export class GameClient {
     const el = this.el;
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
-    if (this.potMode) {
+    if (this.dmMode) {
+      el.bag.textContent = this.money(you.pot ?? 0);
+      el.pnl.textContent = t('hud.dmScore', { k: you.k ?? 0, d: you.dth ?? 0, p: you.pl ?? 1 });
+      el.pnl.className = 'pnl';
+    } else if (this.potMode) {
       el.bag.textContent = this.money(you.pot ?? 0);
       el.pnl.textContent = t(this.teamMode ? 'hud.teamsLeft' : 'hud.left', { n: you.sides ?? 0, s: this.money(this.stake) });
       el.pnl.className = 'pnl';
@@ -668,7 +746,12 @@ export class GameClient {
     const hp = Math.max(0, you.hp);
     el.hpBar.style.width = `${hp}%`;
     el.hpBar.style.background = hpColor(hp / 100);
-    el.hpNum.textContent = hp;
+    el.hpNum.textContent = this.hardcore ? t('hud.oneHit') : hp;
+    if (this.shopMode) {
+      const cr = you.cr ?? 0;
+      el.glCr.textContent = fmt(cr);
+      for (const b of document.querySelectorAll('[data-buy]')) b.classList.toggle('poor', cr < GL.ITEMS[b.dataset.buy].cost);
+    }
     const cd = this.pred ? this.pred.dashCd : 0;
     el.dashChip.classList.toggle('cooling', cd > 0);
     el.dashChip.firstChild.textContent = cd > 0 ? `${t('hud.dash')} ${cd.toFixed(1)}s ` : `${t('hud.dash')} `;
@@ -688,7 +771,11 @@ export class GameClient {
 
     // storm
     const z = this.zone;
-    if (z) {
+    if (this.dmMode) {
+      const top = you.top ?? [];
+      el.storm.textContent = top.length && top[0][1] > 0 ? top.map(([n, k], i) => `${i + 1}. ${n} ${k}`).join(' · ') : t('hud.dmGoal');
+      el.storm.classList.toggle('hot', tl <= 30);
+    } else if (z) {
       const secs = Math.ceil(z.until);
       el.storm.textContent = z.final ? t('hud.final') : z.shrinking ? t('hud.closing', { t: mmss(secs) }) : t('hud.stormIn', { t: mmss(secs) });
       el.storm.classList.toggle('hot', z.shrinking || z.final);
@@ -730,7 +817,10 @@ export class GameClient {
       el.extName.textContent = best ? best.name : '';
       el.extBar.style.width = `${Math.min(100, you.ext * 100)}%`;
     } else el.extract.hidden = true;
-    if (you.st === 'dead') {
+    if (you.st === 'dead' && this.dmMode) {
+      el.spect.hidden = false;
+      el.spText.textContent = t('hud.respawnIn', { s: Math.max(0, you.rs ?? 0).toFixed(1) });
+    } else if (you.st === 'dead') {
       el.spect.hidden = false;
       el.spText.textContent = you.spect ? t('spect.watching', { name: you.spect }) : t('spect.down');
     } else el.spect.hidden = true;
