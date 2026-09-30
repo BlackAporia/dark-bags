@@ -481,4 +481,5 @@ export default {
   'coach.dm': "Yeniden doğarsın · süre bitince en çok leşi olan kazanır",
   'coach.gl': "Leşler kredi kazandırır · ilk yardım ✚, taret ◈ ya da lazer mayını ⌁ al",
   'set.voiceNote': "Kayıtlı spiker (İngilizce, Ukraynaca, İspanyolca, Fransızca, Portekizce; diğer diller için İngilizce).",
+  'net.waking': "Sunucu uyanıyor (ücretsiz barındırma kimse oynamazken uyur, bir dakikaya kadar)… Bu sırada antrenman çalışır.",
 };

@@ -489,4 +489,5 @@ export default {
   'coach.dm': "You respawn · most kills when the clock runs out wins",
   'coach.gl': "Kills pay credits · spend them on a medkit ✚, a turret ◈ or a laser mine ⌁",
   'set.voiceNote': "Recorded announcer (English, Ukrainian, Spanish, French, Portuguese; English for other languages).",
+  'net.waking': "Waking the server up (free hosting sleeps when nobody plays, up to a minute)… Practice works meanwhile.",
 };

@@ -481,4 +481,5 @@ export default {
   'coach.dm': "Tu réapparais · le plus de frags à la fin gagne",
   'coach.gl': "Les frags rapportent des crédits · achète un médikit ✚, une tourelle ◈ ou une mine laser ⌁",
   'set.voiceNote': "Annonceur enregistré (anglais, ukrainien, espagnol, français, portugais ; anglais pour les autres langues).",
+  'net.waking': "Réveil du serveur (l'hébergement gratuit s'endort quand personne ne joue, jusqu'à une minute)… L'entraînement marche en attendant.",
 };

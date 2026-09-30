@@ -481,4 +481,5 @@ export default {
   'coach.dm': "Reapareces · gana quien tenga más bajas al acabar el tiempo",
   'coach.gl': "Las bajas dan créditos · gástalos en un botiquín ✚, una torreta ◈ o una mina láser ⌁",
   'set.voiceNote': "Locutor grabado (inglés, ucraniano, español, francés, portugués; inglés para los demás idiomas).",
+  'net.waking': "Despertando el servidor (el hosting gratuito se duerme cuando nadie juega, hasta un minuto)… Mientras tanto, la práctica funciona.",
 };
