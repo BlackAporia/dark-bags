@@ -58,6 +58,8 @@ export default {
   'xp.Extracted': 'Эвакуация',
   'xp.Profit': 'Прибыль',
   'xp.Practice ×0.5': 'Практика ×0.5',
+  'rk.newRank': "Новый ранг",
+  'rw.continue': "Продолжить",
   'rw.title': 'Награда за ранг',
   'rw.trial': 'твой на 72 часа',
   'rw.try': 'Примерить',

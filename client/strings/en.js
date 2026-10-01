@@ -61,6 +61,8 @@ export default {
   'xp.Extracted': 'Extracted',
   'xp.Profit': 'Profit',
   'xp.Practice ×0.5': 'Practice ×0.5',
+  'rk.newRank': "New rank",
+  'rw.continue': "Continue",
   'rw.title': 'Rank-up reward',
   'rw.trial': 'yours to wear for 72 hours',
   'rw.try': 'Try it on',

@@ -7,6 +7,7 @@ import { isStable } from '../shared/assets.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { boxArt, weaponStill } from './locker.js';
 import { esc } from './game.js';
+import { spinReel } from './reel.js';
 import { t } from './i18n.js';
 import { settings } from './settings.js';
 
@@ -258,18 +259,17 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     const best = results.reduce((a, b) => (rankOf(b.rarity) > rankOf(a.rarity) ? b : a));
     const bestColor = RARITIES[best.rarity].color;
     const ov = $('opening');
-    const boxEl = $('op-stage').querySelector('.op-box');
-    // suspense: the glow climbs through the rarities up to the best one
-    const steps = RARITY_ORDER.slice(0, rankOf(best.rarity) + 1);
-    const stepMs = settings.motion ? 260 : 0;
-    steps.forEach((k, i) =>
-      setTimeout(() => {
-        boxEl?.style.setProperty('--glow', RARITIES[k].color);
-        ov.style.setProperty('--glow', RARITIES[k].color);
-        sfx.play('beep', { f: 440 + i * 180, dur: 0.08 });
-      }, i * stepMs),
-    );
-    setTimeout(() => {
+    // the reel: the box's prizes race past the marker and stop on the best drop
+    ov.className = 'opening spinning';
+    const tile = (i) => ({ id: i.id, name: i.name, rarity: i.rarity, img: box.family === 'weapon' ? weaponStill(i.id, 120, 70) : figureStill({ outfit: i.id, body: L()?.body ?? 'm' }, 56, 78) });
+    const pool = reelPool(box).map(tile);
+    const win = tile(itemOf(best));
+    spinReel($('op-stage'), { pool, win, odds: box.odds, sfx, motion: settings.motion, secs: results.length > 1 ? 4.6 : 6.2, label: t(`box.${box.id}`) }).then(() => {
+      ov.style.setProperty('--glow', bestColor);
+      sfx.play('beep', { f: 1400 + rankOf(best.rarity) * 200, dur: 0.12 });
+      setTimeout(land, settings.motion ? 900 : 0);
+    });
+    const land = () => {
       ov.className = `opening open r-${best.rarity}`;
       fx.flash = rankOf(best.rarity) >= 4 ? 0.9 : 0.5;
       fx.rayColor = bestColor;
@@ -278,7 +278,19 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
       sfx.play(rankOf(best.rarity) >= 3 ? 'bag' : 'coin');
       if (rankOf(best.rarity) >= 4) sfx.sting?.(rankOf(best.rarity) >= 5 ? 5 : 4);
       cards(results, box);
-    }, steps.length * stepMs + (settings.motion ? 350 : 0));
+    };
+  }
+
+  // what the reel shows: a handful of each rarity from the box's collection (images are
+  // drawn on demand, so not all 600 skins)
+  function reelPool(box) {
+    const cat = boxCatalog(box).filter((i) => !i.basic);
+    const out = [];
+    for (const r of RARITY_ORDER) {
+      const of = cat.filter((i) => i.rarity === r);
+      for (let k = 0; k < Math.min(8, of.length); k++) out.push(of.splice(Math.floor(Math.random() * of.length), 1)[0]);
+    }
+    return out;
   }
 
   function cardHtml(res, big) {

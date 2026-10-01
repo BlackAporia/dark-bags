@@ -58,6 +58,8 @@ export default {
   'xp.Extracted': '撤离成功',
   'xp.Profit': '盈利',
   'xp.Practice ×0.5': '练习 ×0.5',
+  'rk.newRank': "新军衔",
+  'rw.continue': "继续",
   'rw.title': '晋升奖励',
   'rw.trial': '可穿戴 72 小时',
   'rw.try': '试穿',
