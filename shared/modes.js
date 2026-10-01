@@ -13,7 +13,8 @@
 // size: runners per raid (bots fill the empty spots); weapon: everyone holds this
 // one weapon for the whole raid (no arms race); seconds: raid length;
 // hardcore: one hit and you're down; shop: in-match credits buy medkits, sentry
-// turrets and laser tripmines (Guns + Lasers, after the CS 1.6 CSDM mod).
+// turrets and laser tripmines (Guns + Lasers, after the CS 1.6 CSDM mod); ranked: the
+// finish moves your season rating and may earn a bonus spin.
 export const MODES = [
   { id: 'raid', kind: 'raid', size: 10 },
   { id: 'br', kind: 'br', size: 20 },
@@ -29,6 +30,8 @@ export const MODES = [
   { id: 'team2', kind: 'team', size: 4, teamSize: 2, seconds: 150 },
   { id: 'team4', kind: 'team', size: 8, teamSize: 4 },
   { id: 'team8', kind: 'team', size: 16, teamSize: 8 },
+  // ranked: a battle royale that also moves your season rating (ranked.js)
+  { id: 'ranked', kind: 'br', size: 10, ranked: true },
 ];
 export const MODE = Object.fromEntries(MODES.map((m) => [m.id, m]));
 export const isPotMode = (m) => !!m && m.kind !== 'raid';

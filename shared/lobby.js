@@ -159,6 +159,23 @@ export class Lobby {
       case 'tables':
         this.send(cid, { t: 'tables', tables: this.tables(), balances: this.balances(s), assets: this.prices.list() });
         return;
+      case 'neon': {
+        // wear a season title (or null to take it off)
+        const k = this.key(s);
+        if (!k) return;
+        if (!this.ranks.setNeon(k, msg.id === null ? null : String(msg.id ?? ''))) return this.send(cid, { t: 'err', msg: 'Win that title first.' });
+        this.send(cid, { t: 'career', career: this.ranks.career(k) });
+        return;
+      }
+      case 'leaderboard': {
+        // the season's ranked table: top 100, and where you stand
+        const k = this.key(s);
+        const all = this.ranks.leaderboard(Date.now(), 100000);
+        const rows = all.slice(0, 100).map((r, i) => ({ pos: i + 1, n: this.social.get(r.key)?.name ?? 'runner', rk: this.ranks.get(r.key).rank, nt: this.ranks.neon(r.key), rp: r.rp, div: r.div, games: r.games, wins: r.wins, top3: r.top3, kills: r.kills, me: r.key === k }));
+        const pos = k ? all.findIndex((r) => r.key === k) + 1 : 0;
+        this.send(cid, { t: 'leaderboard', rows, me: k ? { pos, ...this.ranks.rankedView(k) } : null, total: all.length });
+        return;
+      }
       case 'title': {
         const k = this.key(s);
         if (!k) return;
