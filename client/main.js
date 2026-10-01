@@ -144,6 +144,11 @@ const tour = createTour({
   touch: () => input.touchOn,
   sfx,
   game,
+  pickRaid: () => {
+    app.gameMode = 'raid';
+    store.set('darkbags.gmode', 'raid');
+    renderLobby();
+  },
   practice: () => {
     if (app.mode !== 'practice') setMode('practice');
     go('play');
@@ -312,6 +317,7 @@ function renderModes() {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `mode-card k-${m.kind}`;
+      b.dataset.mode = m.id;
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(m.id === app.gameMode));
       const rows = app.tables.filter((x) => x.mode === m.id);
@@ -320,6 +326,7 @@ function renderModes() {
       const size = m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
       b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>${waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: waiting }))}</span>` : ''}`;
       b.addEventListener('click', () => {
+        if (document.body.classList.contains('tour-raid-only') && m.id !== 'raid') return; // Nyx's first raid is a Raid
         app.gameMode = m.id;
         store.set('darkbags.gmode', m.id);
         sfx.play('beep', { f: 1180, dur: 0.03 });

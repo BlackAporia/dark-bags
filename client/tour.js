@@ -13,30 +13,30 @@ const $ = (id) => document.getElementById(id);
 
 // what she says, exactly (the voice clips in voice/nyx/<key>.mp3)
 export const NYX_LINES = {
-  hello: "Hey, runner. I'm Nyx. I'll be in your ear tonight. Stick with me, and you'll walk out of your first raid... richer.",
-  name: "First things first. Type a name. It's what everyone sees, right above your head.",
-  nameOk: 'Mm. I like it.',
-  practice: "Now tap Practice. It's free, it's just bots. Perfect for your first run.",
-  practiceOk: 'Good call.',
-  modes: 'These are the modes. Raid is the classic: loot, fight, and get out. Pick Raid.',
-  modeOk: 'Good pick.',
-  bag: 'Here\'s the deal. Your stake goes in your bag. Take someone down, and their bag is yours. Go down... and yours is theirs.',
-  shop: "Outfits and weapon skins come from bags and crates in the shop. There's a free one, waiting for you. Later.",
-  social: "Friends, messages, guilds. Bring your crew. It's always more fun together.",
-  wallet: 'Want real stakes? Sign in with a wallet, or just an email. Cash-outs only ever go back to your own address.',
-  play: 'Ready? Hit Play.',
-  ready: 'This is the ready room. Press Ready... and we drop in.',
-  start: "We're in! Move with W, A, S, D. Aim with the mouse, and click to shoot. Space to dash.",
-  startTouch: "We're in! Your left thumb moves you. Hold Fire, on the right. It aims for you.",
-  loot: "See that orange glow? That's money. Walk right over it.",
-  pickup: 'Nice! Your bag just got heavier.',
-  kill: 'First blood! Grab what they dropped. And look at that... a better gun.',
-  hurt: "You're hurt. Back off for a few seconds, and you'll heal up.",
-  storm: 'The storm is closing in. Stay inside the circle!',
-  exit: 'That bag looks good on you. Find a green exit ring, and stand in it.',
-  extracting: "Hold still. Three seconds. Don't get hit.",
-  won: 'You made it out! Told you you would. See you in the next one, runner.',
-  dead: "Ouch. It happens. Practice is free, so run it back.",
+  hello: "Hiii, runner! I'm Nyx, your guide tonight! Stick with me, and you'll walk out of your very first raid... rich!",
+  name: "Okay, first things first! Type a name. Everyone will see it, right above your head!",
+  nameOk: "Ooh, cute name! I like it!",
+  practice: "Now tap Practice! It's free, it's just bots. Perfect for your first run!",
+  practiceOk: "Yesss! Good call!",
+  modes: "These are the game modes! Today we play Raid, the classic one. Loot, fight, and get out! Tap Raid!",
+  modeOk: "Raid it is! Let's go!",
+  bag: "Here's the deal! Your stake goes in your bag. Take someone down, and their bag is yours! Go down... and yours is theirs. Eek!",
+  shop: "Outfits and weapon skins come from bags and crates, right here in the shop! And psst... there's a free one waiting for you!",
+  social: "Friends, messages, guilds! Bring your squad. Everything's more fun together!",
+  wallet: "Want real stakes? Sign in with a wallet, or just an email! Cash-outs only ever go back to your own address. Safe and sound!",
+  play: "Ready? Hit Play!",
+  ready: "This is the ready room! Press Ready, and we drop in! Woo!",
+  start: "We're in! Move with W, A, S, D. Aim with the mouse, and click to shoot! Space to dash!",
+  startTouch: "We're in! Your left thumb moves you. Hold Fire, on the right, and it aims for you!",
+  loot: "See that orange glow? That's money! Run right over it!",
+  pickup: "Yay! Your bag just got heavier!",
+  kill: "First blood! Nice shot! Grab what they dropped. Ooh, and a better gun!",
+  hurt: "Ouch, you're hurt! Back off for a few seconds, and you'll heal up!",
+  storm: "The storm is coming! Stay inside the circle, quick!",
+  exit: "Ooh, that bag looks good on you! Find a green exit ring, and stand in it!",
+  extracting: "Hold still! Three seconds! Don't get hit!",
+  won: "You made it out! I knew you could do it! See you next raid, runner!",
+  dead: "Aww, it happens! Practice is free, so let's run it back!",
 };
 
 // the menu part: `wait` is what the player has to do (the step moves on by itself when they
@@ -56,7 +56,7 @@ const LOBBY = [
 
 const SEEN = 'darkbags.tour.seen'; // who has had the tour on this device: 'device', wallet addresses
 
-export function createTour({ app, go, practice, touch = () => false, sfx = null, game = null }) {
+export function createTour({ app, go, practice, touch = () => false, sfx = null, game = null, pickRaid = () => {} }) {
   let el = null;
   let nyx = null;
   let steps = [];
@@ -268,6 +268,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     el.dataset.step = s.key;
     // the menu steps live on the Play page; the ready room is its own screen
     if (s.wait !== 'game' && app.screen === 'lobby' && app.page !== 'play') go('play');
+    if (s.wait === 'play' && app.gameMode !== 'raid') pickRaid();
     el.classList.toggle('acting', !!s.wait);
     $('tour-move').hidden = !s.wait;
     $('tour-next').hidden = !!s.wait && s.wait !== 'name';
@@ -319,7 +320,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     if (e.target?.id === 'name' && e.key === 'Enter' && e.target.value.trim()) store.set('darkbags.tour.named', true);
   });
   document.addEventListener('click', (e) => {
-    if (e.target?.closest?.('#modes .mode-card')) store.set('darkbags.tour.picked', true);
+    if (e.target?.closest?.('#modes .mode-card[data-mode="raid"]')) store.set('darkbags.tour.picked', true);
   }, true);
 
   function start() {
@@ -332,7 +333,10 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     preload(steps.flatMap((s) => [s.key, s.ok].filter(Boolean)));
     preload(['start', 'startTouch', 'loot', 'pickup', 'kill']);
     build();
-    document.body.classList.add('touring');
+    // the guided match is a Raid (the loot, the bags, the exits she talks about): the other
+    // modes wait until the tour is over
+    pickRaid();
+    document.body.classList.add('touring', 'tour-raid-only');
     requestAnimationFrame(() => el?.classList.add('in'));
     show(0);
     watch();
@@ -346,7 +350,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     removeEventListener('resize', place);
     el?.remove();
     el = null;
-    document.body.classList.remove('touring');
+    document.body.classList.remove('touring', 'tour-raid-only');
   }
 
   // skipped: everything closes; finished: the raid companion takes over if a raid is starting
@@ -399,14 +403,15 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     raid.k0 ??= you.k ?? 0;
     const since = (performance.now() - raid.t0) / 1000;
     if (you.st === 'alive') {
+      const raidMode = !game?.potMode && !game?.dmMode; // loot on the map, bags, exits
       if ((you.k ?? 0) > raid.k0) callout('kill', true);
-      else if (you.bag > raid.bag0 && raid.said.has('loot')) callout('pickup');
-      if (since > 7 && you.bag <= raid.bag0) callout('loot');
+      else if (raidMode && you.bag > raid.bag0 && raid.said.has('loot')) callout('pickup');
+      if (raidMode && since > 7 && you.bag <= raid.bag0) callout('loot');
       if (you.hp < 40) callout('hurt', true);
       if (you.storm) callout('storm', true);
       if (you.ext > 0) callout('extracting', true);
       const tl = game?.recvTl ? game.recvTl.tl : 999;
-      if (!game?.potMode && !game?.dmMode && (you.bag >= (you.stake || 1) * 1.6 || tl < 75) && since > 20) callout('exit');
+      if (raidMode && (you.bag >= (you.stake || 1) * 1.6 || tl < 75) && since > 20) callout('exit');
     } else if (you.st === 'extracted' || you.st === 'won') {
       finishRaid('won');
     } else if (you.st === 'dead' && !game?.dmMode) {
