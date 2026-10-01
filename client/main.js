@@ -839,6 +839,8 @@ function paintPause() {
   const mus = $('pause-music');
   mus.textContent = `${t('hud.music')}: ${t(sfx.musicOn ? 'pause.on' : 'pause.off')}`;
   mus.setAttribute('aria-pressed', String(!!sfx.musicOn));
+  $('pause-track').textContent = sfx.music ? `♪ ${sfx.music.trackName}` : '';
+  $('pause-next').hidden = !sfx.music || !sfx.musicOn;
 }
 function openPause() {
   if (app.screen !== 'game' || pauseOpen()) return;
@@ -871,6 +873,9 @@ function leaveMatch() {
   send({ t: 'leave' });
   app.inRoom = false;
   showScreen('lobby');
+  // practice: the bots' raid would run on without you and the next one would wait for it;
+  // start a fresh local world (wallet, ranks and locker are saved, nothing is lost)
+  if (app.mode === 'practice') setTimeout(() => app.mode === 'practice' && setMode('practice'), 60);
 }
 addEventListener('keydown', (e) => {
   if (e.code !== 'Escape' || app.screen !== 'game') return;
@@ -898,6 +903,7 @@ pauseEl.addEventListener('click', (e) => e.target === pauseEl && closePause());
 
 // ----------------------------------------------------------------- result
 function showResult(m) {
+  sfx.music?.sting(m.status === 'extracted' || !!m.won);
   const k = $('res-kicker');
   const amt = $('res-amount');
   const det = $('res-detail');
@@ -984,6 +990,10 @@ function applySetting(k) {
   if (k === 'sound') sfx.setVolume(settings.sound);
   if (k === 'voice') sfx.voiceOff = !settings.voice;
   if (k === 'music') sfx.setMusicVolume(settings.music);
+  if (k === 'track') {
+    sfx.trackChoice = settings.track;
+    sfx.music?.choose(settings.track);
+  }
   if (k === 'gore') {
     app.gore = settings.gore;
     game.gore = settings.gore;
@@ -994,7 +1004,7 @@ function applySetting(k) {
   if (k === 'motion') document.documentElement.classList.toggle('no-motion', !settings.motion);
 }
 onSetting(applySetting);
-for (const k of ['quality', 'sound', 'music', 'voice', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
+for (const k of ['quality', 'sound', 'music', 'track', 'voice', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
 $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 $('mode-online').addEventListener('click', () => app.mode !== 'online' && setMode('online'));
 $('mode-practice').addEventListener('click', () => app.mode !== 'practice' && setMode('practice'));
@@ -1046,6 +1056,22 @@ const toggleMusic = () => {
 muteChip.addEventListener('click', toggleMute);
 $('pause-sound').addEventListener('click', toggleMute);
 $('pause-music').addEventListener('click', toggleMusic);
+$('pause-next').addEventListener('click', () => {
+  sfx.music?.next();
+  paintPause();
+});
+// a new track: its name, briefly, like a radio
+let trackT = 0;
+addEventListener('darkbags:track', (e) => {
+  const n = $('now-playing');
+  if (!n || !sfx.musicOn) return;
+  n.textContent = `♪ ${e.detail.name}`;
+  n.classList.remove('on');
+  void n.offsetWidth;
+  n.classList.add('on');
+  clearTimeout(trackT);
+  trackT = setTimeout(() => n.classList.remove('on'), 3200);
+});
 musicChip.addEventListener('click', toggleMusic);
 syncAudio();
 input.onBluff = () => game.cycleBluff();

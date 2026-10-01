@@ -81,6 +81,7 @@
         <button type="button" id="pause-sound" class="ghost" aria-pressed="true"></button>
         <button type="button" id="pause-music" class="ghost" aria-pressed="true"></button>
       </div>
+      <div class="pause-row pause-track"><span id="pause-track" class="fine"></span><button type="button" id="pause-next" class="ghost" data-i18n="pause.nextTrack">Next track ⏭</button></div>
       <button type="button" id="pause-leave" class="danger" data-i18n="pause.leave">Leave match</button>
       <p class="fine pause-keys" data-i18n="pause.keys">Esc: back to the match</p>
     </div>
@@ -121,6 +122,8 @@
     <button id="intro-go" class="cta intro-go" type="button" hidden data-i18n="intro.go">Enter</button>
   </div>
 </div>
+
+<div id="now-playing" class="now-playing" aria-hidden="true"></div>
 
 <!-- main menu -->
 <section id="lobby" class="screen menu">

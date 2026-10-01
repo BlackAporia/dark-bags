@@ -3,6 +3,7 @@
 import { settings, setSetting } from './settings.js';
 import { LANGS, getLang, setLang } from './i18n.js';
 import { t } from './i18n.js';
+import { TRACKS, RAID_TRACKS } from './music.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -12,6 +13,9 @@ export function createSettingsUi() {
   }
   const toggle = (key) => `<label class="switch"><input type="checkbox" data-tog="${key}" ${settings[key] ? 'checked' : ''}><i></i></label>`;
   const slider = (key, min, max, step) => `<input type="range" data-rng="${key}" min="${min}" max="${max}" step="${step}" value="${settings[key]}">`;
+  // the raid soundtrack: a mix, or one track every match (track names are titles: not translated)
+  const tracks = () =>
+    `<div class="track-grid" role="radiogroup">${[['auto', t('set.trackAuto')], ...RAID_TRACKS.map((k) => [k, TRACKS[k].name])].map(([v, label]) => `<button type="button" data-set="track" data-v="${v}" aria-pressed="${settings.track === v}">${label}</button>`).join('')}</div>`;
   const row = (label, ctl, note = '') => `<div class="set-row"><div><p>${t(label)}</p>${note ? `<p class="fine">${t(note)}</p>` : ''}</div>${ctl}</div>`;
 
   // the settings page, or the same controls inside the in-match menu
@@ -37,6 +41,7 @@ export function createSettingsUi() {
       <section class="set-card"><p class="eyebrow">${t('set.audio')}</p>
         ${row('set.sound', slider('sound', 0, 1, 0.05))}
         ${row('set.music', slider('music', 0, 1, 0.05))}
+        ${row('set.track', tracks(), 'set.trackNote')}
         ${row('set.voice', toggle('voice'), 'set.voiceNote')}
       </section>
       <section class="set-card"><p class="eyebrow">${t('set.tour')}</p>

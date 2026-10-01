@@ -43,6 +43,7 @@ export class Sfx {
         this.music = new Music(c, this.master);
         this.music.setEnabled(this.musicOn);
         this.music.setVolume(this.musicVolume ?? 1);
+        this.music.choose(this.trackChoice ?? 'auto');
         this.startStormBed();
       } catch {
         this.ctx = null;
