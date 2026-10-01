@@ -34,6 +34,10 @@ function glowSprite(color, size = 64) {
   return c;
 }
 
+// team colours: your side green, the other side red
+const TEAM_ALLY = { fill: 'rgba(61, 220, 151, 0.22)', line: '#3ddc97', glow: 'rgba(61, 220, 151, 0.9)' };
+const TEAM_FOE = { fill: 'rgba(255, 77, 94, 0.24)', line: '#ff4d5e', glow: 'rgba(255, 77, 94, 0.95)' };
+
 export class Renderer {
   constructor(canvasEl, mini) {
     this.canvas = canvasEl;
@@ -450,6 +454,17 @@ export class Renderer {
       ctx.ellipse(gx, gy, 18, 7, 0, 0, TAU);
       ctx.stroke();
     }
+    // team modes: a coloured disc under every runner, green for your side, red for theirs
+    const side = f.ally === true ? TEAM_ALLY : f.ally === false ? TEAM_FOE : null;
+    if (side) {
+      ctx.fillStyle = side.fill;
+      ctx.strokeStyle = side.line;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(gx, gy, 19, 7.5, 0, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+    }
     if (f.ext > 0) {
       ctx.strokeStyle = C.exit;
       ctx.lineWidth = 4;
@@ -468,7 +483,14 @@ export class Renderer {
     }
     const p = pose(a, t, gore);
     f.p = p;
+    if (side && this.quality >= 1) {
+      // and a glow around the figure itself, so you can tell sides apart mid-fight
+      ctx.shadowColor = side.glow;
+      ctx.shadowBlur = 12;
+    }
     drawFigure(ctx, a, p, { gore, color: f.color, flash: f.flash });
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
     if (f.shield) {
       ctx.strokeStyle = 'rgba(235, 229, 214, 0.55)';
       ctx.setLineDash([4, 5]);
@@ -654,11 +676,18 @@ export class Renderer {
     const p = f.p;
     const top = p.head.y - p.head.r - 8;
     const frac = Math.max(0, Math.min(1, f.hp / 100));
-    const w = 34;
+    const side = f.ally === true ? TEAM_ALLY : f.ally === false ? TEAM_FOE : null;
+    const w = side ? 40 : 34;
     ctx.fillStyle = 'rgba(4, 6, 10, 0.8)';
     ctx.fillRect(p.head.x - w / 2 - 1, top - 1, w + 2, 6);
-    ctx.fillStyle = hpColor(frac);
+    // team modes: the bar in the side's colour (red for enemies, green for allies)
+    ctx.fillStyle = side ? side.line : hpColor(frac);
     ctx.fillRect(p.head.x - w / 2, top, w * frac, 4);
+    if (side) {
+      ctx.strokeStyle = side.line;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(p.head.x - w / 2 - 1.5, top - 1.5, w + 3, 7);
+    }
     if (f.ping != null) {
       // their round trip to the server, right of the health bar
       ctx.font = `700 8px ${F_UI}`;
@@ -666,7 +695,7 @@ export class Renderer {
       ctx.fillStyle = f.ping < 80 ? '#3ddc97' : f.ping < 160 ? '#ffd166' : '#ff6b6b';
       ctx.fillText(`${f.ping}ms`, p.head.x + w / 2 + 3, top + 4);
     }
-    if (f.isMe || !f.noName) {
+    if (f.isMe || !f.noName || side) {
       // your own name too, in gold, so you can find yourself in a fight
       // team modes: allies green, enemies red
       ctx.fillStyle = f.isMe ? '#ffd166' : f.ally === true ? '#3ddc97' : f.ally === false ? '#ff6b6b' : 'rgba(235, 229, 214, 0.9)';

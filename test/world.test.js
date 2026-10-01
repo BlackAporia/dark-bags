@@ -1,3 +1,4 @@
+import { WEAPONS } from '../shared/weapons.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CFG, GL } from '../shared/config.js';
@@ -236,7 +237,7 @@ test('pot modes: every stake goes into one pot, the last one standing takes it, 
       if (won.length) assert.equal(won.reduce((s, p) => s + p.payout, 0), w.ledger.paidOut + w.ledger.botPaidOut);
       assert.equal(w.orbs.size, 0, 'no loot on the map');
       if (mode === 'knives') for (const p of w.players.values()) assert.equal(p.w, 0, 'knives only, all raid');
-      if (mode === 'snipers') for (const p of w.players.values()) assert.equal(p.w, 5, 'snipers only, all raid');
+      if (mode === 'snipers') for (const p of w.players.values()) assert.equal(WEAPONS[p.w].id, 'sniper', 'snipers only, all raid');
     }
   }
 });

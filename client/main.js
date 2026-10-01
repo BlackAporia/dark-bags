@@ -1,6 +1,7 @@
 import './polyfills.js'; // first: older phone browsers need it before anything draws
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
+import { WEAPONS } from '../shared/weapons.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
 import { Sfx } from './sfx.js';
@@ -89,7 +90,16 @@ const el = {
   bluffChip: $('bluff-chip'),
   weapon: $('weapon'),
   prestige: $('prestige'),
-  ladder: $('ladder'),
+  ladder: (() => {
+    // one notch per weapon on the arms-race ladder
+    const l = $('ladder');
+    l.innerHTML = WEAPONS.map(() => '<i></i>').join('');
+    l.style.setProperty('--n', WEAPONS.length);
+    return l;
+  })(),
+  ammo: $('ammo'),
+  ammoNum: $('ammo-num'),
+  ammoBar: $('ammo-bar'),
   xpBar: $('xp-bar'),
   nextWeapon: $('next-weapon'),
 };

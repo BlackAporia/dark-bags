@@ -201,6 +201,7 @@ export class GameClient {
     this.recvTl = { tl: s.tl, at: now };
     const you = s.you;
     const wasAlive = this.you?.st === 'alive';
+    if (you.rl > 0 && !(this.you?.rl > 0) && you.st === 'alive') this.sfx.play('reload', { secs: WEAPONS[you.w]?.reload });
     this.you = you;
     if (this.dead && you.st === 'alive') {
       // deathmatch: back in. Fresh body, fresh prediction.
@@ -242,6 +243,7 @@ export class GameClient {
       const a = this.anims.get(p.i);
       if (!q || !a) continue;
       if (p.fc !== q.fc) this.attackFx(a, p.w, now, false);
+      if (p.rl && !q.rl) this.sfx.play('reload', { x: a.x, y: a.y, secs: WEAPONS[p.w]?.reload });
       if (p.h < q.h - 0.5) this.hitFx(a, now, q.h - p.h);
       if (p.d && !q.d) a.dashT = now;
     }
@@ -273,8 +275,8 @@ export class GameClient {
     a.attackT = now;
     const wp = WEAPONS[w];
     const p = pose(a, now + 30, this.gore);
-    const opts = mine ? {} : { x: a.x, y: a.y };
-    this.sfx.play(wp.id, opts);
+    const opts = mine ? { pitch: wp.pitch } : { x: a.x, y: a.y, pitch: wp.pitch };
+    this.sfx.play(wp.snd ?? wp.id, opts);
     // a weapon skin from rare up tints the flash and the swing in its neon
     const fin = FINISH[a.ws?.[wp.id]];
     const tint = fin && RARITY_ORDER.indexOf(fin.rarity) >= 1 ? (fin.fx === 'rainbow' ? `hsl(${(now / 3) % 360}, 100%, 65%)` : fin.color) : null;
@@ -283,9 +285,9 @@ export class GameClient {
       this.fx.slash(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.aim, a.facing, tint, big);
       return;
     }
-    this.fx.muzzle(p.muzzle.x, a.y + FEET, a.y + FEET - p.muzzle.y, p.aim, wp.id === 'shotgun' || wp.id === 'sniper', now, tint);
+    this.fx.muzzle(p.muzzle.x, a.y + FEET, a.y + FEET - p.muzzle.y, p.aim, !!wp.heavy, now, tint);
     this.fx.casing(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.facing);
-    if (mine) this.shake = Math.max(this.shake, wp.id === 'sniper' ? 9 : wp.id === 'shotgun' ? 7 : 2.5);
+    if (mine) this.shake = Math.max(this.shake, wp.snd === 'sniper' ? 9 : wp.heavy ? 7 : 2.5);
   }
 
   hitFx(a, now, dmg) {
@@ -559,7 +561,13 @@ export class GameClient {
     this.aim = inp.a;
     this.localFireCd = Math.max(0, this.localFireCd - DT);
     const wp = WEAPONS[this.you.w ?? 0];
-    if (f && this.localFireCd <= 0) {
+    const dry = !wp.melee && ((this.you.rl ?? 0) > 0 || (this.you.am ?? 1) <= 0);
+    if (f && dry && this.localFireCd <= 0 && !this.dryT) {
+      this.dryT = 1;
+      this.sfx.play('dry');
+    }
+    if (!f) this.dryT = 0;
+    if (f && !dry && this.localFireCd <= 0) {
       this.localFireCd = wp.cd;
       if (this.meAnim) this.attackFx(this.meAnim, this.you.w ?? 0, performance.now(), true);
     }
@@ -806,6 +814,16 @@ export class GameClient {
     // weapon ladder
     const w = you.w ?? 0;
     el.weapon.textContent = t(`w.${WEAPONS[w].name}`);
+    // the magazine: rounds left, or the reload filling up
+    const wpn = WEAPONS[w];
+    el.ammo.hidden = !!wpn.melee;
+    if (!wpn.melee) {
+      const rl = you.rl ?? 0;
+      el.ammo.classList.toggle('reloading', rl > 0);
+      el.ammo.classList.toggle('low', rl <= 0 && (you.am ?? 0) <= Math.ceil(wpn.mag * 0.2));
+      el.ammoNum.textContent = rl > 0 ? t('hud.reloading') : `${you.am ?? 0} / ${wpn.mag}`;
+      el.ammoBar.style.width = `${rl > 0 ? (1 - rl / wpn.reload) * 100 : ((you.am ?? 0) / wpn.mag) * 100}%`;
+    }
     el.xpBar.style.width = `${Math.min(100, ((you.xp ?? 0) / XP_PER_LEVEL) * 100)}%`;
     el.nextWeapon.textContent = t('hud.next', { w: t(`w.${WEAPONS[(w + 1) % WEAPONS.length].name}`) });
     el.prestige.textContent = you.pr ? '★'.repeat(Math.min(5, you.pr)) : '';

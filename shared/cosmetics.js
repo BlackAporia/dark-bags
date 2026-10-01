@@ -178,6 +178,7 @@ export const MODEL_NAMES = {
   smg: 'SMG', uzi: 'Machine Pistol', vector: 'Vector SMG',
   rifle: 'Rifle', ak: 'Assault Rifle', bullpup: 'Bullpup', plasma: 'Plasma Rifle',
   sniper: 'Laser Sniper', bolt: 'Bolt Sniper', rail: 'Railgun',
+  autoshotgun: 'Auto Shotgun', pdw: 'PDW', carbine: 'Carbine', scout: 'Scout', lmg: 'Machine Gun', minigun: 'Minigun', magnum: 'Magnum Sniper',
 };
 // models per weapon, by rarity (common → exotic); finishes of one rarity cycle through the list
 const MODELS = {
@@ -187,6 +188,13 @@ const MODELS = {
   smg: [['smg'], ['smg', 'uzi'], ['uzi', 'vector'], ['vector'], ['vector', 'uzi'], ['vector']],
   rifle: [['rifle'], ['rifle', 'ak'], ['ak', 'bullpup'], ['bullpup', 'ak'], ['plasma', 'bullpup'], ['plasma']],
   sniper: [['sniper'], ['sniper', 'bolt'], ['bolt'], ['bolt', 'rail'], ['rail'], ['rail']],
+  deagle: [['deagle'], ['deagle', 'revolver'], ['revolver', 'deagle'], ['deagle'], ['blaster', 'deagle'], ['blaster']],
+  autoshotgun: [['autoshotgun'], ['autoshotgun', 'drum'], ['drum', 'autoshotgun'], ['drum', 'double'], ['drum'], ['drum']],
+  pdw: [['pdw'], ['pdw', 'vector'], ['vector', 'pdw'], ['vector'], ['vector', 'uzi'], ['vector']],
+  carbine: [['carbine'], ['carbine', 'bullpup'], ['bullpup', 'ak'], ['bullpup', 'carbine'], ['plasma', 'bullpup'], ['plasma']],
+  scout: [['scout'], ['scout', 'bolt'], ['bolt', 'scout'], ['bolt'], ['rail', 'bolt'], ['rail']],
+  lmg: [['lmg'], ['lmg'], ['lmg', 'minigun'], ['minigun', 'lmg'], ['minigun'], ['minigun']],
+  magnum: [['magnum'], ['magnum', 'bolt'], ['bolt', 'magnum'], ['rail', 'magnum'], ['rail'], ['rail']],
 };
 export function modelFor(weapon, finishId) {
   const f = FINISH[finishId];
