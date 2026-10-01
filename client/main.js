@@ -1,3 +1,4 @@
+import './polyfills.js'; // first: older phone browsers need it before anything draws
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
 import { Renderer } from './render.js';
@@ -1082,12 +1083,20 @@ addEventListener('pointerdown', () => sfx.unlock(), { once: true });
 
 // ------------------------------------------------------------------- loop
 let lastFrame = performance.now();
+// The next frame is booked first: whatever goes wrong in this one, the loop (input, HUD,
+// drawing) keeps running. A frame error is reported once, not a frozen black screen.
+let loopErr = false;
 function loop(now) {
+  requestAnimationFrame(loop);
   const dt = Math.min(0.1, (now - lastFrame) / 1000);
   lastFrame = now;
-  if (game.active) game.frame(now, dt);
-  else attract.frame(now, dt);
-  requestAnimationFrame(loop);
+  try {
+    if (game.active) game.frame(now, dt);
+    else attract.frame(now, dt);
+  } catch (e) {
+    if (!loopErr) console.error('frame failed', e);
+    loopErr = true;
+  }
 }
 
 // handle for automated smoke tests and console poking
