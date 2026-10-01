@@ -1767,3 +1767,22 @@ body:has(#pause:not([hidden])) .now-playing { display: none; }
 .ammo-track i { display: block; height: 100%; background: var(--paper); transition: width 0.12s linear; }
 .ammo.reloading .ammo-track i { background: var(--loot); }
 .ammo.low .ammo-track i { background: var(--blood); }
+/* collection cases: their own colours, a shine across the card, and what is inside */
+.box-group { margin-top: 14px; }
+.box-group > .eyebrow { margin-bottom: 8px; }
+.box-card.themed { border-color: color-mix(in srgb, var(--c1) 55%, transparent); background: radial-gradient(110% 70% at 50% 0%, color-mix(in srgb, var(--c1) 30%, transparent), transparent 62%), linear-gradient(180deg, color-mix(in srgb, var(--c2) 85%, transparent), var(--glass)); }
+.box-card.themed::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, color-mix(in srgb, var(--c1) 26%, transparent) 50%, transparent 65%); transform: translateX(-120%); animation: case-shine 5s ease-in-out infinite; pointer-events: none; }
+@keyframes case-shine { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.box-card.themed h4 { color: color-mix(in srgb, var(--c1) 70%, #fff); text-shadow: 0 0 14px color-mix(in srgb, var(--c1) 60%, transparent); }
+.box-card.themed .box-art svg { filter: drop-shadow(0 0 16px color-mix(in srgb, var(--c1) 55%, transparent)); }
+.box-card.themed:hover .box-art svg { animation: case-bob 1.2s ease-in-out infinite; }
+@keyframes case-bob { 50% { transform: translateY(-4px) rotate(-2deg); } }
+.box-peek { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.box-peek figure { margin: 0; aspect-ratio: 12 / 7; border-radius: 8px; border-bottom: 2px solid var(--q); background: radial-gradient(80% 80% at 50% 60%, color-mix(in srgb, var(--q) 28%, transparent), rgba(0, 0, 0, 0.35)); display: grid; place-items: center; overflow: hidden; }
+.box-peek.fig figure { aspect-ratio: 3 / 4; }
+.box-peek img { width: 100%; height: 100%; object-fit: contain; }
+.box-contents summary { cursor: pointer; font: 600 12px var(--f-ui); color: var(--dust); }
+.box-contents ul { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px; max-height: 150px; overflow: auto; }
+.box-contents li { font: 600 11px var(--f-ui); padding: 2px 7px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--q) 60%, transparent); color: color-mix(in srgb, var(--q) 75%, #fff); }
+@media (prefers-reduced-motion: reduce) { .box-card.themed::after, .box-card.themed:hover .box-art svg { animation: none; } }
+.box-card h4 { overflow-wrap: anywhere; hyphens: auto; }

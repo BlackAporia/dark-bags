@@ -2,7 +2,7 @@
 // limited editions, and the opening show. The server decides every roll; this page
 // only stages it: the box charges up in the colour of the best drop, bursts, and the
 // cards flip one by one.
-import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY, FIRST_TOPUP_MAX, firstBonus } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY, FIRST_TOPUP_MAX, firstBonus, boxCatalog } from '../shared/cosmetics.js';
 import { isStable } from '../shared/assets.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { boxArt, weaponStill } from './locker.js';
@@ -57,7 +57,10 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
         <button type="button" class="seg" role="tab" data-fam="weapon" aria-selected="${st.family === 'weapon'}">${t('shop.crates')}</button>
       </div>
       <p class="fine">${t(st.family === 'outfit' ? 'shop.bagsNote' : 'shop.cratesNote')} ${t('shop.fair', { e: PITY.epic, l: PITY.legendary })}</p>
-      <div class="box-grid">${boxes.map(boxCard).join('')}</div>
+      ${['theme', 'class', 'tier'].map((g) => {
+        const list = boxes.filter((b) => b.group === g);
+        return list.length ? `<section class="box-group"><p class="eyebrow">${t(`shop.g.${g}`)}</p><div class="box-grid">${list.map(boxCard).join('')}</div></section>` : '';
+      }).join('')}
       ${limited.length ? `<section class="limited"><p class="eyebrow">${t('shop.limited')}</p><div class="lim-row">${limited.map(limCard).join('')}</div></section>` : ''}`;
     for (const b of root.querySelectorAll('[data-pack]')) b.addEventListener('click', () => send({ t: 'topup', id: b.dataset.pack }));
     for (const b of root.querySelectorAll('[data-fam]'))
@@ -84,9 +87,11 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     const cost = boxCost(bx, paid);
     const gift = Math.floor(paid / BULK_FREE_EVERY);
     const cta = paid === 0 ? `${t('lk.openFree')} ×${n}` : `${t('shop.open', { n })} · ${gift ? `<s>${usd(paid * bx.price)}</s> ` : ''}${usd(cost)}`;
-    return `<article class="box-card t${bx.tier}" data-box="${bx.id}" style="--r:${RARITIES[bx.jackpot].color}">
+    const art = bx.art ? `;--c1:${bx.art.c1};--c2:${bx.art.c2}` : '';
+    return `<article class="box-card t${bx.tier}${bx.art ? ' themed' : ''}" data-box="${bx.id}" style="--r:${RARITIES[bx.jackpot].color}${art}">
       ${held ? `<span class="held-badge">×${held}</span>` : ''}
       <div class="box-art">${boxArt(bx, 128)}</div>
+      ${bx.art ? contents(bx) : ''}
       <h4>${esc(t(`box.${bx.id}`))}</h4>
       <p class="box-price num">${usd(bx.price)}</p>
       <p class="fine">${t('lk.jackpot')}: <b style="color:${RARITIES[bx.jackpot].color}">${rn(bx.jackpot)}</b></p>
@@ -103,6 +108,24 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
       <p class="bulk-note${gift ? ' on' : ''}">${gift ? t('shop.bulkOn', { n: gift }) : t('shop.bulk', { n: BULK_FREE_EVERY })}</p>
       <button type="button" class="cta box-go" ${cost > reach() ? 'disabled' : ''}>${cta}</button>
     </article>`;
+  }
+
+  // a collection shows what is inside: its best pieces up front, the full list on demand
+  function contents(bx) {
+    const cat = boxCatalog(bx).filter((i) => !i.basic);
+    const best = [...cat].sort((a, b) => rankOf(b.rarity) - rankOf(a.rarity));
+    const seen = new Set();
+    const top = best.filter((i) => {
+      const k = i.finish ?? i.id; // one of each finish
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).slice(0, 4);
+    const img = (i) => (bx.family === 'weapon' ? `<img src="${weaponStill(i.id, 120, 70)}" alt="">` : `<img src="${figureStill({ outfit: i.id, body: 'm' }, 56, 78)}" alt="">`);
+    const strip = top.map((i) => `<figure style="--q:${RARITIES[i.rarity].color}" title="${esc(i.name)}">${img(i)}</figure>`).join('');
+    const list = best.slice(0, 60).map((i) => `<li style="--q:${RARITIES[i.rarity].color}">${esc(i.name)}${i.limited ? ' ◆' : ''}</li>`).join('');
+    return `<div class="box-peek${bx.family === 'outfit' ? ' fig' : ''}">${strip}</div>
+      <details class="box-contents"><summary>${t('shop.contents', { n: cat.length })}</summary><ul>${list}</ul></details>`;
   }
 
   function limCard(o) {

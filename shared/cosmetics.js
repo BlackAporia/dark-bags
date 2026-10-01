@@ -131,6 +131,19 @@ export const OUTFITS = [
   // limited editions: a fixed number will ever exist, numbered as they drop
   { id: 'first-block', name: 'First Block #1', rarity: 'exotic', limited: 21, color: '#ffffff', accent: '#f7931a', head: 'diamond', fx: 'gold', fx2: 'money', cape: '#f7931a' },
   { id: 'singularity', name: 'Singularity', rarity: 'exotic', limited: 50, color: '#111111', accent: '#a855f7', head: 'halo', fx: 'glitch', fx2: 'galaxy', cape: '#000000' },
+  // collection outfits (themed bags)
+  { id: 'courier', name: 'Night Courier', rarity: 'common', color: '#64748b', accent: '#f59e0b', head: 'cap' },
+  { id: 'skater', name: 'Skater', rarity: 'common', color: '#a3e635', accent: '#1f2937', head: 'beanie' },
+  { id: 'oni-mask', name: 'Oni Mask', rarity: 'rare', color: '#b91c1c', accent: '#111111', head: 'mask' },
+  { id: 'ice-cadet', name: 'Ice Cadet', rarity: 'rare', color: '#dbeafe', accent: '#3b82f6', head: 'helmet' },
+  { id: 'luchador', name: 'Luchador', rarity: 'rare', color: '#7c3aed', accent: '#facc15', head: 'mask' },
+  { id: 'cyber-oni', name: 'Cyber Oni', rarity: 'epic', color: '#ef4444', accent: '#22d3ee', head: 'kabuto', fx: 'pulse' },
+  { id: 'yeti', name: 'Yeti', rarity: 'epic', color: '#f1f5f9', accent: '#93c5fd', head: 'hood', fx2: 'frost' },
+  { id: 'disco', name: 'Disco Fever', rarity: 'epic', color: '#f472b6', accent: '#fde047', head: 'party', fx: 'glow', fx2: 'sparks' },
+  { id: 'storm-chaser', name: 'Storm Chaser', rarity: 'legendary', color: '#38bdf8', accent: '#0c4a6e', head: 'visor', fx: 'glow', fx2: 'lightning' },
+  { id: 'jade-emperor', name: 'Jade Emperor', rarity: 'legendary', color: '#10b981', accent: '#fde68a', head: 'crown', fx: 'gold', cape: '#065f46' },
+  { id: 'kraken-lord', name: 'Kraken Lord', rarity: 'mythic', color: '#0e7490', accent: '#22d3ee', head: 'horns', fx: 'pulse', fx2: 'shadow', cape: '#082f49' },
+  { id: 'toon-overlord', name: 'Toon Overlord', rarity: 'exotic', color: '#facc15', accent: '#f472b6', head: 'crown', fx: 'rainbow', fx2: 'sparks', cape: '#7c3aed' },
 ];
 
 export const OUTFIT = Object.fromEntries(OUTFITS.map((o) => [o.id, o]));
@@ -164,6 +177,31 @@ export const FINISHES = [
   { id: 'prism', name: 'Prism', rarity: 'exotic', color: '#ffffff', fx: 'rainbow' },
   { id: 'void', name: 'Void', rarity: 'exotic', color: '#0b0014', accent: '#a855f7', fx: 'plasma' },
   { id: 'genesis', name: 'Genesis', rarity: 'exotic', limited: 100, color: '#f7931a', accent: '#fff3c4', fx: 'rainbow' },
+  // collection finishes (themed cases); new patterns: dots, wave, fade, stripe
+  { id: 'graphite', name: 'Graphite', rarity: 'common', color: '#3f3f46' },
+  { id: 'copper', name: 'Copper', rarity: 'common', color: '#b87333' },
+  { id: 'wasteland', name: 'Wasteland', rarity: 'common', color: '#78716c', accent: '#a3e635', pattern: 'camo' },
+  { id: 'navy', name: 'Navy', rarity: 'common', color: '#1e3a8a' },
+  { id: 'sakura', name: 'Sakura', rarity: 'rare', color: '#ffb7c5', accent: '#ff5d8f', pattern: 'dots' },
+  { id: 'circuit', name: 'Circuit', rarity: 'rare', color: '#0f172a', accent: '#22d3ee', pattern: 'digital' },
+  { id: 'frostbite', name: 'Frostbite', rarity: 'rare', color: '#dbeafe', accent: '#3b82f6', pattern: 'wave' },
+  { id: 'candy', name: 'Candy Cane', rarity: 'rare', color: '#fdf2f8', accent: '#f43f5e', pattern: 'stripe' },
+  { id: 'oni', name: 'Oni', rarity: 'epic', color: '#b91c1c', accent: '#111111', pattern: 'tiger' },
+  { id: 'synthwave', name: 'Synthwave', rarity: 'epic', color: '#ff2dd4', accent: '#7c3aed', pattern: 'fade', fx: 'glow' },
+  { id: 'lava', name: 'Lava Flow', rarity: 'epic', color: '#7c2d12', accent: '#f97316', pattern: 'wave', fx: 'glow' },
+  { id: 'black-ice', name: 'Black Ice', rarity: 'epic', color: '#1e293b', accent: '#bae6fd', pattern: 'wave' },
+  { id: 'bubblegum', name: 'Bubblegum', rarity: 'epic', color: '#f9a8d4', accent: '#a5f3fc', pattern: 'dots', fx: 'glow' },
+  { id: 'graffiti', name: 'Graffiti', rarity: 'epic', color: '#22c55e', accent: '#f43f5e', pattern: 'stripe' },
+  { id: 'jade', name: 'Jade', rarity: 'legendary', color: '#10b981', accent: '#d1fae5', fx: 'shimmer' },
+  { id: 'hologram', name: 'Hologram', rarity: 'legendary', color: '#a5f3fc', accent: '#f0abfc', pattern: 'fade', fx: 'shimmer' },
+  { id: 'hash-power', name: 'Hash Power', rarity: 'legendary', color: '#f7931a', accent: '#111111', pattern: 'digital', fx: 'shimmer' },
+  { id: 'biohazard', name: 'Biohazard', rarity: 'legendary', color: '#a3e635', accent: '#000000', pattern: 'stripe', fx: 'glow' },
+  { id: 'dragon', name: 'Dragon Scale', rarity: 'mythic', color: '#dc2626', accent: '#fbbf24', pattern: 'dots', fx: 'fire' },
+  { id: 'aurora', name: 'Aurora', rarity: 'mythic', color: '#34d399', accent: '#818cf8', pattern: 'fade', fx: 'galaxy' },
+  { id: 'moonshot', name: 'Moonshot', rarity: 'mythic', color: '#e5e7eb', accent: '#6366f1', fx: 'galaxy' },
+  { id: 'abyss', name: 'Abyss', rarity: 'mythic', color: '#020617', accent: '#0ea5e9', fx: 'plasma' },
+  { id: 'supernova', name: 'Supernova', rarity: 'exotic', color: '#fff7ae', accent: '#f97316', fx: 'rainbow' },
+  { id: 'dragonlord', name: 'Dragonlord', rarity: 'exotic', limited: 77, color: '#dc2626', accent: '#fbbf24', pattern: 'dots', fx: 'fire' },
 ];
 export const FINISH = Object.fromEntries(FINISHES.map((f) => [f.id, f]));
 
@@ -237,11 +275,47 @@ const BAG_IDS = ['street', 'vault', 'golden', 'elite', 'diamond', 'obsidian', 'r
 const BAG_NAMES = ['Street Bag', 'Vault Bag', 'Golden Bag', 'Elite Bag', 'Diamond Bag', 'Obsidian Bag', 'Royal Bag', 'Apex Bag', 'Genesis Bag'];
 const CRATE_IDS = ['w-scrap', 'w-armory', 'w-brass', 'w-specops', 'w-diamond', 'w-obsidian', 'w-royal', 'w-apex', 'w-genesis'];
 const CRATE_NAMES = ['Scrap Crate', 'Armory Crate', 'Brass Crate', 'Spec Ops Crate', 'Diamond Crate', 'Obsidian Crate', 'Royal Crate', 'Apex Crate', 'Genesis Crate'];
+// Collection cases: a themed set (or one class of guns) instead of the whole catalog, each
+// with its own look. One price and one odds table for all of them; the knife case is the
+// premium one. art: the case's colours and emblem.
+const CASE_ODDS = { common: 38, rare: 36, epic: 18, legendary: 6.3, mythic: 1.45, exotic: 0.25 };
+const KNIFE_ODDS = { rare: 45, epic: 35, legendary: 15, mythic: 4.2, exotic: 0.8 };
+const ALL_FIN = null; // every finish
+const COLLECTIONS = [
+  // weapon cases: themes (every gun, the theme's finishes)
+  { id: 'c-samurai', family: 'weapon', name: 'Cyber Samurai Case', finishes: ['urban', 'navy', 'sakura', 'oni', 'jade', 'dragon', 'supernova'], art: { c1: '#ff5d8f', c2: '#1a0610', icon: '刀' } },
+  { id: 'c-neon', family: 'weapon', name: 'Neon Nights Case', finishes: ['graphite', 'circuit', 'cobalt', 'neon', 'synthwave', 'hologram', 'plasma', 'prism'], art: { c1: '#ff2dd4', c2: '#0b0420', icon: '◆' } },
+  { id: 'c-arctic', family: 'weapon', name: 'Arctic Ops Case', finishes: ['arctic', 'frostbite', 'black-ice', 'ice', 'aurora', 'prism'], art: { c1: '#bae6fd', c2: '#0b1726', icon: '❄' } },
+  { id: 'c-inferno', family: 'weapon', name: 'Inferno Case', finishes: ['crimson', 'copper', 'tiger', 'lava', 'blood', 'inferno', 'dragon', 'dragonlord'], art: { c1: '#f97316', c2: '#1c0702', icon: '♨' } },
+  { id: 'c-crypto', family: 'weapon', name: 'Crypto Kings Case', finishes: ['sand', 'carbon', 'digital', 'hazard', 'hash-power', 'gold', 'moonshot', 'genesis'], art: { c1: '#f7931a', c2: '#140c02', icon: '₿' } },
+  { id: 'c-toxic', family: 'weapon', name: 'Toxic Wasteland Case', finishes: ['wasteland', 'field', 'woodland', 'toxic', 'graffiti', 'biohazard', 'abyss', 'void'], art: { c1: '#a3e635', c2: '#0a1402', icon: '☣' } },
+  { id: 'c-toon', family: 'weapon', name: 'Toon Town Case', finishes: ['sand', 'candy', 'bubblegum', 'neon', 'chrome', 'diamond', 'supernova'], art: { c1: '#f9a8d4', c2: '#1d0a1a', icon: '★' } },
+  // weapon cases: one class of guns, every finish
+  { id: 'c-knife', family: 'weapon', name: 'Knife Case', weapons: ['knife'], odds: KNIFE_ODDS, price: 699, jackpot: 'exotic', art: { c1: '#e5e7eb', c2: '#0a0a0a', icon: '⚔' } },
+  { id: 'c-pistol', family: 'weapon', name: 'Pistol Case', weapons: ['pistol', 'deagle'], art: { c1: '#94a3b8', c2: '#0b0f16', icon: '◎' } },
+  { id: 'c-smg', family: 'weapon', name: 'SMG Case', weapons: ['smg', 'pdw'], art: { c1: '#38bdf8', c2: '#06121c', icon: '≋' } },
+  { id: 'c-rifle', family: 'weapon', name: 'Rifle Case', weapons: ['rifle', 'carbine'], art: { c1: '#84cc16', c2: '#0b1204', icon: '✦' } },
+  { id: 'c-heavy', family: 'weapon', name: 'Heavy Case', weapons: ['shotgun', 'autoshotgun', 'lmg'], art: { c1: '#f59e0b', c2: '#160d02', icon: '▣' } },
+  { id: 'c-sniper', family: 'weapon', name: 'Sniper Case', weapons: ['scout', 'magnum', 'sniper'], art: { c1: '#ef4444', c2: '#160404', icon: '⌖' } },
+  // outfit bags: themes
+  { id: 'b-crypto', family: 'outfit', name: 'Crypto Memes Bag', outfits: ['paper-hands', 'gm', 'stacker', 'hodler', 'degen', 'rug-pull', 'airdrop', 'much-wow', 'validator', 'bear-market', 'satoshi', 'diamond-hands', 'bull-run', 'whale', 'money-printer', 'stark-pioneer', 'golden-bull', 'first-block'], art: { c1: '#f7931a', c2: '#140c02', icon: '₿' } },
+  { id: 'b-heroes', family: 'outfit', name: 'Multiverse Heroes Bag', outfits: ['rookie-vest', 'denim', 'sheriff', 'night-ops', 'caped-wonder', 'samurai', 'moon-boy', 'night-vigilante', 'space-ranger', 'storm-chaser', 'thunder-god', 'cosmic-wizard', 'celestial', 'multiverse-prime'], art: { c1: '#3a86ff', c2: '#060b1f', icon: '⚡' } },
+  { id: 'b-monsters', family: 'outfit', name: 'Monsters & Myths Bag', outfits: ['rust', 'woodland', 'oni-mask', 'toxic', 'ghost', 'blood-moon', 'pumpkin-king', 'alien', 'yeti', 'skull-rider', 'void', 'inferno', 'shadow-demon', 'kraken-lord', 'phoenix', 'void-emperor'], art: { c1: '#ef4444', c2: '#140204', icon: '☠' } },
+  { id: 'b-cyber', family: 'outfit', name: 'Cyber Street Bag', outfits: ['streetwear', 'courier', 'skater', 'neon', 'hazard', 'luchador', 'circuit', 'arcade', 'neon-ninja', 'cyber-oni', 'chrome-android', 'matrix-runner', 'zero-knowledge', 'galaxy-brain', 'neon-samurai', 'genesis-ghost', 'singularity'], art: { c1: '#00f5d4', c2: '#020f14', icon: '◈' } },
+  { id: 'b-toon', family: 'outfit', name: 'Toon Friends Bag', outfits: ['slate', 'olive', 'toon-cat', 'bunny-bandit', 'shiba-scout', 'mad-scientist', 'ice-cadet', 'frog-prince', 'disco', 'much-wow', 'gold-bag', 'jade-emperor', 'genesis', 'money-printer', 'toon-overlord'], art: { c1: '#f9a8d4', c2: '#1d0a1a', icon: '✿' } },
+];
 export const BOXES = [
-  ...TIERS.map((t, i) => ({ id: BAG_IDS[i], family: 'outfit', tier: i + 1, name: BAG_NAMES[i], ...t })),
-  ...TIERS.map((t, i) => ({ id: CRATE_IDS[i], family: 'weapon', tier: i + 1, name: CRATE_NAMES[i], ...t })),
+  ...TIERS.map((t, i) => ({ id: BAG_IDS[i], family: 'outfit', tier: i + 1, group: 'tier', name: BAG_NAMES[i], ...t })),
+  ...TIERS.map((t, i) => ({ id: CRATE_IDS[i], family: 'weapon', tier: i + 1, group: 'tier', name: CRATE_NAMES[i], ...t })),
+  ...COLLECTIONS.map((c) => ({ price: 249, odds: CASE_ODDS, jackpot: 'mythic', tier: 4, group: c.weapons ? 'class' : 'theme', ...c })),
 ];
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
+// what a box can drop: the whole family, or its collection
+export function boxCatalog(box) {
+  if (box.family === 'outfit') return box.outfits ? box.outfits.map((id) => OUTFIT[id]).filter(Boolean) : OUTFITS;
+  if (!box.finishes && !box.weapons) return WEAPON_SKINS;
+  return WEAPON_SKINS.filter((s) => (!box.finishes || box.finishes.includes(s.finish)) && (!box.weapons || box.weapons.includes(s.weapon)));
+}
 export const PITY = { epic: 15, legendary: 60 }; // guaranteed at or better, by the Nth open of a box
 export const MAX_OPEN = 100; // boxes per purchase
 // how often an Exotic from this tier is one of the limited editions (while any are left)
@@ -516,7 +590,7 @@ export class Inventory {
     const roll = rollRarity(box, p, this.rnd);
     const weapon = box.family === 'weapon';
     const mine = weapon ? r.wowned : r.owned;
-    const item = pickItem(weapon ? WEAPON_SKINS : OUTFITS, roll.rarity, new Set(mine), this.rnd, { tier: box.tier, minted: this.minted });
+    const item = pickItem(boxCatalog(box), roll.rarity, new Set(mine), this.rnd, { tier: box.tier, minted: this.minted });
     const dup = mine.includes(item.id);
     let refund = 0;
     let serial = null;
