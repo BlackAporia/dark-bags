@@ -58,6 +58,8 @@ export default {
   'xp.Extracted': 'निकासी',
   'xp.Profit': 'मुनाफ़ा',
   'xp.Practice ×0.5': 'अभ्यास ×0.5',
+  'rk.newRank': "नई रैंक",
+  'rw.continue': "जारी रखें",
   'rw.title': 'रैंक-अप इनाम',
   'rw.trial': '72 घंटे तुम्हारी',
   'rw.try': 'पहनकर देखो',

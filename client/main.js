@@ -14,7 +14,8 @@ import { rankBadgeSvg } from './rankbadge.js';
 import { createLocker } from './locker.js';
 import { figureStill } from './stickman.js';
 import { openShare, wireShare } from './sharecard.js';
-import { OUTFIT } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES } from '../shared/cosmetics.js';
+import { spinReel } from './reel.js';
 import { createAchievements, achName } from './achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
@@ -567,10 +568,69 @@ function renderRewards(m) {
   el.hidden = !(m.rewards ?? []).length;
   if (el.hidden) return;
   el.innerHTML = `<p class="eyebrow">${t('rw.title')}</p><ul>${trials
-    .map((tr) => `<li><span class="rw-ico trial"></span><b>${esc(OUTFIT[tr.id].name)}</b><span class="fine">${t('rw.trial')}</span></li>`)
+    .map((tr) => {
+      const o = OUTFIT[tr.id];
+      const c = RARITIES[o.rarity].color;
+      return `<li style="--q:${c}"><img class="rw-fig" src="${figureStill({ outfit: tr.id, body: app.locker?.body ?? 'm' }, 56, 78)}" alt=""><div><b>${esc(o.name)}</b><span class="rw-rar">${esc(t(`r.${o.rarity}`))}</span><span class="fine">${t('rw.trial')}</span></div></li>`;
+    })
     .join('')}</ul><div class="rw-actions"><button type="button" class="ghost" data-rw="locker">${t('rw.try')}</button><button type="button" class="ghost share" data-rw="share">${t('rw.share')}</button></div>`;
   el.querySelector('[data-rw="locker"]').addEventListener('click', () => locker.open('outfits'));
   el.querySelector('[data-rw="share"]').addEventListener('click', () => shareMoment('rankUp', { rank: m.rank.after.rank, rewards: m.rewards }));
+}
+
+// A new rank: the whole screen celebrates, then a case spins and lands on the outfit the
+// rank pays (yours to wear for 72 hours). Tap anywhere after it lands to carry on.
+function rankUpShow(m) {
+  const up = m.rank && m.rank.after.rank > m.rank.before.rank;
+  if (!up) return;
+  const el = $('rankup');
+  const after = m.rank.after;
+  const trial = (m.rewards ?? []).map((r) => r.trial).filter(Boolean).at(-1);
+  const confetti = Array.from({ length: 46 }, (_, i) => `<i style="--x:${Math.random() * 100}%;--d:${(Math.random() * 1.2).toFixed(2)}s;--c:${['#ffd166', '#ff3d7f', '#00f0ff', '#7dff9b', '#b37bff', '#f7931a'][i % 6]};--r:${Math.round(Math.random() * 360)}deg"></i>`).join('');
+  el.innerHTML = `<div class="ru-rays"></div><div class="ru-confetti">${confetti}</div>
+    <div class="ru-stage">
+      <div class="ru-head"><div class="ru-badge">${rankBadgeSvg(after.rank, 150)}</div>
+        <p class="ru-kicker">${t('rk.newRank')}</p>
+        <p class="ru-name"><span>${after.rank}</span> ${esc(after.name)}</p></div>
+      <div class="ru-reel" id="ru-reel"></div>
+      <div class="ru-actions" id="ru-actions"></div>
+    </div>`;
+  el.hidden = false;
+  el.className = 'rankup in';
+  sfx.music?.sting(true);
+  sfx.play('bag');
+  const finish = () => {
+    const acts = $('ru-actions');
+    acts.innerHTML = `${trial ? `<p class="ru-won" style="--q:${RARITIES[OUTFIT[trial.id].rarity].color}"><b>${esc(OUTFIT[trial.id].name)}</b> · ${t('rw.trial')}</p>` : ''}
+      <div class="ru-btns">${trial ? `<button type="button" class="cta" data-ru="try">${t('rw.try')}</button>` : ''}<button type="button" class="ghost share" data-ru="share">${t('rw.share')}</button><button type="button" class="ghost" data-ru="close">${t('rw.continue')}</button></div>`;
+    const close = () => {
+      el.hidden = true;
+      el.className = 'rankup';
+    };
+    acts.querySelector('[data-ru="try"]')?.addEventListener('click', () => {
+      close();
+      locker.open('outfits');
+    });
+    acts.querySelector('[data-ru="share"]').addEventListener('click', () => shareMoment('rankUp', { rank: after.rank, rewards: m.rewards }));
+    acts.querySelector('[data-ru="close"]').addEventListener('click', close);
+  };
+  if (!trial) return setTimeout(finish, 1600);
+  // the case: rank-up odds, outfits you could have got, landing on the one you did
+  const pool = OUTFITS.filter((o) => !o.basic && !o.limited && o.rarity !== 'exotic');
+  const pick = [];
+  for (const r of ['rare', 'epic', 'legendary', 'mythic']) {
+    const of = pool.filter((o) => o.rarity === r);
+    for (let k = 0; k < Math.min(8, of.length); k++) pick.push(of.splice(Math.floor(Math.random() * of.length), 1)[0]);
+  }
+  const tile = (o) => ({ id: o.id, name: o.name, rarity: o.rarity, img: figureStill({ outfit: o.id, body: app.locker?.body ?? 'm' }, 56, 78) });
+  setTimeout(() => {
+    el.classList.add('spin');
+    spinReel($('ru-reel'), { pool: pick.map(tile), win: tile(OUTFIT[trial.id]), odds: { rare: 55, epic: 30, legendary: 12, mythic: 3 }, sfx, motion: settings.motion, secs: 5.2, label: t('rw.title') }).then(() => {
+      sfx.play('beep', { f: 1600, dur: 0.15 });
+      el.classList.add('landed');
+      finish();
+    });
+  }, settings.motion ? 2300 : 0);
 }
 
 // ------------------------------------------------------------- ready room
@@ -966,6 +1026,7 @@ function showResult(m) {
   }
   renderRankResult(m.rank);
   renderRewards(m);
+  setTimeout(() => rankUpShow(m), settings.motion ? 1300 : 200);
   app.lastResult = m;
   const q = quote(m.stake);
   $('res-again').textContent = q === null ? t('res.again') : `${t('res.again')} · ${money(m.stake)}`;

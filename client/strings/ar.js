@@ -58,6 +58,8 @@ export default {
   'xp.Extracted': 'إجلاء',
   'xp.Profit': 'ربح',
   'xp.Practice ×0.5': 'تدريب ×0.5',
+  'rk.newRank': "رتبة جديدة",
+  'rw.continue': "متابعة",
   'rw.title': 'مكافأة الترقية',
   'rw.trial': 'لك لمدة 72 ساعة',
   'rw.try': 'جرّبه',

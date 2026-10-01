@@ -58,6 +58,8 @@ export default {
   'xp.Extracted': 'Extracción',
   'xp.Profit': 'Beneficio',
   'xp.Practice ×0.5': 'Práctica ×0.5',
+  'rk.newRank': "Nuevo rango",
+  'rw.continue': "Continuar",
   'rw.title': 'Recompensa de ascenso',
   'rw.trial': 'tuyo durante 72 horas',
   'rw.try': 'Probártelo',

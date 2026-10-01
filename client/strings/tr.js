@@ -58,6 +58,8 @@ export default {
   'xp.Extracted': 'Tahliye',
   'xp.Profit': 'Kâr',
   'xp.Practice ×0.5': 'Antrenman ×0.5',
+  'rk.newRank': "Yeni rütbe",
+  'rw.continue': "Devam",
   'rw.title': 'Rütbe ödülü',
   'rw.trial': '72 saat boyunca senin',
   'rw.try': 'Dene',
