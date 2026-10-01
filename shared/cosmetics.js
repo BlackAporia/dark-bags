@@ -659,6 +659,12 @@ export class Inventory {
     const list = track === 'p' ? ps.p : ps.f;
     if (list.includes(tier)) return { ok: false, error: 'Already claimed.' };
     list.push(tier);
+    this.give(key, rw);
+    return { ok: true, track, tier, reward: rw };
+  }
+
+  // hand over a reward: shop $, a box, an outfit, a weapon skin or a turret skin
+  give(key, rw) {
     const r = this.rec(key);
     if (rw.k === 'credit') r.credit += rw.v;
     else if (rw.k === 'box') r.boxes[rw.id] = (r.boxes[rw.id] ?? 0) + (rw.n ?? 1);
@@ -668,7 +674,6 @@ export class Inventory {
     } else if (rw.k === 'wskin' && !r.wowned.includes(rw.id)) r.wowned.push(rw.id);
     else if (rw.k === 'turret' && !r.towned.includes(rw.id)) r.towned.push(rw.id);
     this.changed();
-    return { ok: true, track, tier, reward: rw };
   }
 
   setBody(key, body) {

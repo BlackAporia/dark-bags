@@ -147,7 +147,7 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
     const rake = Math.floor(stake * CFG.RAKE);
@@ -180,6 +180,7 @@ export class World {
       body,
       ws: ws && Object.keys(ws).length ? ws : null, // weapon skins: { weaponId: finishId }
       ts: ts || null, // turret skin (guns + lasers)
+      neon: neon || null, // a season title, worn in neon over the name
       x: pos.x,
       y: pos.y,
       vx: 0,
@@ -550,6 +551,7 @@ export class World {
 
   kill(v, killer, cause = 'shot') {
     v.hp = 0;
+    v.place ??= this.aliveCount(); // finishing place (before this death: the alive count)
     v.status = 'dead';
     v.endedAt = this.time;
     v.lostBag = v.bag;
@@ -948,6 +950,7 @@ export class World {
       if (rest > 0) rest--;
       p.payout = amount;
       p.won = true;
+      p.place = 1;
       if (p.isBot) this.ledger.botPaidOut += amount;
       else this.ledger.paidOut += amount;
       this.emit({ k: 'payout', to: [p.id], pid: p.id, amount });
@@ -1098,6 +1101,7 @@ export class World {
         pr: p.prestige,
         rk: p.rank,
         ...(p.title ? { tt: p.title } : {}),
+        ...(p.neon ? { nt: p.neon } : {}),
         ...(this.teamSize ? { tm: p.team } : {}),
         ...(p.ws ? { ws: p.ws } : {}),
         ...(p.ping != null ? { pg: p.ping } : {}),

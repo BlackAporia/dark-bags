@@ -6,6 +6,7 @@ import { MapLayer } from './mapLayer.js';
 import { pose, drawFigure, FEET, hpColor } from './stickman.js';
 import { textures, canvas } from './textures.js';
 import { FINISH, RARITY_ORDER, TURRET_SKIN } from '../shared/cosmetics.js';
+import { neonText, neonColor } from './ranked.js';
 
 const C = {
   void: '#07090f',
@@ -734,6 +735,25 @@ export class Renderer {
         ctx.fillStyle = 'rgba(255, 209, 102, 0.9)';
         ctx.textAlign = 'center';
         ctx.fillText(f.title.toUpperCase(), p.head.x, top - 19);
+      }
+      if (f.neon) {
+        // a season title: neon, glowing and flickering, above everything else
+        const c = neonColor(f.neon);
+        const y = top - (f.title ? 31 : 19);
+        ctx.save();
+        ctx.font = `900 10px ${F_UI}`;
+        ctx.textAlign = 'center';
+        ctx.shadowColor = c;
+        ctx.shadowBlur = this.quality >= 1 ? 10 : 0;
+        ctx.globalAlpha = Math.sin(performance.now() / 70) > 0.97 ? 0.55 : 1;
+        ctx.fillStyle = c;
+        const txt = `◆ ${neonText(f.neon).toUpperCase()} ◆`;
+        ctx.fillText(txt, p.head.x, y);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.globalAlpha *= 0.55;
+        ctx.fillText(txt, p.head.x, y);
+        ctx.restore();
       }
     }
   }

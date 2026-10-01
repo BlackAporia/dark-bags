@@ -17,6 +17,7 @@ import { openShare, wireShare } from './sharecard.js';
 import { OUTFIT, OUTFITS, RARITIES } from '../shared/cosmetics.js';
 import { spinReel } from './reel.js';
 import { createPass } from './pass.js';
+import { createRanked, neonText, neonColor } from './ranked.js';
 import { createAchievements, achName } from './achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
@@ -190,7 +191,12 @@ const social = createSocial({
   },
 });
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m) });
-const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass };
+const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p) });
+const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked };
+document.addEventListener('darkbags:mode', () => {
+  store.set('darkbags.gmode', app.gameMode);
+  renderLobby();
+});
 function go(page, extra) {
   if (!document.querySelector(`.page[data-page="${page}"]`)) page = 'play';
   app.page = page;
@@ -326,7 +332,7 @@ function tableInfo(stake) {
 }
 
 // the mode picker: a card per mode with what it is and how the money works
-const MODE_ICON = { raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
+const MODE_ICON = { ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
 function renderModes() {
   const box = $('modes');
   box.replaceChildren(
@@ -586,9 +592,9 @@ function renderRewards(m) {
 
 // A new rank: the whole screen celebrates, then a case spins and lands on the outfit the
 // rank pays (yours to wear for 72 hours). Tap anywhere after it lands to carry on.
-function rankUpShow(m) {
+function rankUpShow(m, next = () => {}) {
   const up = m.rank && m.rank.after.rank > m.rank.before.rank;
-  if (!up) return;
+  if (!up) return next();
   const el = $('rankup');
   const after = m.rank.after;
   const trial = (m.rewards ?? []).map((r) => r.trial).filter(Boolean).at(-1);
@@ -612,6 +618,7 @@ function rankUpShow(m) {
     const close = () => {
       el.hidden = true;
       el.className = 'rankup';
+      next();
     };
     acts.querySelector('[data-ru="try"]')?.addEventListener('click', () => {
       close();
@@ -778,6 +785,7 @@ function onMessage(m) {
   if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
   if (m.t === 'locker') pass.onMessage(m);
+  if (m.t === 'leaderboard' || m.t === 'career' || m.t === 'result') ranked.onMessage(m);
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
@@ -833,6 +841,7 @@ function handleMessage(m) {
       game.myName = app.name || 'runner';
       game.myRank = app.rank?.rank ?? 1;
       game.myTitle = app.career?.title ? achName(app.career.title) : null;
+      game.myNeon = app.career?.neon ?? null;
       game.begin(m, app.skin, app.gore, app.locker);
       renderer.prewarm(m.map.w / 2, m.map.h / 2);
       showScreen('game');
@@ -1034,7 +1043,9 @@ function showResult(m) {
   }
   renderRankResult(m.rank);
   renderRewards(m);
-  setTimeout(() => rankUpShow(m), settings.motion ? 1300 : 200);
+  ranked.resultLine(m);
+  // the shows after a match, one after the other: a new rank, then the ranked bonus spin
+  setTimeout(() => rankUpShow(m, () => ranked.spin(m, $('rankup'))), settings.motion ? 1300 : 200);
   app.lastResult = m;
   const q = quote(m.stake);
   $('res-again').textContent = q === null ? t('res.again') : `${t('res.again')} · ${money(m.stake)}`;

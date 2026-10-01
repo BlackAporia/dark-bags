@@ -6,7 +6,8 @@ import { PriceBook, unitsAtEntryRate } from './assets.js';
 import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
 import { MODE } from './modes.js';
-import { Inventory, botLook, OUTFIT } from './cosmetics.js';
+import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, seasonAt } from './cosmetics.js';
+import { spinChance, rollLottery, titleBonus } from './ranked.js';
 
 /**
  * A table at one stake level.
@@ -252,7 +253,7 @@ export class RoomCore {
     }
     for (const c of ready) {
       const look = this.inventory.look(c.token);
-      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), ...look });
+      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), neon: this.ranks.neon(c.token), ...look });
       this.accounts.set(p.id, { token: c.token, ...c.escrow });
       this.book(c.escrow.asset, 'in', c.escrow.units);
       c.pid = p.id;
@@ -412,6 +413,26 @@ export class RoomCore {
     for (const [cid, l] of per) this.send(cid, { t: 'ev', l });
   }
 
+  // the ranked bonus spin: a season title (rare), a weapon skin, or a collection case
+  lottery(token) {
+    const won = rollLottery(Math.random);
+    const sid = seasonAt().id;
+    if (won.k === 'title') {
+      const r = this.ranks.addSeasonTitle(token, sid, won.key);
+      return { k: 'title', id: r.id, fresh: r.fresh };
+    }
+    if (won.k === 'wskin') {
+      const pool = WEAPON_SKINS.filter((x) => !x.limited && ['rare', 'epic', 'legendary'].includes(x.rarity));
+      const it = pool[Math.floor(Math.random() * pool.length)];
+      this.inventory.give(token, { k: 'wskin', id: it.id });
+      return { k: 'wskin', id: it.id };
+    }
+    const cases = BOXES.filter((b) => b.group !== 'tier' && b.id !== 'c-knife');
+    const bx = cases[Math.floor(Math.random() * cases.length)];
+    this.inventory.give(token, { k: 'box', id: bx.id });
+    return { k: 'box', id: bx.id };
+  }
+
   reportEnds() {
     const w = this.world;
     for (const c of this.clients.values()) {
@@ -428,6 +449,21 @@ export class RoomCore {
       const done = this.ranks.progress(c.token, { ...stats, outfits: this.inventory.view(c.token).owned.length });
       for (const a of done) if (a.xp) earned.parts.push({ label: 'Achievement', ach: a.id, xp: a.xp });
       earned.total += done.reduce((s, a) => s + a.xp, 0);
+      // a season title in neon adds its bonus to everything earned, while its season lasts
+      const bonus = titleBonus(this.ranks.neon(c.token));
+      if (bonus > 0 && earned.total > 0) {
+        const extra = Math.round(earned.total * bonus);
+        earned.parts.push({ label: 'Season title', xp: extra });
+        earned.total += extra;
+      }
+      // ranked: the finish moves the season rating, and may earn a bonus spin
+      let ranked = null;
+      if (MODE[this.mode]?.ranked && !this.practice && (w.phase === 'ended' || p.status === 'dead')) {
+        const place = p.won ? 1 : p.place ?? w.players.size;
+        ranked = this.ranks.rankedResult(c.token, { place, size: w.players.size, kills: p.kills, won: !!p.won });
+        if (Math.random() < spinChance(place)) ranked.spin = this.lottery(c.token);
+        ranked.view = this.ranks.rankedView(c.token);
+      }
       const { before, after } = this.ranks.add(c.token, earned.total);
       done.push(...this.ranks.progress(c.token, { rank: after.rank }));
       // every rank gained pays a luck bag, $ credit and a 72h trial outfit
@@ -440,6 +476,8 @@ export class RoomCore {
         locker: this.inventory.view(c.token),
         rank: { gained: earned.total, parts: earned.parts, before, after },
         pass,
+        ...(ranked ? { ranked } : {}),
+        size: w.players.size,
         achievements: done.map((a) => a.id),
         career: this.ranks.career(c.token),
         status: p.status,

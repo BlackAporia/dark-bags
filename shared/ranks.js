@@ -1,4 +1,6 @@
 import { applyStats, achievementView } from './achievements.js';
+import { START_RP, rpDelta, divisionOf, seasonTitle, seasonTitleId } from './ranked.js';
+import { seasonAt } from './season.js';
 // Career ranks: 1 (Lance Corporal) to 90 (Legend). Every raid pays rank XP, win or lose.
 // The first ranks come after a raid or two; the last ones take hundreds of hours.
 // Separate from the Arms Race weapon XP inside a raid (weapons.js), which resets every raid.
@@ -126,6 +128,69 @@ export class RankBook {
     return this.recs.get(key)?.title ?? null;
   }
 
+  // ---------------------------------------------------------- ranked
+  // this season's ranked record (a new month starts everyone at START_RP)
+  ranked(key, now = Date.now()) {
+    const r = this.rec(key);
+    const sid = seasonAt(now).id;
+    if (r.ranked?.sid !== sid) r.ranked = { sid, rp: START_RP, games: 0, wins: 0, kills: 0, top3: 0, best: START_RP };
+    return r.ranked;
+  }
+
+  rankedView(key, now = Date.now()) {
+    const q = this.ranked(key, now);
+    return { ...q, div: divisionOf(q.rp).id };
+  }
+
+  rankedResult(key, { place, size, kills = 0, won = false }, now = Date.now()) {
+    const q = this.ranked(key, now);
+    const before = q.rp;
+    const delta = rpDelta({ place, size, kills });
+    q.rp = Math.max(0, q.rp + delta);
+    q.best = Math.max(q.best, q.rp);
+    q.games++;
+    q.kills += kills;
+    if (won || place === 1) q.wins++;
+    if (place <= 3) q.top3++;
+    this.onChange?.(this);
+    return { before, after: q.rp, delta, place, divBefore: divisionOf(before).id, div: divisionOf(q.rp).id };
+  }
+
+  // the season's top players by RP (only those who played this season)
+  leaderboard(now = Date.now(), n = 100) {
+    const sid = seasonAt(now).id;
+    const rows = [];
+    for (const [key, r] of this.recs) if (r.ranked?.sid === sid && r.ranked.games > 0) rows.push({ key, ...r.ranked, div: divisionOf(r.ranked.rp).id });
+    rows.sort((a, b) => b.rp - a.rp || b.wins - a.wins || b.kills - a.kills);
+    return rows.slice(0, n);
+  }
+
+  // season titles: won from the ranked spin, worn in neon, a bonus on XP while their season lasts
+  addSeasonTitle(key, sid, tierKey) {
+    const r = this.rec(key);
+    const id = seasonTitleId(sid, tierKey);
+    r.stitles ??= [];
+    const fresh = !r.stitles.includes(id);
+    if (fresh) r.stitles.push(id);
+    if (fresh && !r.neon) r.neon = id; // the first one goes straight on
+    this.onChange?.(this);
+    return { id, fresh };
+  }
+  neon(key) {
+    const r = this.recs.get(key);
+    return r?.neon && r.stitles?.includes(r.neon) ? r.neon : null;
+  }
+  setNeon(key, id) {
+    const r = this.rec(key);
+    if (id !== null && !(r.stitles ?? []).includes(id)) return false;
+    r.neon = id;
+    this.onChange?.(this);
+    return true;
+  }
+  seasonTitles(key) {
+    return (this.recs.get(key)?.stitles ?? []).map(seasonTitle).filter(Boolean);
+  }
+
   // wear an unlocked achievement as a title (null takes it off)
   setTitle(key, id) {
     const r = this.rec(key);
@@ -137,7 +202,7 @@ export class RankBook {
 
   career(key) {
     const r = this.recs.get(key);
-    return { title: r?.title ?? null, stats: r?.stats ?? {}, achievements: achievementView(r) };
+    return { title: r?.title ?? null, stats: r?.stats ?? {}, achievements: achievementView(r), neon: this.neon(key), stitles: r?.stitles ?? [], ranked: this.rankedView(key) };
   }
 
   toJSON() {
