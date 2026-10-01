@@ -432,11 +432,14 @@ export class RoomCore {
       done.push(...this.ranks.progress(c.token, { rank: after.rank }));
       // every rank gained pays a luck bag, $ credit and a 72h trial outfit
       const rewards = this.inventory.rankUp(c.token, before.rank, after.rank);
+      // the season's battle pass fills with the same XP
+      const pass = this.inventory.passXp(c.token, earned.total);
       this.send(c.cid, {
         t: 'result',
         rewards,
         locker: this.inventory.view(c.token),
         rank: { gained: earned.total, parts: earned.parts, before, after },
+        pass,
         achievements: done.map((a) => a.id),
         career: this.ranks.career(c.token),
         status: p.status,

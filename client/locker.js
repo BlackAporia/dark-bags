@@ -1,6 +1,6 @@
 // The locker: your character, your outfits and weapon skins. Equip only: skins come
 // from bags and crates in the shop (shop.js). Also draws the box art both use.
-import { OUTFIT, OUTFITS, RARITIES, FINISH, WEAPON_SKINS, WSKIN } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, FINISH, WEAPON_SKINS, WSKIN, SEASON_OUTFITS, SEASON_WSKINS } from '../shared/cosmetics.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { drawPreview, figureStill, weaponArt, drawWeapon } from './stickman.js';
 import { esc } from './game.js';
@@ -235,7 +235,9 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
     for (const b of document.querySelectorAll('#lk-body [data-body]')) b.setAttribute('aria-checked', String(b.dataset.body === L().body));
     if (st.tab === 'outfits') {
       renderDetail();
-      renderGrid(OUTFITS.filter((o) => st.filter === 'all' || (st.filter === 'owned' ? owns(o.id) : o.rarity === st.filter)));
+      // seasonal armour shows once you own it (it never drops from a box)
+      const all = [...SEASON_OUTFITS.filter((o) => owns(o.id)), ...OUTFITS];
+      renderGrid(all.filter((o) => st.filter === 'all' || (st.filter === 'owned' ? owns(o.id) : o.rarity === st.filter)));
       const have = OUTFITS.filter((o) => owns(o.id)).length;
       $('lk-count').textContent = t('lk.collected', { a: have, b: OUTFITS.length });
     } else renderWeapons();
@@ -306,7 +308,7 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
         return b;
       }),
     );
-    const list = WEAPON_SKINS.filter((s) => s.weapon === st.weapon);
+    const list = [...SEASON_WSKINS.filter((s) => s.weapon === st.weapon && L().wowned?.includes(s.id)), ...WEAPON_SKINS.filter((s) => s.weapon === st.weapon)];
     const on = myWs()[st.weapon] ?? 'default';
     const plain = { id: `${st.weapon}.default`, name: t('lk.plain'), rarity: 'common' };
     const cards = [plain, ...list].map((s) => {

@@ -778,6 +778,7 @@ export function drawFigure(ctx, a, p, o) {
       ctx.stroke();
     }
   }
+  if (outfit?.armor && !flash) drawArmor(ctx, p, outfit.armor, t);
   // visor, then hair and headgear
   if (!headless) {
     ctx.strokeStyle = flash ? '#fff' : 'rgba(235, 229, 214, 0.9)';
@@ -826,6 +827,138 @@ export function drawFigure(ctx, a, p, o) {
     ctx.fill();
   }
   drawWeapon(ctx, p, flash, FINISH[a.ws?.[WEAPONS[a.w]?.id]], t);
+}
+
+// Seasonal armour: a chest plate over the torso, a belt, greaves on the shins and plated
+// fists; Warlord adds spiked pauldrons, Apex glowing seams and a visor that burns. It
+// changes the whole silhouette, not just the colour.
+function drawArmor(ctx, p, A, t) {
+  const dx = p.shoulder.x - p.hip.x;
+  const dy = p.shoulder.y - p.hip.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const nx = -uy;
+  const ny = ux;
+  const at = (k, w) => ({ x: p.hip.x + dx * k + nx * w, y: p.hip.y + dy * k + ny * w });
+  const big = A.style !== 'vanguard';
+  const pulse = 0.6 + 0.4 * Math.sin(t / 260);
+  ctx.save();
+  ctx.lineJoin = 'round';
+  // chest plate
+  const top = big ? 7.5 : 6.5;
+  const pts = [at(1.02, -top), at(1.02, top), at(0.2, 4.6), at(0.2, -4.6)];
+  ctx.beginPath();
+  pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+  ctx.closePath();
+  ctx.fillStyle = A.plate;
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 3.4;
+  ctx.stroke();
+  ctx.fill();
+  ctx.strokeStyle = A.trim;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // plate seams: a chevron, and for the Apex a glowing core
+  const c1 = at(0.78, 0);
+  ctx.beginPath();
+  ctx.moveTo(at(0.86, -4).x, at(0.86, -4).y);
+  ctx.lineTo(c1.x, c1.y);
+  ctx.lineTo(at(0.86, 4).x, at(0.86, 4).y);
+  ctx.stroke();
+  // belt
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(at(0.12, -5.5).x, at(0.12, -5.5).y);
+  ctx.lineTo(at(0.12, 5.5).x, at(0.12, 5.5).y);
+  ctx.stroke();
+  ctx.strokeStyle = A.trim;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // greaves and gauntlets
+  for (const L of p.legs) {
+    if (!L.knee || !L.foot) continue;
+    for (const [w, c] of [[5.4, OUTLINE], [3.6, A.plate]]) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(lerp(L.knee.x, L.foot.x, 0.1), lerp(L.knee.y, L.foot.y, 0.1));
+      ctx.lineTo(lerp(L.knee.x, L.foot.x, 0.85), lerp(L.knee.y, L.foot.y, 0.85));
+      ctx.stroke();
+    }
+    ctx.fillStyle = A.trim;
+    ctx.beginPath();
+    ctx.arc(L.knee.x, L.knee.y, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (const arm of p.arms) {
+    ctx.fillStyle = A.trim;
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(arm.hand.x, arm.hand.y, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // pauldrons
+  if (big) {
+    for (const s of [-1, 1]) {
+      const q = at(1.02, s * 7.5);
+      ctx.fillStyle = A.trim;
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(q.x, q.y + 0.5, 4.6, 3.4, Math.atan2(uy, ux) + Math.PI / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (A.style === 'warlord' || A.style === 'apex') {
+        // a spike off each shoulder
+        const tip = { x: q.x + ux * 5.5 + nx * s * 2.5, y: q.y + uy * 5.5 + ny * s * 2.5 };
+        ctx.beginPath();
+        ctx.moveTo(q.x + nx * s * 2.4 - ux, q.y + ny * s * 2.4 - uy);
+        ctx.lineTo(tip.x, tip.y);
+        ctx.lineTo(q.x - nx * s * 1 + ux, q.y - ny * s * 1 + uy);
+        ctx.closePath();
+        ctx.fillStyle = A.glow;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }
+  // glowing seams and visor
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = A.glow;
+  ctx.globalAlpha = (A.style === 'apex' ? 0.95 : 0.6) * pulse;
+  ctx.lineWidth = A.style === 'apex' ? 1.8 : 1.1;
+  ctx.beginPath();
+  ctx.moveTo(at(0.22, 0).x, at(0.22, 0).y);
+  ctx.lineTo(c1.x, c1.y);
+  ctx.stroke();
+  if (A.style === 'apex') {
+    for (const L of p.legs) {
+      if (!L.knee || !L.foot) continue;
+      ctx.beginPath();
+      ctx.moveTo(lerp(L.knee.x, L.foot.x, 0.15), lerp(L.knee.y, L.foot.y, 0.15));
+      ctx.lineTo(lerp(L.knee.x, L.foot.x, 0.8), lerp(L.knee.y, L.foot.y, 0.8));
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.35 * pulse;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(at(0.3, 0).x, at(0.3, 0).y);
+    ctx.lineTo(c1.x, c1.y);
+    ctx.stroke();
+  }
+  if (big) {
+    ctx.globalAlpha = 0.9 * pulse;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.head.x - p.f * 0.5, p.head.y - 1);
+    ctx.lineTo(p.head.x + p.f * 6, p.head.y - 1);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // the body colour of a weapon finish at time t (animated finishes shift over time)

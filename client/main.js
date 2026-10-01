@@ -16,6 +16,7 @@ import { figureStill } from './stickman.js';
 import { openShare, wireShare } from './sharecard.js';
 import { OUTFIT, OUTFITS, RARITIES } from '../shared/cosmetics.js';
 import { spinReel } from './reel.js';
+import { createPass } from './pass.js';
 import { createAchievements, achName } from './achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
@@ -188,7 +189,8 @@ const social = createSocial({
     goToTable();
   },
 });
-const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage };
+const pass = createPass({ app, send, sfx, toast: (m) => toast(m) });
+const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass };
 function go(page, extra) {
   if (!document.querySelector(`.page[data-page="${page}"]`)) page = 'play';
   app.page = page;
@@ -197,6 +199,10 @@ function go(page, extra) {
   for (const b of document.querySelectorAll('.nav-btn')) b.setAttribute('aria-current', String(b.dataset.page === page));
   if (page === 'achievements') ach.renderList();
   if (page === 'shop' && extra) shop.family?.(extra);
+  if (page === 'pass') {
+    const b = document.querySelector('.nav-btn[data-page="pass"] .nav-badge');
+    if (b) b.hidden = true;
+  }
   PAGES[page]?.render();
   document.querySelector('.pages').scrollTo?.({ top: 0 });
   sfx.play('beep', { f: 990, dur: 0.02 });
@@ -771,6 +777,7 @@ function onMessage(m) {
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
   if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
+  if (m.t === 'locker') pass.onMessage(m);
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
@@ -838,6 +845,7 @@ function handleMessage(m) {
       break;
     case 'result':
       tour.onResult(m);
+      pass.onResult(m);
       app.balances = m.balances ?? app.balances;
       if (app.mode === 'online') store.set('darkbags.firstOnline', true);
       store.set('darkbags.raids', store.get('darkbags.raids', 0) + 1);

@@ -21,6 +21,8 @@
 // Rank-ups pay one thing: a random outfit to try for 72 hours. Nothing here changes
 // how a runner plays. It is all looks.
 import { WEAPONS } from './weapons.js';
+import { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems } from './season.js';
+export { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems };
 
 export const BODIES = ['m', 'f'];
 
@@ -146,7 +148,8 @@ export const OUTFITS = [
   { id: 'toon-overlord', name: 'Toon Overlord', rarity: 'exotic', color: '#facc15', accent: '#f472b6', head: 'crown', fx: 'rainbow', fx2: 'sparks', cape: '#7c3aed' },
 ];
 
-export const OUTFIT = Object.fromEntries(OUTFITS.map((o) => [o.id, o]));
+// seasonal armour is not in OUTFITS (no box or trial ever drops it); it is still an outfit
+export const OUTFIT = Object.fromEntries([...OUTFITS, ...SEASON_OUTFITS].map((o) => [o.id, o]));
 export const DEFAULT_OUTFIT = 'basic-0';
 
 // ------------------------------------------------------------ weapon skins
@@ -203,7 +206,7 @@ export const FINISHES = [
   { id: 'supernova', name: 'Supernova', rarity: 'exotic', color: '#fff7ae', accent: '#f97316', fx: 'rainbow' },
   { id: 'dragonlord', name: 'Dragonlord', rarity: 'exotic', limited: 77, color: '#dc2626', accent: '#fbbf24', pattern: 'dots', fx: 'fire' },
 ];
-export const FINISH = Object.fromEntries(FINISHES.map((f) => [f.id, f]));
+export const FINISH = Object.fromEntries([...FINISHES, ...SEASON_FINISHES].map((f) => [f.id, f]));
 
 // Each skin is also a model: the rarer the finish, the wilder the weapon. Knife skins
 // become daggers, machetes, axes, katanas, twin blades, scythes, energy swords; guns
@@ -241,7 +244,7 @@ export function modelFor(weapon, finishId) {
   const ri = RARITY_ORDER.indexOf(f.rarity);
   const same = FINISHES.filter((x) => x.rarity === f.rarity);
   const opts = list[ri] ?? [weapon];
-  return opts[same.indexOf(f) % opts.length];
+  return opts[Math.max(0, same.indexOf(f)) % opts.length]; // seasonal finishes take the first
 }
 export const WEAPON_SKINS = WEAPONS.flatMap((w) =>
   FINISHES.map((f) => {
@@ -249,7 +252,14 @@ export const WEAPON_SKINS = WEAPONS.flatMap((w) =>
     return { id: `${w.id}.${f.id}`, weapon: w.id, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, ...(f.limited ? { limited: f.limited } : {}) };
   }),
 );
-export const WSKIN = Object.fromEntries(WEAPON_SKINS.map((s) => [s.id, s]));
+// seasonal weapon skins: a season's two finishes on the three guns it names
+export const SEASON_WSKINS = SEASON_FINISHES.flatMap((f) =>
+  f.weapons.map((w) => {
+    const model = modelFor(w, f.id);
+    return { id: `${w}.${f.id}`, weapon: w, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, season: f.season };
+  }),
+);
+export const WSKIN = Object.fromEntries([...WEAPON_SKINS, ...SEASON_WSKINS].map((s) => [s.id, s]));
 
 // ------------------------------------------------------------------ boxes
 // odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss);
@@ -327,6 +337,37 @@ export const boxCost = (box, n) => (n - Math.floor(n / BULK_FREE_EVERY)) * box.p
 
 export const usd = (cents) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const TRIAL_MS = 72 * 3600 * 1000;
+
+// ------------------------------------------------------------ battle pass
+export const PASS_TIERS = 50;
+export const PASS_STEP = 600; // rank XP per tier: a month of regular play fills it
+export const PASS_PRICE = 999; // the premium track, $9.99 in shop $
+export const passTier = (xp) => Math.min(PASS_TIERS, Math.floor(xp / PASS_STEP));
+// The tiers of a season's pass. Free: a reward every few tiers, one seasonal weapon skin
+// and the season's first armour set at the end. Premium: something every tier, all of the
+// season's items (both turret skins, five weapon skins, the Warlord and the Apex armour).
+const passCache = new Map();
+export function passRewards(sid) {
+  if (passCache.has(sid)) return passCache.get(sid);
+  const s = seasonItems(sid);
+  const f = {
+    3: { k: 'credit', v: 10 }, 5: { k: 'box', id: 'street' }, 8: { k: 'box', id: 'w-scrap' }, 10: { k: 'credit', v: 25 },
+    15: { k: 'box', id: 'c-pistol' }, 20: { k: 'credit', v: 25 }, 25: { k: 'wskin', id: `rifle.${s.edge}` }, 30: { k: 'box', id: 'b-crypto' },
+    35: { k: 'credit', v: 50 }, 40: { k: 'box', id: 'c-heavy' }, 45: { k: 'credit', v: 50 }, 50: { k: 'outfit', id: s.vanguard },
+  };
+  const special = {
+    1: { k: 'wskin', id: `knife.${s.edge}` }, 5: { k: 'turret', id: s.sentry }, 10: { k: 'wskin', id: `deagle.${s.edge}` },
+    15: { k: 'box', id: 'c-knife' }, 20: { k: 'wskin', id: `carbine.${s.relic}` }, 25: { k: 'outfit', id: s.warlord },
+    30: { k: 'turret', id: s.overwatch }, 35: { k: 'wskin', id: `magnum.${s.relic}` }, 40: { k: 'box', id: 'c-knife' },
+    45: { k: 'wskin', id: `knife.${s.relic}` }, 50: { k: 'outfit', id: s.apex },
+  };
+  const cases = ['c-samurai', 'c-neon', 'c-arctic', 'c-inferno', 'c-crypto', 'c-toxic', 'c-toon', 'b-cyber', 'b-heroes', 'b-monsters'];
+  const p = {};
+  for (let t = 1; t <= PASS_TIERS; t++) p[t] = special[t] ?? (t % 2 ? { k: 'credit', v: 15 } : { k: 'box', id: cases[(t / 2) % cases.length] });
+  const out = { f, p };
+  passCache.set(sid, out);
+  return out;
+}
 export const START_BOXES = { street: 1, 'w-scrap': 1 }; // a welcome bag and crate for every new runner
 
 // Shop $ packs: paid in USDC/USDT, credited as shop $ with a bonus on the bigger ones.
@@ -419,11 +460,13 @@ function migrate(r) {
   r.wowned ??= [];
   r.wequip ??= {};
   r.serials ??= {};
+  r.towned ??= [];
+  r.tequip ??= null;
   return r;
 }
 
 function fresh() {
-  return { credit: 0, owned: [], wowned: [], wequip: {}, serials: {}, trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
+  return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
 }
 
 /**
@@ -488,6 +531,9 @@ export class Inventory {
       body: r.body,
       opened: r.opened,
       supply: this.supply(),
+      towned: r.towned,
+      tequip: r.tequip,
+      pass: this.passView(key),
       pity: Object.fromEntries(BOXES.map((b) => [b.id, { sinceEpic: r.pity[b.id]?.sinceEpic ?? 0, sinceLegendary: r.pity[b.id]?.sinceLegendary ?? 0, sinceExotic: r.pity[b.id]?.sinceExotic ?? 0 }])),
     };
   }
@@ -497,7 +543,8 @@ export class Inventory {
     const r = this.rec(key);
     const ws = {};
     for (const [w, f] of Object.entries(r.wequip)) if (r.wowned.includes(`${w}.${f}`)) ws[w] = f;
-    return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm', ws };
+    const ts = r.tequip && r.towned.includes(r.tequip) ? r.tequip : null;
+    return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm', ws, ...(ts ? { ts } : {}) };
   }
 
   changed() {
@@ -558,6 +605,70 @@ export class Inventory {
     else r.wequip[w] = f;
     this.changed();
     return { ok: true };
+  }
+
+  // a turret skin you own (guns + lasers), or null for the plain one
+  equipTurret(key, id) {
+    const r = this.rec(key);
+    if (id && !r.towned.includes(id)) return { ok: false, error: 'You do not own that turret skin.' };
+    r.tequip = id || null;
+    this.changed();
+    return { ok: true };
+  }
+
+  // ------------------------------------------------------------ battle pass
+  // One pass per season (a calendar month). Every raid's rank XP also fills it; each tier
+  // pays on the free track, and on the premium track once the pass is bought. Rewards are
+  // claimed from the pass page; a new season starts a new pass.
+  passRec(key) {
+    const r = this.rec(key);
+    const sid = seasonAt(this.now()).id;
+    if (r.pass?.sid !== sid) r.pass = { sid, xp: 0, premium: false, f: [], p: [] };
+    return r.pass;
+  }
+
+  passView(key) {
+    const ps = this.passRec(key);
+    return { sid: ps.sid, xp: ps.xp, tier: passTier(ps.xp), premium: ps.premium, claimed: { f: ps.f, p: ps.p } };
+  }
+
+  passXp(key, xp) {
+    const ps = this.passRec(key);
+    const before = passTier(ps.xp);
+    ps.xp = Math.min(PASS_TIERS * PASS_STEP, ps.xp + Math.max(0, Math.floor(xp)));
+    this.changed();
+    return { before, after: passTier(ps.xp), xp: ps.xp };
+  }
+
+  passBuy(key, external) {
+    const ps = this.passRec(key);
+    if (ps.premium) return { ok: false, error: 'You already have the premium pass.' };
+    if (!this.charge(key, PASS_PRICE, external)) return { ok: false, error: `Not enough $ (${usd(PASS_PRICE)} needed).` };
+    ps.premium = true;
+    this.changed();
+    return { ok: true, premium: true };
+  }
+
+  passClaim(key, track, tier) {
+    const ps = this.passRec(key);
+    tier = Math.floor(Number(tier));
+    const rw = passRewards(ps.sid)[track === 'p' ? 'p' : 'f'][tier];
+    if (!rw) return { ok: false, error: 'No reward there.' };
+    if (passTier(ps.xp) < tier) return { ok: false, error: 'Reach that tier first.' };
+    if (track === 'p' && !ps.premium) return { ok: false, error: 'That one is on the premium pass.' };
+    const list = track === 'p' ? ps.p : ps.f;
+    if (list.includes(tier)) return { ok: false, error: 'Already claimed.' };
+    list.push(tier);
+    const r = this.rec(key);
+    if (rw.k === 'credit') r.credit += rw.v;
+    else if (rw.k === 'box') r.boxes[rw.id] = (r.boxes[rw.id] ?? 0) + (rw.n ?? 1);
+    else if (rw.k === 'outfit') {
+      if (!r.owned.includes(rw.id)) r.owned.push(rw.id);
+      delete r.trials[rw.id];
+    } else if (rw.k === 'wskin' && !r.wowned.includes(rw.id)) r.wowned.push(rw.id);
+    else if (rw.k === 'turret' && !r.towned.includes(rw.id)) r.towned.push(rw.id);
+    this.changed();
+    return { ok: true, track, tier, reward: rw };
   }
 
   setBody(key, body) {

@@ -197,6 +197,9 @@ export class Lobby {
       case 'body':
       case 'box':
       case 'topup':
+      case 'tequip':
+      case 'pass_buy':
+      case 'pass_claim':
         this.lockerOp(cid, s, msg);
         return;
       case 'auth_start':
@@ -300,10 +303,13 @@ export class Lobby {
       : msg.t === 'body' ? inv.setBody(key, id)
       : msg.t === 'wequip' ? inv.equipWeapon(key, id)
       : msg.t === 'topup' ? inv.topUp(key, id, pay)
+      : msg.t === 'tequip' ? inv.equipTurret(key, msg.id ? id : null)
+      : msg.t === 'pass_buy' ? inv.passBuy(key, pay)
+      : msg.t === 'pass_claim' ? inv.passClaim(key, msg.track, msg.tier)
       : inv.open(key, id, pay, msg.n);
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
-    if (s.room && (msg.t === 'equip' || msg.t === 'body' || msg.t === 'wequip')) s.room.broadcastPrep();
+    if (s.room && (msg.t === 'equip' || msg.t === 'body' || msg.t === 'wequip' || msg.t === 'tequip')) s.room.broadcastPrep();
   }
 
   // Shop $ is bought 1:1 with USDC or USDT (play-money test tokens without a cashier)
