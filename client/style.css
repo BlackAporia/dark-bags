@@ -1742,3 +1742,5 @@ body.touch-on .pause-keys { display: none; }
   .tour-who b { font-size: 16px; }
   .tour-actions .cta, .tour-actions .ghost { padding: 7px 14px; }
 }
+/* Nyx's first raid is a Raid: the other modes wait */
+body.tour-raid-only #modes .mode-card:not([data-mode="raid"]) { opacity: 0.28; filter: grayscale(1); pointer-events: none; }
