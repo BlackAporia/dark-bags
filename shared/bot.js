@@ -204,6 +204,7 @@ export class BotBrain {
     const inp = p.botInput;
     inp.d = false;
     inp.f = false;
+    inp.r = false;
 
     const tl = w.timeLeft;
     const exit = w.potMode ? null : this.nearestExit(); // pot modes have no exits
@@ -255,6 +256,8 @@ export class BotBrain {
       if (edge < 0 && p.dashCd <= 0 && this.rnd() < 0.1) inp.d = true;
     }
 
+    // a quiet moment: top the magazine up
+    if (!foe && !WEAPONS[p.w].melee && p.ammo < WEAPONS[p.w].mag * 0.5) inp.r = true;
     if (foe) {
       const wp = WEAPONS[p.w];
       const reaction = this.easy ? 0.45 + (1 - this.skill) * 0.5 : 0.3 + (1 - this.skill) * 0.4;

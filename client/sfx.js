@@ -160,7 +160,7 @@ export class Sfx {
 
   play(name, o = {}) {
     if (!this.ctx || this.muted) return;
-    const r = 1 + (Math.random() - 0.5) * 0.08; // tiny pitch variation so repeats don't drone
+    const r = (1 + (Math.random() - 0.5) * 0.08) * (o.pitch ?? 1); // tiny pitch variation so repeats don't drone; o.pitch: each gun its own voice
     switch (name) {
       case 'knife': {
         const v = this.voice(o, 0.9, 0.1);
@@ -203,6 +203,23 @@ export class Sfx {
         this.osc(v, { f: 75, to: 28, dur: 0.45, vol: 0.9 });
         this.noise(v, { dur: 0.05, vol: 0.2, f: 2500, q: 4, at: 0.55 });
         this.noise(v, { dur: 0.06, vol: 0.22, f: 1800, q: 4, at: 0.72 });
+        break;
+      }
+      // magazine out, magazine in, the slide: spread over the reload
+      case 'reload': {
+        const v = this.voice(o, 0.55, 0.1);
+        const L = Math.max(0.8, o.secs ?? 1.6);
+        this.noise(v, { dur: 0.03, vol: 0.35, f: 2400 * r, q: 4 });
+        this.osc(v, { type: 'square', f: 900 * r, to: 500, dur: 0.03, vol: 0.06 });
+        this.noise(v, { dur: 0.05, vol: 0.3, f: 1500 * r, q: 3, at: L * 0.55 });
+        this.noise(v, { dur: 0.025, vol: 0.4, type: 'highpass', f: 3000, at: L * 0.62 });
+        this.noise(v, { dur: 0.04, vol: 0.35, f: 2800 * r, q: 5, at: L * 0.92 });
+        this.osc(v, { type: 'square', f: 1300 * r, to: 700, dur: 0.025, vol: 0.06, at: L * 0.92 });
+        break;
+      }
+      case 'dry': {
+        const v = this.voice(o, 0.4, 0);
+        this.noise(v, { dur: 0.02, vol: 0.3, type: 'highpass', f: 3500 });
         break;
       }
       case 'impact': {

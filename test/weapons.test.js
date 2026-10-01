@@ -50,6 +50,7 @@ test('the knife only cuts what is in front of you and not through walls', () => 
 test('the shotgun fires a spread of pellets', () => {
   const { w, a, swing } = duel();
   a.w = WEAPONS.findIndex((x) => x.id === 'shotgun');
+  w.arm(a);
   swing(Math.PI / 2);
   assert.equal(w.bullets.size, WEAPONS[a.w].pellets);
 });
@@ -103,4 +104,50 @@ test('bots climb slower on each other and leave each other alone early on', () =
   assert.ok(b1.xp > 0 && b1.xp < XP_PER_LEVEL);
   w.kill(h, b1);
   assert.equal(b1.w, 1, 'killing a human is');
+});
+
+test('every gun has a magazine: it empties, reloads by itself, and cannot shoot while reloading', () => {
+  const { w, a, swing } = duel();
+  a.w = WEAPONS.findIndex((x) => x.id === 'deagle');
+  w.arm(a);
+  const wp = WEAPONS[a.w];
+  assert.equal(a.ammo, wp.mag);
+  let shots = 0;
+  for (let i = 0; i < 400 && a.reloadT <= 0; i++) {
+    const fc = a.fc;
+    swing(Math.PI / 2);
+    if (a.fc !== fc) shots++;
+  }
+  assert.equal(shots, wp.mag, 'a full magazine, then the reload starts');
+  assert.equal(a.ammo, 0);
+  assert.ok(a.reloadT > 0);
+  const fc = a.fc;
+  for (let i = 0; i < Math.floor((wp.reload - 0.2) * CFG.TICK_RATE); i++) swing(Math.PI / 2);
+  assert.equal(a.fc, fc, 'no shots while reloading');
+  for (let i = 0; i < CFG.TICK_RATE; i++) swing(Math.PI / 2);
+  assert.ok(a.fc !== fc, 'shooting again after the reload');
+});
+
+test('a half-empty magazine tops up by itself once you stop shooting; the knife never reloads; a new weapon comes loaded', () => {
+  const { w, a } = duel();
+  a.w = WEAPONS.findIndex((x) => x.id === 'rifle');
+  w.arm(a);
+  a.ammo = 10;
+  w.queueInput(a.id, { s: 1, mx: 0, my: 0, a: 0, f: false, d: false });
+  for (let i = 0; i < 1.5 * CFG.TICK_RATE; i++) w.step();
+  assert.ok(a.reloadT > 0 || a.ammo === WEAPONS[a.w].mag, 'reload started without any button');
+  for (let i = 0; i < 3 * CFG.TICK_RATE; i++) w.step();
+  assert.equal(a.ammo, WEAPONS[a.w].mag);
+  a.w = 0;
+  w.arm(a);
+  w.reload(a);
+  assert.equal(a.reloadT, 0);
+  a.w = WEAPONS.length - 2;
+  w.addXp(a, 100);
+  assert.equal(a.ammo, WEAPONS[a.w].mag);
+});
+
+test('the arsenal: every gun has a magazine, a reload and a sound', () => {
+  assert.ok(WEAPONS.length >= 12);
+  for (const wp of WEAPONS) if (!wp.melee) assert.ok(wp.mag > 0 && wp.reload > 0 && wp.snd, wp.id);
 });

@@ -19,6 +19,7 @@ export function sanitizeInput(raw) {
     a: num(raw?.a),
     f: !!raw?.f,
     d: !!raw?.d,
+    r: !!raw?.r,
   };
 }
 

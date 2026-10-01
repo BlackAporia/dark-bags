@@ -459,7 +459,7 @@ body.touch-on .banner { top: 27%; font-size: 20px; }
 .weapon-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .weapon-name { font: 900 22px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.03em; }
 .prestige { color: var(--gold); font-size: 13px; letter-spacing: 0.1em; }
-.ladder { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.ladder { display: grid; grid-template-columns: repeat(var(--n, 6), 1fr); gap: 2px; }
 .ladder i { height: 4px; border-radius: 2px; background: var(--line); }
 .ladder i.done { background: var(--dust); }
 .ladder i.on { background: var(--loot); box-shadow: 0 0 8px rgba(247, 147, 26, 0.8); }
@@ -1757,3 +1757,13 @@ body.tour-raid-only #modes .mode-card:not([data-mode="raid"]) { opacity: 0.28; f
 .track-grid button[aria-pressed="true"] { border-color: var(--loot); color: var(--loot); background: rgba(247, 147, 26, 0.1); }
 @media (max-height: 500px) { .now-playing { bottom: auto; top: calc(10px + var(--safe-t)); right: 50%; transform: translate(50%, -8px); } .now-playing.on { transform: translate(50%, 0); } }
 body:has(#pause:not([hidden])) .now-playing { display: none; }
+/* the magazine: rounds left, and the automatic reload filling the bar */
+.ammo { display: grid; grid-template-columns: 1fr; gap: 3px; margin: 2px 0 5px; }
+.ammo b { font: 800 15px var(--f-display); letter-spacing: 0.04em; color: var(--paper); }
+.ammo.low b { color: var(--blood); }
+.ammo.reloading b { color: var(--loot); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; animation: ammo-blink 0.6s steps(2) infinite; }
+@keyframes ammo-blink { 50% { opacity: 0.55; } }
+.ammo-track { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.ammo-track i { display: block; height: 100%; background: var(--paper); transition: width 0.12s linear; }
+.ammo.reloading .ammo-track i { background: var(--loot); }
+.ammo.low .ammo-track i { background: var(--blood); }

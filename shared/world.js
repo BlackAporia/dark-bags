@@ -10,6 +10,7 @@ import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 import { MODE } from './modes.js';
 
 const DT = 1 / CFG.TICK_RATE;
+const AUTO_RELOAD_IDLE = 1.2; // seconds without shooting before a half-empty magazine tops up
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -194,6 +195,8 @@ export class World {
       stake,
       fireCd: 0,
       w: this.fixedWeapon >= 0 ? this.fixedWeapon : 0, // weapon index: the knife, unless the mode fixes one
+      ammo: 0, // rounds in the magazine (set by arm())
+      reloadT: 0, // seconds left on a reload
       team,
       xp: 0,
       prestige: 0,
@@ -222,6 +225,7 @@ export class World {
       lostBag: 0,
       payout: 0,
     };
+    this.arm(p);
     this.players.set(p.id, p);
     if (isBot) this.brains.set(p.id, new BotBrain(this, p, this.rnd));
     this.sides = this.teamSize ? new Set([...this.players.values()].map((o) => o.team)).size : this.players.size;
@@ -317,7 +321,19 @@ export class World {
 
       if (p.shield > 0) p.shield = Math.max(0, p.shield - DT);
       if (p.fireCd > 0) p.fireCd = Math.max(0, p.fireCd - DT);
-      if (inp.f && p.fireCd <= 0) {
+      if (p.reloadT > 0) {
+        p.reloadT -= DT;
+        if (p.reloadT <= 0) {
+          p.reloadT = 0;
+          p.ammo = WEAPONS[p.w].mag;
+        }
+      }
+      // reloading is automatic: an empty magazine reloads at once, a half-empty one as soon
+      // as you stop shooting for a moment (bots may also ask for it)
+      if (inp.f) p.idleT = 0;
+      else p.idleT = (p.idleT ?? 0) + DT;
+      if (inp.r || (p.idleT > AUTO_RELOAD_IDLE && p.ammo < (WEAPONS[p.w].mag ?? 0) * 0.5)) this.reload(p);
+      if (inp.f && p.fireCd <= 0 && p.reloadT <= 0) {
         p.shield = 0;
         this.fire(p);
       }
@@ -384,11 +400,28 @@ export class World {
     }
   }
 
+  // a full magazine of whatever is in your hands (new weapon, spawn)
+  arm(p) {
+    p.ammo = WEAPONS[p.w].mag ?? 0;
+    p.reloadT = 0;
+  }
+
+  // start reloading: on an empty magazine automatically, or when asked (R) with rounds missing
+  reload(p) {
+    const wp = WEAPONS[p.w];
+    if (wp.melee || p.reloadT > 0 || p.ammo >= wp.mag) return;
+    p.reloadT = wp.reload;
+    p.rlc = (p.rlc ?? 0) + 1; // reload counter: clients play the sound
+  }
+
   fire(p) {
     const wp = WEAPONS[p.w];
+    if (!wp.melee && p.ammo <= 0) return this.reload(p);
     p.fireCd = wp.cd;
     p.fc = (p.fc + 1) % 1000;
     if (wp.melee) return this.slash(p, wp);
+    p.ammo--;
+    if (p.ammo <= 0) this.reload(p);
     const muzzle = CFG.PLAYER_R + 10;
     const sx = p.x + Math.cos(p.aim) * muzzle;
     const sy = p.y + Math.sin(p.aim) * muzzle;
@@ -566,6 +599,7 @@ export class World {
     });
     p.queue.length = 0;
     p.last = sanitizeInput({ s: p.ack });
+    this.arm(p);
     this.brains.get(p.id)?.reset();
     this.emit({ k: 'respawn', to: [p.id], pid: p.id });
   }
@@ -734,6 +768,7 @@ export class World {
       p.xp -= XP_PER_LEVEL;
       p.w = (p.w + 1) % WEAPONS.length;
       p.fireCd = Math.min(p.fireCd, 0.15);
+      this.arm(p);
       if (p.w === 0) {
         p.prestige++;
         this.emit({ k: 'arsenal', name: p.name, pid: p.id });
@@ -1058,6 +1093,7 @@ export class World {
         s: p.shield > 0 ? 1 : 0,
         w: p.w,
         fc: p.fc,
+        ...(p.reloadT > 0 ? { rl: 1 } : {}),
         pr: p.prestige,
         rk: p.rank,
         ...(p.title ? { tt: p.title } : {}),
@@ -1101,6 +1137,8 @@ export class World {
         stake: me.stake,
         st: me.status,
         fireCd: r2(me.fireCd),
+        am: me.ammo,
+        rl: me.reloadT > 0 ? r2(me.reloadT) : 0,
         ext: r2(me.ext),
         bluff: me.bluff,
         k: me.kills,
