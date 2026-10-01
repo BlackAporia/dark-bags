@@ -1,47 +1,181 @@
-// The first-run tour: Nyx, the raid handler, walks a new player (and every newly signed-in
-// wallet) through the menu. A spotlight follows what she is talking about; the words are
-// in the game's language, her voice is English.
+// Nyx, the raid handler: walks a new player (and every newly signed-in wallet) through the
+// menu by having them DO each thing (name, Practice, a mode, Play, Ready), then rides along
+// in their first practice raid, calling out what matters as it happens. Her voice is English
+// (Piper); the line she says is shown word for word, with a translation underneath when the
+// game is in another language. Voice goes through the game's own AudioContext (unlocked by
+// the intro tap), decoded once per line: reliable on phones, and it drives her lips.
 import { createNyx } from './nyx.js';
 import { settings } from './settings.js';
 import { store } from './store.js';
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
-// target: what to light up (the first one on screen); when: skip the step otherwise
-const STEPS = [
-  { key: 1 },
-  { key: 2, target: ['#name'] },
-  { key: 3, target: ['#modes'] },
-  { key: 4, target: ['#lobby .mode[role="tablist"]'] },
-  { key: 5, target: ['#play'] },
-  { key: 6, art: 'keys' },
-  { key: 7, art: 'exit' },
-  { key: 8, target: ['.nav-btn[data-page="shop"]'] },
-  { key: 9, target: ['.nav-btn[data-page="friends"]', '.nav-btn[data-page="guilds"]'] },
-  { key: 10, target: ['#connect'], when: (app) => app.mode === 'online' },
-  { key: 11, end: true },
+// what she says, exactly (the voice clips in voice/nyx/<key>.mp3)
+export const NYX_LINES = {
+  hello: "Hey, runner. I'm Nyx. I'll be in your ear tonight. Stick with me, and you'll walk out of your first raid... richer.",
+  name: "First things first. Type a name. It's what everyone sees, right above your head.",
+  nameOk: 'Mm. I like it.',
+  practice: "Now tap Practice. It's free, it's just bots. Perfect for your first run.",
+  practiceOk: 'Good call.',
+  modes: 'These are the modes. Raid is the classic: loot, fight, and get out. Pick Raid.',
+  modeOk: 'Good pick.',
+  bag: 'Here\'s the deal. Your stake goes in your bag. Take someone down, and their bag is yours. Go down... and yours is theirs.',
+  shop: "Outfits and weapon skins come from bags and crates in the shop. There's a free one, waiting for you. Later.",
+  social: "Friends, messages, guilds. Bring your crew. It's always more fun together.",
+  wallet: 'Want real stakes? Sign in with a wallet, or just an email. Cash-outs only ever go back to your own address.',
+  play: 'Ready? Hit Play.',
+  ready: 'This is the ready room. Press Ready... and we drop in.',
+  start: "We're in! Move with W, A, S, D. Aim with the mouse, and click to shoot. Space to dash.",
+  startTouch: "We're in! Your left thumb moves you. Hold Fire, on the right. It aims for you.",
+  loot: "See that orange glow? That's money. Walk right over it.",
+  pickup: 'Nice! Your bag just got heavier.',
+  kill: 'First blood! Grab what they dropped. And look at that... a better gun.',
+  hurt: "You're hurt. Back off for a few seconds, and you'll heal up.",
+  storm: 'The storm is closing in. Stay inside the circle!',
+  exit: 'That bag looks good on you. Find a green exit ring, and stand in it.',
+  extracting: "Hold still. Three seconds. Don't get hit.",
+  won: 'You made it out! Told you you would. See you in the next one, runner.',
+  dead: "Ouch. It happens. Practice is free, so run it back.",
+};
+
+// the menu part: `wait` is what the player has to do (the step moves on by itself when they
+// do it); `ok` is her reaction. `when` skips a step that does not apply.
+const LOBBY = [
+  { key: 'hello' },
+  { key: 'name', target: ['#name'], wait: 'name', ok: 'nameOk' },
+  { key: 'practice', target: ['#mode-practice'], wait: 'practice', ok: 'practiceOk' },
+  { key: 'modes', target: ['#modes'], wait: 'mode', ok: 'modeOk' },
+  { key: 'bag', target: ['#play'] },
+  { key: 'shop', target: ['.nav-btn[data-page="shop"]'] },
+  { key: 'social', target: ['.nav-btn[data-page="friends"]', '.nav-btn[data-page="guilds"]'] },
+  { key: 'wallet', target: ['#connect'] },
+  { key: 'play', target: ['#play'], wait: 'play' },
+  { key: 'ready', target: ['#ready'], wait: 'game' },
 ];
 
 const SEEN = 'darkbags.tour.seen'; // who has had the tour on this device: 'device', wallet addresses
 
-export function createTour({ app, go, practice, touch = () => false }) {
+export function createTour({ app, go, practice, touch = () => false, sfx = null, game = null }) {
   let el = null;
   let nyx = null;
-  let i = 0;
   let steps = [];
-  let audio = null;
-  let ctx = null;
+  let i = 0;
+  let typeT = 0;
+  let pollT = 0;
+  let dock = null; // the in-raid companion
+  let raid = null; // { said: Set, t0, bag0, k0 }
+  let raidT = 0;
+
+  // ------------------------------------------------------------------ voice
+  const buffers = new Map();
+  let src = null;
   let analyser = null;
   let raf = 0;
-  let typeT = 0;
+  let mouthOf = null; // the Nyx currently on screen
+  let queue = [];
+  let speaking = false;
+  const voiceOn = () => settings.voice && !store.get('darkbags.tour.mute', false);
+  const ctxOf = () => sfx?.ctx ?? null;
 
+  async function load(key) {
+    if (buffers.has(key)) return buffers.get(key);
+    const ctx = ctxOf();
+    if (!ctx) return null;
+    const p = fetch(new URL(`voice/nyx/${key}.mp3`, document.baseURI).href)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+      .then((b) => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej)))
+      .catch(() => null);
+    buffers.set(key, p);
+    return p;
+  }
+  const preload = (keys) => keys.forEach((k) => load(k));
+
+  function stopVoice() {
+    try {
+      src?.stop();
+    } catch {
+      /* already stopped */
+    }
+    src = null;
+    speaking = false;
+    cancelAnimationFrame(raf);
+    mouthOf?.talk(0);
+  }
+
+  // say a line: shows it at once, plays the voice when it is decoded
+  async function say(key, { show, interrupt = true } = {}) {
+    show?.(key);
+    if (interrupt) {
+      queue = [];
+      stopVoice();
+    }
+    if (!voiceOn()) return;
+    const ctx = ctxOf();
+    if (!ctx) return;
+    ctx.resume?.();
+    const buf = await load(key);
+    if (!buf) return;
+    if (interrupt) stopVoice();
+    const s = ctx.createBufferSource();
+    s.buffer = buf;
+    const gain = ctx.createGain();
+    gain.gain.value = Math.max(0, Math.min(1.2, (settings.sound ?? 0.9) * 1.15));
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    s.connect(gain).connect(analyser).connect(ctx.destination);
+    src = s;
+    speaking = true;
+    s.onended = () => {
+      if (src !== s) return;
+      speaking = false;
+      mouthOf?.talk(0);
+      cancelAnimationFrame(raf);
+      const next = queue.shift();
+      if (next) next();
+    };
+    s.start();
+    const data = new Uint8Array(256);
+    const tick = () => {
+      if (src !== s || !analyser) return;
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (const v of data) sum += (v - 128) ** 2;
+      mouthOf?.talk(Math.min(1, Math.sqrt(sum / data.length) / 26));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  }
+
+  // subtitles: the English she speaks, the translation under it in another language
+  function subtitle(box, key) {
+    const en = NYX_LINES[key] ?? '';
+    const tr = getLang() === 'en' ? '' : t(`nyx.${key}`);
+    const main = box.querySelector('.nyx-en');
+    const sub = box.querySelector('.nyx-tr');
+    clearInterval(typeT);
+    sub.textContent = tr;
+    sub.hidden = !tr;
+    if (!settings.motion) {
+      main.textContent = en;
+      return;
+    }
+    let k = 0;
+    main.textContent = '';
+    typeT = setInterval(() => {
+      k += 2;
+      main.textContent = en.slice(0, k);
+      if (k >= en.length) clearInterval(typeT);
+    }, 20);
+  }
+
+  // ----------------------------------------------------------------- lobby
   const visible = (sel) => {
     for (const s of sel ?? []) {
       const n = document.querySelector(s);
       if (!n) continue;
       const r = n.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== 'hidden') return n;
+      if (r.width > 0 && r.height > 0) return n;
     }
     return null;
   };
@@ -51,50 +185,49 @@ export function createTour({ app, go, practice, touch = () => false }) {
     el.id = 'tour';
     el.className = 'tour';
     el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-modal', 'true');
     el.setAttribute('aria-labelledby', 'tour-name');
     el.innerHTML = `
       <div class="tour-spot" id="tour-spot"></div>
       <div class="tour-card" id="tour-card">
-        <div class="tour-nyx" id="tour-nyx"></div>
+        <button type="button" class="tour-nyx" id="tour-nyx" aria-label="${t('tour.again')}"></button>
         <div class="tour-body">
-          <p class="tour-who"><b id="tour-name">NYX</b> <span>${t('tour.who')}</span><button type="button" class="tour-voice" id="tour-voice" aria-pressed="true" title="${t('tour.voice')}">🔊</button></p>
-          <p class="tour-text" id="tour-text" aria-live="polite"></p>
-          <div class="tour-art" id="tour-art" hidden></div>
+          <p class="tour-who"><b id="tour-name">NYX</b> <span>${t('tour.who')}</span><button type="button" class="tour-voice" id="tour-voice" title="${t('tour.voice')}"></button></p>
+          <p class="tour-text nyx-en" id="tour-text" aria-live="polite"></p>
+          <p class="nyx-tr" hidden></p>
+          <p class="tour-move" id="tour-move" hidden>👆 ${t('tour.yourMove')}</p>
           <div class="tour-dots" id="tour-dots" aria-hidden="true"></div>
           <div class="tour-actions">
             <button type="button" class="link tour-skip" id="tour-skip">${t('tour.skip')}</button>
             <span class="tour-grow"></span>
-            <button type="button" class="ghost" id="tour-back">${t('tour.back')}</button>
             <button type="button" class="cta" id="tour-next">${t('tour.next')}</button>
           </div>
         </div>
       </div>`;
     document.body.append(el);
     nyx = createNyx($('tour-nyx'));
-    $('tour-skip').addEventListener('click', () => close());
-    $('tour-back').addEventListener('click', () => show(i - 1));
-    $('tour-next').addEventListener('click', () => (steps[i].end ? finish() : show(i + 1)));
-    $('tour-voice').addEventListener('click', () => {
-      const on = !store.get('darkbags.tour.mute', false);
-      store.set('darkbags.tour.mute', on);
-      $('tour-voice').setAttribute('aria-pressed', String(!on));
-      $('tour-voice').textContent = on ? '🔇' : '🔊';
-      if (on) audio?.pause();
-      else speak(steps[i].key);
-    });
+    mouthOf = nyx;
+    $('tour-skip').addEventListener('click', () => end(true));
+    $('tour-next').addEventListener('click', () => advance());
+    $('tour-nyx').addEventListener('click', () => say(steps[i].key, { show: (k) => subtitle(el, k) }));
+    $('tour-voice').addEventListener('click', toggleVoice);
+    paintVoice();
     el.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') close();
-      else if (e.key === 'ArrowRight' || e.key === 'Enter') $('tour-next').click();
-      else if (e.key === 'ArrowLeft' && i > 0) show(i - 1);
+      if (e.key === 'Escape') end(true);
     });
     addEventListener('resize', place);
-    const mute = store.get('darkbags.tour.mute', false);
-    $('tour-voice').setAttribute('aria-pressed', String(!mute));
-    $('tour-voice').textContent = mute ? '🔇' : '🔊';
   }
 
-  // the spotlight around the step's target, and the card out of its way
+  function paintVoice() {
+    const b = $('tour-voice') ?? dock?.querySelector('.tour-voice');
+    for (const x of [$('tour-voice'), dock?.querySelector('.tour-voice')]) if (x) x.textContent = voiceOn() ? '🔊' : '🔇';
+    return b;
+  }
+  function toggleVoice() {
+    store.set('darkbags.tour.mute', voiceOn());
+    if (!voiceOn()) stopVoice();
+    paintVoice();
+  }
+
   function place() {
     if (!el || !steps[i]) return;
     const spot = $('tour-spot');
@@ -105,139 +238,213 @@ export function createTour({ app, go, practice, touch = () => false }) {
       spot.className = 'tour-spot none';
       return;
     }
-    n.scrollIntoView?.({ block: 'nearest', behavior: settings.motion ? 'smooth' : 'auto' });
+    // once per step: bring the target into view (a step that asks you to act puts it at the top,
+    // clear of the card)
+    if (!steps[i].scrolled) {
+      steps[i].scrolled = true;
+      n.scrollIntoView?.({ block: steps[i].wait ? 'start' : 'nearest', behavior: settings.motion ? 'smooth' : 'auto' });
+    }
     const r = n.getBoundingClientRect();
     const pad = 8;
-    spot.className = 'tour-spot';
+    spot.className = `tour-spot${steps[i].wait ? ' act' : ''}`;
     Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
-    // the card sits at the bottom; if the target is down there too, it moves up
     const cr = card.getBoundingClientRect();
     if (r.bottom > innerHeight - cr.height - 24) card.classList.add('top');
   }
 
-  function art(kind) {
-    const box = $('tour-art');
-    box.hidden = !kind;
-    if (kind === 'keys') {
-      box.innerHTML = touch()
-        ? `<span class="ta-stick">◎</span><span>${t('tour.artMove')}</span><span class="ta-fire">FIRE</span>`
-        : `<span class="ta-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>🖱 ${t('tour.artAim')}</span><kbd>Space</kbd><span>${t('tour.artDash')}</span>`;
-    } else if (kind === 'exit') {
-      box.innerHTML = `<span class="ta-exit"></span><span>${t('tour.artExit')}</span>`;
-    } else box.innerHTML = '';
-  }
-
-  function type(text) {
-    const p = $('tour-text');
-    clearInterval(typeT);
-    if (!settings.motion) {
-      p.textContent = text;
-      return;
-    }
-    let k = 0;
-    p.textContent = '';
-    typeT = setInterval(() => {
-      k += 2;
-      p.textContent = text.slice(0, k);
-      if (k >= text.length) clearInterval(typeT);
-    }, 18);
-  }
-
-  // her voice (English), with the lips following it
-  function speak(key) {
-    audio?.pause();
-    cancelAnimationFrame(raf);
-    nyx?.talk(0);
-    if (!settings.voice || store.get('darkbags.tour.mute', false)) return;
-    audio = new Audio(new URL(`voice/nyx/${String(key).padStart(2, '0')}.mp3`, document.baseURI).href);
-    audio.volume = Math.max(0, Math.min(1, settings.sound ?? 0.9));
-    try {
-      ctx ??= new (globalThis.AudioContext || globalThis.webkitAudioContext)();
-      ctx.resume?.();
-      const src = ctx.createMediaElementSource(audio);
-      analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      src.connect(analyser);
-      analyser.connect(ctx.destination);
-    } catch {
-      analyser = null; // no WebAudio: she still speaks, the lips just follow a guess
-    }
-    const buf = new Uint8Array(256);
-    const tick = () => {
-      if (!audio || audio.paused) {
-        nyx?.talk(0);
-        return;
-      }
-      let level = 0;
-      if (analyser) {
-        analyser.getByteTimeDomainData(buf);
-        let sum = 0;
-        for (const v of buf) sum += (v - 128) ** 2;
-        level = Math.min(1, Math.sqrt(sum / buf.length) / 28);
-      } else level = 0.4 + Math.sin(performance.now() / 70) * 0.4;
-      nyx?.talk(level);
-      raf = requestAnimationFrame(tick);
-    };
-    audio.addEventListener('playing', () => (raf = requestAnimationFrame(tick)));
-    audio.play().catch(() => {});
+  // is what this step asks for already done?
+  function done(wait) {
+    if (wait === 'name') return !!$('name')?.value.trim() && store.get('darkbags.tour.named', false);
+    if (wait === 'practice') return app.mode === 'practice';
+    if (wait === 'mode') return store.get('darkbags.tour.picked', false);
+    if (wait === 'play') return app.screen === 'prep' || app.screen === 'game';
+    if (wait === 'game') return app.screen === 'game';
+    return false;
   }
 
   function show(n) {
     i = Math.max(0, Math.min(steps.length - 1, n));
     const s = steps[i];
-    type(t(`tour.${s.key}`));
-    art(s.art);
-    $('tour-back').hidden = i === 0;
-    $('tour-next').textContent = s.end ? t('tour.done') : t('tour.next');
+    el.dataset.step = s.key;
+    // the menu steps live on the Play page; the ready room is its own screen
+    if (s.wait !== 'game' && app.screen === 'lobby' && app.page !== 'play') go('play');
+    el.classList.toggle('acting', !!s.wait);
+    $('tour-move').hidden = !s.wait;
+    $('tour-next').hidden = !!s.wait && s.wait !== 'name';
+    $('tour-next').textContent = s.wait === 'name' ? t('tour.skipStep') : t('tour.next');
     $('tour-dots').innerHTML = steps.map((_, k) => `<i class="${k === i ? 'on' : k < i ? 'past' : ''}"></i>`).join('');
-    const extra = $('tour-practice');
-    extra?.remove();
-    if (s.end && app.mode === 'practice') {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.id = 'tour-practice';
-      b.className = 'ghost';
-      b.textContent = t('tour.practiceNow');
-      b.addEventListener('click', () => {
-        finish();
-        practice?.();
-      });
-      $('tour-next').before(b);
-    }
+    say(s.key, { show: (k) => subtitle(el, k) });
     requestAnimationFrame(place);
-    speak(s.key);
-    $('tour-next').focus({ preventScroll: true });
+    setTimeout(place, 400);
+    if (!s.wait) $('tour-next').focus({ preventScroll: true });
   }
+
+  function advance() {
+    if (!el) return;
+    const s = steps[i];
+    if (i >= steps.length - 1) return end(false);
+    show(i + 1);
+    return s;
+  }
+
+  // the player did what the step asked: a short reaction, then on
+  function acted() {
+    const s = steps[i];
+    if (!s?.wait) return;
+    if (s.ok) {
+      say(s.ok, { show: (k) => subtitle(el, k) });
+      setTimeout(() => el && steps[i] === s && advance(), 1300);
+    } else advance();
+  }
+
+  function watch() {
+    clearInterval(pollT);
+    pollT = setInterval(() => {
+      if (!el || !steps[i]) return;
+      const s = steps[i];
+      if (s.wait && done(s.wait) && !s.fired) {
+        s.fired = true;
+        if (s.wait === 'game') return startRaid();
+        acted();
+      }
+      if (el && steps[i]?.target) place();
+    }, 250);
+  }
+
+  // events the waits listen for
+  document.addEventListener('change', (e) => {
+    if (e.target?.id === 'name' && e.target.value.trim()) store.set('darkbags.tour.named', true);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.target?.id === 'name' && e.key === 'Enter' && e.target.value.trim()) store.set('darkbags.tour.named', true);
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target?.closest?.('#modes .mode-card')) store.set('darkbags.tour.picked', true);
+  }, true);
 
   function start() {
-    if (el) return;
+    if (el || dock) return;
     if (app.screen !== 'lobby') return;
     go('play');
-    steps = STEPS.filter((s) => !s.when || s.when(app));
+    store.set('darkbags.tour.named', false);
+    store.set('darkbags.tour.picked', false);
+    steps = LOBBY.filter((s) => !s.when || s.when(app)).map((s) => ({ ...s }));
+    preload(steps.flatMap((s) => [s.key, s.ok].filter(Boolean)));
+    preload(['start', 'startTouch', 'loot', 'pickup', 'kill']);
     build();
     document.body.classList.add('touring');
-    requestAnimationFrame(() => el.classList.add('in'));
+    requestAnimationFrame(() => el?.classList.add('in'));
     show(0);
+    watch();
   }
 
-  function close() {
-    if (!el) return;
-    audio?.pause();
-    audio = null;
-    cancelAnimationFrame(raf);
+  function closeCard() {
     clearInterval(typeT);
+    clearInterval(pollT);
     nyx?.destroy();
+    nyx = null;
     removeEventListener('resize', place);
-    el.remove();
+    el?.remove();
     el = null;
     document.body.classList.remove('touring');
   }
 
-  function finish() {
-    close();
+  // skipped: everything closes; finished: the raid companion takes over if a raid is starting
+  function end(skipped) {
+    stopVoice();
+    closeCard();
+    closeDock();
+    if (skipped) store.set('darkbags.tour.done', true);
   }
 
-  // first launch on this device, and the first time a wallet signs in here
+  // -------------------------------------------------------------- the raid
+  function startRaid() {
+    closeCard();
+    dock = document.createElement('div');
+    dock.className = 'nyx-dock';
+    dock.innerHTML = `<div class="nyx-face" id="nyx-face"></div><div class="nyx-says"><p class="nyx-who"><b>NYX</b><button type="button" class="tour-voice" title="${t('tour.voice')}"></button><button type="button" class="nyx-x" aria-label="${t('tour.skip')}">✕</button></p><p class="nyx-en"></p><p class="nyx-tr" hidden></p></div>`;
+    document.body.append(dock);
+    const face = createNyx(dock.querySelector('#nyx-face'));
+    mouthOf = face;
+    dock._face = face;
+    dock.querySelector('.tour-voice').addEventListener('click', toggleVoice);
+    dock.querySelector('.nyx-x').addEventListener('click', () => end(true));
+    paintVoice();
+    raid = { said: new Set(), t0: performance.now(), bag0: null, k0: null };
+    preload(['hurt', 'storm', 'exit', 'extracting', 'won', 'dead']);
+    callout(touch() ? 'startTouch' : 'start', true);
+    clearInterval(raidT);
+    raidT = setInterval(raidTick, 250);
+  }
+
+  // one line per moment, once; the big ones cut in, the rest wait their turn
+  function callout(key, urgent = false) {
+    if (!dock || raid.said.has(key)) return;
+    raid.said.add(key);
+    const play = () => say(key, { show: (k) => subtitle(dock, k), interrupt: true });
+    if (speaking && !urgent) {
+      if (queue.length < 2) queue.push(play);
+    } else play();
+    dock.classList.remove('pop');
+    void dock.offsetWidth;
+    dock.classList.add('pop');
+  }
+
+  function raidTick() {
+    if (!dock || !raid) return;
+    if (app.screen !== 'game' && app.screen !== 'result') return;
+    const you = game?.you;
+    if (!you) return;
+    raid.bag0 ??= you.bag;
+    raid.k0 ??= you.k ?? 0;
+    const since = (performance.now() - raid.t0) / 1000;
+    if (you.st === 'alive') {
+      if ((you.k ?? 0) > raid.k0) callout('kill', true);
+      else if (you.bag > raid.bag0 && raid.said.has('loot')) callout('pickup');
+      if (since > 7 && you.bag <= raid.bag0) callout('loot');
+      if (you.hp < 40) callout('hurt', true);
+      if (you.storm) callout('storm', true);
+      if (you.ext > 0) callout('extracting', true);
+      const tl = game?.recvTl ? game.recvTl.tl : 999;
+      if (!game?.potMode && !game?.dmMode && (you.bag >= (you.stake || 1) * 1.6 || tl < 75) && since > 20) callout('exit');
+    } else if (you.st === 'extracted' || you.st === 'won') {
+      finishRaid('won');
+    } else if (you.st === 'dead' && !game?.dmMode) {
+      finishRaid('dead');
+    }
+  }
+
+  function finishRaid(key) {
+    if (raid.over) return;
+    raid.over = true;
+    queue = [];
+    callout(key, true);
+    store.set('darkbags.tour.done', true);
+    // and where to find her again
+    const hint = document.createElement('p');
+    hint.className = 'nyx-replay';
+    hint.textContent = t('tour.replayHint');
+    dock?.querySelector('.nyx-says')?.append(hint);
+    setTimeout(() => closeDock(), 10000);
+  }
+
+  function closeDock() {
+    clearInterval(raidT);
+    dock?._face?.destroy();
+    dock?.remove();
+    dock = null;
+    raid = null;
+  }
+
+  // the screen changed under the tour: the ready room keeps the card; a raid hands over to the
+  // companion; anything else ends the menu part
+  function onScreen(name) {
+    if (dock && name === 'lobby') return closeDock();
+    if (!el) return;
+    if (name === 'prep' || name === 'game') return;
+    if (name !== 'lobby') closeCard();
+  }
+
   function maybeStart(who = 'device') {
     const seen = store.get(SEEN, []);
     if (seen.includes(who)) return;
@@ -245,7 +452,18 @@ export function createTour({ app, go, practice, touch = () => false }) {
     setTimeout(start, who === 'device' ? 600 : 300);
   }
 
-  return { start, close, maybeStart, get open() {
-    return !!el;
-  } };
+  function onResult(m) {
+    if (dock && raid) finishRaid(m.status === 'extracted' || m.won ? 'won' : 'dead');
+  }
+
+  return {
+    start,
+    onResult,
+    close: () => end(false),
+    onScreen,
+    maybeStart,
+    get open() {
+      return !!el || !!dock;
+    },
+  };
 }

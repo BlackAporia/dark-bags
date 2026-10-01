@@ -142,6 +142,8 @@ const tour = createTour({
   app,
   go: (p) => go(p),
   touch: () => input.touchOn,
+  sfx,
+  game,
   practice: () => {
     if (app.mode !== 'practice') setMode('practice');
     go('play');
@@ -192,7 +194,7 @@ const attract = new Attract(renderer);
 // ---------------------------------------------------------------- screens
 function showScreen(name) {
   app.screen = name;
-  if (name !== 'lobby') tour.close();
+  tour.onScreen(name);
   if (name !== 'game' && !$('pause').hidden) closePause();
   $('lobby').hidden = name !== 'lobby';
   $('prep').hidden = name !== 'prep';
@@ -743,7 +745,7 @@ function handleMessage(m) {
       app.balances = m.balances ?? app.balances;
       attract.stop();
       sfx.play('beep', { f: 1320, dur: 0.3 });
-      game.coachOn = store.get('darkbags.raids', 0) < 3; // hints for the first three raids
+      game.coachOn = store.get('darkbags.raids', 0) < 3 && !tour.open; // hints for the first three raids (Nyx does it on the first)
       game.myName = app.name || 'runner';
       game.myRank = app.rank?.rank ?? 1;
       game.myTitle = app.career?.title ? achName(app.career.title) : null;
@@ -758,6 +760,7 @@ function handleMessage(m) {
       if (game.active) game.onEvents(m.l);
       break;
     case 'result':
+      tour.onResult(m);
       app.balances = m.balances ?? app.balances;
       if (app.mode === 'online') store.set('darkbags.firstOnline', true);
       store.set('darkbags.raids', store.get('darkbags.raids', 0) + 1);
