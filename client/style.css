@@ -1744,3 +1744,6 @@ body.touch-on .pause-keys { display: none; }
 }
 /* Nyx's first raid is a Raid: the other modes wait */
 body.tour-raid-only #modes .mode-card:not([data-mode="raid"]) { opacity: 0.28; filter: grayscale(1); pointer-events: none; }
+/* the raid banner drops below Nyx while she is on screen (phones keep her at the bottom) */
+@media (min-height: 501px) { body.nyx-on .banner { top: max(24%, 250px); } }
+@media (min-height: 501px) and (max-width: 720px) { body.nyx-on .banner { top: max(24%, 190px); } }

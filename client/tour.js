@@ -45,11 +45,11 @@ const LOBBY = [
   { key: 'hello' },
   { key: 'name', target: ['#name'], wait: 'name', ok: 'nameOk' },
   { key: 'practice', target: ['#mode-practice'], wait: 'practice', ok: 'practiceOk' },
-  { key: 'modes', target: ['#modes'], wait: 'mode', ok: 'modeOk' },
+  { key: 'modes', target: ['#modes .mode-card[data-mode="raid"]', '#modes'], wait: 'mode', ok: 'modeOk' },
   { key: 'bag', target: ['#play'] },
   { key: 'shop', target: ['.nav-btn[data-page="shop"]'] },
   { key: 'social', target: ['.nav-btn[data-page="friends"]', '.nav-btn[data-page="guilds"]'] },
-  { key: 'wallet', target: ['#connect'] },
+  { key: 'wallet', target: ['#connect', '#tb-wallet'] },
   { key: 'play', target: ['#play'], wait: 'play' },
   { key: 'ready', target: ['#ready'], wait: 'game' },
 ];
@@ -104,18 +104,20 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
   }
 
   // say a line: shows it at once, plays the voice when it is decoded
-  async function say(key, { show, interrupt = true } = {}) {
+  // `then` runs once the line has been heard (or after a short read when there is no voice)
+  async function say(key, { show, interrupt = true, then = null } = {}) {
     show?.(key);
     if (interrupt) {
       queue = [];
       stopVoice();
     }
-    if (!voiceOn()) return;
+    const silent = () => then && setTimeout(then, 1400);
+    if (!voiceOn()) return silent();
     const ctx = ctxOf();
-    if (!ctx) return;
+    if (!ctx) return silent();
     ctx.resume?.();
     const buf = await load(key);
-    if (!buf) return;
+    if (!buf) return silent();
     if (interrupt) stopVoice();
     const s = ctx.createBufferSource();
     s.buffer = buf;
@@ -131,6 +133,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
       speaking = false;
       mouthOf?.talk(0);
       cancelAnimationFrame(raf);
+      if (then) setTimeout(then, 250);
       const next = queue.shift();
       if (next) next();
     };
@@ -248,8 +251,12 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     const pad = 8;
     spot.className = `tour-spot${steps[i].wait ? ' act' : ''}`;
     Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
+    // the card goes where it hides less of the target (on a phone held sideways neither side is
+    // fully clear)
     const cr = card.getBoundingClientRect();
-    if (r.bottom > innerHeight - cr.height - 24) card.classList.add('top');
+    const hideBelow = Math.max(0, r.bottom + pad - (innerHeight - cr.height - 18));
+    const hideAbove = Math.max(0, 18 + cr.height - (r.top - pad));
+    if (hideBelow > 0 && hideAbove < hideBelow) card.classList.add('top');
   }
 
   // is what this step asks for already done?
@@ -293,8 +300,15 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     const s = steps[i];
     if (!s?.wait) return;
     if (s.ok) {
-      say(s.ok, { show: (k) => subtitle(el, k) });
-      setTimeout(() => el && steps[i] === s && advance(), 1300);
+      // let her finish the reaction before the next line cuts in
+      let moved = false;
+      const go = () => {
+        if (moved || !el || steps[i] !== s) return;
+        moved = true;
+        advance();
+      };
+      say(s.ok, { show: (k) => subtitle(el, k), then: go });
+      setTimeout(go, 4000); // never stuck if the clip never ends
     } else advance();
   }
 
@@ -368,6 +382,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     dock.className = 'nyx-dock';
     dock.innerHTML = `<div class="nyx-face" id="nyx-face"></div><div class="nyx-says"><p class="nyx-who"><b>NYX</b><button type="button" class="tour-voice" title="${t('tour.voice')}"></button><button type="button" class="nyx-x" aria-label="${t('tour.skip')}">✕</button></p><p class="nyx-en"></p><p class="nyx-tr" hidden></p></div>`;
     document.body.append(dock);
+    document.body.classList.add('nyx-on');
     const face = createNyx(dock.querySelector('#nyx-face'));
     mouthOf = face;
     dock._face = face;
@@ -395,7 +410,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
   }
 
   function raidTick() {
-    if (!dock || !raid) return;
+    if (!dock || !raid || raid.over) return;
     if (app.screen !== 'game' && app.screen !== 'result') return;
     const you = game?.you;
     if (!you) return;
@@ -405,13 +420,14 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     if (you.st === 'alive') {
       const raidMode = !game?.potMode && !game?.dmMode; // loot on the map, bags, exits
       if ((you.k ?? 0) > raid.k0) callout('kill', true);
-      else if (raidMode && you.bag > raid.bag0 && raid.said.has('loot')) callout('pickup');
+      else if (raidMode && you.bag > raid.bag0) callout('pickup'); // the first coins, however they came
       if (raidMode && since > 7 && you.bag <= raid.bag0) callout('loot');
-      if (you.hp < 40) callout('hurt', true);
-      if (you.storm) callout('storm', true);
       if (you.ext > 0) callout('extracting', true);
+      else if (you.hp < 40) callout('hurt'); // not over "hold still" while extracting
+      if (you.storm && !(you.ext > 0)) callout('storm', true);
       const tl = game?.recvTl ? game.recvTl.tl : 999;
-      if (raidMode && (you.bag >= (you.stake || 1) * 1.6 || tl < 75) && since > 20) callout('exit');
+      // where to go: once the bag is worth it, when time runs low, or after a while anyway
+      if (raidMode && since > 20 && (you.bag >= (you.stake || 1) * 1.2 || tl < 100 || since > 50)) callout('exit');
     } else if (you.st === 'extracted' || you.st === 'won') {
       finishRaid('won');
     } else if (you.st === 'dead' && !game?.dmMode) {
@@ -439,6 +455,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     dock?.remove();
     dock = null;
     raid = null;
+    document.body.classList.remove('nyx-on');
   }
 
   // the screen changed under the tour: the ready room keeps the card; a raid hands over to the
