@@ -907,6 +907,35 @@ export function drawWeapon(ctx, p, flash, finish = null, t = performance.now()) 
       ctx.setLineDash(finish.pattern === 'carbon' ? [1, 1] : [2, 2.5]);
       line(x1, y1, x2, y2);
       ctx.setLineDash([]);
+    } else if (finish.pattern === 'dots') {
+      ctx.fillStyle = finish.accent ?? '#111';
+      for (let d = 2.5; d < len - 1; d += 3.2) {
+        ctx.beginPath();
+        ctx.arc(x1 + ux * d - uy * ((d * 7) % 3 - 1.5) * w * 0.18, y1 + uy * d + ux * ((d * 7) % 3 - 1.5) * w * 0.18, Math.max(0.5, w * 0.2), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (finish.pattern === 'wave') {
+      ctx.beginPath();
+      for (let d = 0; d <= len; d += 1) {
+        const o = Math.sin(d / 2.2 + t / 300) * w * 0.28;
+        const px = x1 + ux * d - uy * o;
+        const py = y1 + uy * d + ux * o;
+        if (d === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.lineWidth = Math.max(0.6, w * 0.3);
+      ctx.stroke();
+    } else if (finish.pattern === 'stripe') {
+      ctx.lineWidth = Math.max(0.8, w * 0.7);
+      for (let d = 2; d < len - 1; d += 5) line(x1 + ux * d, y1 + uy * d, x1 + ux * (d + 2), y1 + uy * (d + 2));
+    } else if (finish.pattern === 'fade') {
+      // the colour melts into the accent toward the muzzle
+      const g = ctx.createLinearGradient(x1, y1, x2, y2);
+      g.addColorStop(0, `${finish.accent ?? '#111'}00`);
+      g.addColorStop(1, finish.accent ?? '#111');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = w * 0.9;
+      line(x1 + ux * len * 0.25, y1 + uy * len * 0.25, x2, y2);
     }
     if (finish.fx === 'shimmer' || finish.fx === 'rainbow' || finish.fx === 'galaxy' || finish.fx === 'ice') {
       // a glint sliding along the barrel, and stars for galaxy

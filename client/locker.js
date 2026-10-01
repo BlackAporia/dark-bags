@@ -24,12 +24,21 @@ const TIER_PAL = [
   { body: '#111827', lid: '#e5e7eb', strap: '#00f0ff', trim: '#030712', glow: '#00f0ff' },
   { body: '#f7931a', lid: '#ffd166', strap: '#ffffff', trim: '#7c2d12', glow: '#ffffff' },
 ];
+// a colour darkened (k < 0) or lightened (k > 0), for the themed cases' palettes
+const shade = (hex, k) => {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (c) => Math.round(k < 0 ? c * (1 + k) : c + (255 - c) * k);
+  return `rgb(${f(n >> 16)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+};
+
 export function boxArt(box, size = 120) {
   const tier = (box?.tier ?? 1) - 1;
-  const p = TIER_PAL[tier] ?? TIER_PAL[0];
+  const a = box?.art;
+  // collection cases wear their theme: its colours and its emblem on the front
+  const p = a ? { body: shade(a.c1, -0.55), lid: shade(a.c1, -0.15), strap: shade(a.c1, 0.55), trim: a.c2, glow: a.c1 } : TIER_PAL[tier] ?? TIER_PAL[0];
   const crate = box?.family === 'weapon';
   const uid = `bx${box?.id ?? 'x'}${Math.random().toString(36).slice(2, 7)}`;
-  const rays = tier >= 5 ? `<g opacity=".5" stroke="${p.glow}" stroke-width="2">${Array.from({ length: 12 }, (_, i) => `<line x1="60" y1="64" x2="${60 + Math.cos((i / 12) * Math.PI * 2) * 60}" y2="${64 + Math.sin((i / 12) * Math.PI * 2) * 60}"/>`).join('')}</g>` : '';
+  const rays = tier >= 5 || a ? `<g opacity=".5" stroke="${p.glow}" stroke-width="2">${Array.from({ length: 12 }, (_, i) => `<line x1="60" y1="64" x2="${60 + Math.cos((i / 12) * Math.PI * 2) * 60}" y2="${64 + Math.sin((i / 12) * Math.PI * 2) * 60}"/>`).join('')}</g>` : '';
   const gem = tier >= 3 ? `<path d="M60 58 l7 7 -7 10 -7 -10z" fill="${p.strap}" stroke="${p.trim}" stroke-width="1.5"/>` : `<circle cx="60" cy="68" r="6" fill="${p.trim}" stroke="${p.strap}" stroke-width="2"/>`;
   const shape = crate
     ? `<path d="M18 46 L60 30 L102 46 L60 62 Z" fill="url(#${uid}l)" stroke="${p.trim}" stroke-width="2"/>
@@ -53,7 +62,7 @@ export function boxArt(box, size = 120) {
   <ellipse cx="60" cy="106" rx="44" ry="7" fill="#000" opacity=".5"/>
   <circle cx="60" cy="66" r="56" fill="url(#${uid}g)"/>
   ${shape}
-  ${gem}
+  ${a ? `<circle cx="${crate ? 39 : 60}" cy="${crate ? 74 : 80}" r="13" fill="${a.c2}" stroke="${p.strap}" stroke-width="1.6"/><text x="${crate ? 39 : 60}" y="${crate ? 79 : 85}" text-anchor="middle" font-size="15" font-weight="900" fill="${p.strap}" font-family="system-ui, sans-serif">${a.icon}</text>` : gem}
 </svg>`;
 }
 

@@ -147,7 +147,7 @@ test('buy many at once: one charge, held boxes first, a result per box', () => {
 });
 
 test('dearer boxes have better odds; weapon crates drop weapon skins you can wear', () => {
-  const bags = BOXES.filter((b) => b.family === 'outfit').sort((a, b) => a.tier - b.tier);
+  const bags = BOXES.filter((b) => b.family === 'outfit' && b.group === 'tier').sort((a, b) => a.tier - b.tier);
   const ev = (b) => RARITY_ORDER.reduce((s, k, i) => s + (b.odds[k] ?? 0) * i, 0);
   for (let i = 1; i < bags.length; i++) assert.ok(ev(bags[i]) > ev(bags[i - 1]), `${bags[i].id} beats ${bags[i - 1].id}`);
   assert.equal(bags[0].price, 49, 'an impulse-priced entry box');
@@ -156,7 +156,7 @@ test('dearer boxes have better odds; weapon crates drop weapon skins you can wea
   const perExotic = bags.filter((b) => b.odds.exotic).map((b) => b.price / b.odds.exotic);
   for (let i = 1; i < perExotic.length; i++) assert.ok(perExotic[i] < perExotic[i - 1], 'Exotics get cheaper per $ up the ladder');
   for (const b of BOXES) assert.equal(Math.round(Object.values(b.odds).reduce((a, c) => a + c, 0) * 100), 10000, `${b.id} odds add up to 100%`);
-  assert.equal(BOXES.filter((b) => b.family === 'weapon').length, 9, 'weapon crates sold separately');
+  assert.equal(BOXES.filter((b) => b.family === 'weapon' && b.group === 'tier').length, 9, 'weapon crates sold separately');
 
   const inv = new Inventory({ rnd: seeded(4) });
   inv.rec('p').credit = 1e9;
@@ -281,4 +281,23 @@ test('the first top-up bonus is capped at $10', async () => {
   inv.rec('w');
   const r = inv.topUp('w', 'p100', () => true);
   assert.equal(r.added, 10000 + 2000 + 10000);
+});
+
+test('collection cases: every rarity they list can drop, and only from their collection', async () => {
+  const { BOXES, boxCatalog, RARITY_ORDER, Inventory } = await import('../shared/cosmetics.js');
+  const themed = BOXES.filter((b) => b.group !== 'tier');
+  assert.ok(themed.length >= 15);
+  for (const b of themed) {
+    const cat = boxCatalog(b);
+    for (const r of RARITY_ORDER) if (b.odds[r] > 0) assert.ok(cat.some((i) => i.rarity === r && !i.basic), `${b.id} has a ${r}`);
+  }
+  let seed = 7;
+  const inv = new Inventory({ rnd: () => ((seed = (seed * 16807) % 2147483647) / 2147483647) });
+  inv.rec('p').credit = 1e9;
+  for (const id of ['c-knife', 'c-samurai', 'b-cyber']) {
+    const ids = new Set(boxCatalog(BOXES.find((b) => b.id === id)).map((i) => i.id));
+    const r = inv.open('p', id, null, 100);
+    assert.ok(r.ok, id);
+    for (const x of r.results) assert.ok(ids.has(x.item), `${id} dropped ${x.item}`);
+  }
 });
