@@ -5,7 +5,7 @@ import { WEAPONS } from '../shared/weapons.js';
 import { MapLayer } from './mapLayer.js';
 import { pose, drawFigure, FEET, hpColor } from './stickman.js';
 import { textures, canvas } from './textures.js';
-import { FINISH, RARITY_ORDER } from '../shared/cosmetics.js';
+import { FINISH, RARITY_ORDER, TURRET_SKIN } from '../shared/cosmetics.js';
 
 const C = {
   void: '#07090f',
@@ -546,6 +546,7 @@ export class Renderer {
   drawTurret(o, t) {
     const ctx = this.ctx;
     const col = this.gadgetColor(o);
+    const sk = o.sk ? TURRET_SKIN[o.sk] : null; // a seasonal turret skin: body, trim, eye
     const z = 22;
     ctx.save();
     // shadow and legs
@@ -577,17 +578,32 @@ export class Renderer {
     // head
     ctx.translate(o.x, o.y - z);
     ctx.rotate(o.a);
-    ctx.fillStyle = '#12161f';
+    ctx.fillStyle = sk ? sk.trim : '#12161f';
     ctx.strokeStyle = col;
     ctx.lineWidth = 1.5;
-    ctx.fillRect(4, -5, 20, 3.5);
-    ctx.fillRect(4, 1.5, 20, 3.5);
+    ctx.fillRect(4, -5, sk?.fx ? 24 : 20, 3.5);
+    ctx.fillRect(4, 1.5, sk?.fx ? 24 : 20, 3.5);
+    ctx.fillStyle = sk ? sk.body : '#12161f';
     ctx.beginPath();
     ctx.roundRect(-10, -9, 18, 18, 5);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = col;
-    ctx.shadowColor = col;
+    if (sk) {
+      // trim plates on the head, and a halo for the mythic ones
+      ctx.strokeStyle = sk.trim;
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(-7, -6, 12, 12);
+      if (sk.fx && !this.reduced) {
+        ctx.strokeStyle = sk.eye;
+        ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t / 180);
+        ctx.beginPath();
+        ctx.arc(1, 0, 13, 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.fillStyle = sk ? sk.eye : col;
+    ctx.shadowColor = sk ? sk.eye : col;
     ctx.shadowBlur = this.quality >= 1 ? 10 : 0;
     ctx.beginPath();
     ctx.arc(1, 0, 3 + (this.reduced ? 0 : Math.sin(t / 140) * 0.8), 0, TAU);

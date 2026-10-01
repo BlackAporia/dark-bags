@@ -147,7 +147,7 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
     const rake = Math.floor(stake * CFG.RAKE);
@@ -179,6 +179,7 @@ export class World {
       outfit, // cosmetic outfit id and character (m/f): looks only
       body,
       ws: ws && Object.keys(ws).length ? ws : null, // weapon skins: { weaponId: finishId }
+      ts: ts || null, // turret skin (guns + lasers)
       x: pos.x,
       y: pos.y,
       vx: 0,
@@ -647,7 +648,7 @@ export class World {
       const fx = p.x + Math.cos(p.aim) * 34;
       const fy = p.y + Math.sin(p.aim) * 34;
       const free = segWalls(p.x, p.y, fx, fy, this.map.walls) < 0;
-      const o = { id: this.nextId++, kind: 'turret', owner: p.id, team: p.team, x: free ? fx : p.x, y: free ? fy : p.y, a: p.aim, hp: it.hp, cd: 0.6, until: this.time + it.life, fc: 0 };
+      const o = { id: this.nextId++, kind: 'turret', sk: p.ts, owner: p.id, team: p.team, x: free ? fx : p.x, y: free ? fy : p.y, a: p.aim, hp: it.hp, cd: 0.6, until: this.time + it.life, fc: 0 };
       this.turrets.set(o.id, o);
     } else if (item === 'mine') {
       const mine = [...this.mines.values()].filter((o) => o.owner === p.id);
@@ -1055,7 +1056,7 @@ export class World {
     const pct = (o) => Math.ceil((o.hp / GL.ITEMS.turret.hp) * 100);
     const mine = (o) => (o.owner === me.id ? 1 : this.teamSize && o.team === me.team ? 2 : 0);
     const turrets = [];
-    for (const o of this.turrets.values()) if (near(o.x, o.y, 40)) turrets.push({ i: o.id, x: r1(o.x), y: r1(o.y), a: r2(o.a), h: pct(o), fc: o.fc, o: mine(o), tl: Math.ceil(o.until - this.time) });
+    for (const o of this.turrets.values()) if (near(o.x, o.y, 40)) turrets.push({ i: o.id, x: r1(o.x), y: r1(o.y), a: r2(o.a), h: pct(o), fc: o.fc, o: mine(o), tl: Math.ceil(o.until - this.time), ...(o.sk ? { sk: o.sk } : {}) });
     const mines = [];
     for (const o of this.mines.values()) if (near(o.x, o.y, 40) || near(o.x2, o.y2, 40) || near((o.x + o.x2) / 2, (o.y + o.y2) / 2, 40)) mines.push({ i: o.id, x: r1(o.x), y: r1(o.y), x2: r1(o.x2), y2: r1(o.y2), o: mine(o), arm: this.time >= o.armAt ? 1 : 0 });
     return { turrets, mines };
