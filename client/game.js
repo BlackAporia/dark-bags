@@ -847,7 +847,7 @@ export class GameClient {
       const stage = z ? z.stage : 0;
       const danger = view?.figures?.some((f) => !f.isMe && this.pred && Math.hypot(f.a.x - this.pred.x, f.a.y - this.pred.y) < 380) ? 1 : 0;
       const intensity = alive ? Math.min(4, 1 + Math.floor(stage * 0.75) + danger + (you.ext > 0 ? 2 : 0) + (this.hurt > 0.3 ? 1 : 0)) : 0;
-      this.sfx.music.set({ mode: alive ? 'raid' : 'lobby', intensity, bpm: alive ? 140 + stage * 7 : 96 });
+      this.sfx.music.set({ mode: alive ? 'raid' : 'calm', intensity, bpm: alive ? 140 + stage * 7 : 96 });
     }
 
     if (alive && you.ext > 0) {
