@@ -8,7 +8,10 @@
 // only sign for the wallet that belongs to the bearer of the token.
 
 export async function createPrivy({ cfg, starkzap, log = console }) {
-  if (!cfg.privy) return null;
+  if (!cfg.privy) {
+    log.info?.('Privy: off (set PRIVY_APP_ID and PRIVY_APP_SECRET in the server variables to show email / Google / X / Discord sign-in)');
+    return null;
+  }
   let PrivyClient;
   try {
     ({ PrivyClient } = await import('@privy-io/node'));

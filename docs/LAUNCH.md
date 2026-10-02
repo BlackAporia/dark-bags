@@ -88,6 +88,21 @@
 `PAYMASTER_API_KEY` (оплата газу за гравців), `STRK20_*` (приватні депозити). Без них
 працюють звичайні гаманці, Cartridge і публічні депозити.
 
+### Privy (вхід через пошту, Google, X, Discord)
+
+Кнопка Privy з'являється у вікні входу, лише коли на сервері задані обидві змінні
+`PRIVY_APP_ID` і `PRIVY_APP_SECRET`. Інакше в логах буде рядок `Privy: off`.
+
+1. dashboard.privy.io → створи застосунок (окремий для Sepolia і для мейнету, або один).
+2. Settings → Basics: скопіюй **App ID** і **App secret**.
+3. Settings → Domains (Allowed origins): додай адресу гри, наприклад
+   `https://dark-bags-production.up.railway.app` (і адресу GitHub Pages, якщо граєш звідти).
+4. Login methods: увімкни Email, а за бажанням і Google, X, Discord.
+5. Wallets: увімкни серверні гаманці (server wallets) з підтримкою Starknet.
+6. Railway → Variables: `PRIVY_APP_ID=<App ID>`, `PRIVY_APP_SECRET=<App secret>`
+   (необов'язково `PRIVY_CLIENT_ID`). Секрет лише тут, ніколи в чат чи git.
+7. Після перезапуску у вікні входу з'явиться блок «Без гаманця · пошта або соцмережі».
+
 Після збереження змінних Railway перезапустить сервіс. Відкрий `https://dark-bags-production.up.railway.app/healthz`:
 там має бути `"ok"`, а в логах (Deployments → View logs) рядок `cashier: sepolia, house 0x…`.
 
