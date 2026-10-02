@@ -821,8 +821,14 @@ export class World {
       this.emit({ k: 'buyFail', to: [p.id], item, why });
       return false;
     };
+    if (item === 'revive' && !this.zombie) return no('mode');
     if (p.cr < it.cost) return no('cash');
-    if (item === 'medkit') {
+    if (item === 'revive') {
+      const down = [...this.players.values()].filter((q) => q !== p && !q.isBot && q.status === 'dead');
+      if (!down.length) return no('none');
+      for (const q of down) this.respawn(q, true);
+      this.emit({ k: 'revived', by: p.id, name: p.name, n: down.length, x: r1(p.x), y: r1(p.y) });
+    } else if (item === 'medkit') {
       if (p.hp >= this.maxHp) return no('full');
       p.hp = Math.min(this.maxHp, p.hp + it.heal);
     } else if (item === 'turret') {

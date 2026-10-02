@@ -568,6 +568,12 @@ export class GameClient {
           this.fx.sparks(ev.x, ev.y, 24, 14, '#ffd166');
           this.banner(t(ev.kind === 'turret' ? 'gl.upTurret' : 'gl.upMine', { lv: ev.lv }), 'gold', 1600);
           break;
+        case 'revived':
+          this.sfx.play('level');
+          this.fx.ring(ev.x, ev.y, '#ffd166');
+          this.fx.sparks(ev.x, ev.y, 30, 18, '#ffd166');
+          this.banner(t('gl.revived', { name: ev.by === this.pid ? t('gl.you') : ev.name, n: ev.n }), 'gold', 2200);
+          break;
         case 'buyFail':
           this.banner(t(`gl.no.${ev.why}`), 'warn', 1200);
           this.sfx.play('beep', { f: 220, dur: 0.08 });

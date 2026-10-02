@@ -2200,3 +2200,8 @@ body.gold-on #bag { color: #ffd166; }
 /* the server went quiet (no picture for over a second) */
 .lagwarn { position: fixed; top: 112px; left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 14px; border-radius: 10px; background: rgba(120, 20, 20, 0.85); border: 1px solid rgba(255, 92, 108, 0.7); color: #fff; font: 600 13px/1.2 'IBM Plex Mono', monospace; letter-spacing: 0.04em; pointer-events: none; animation: lagpulse 1s ease-in-out infinite alternate; }
 @keyframes lagpulse { from { opacity: 0.75; } to { opacity: 1; } }
+
+/* zombies: buy the whole squad back on its feet */
+.gl-btn.gl-revive { display: none; }
+body.z-on .gl-btn.gl-revive { display: flex; }
+.gl-btn.gl-revive .gl-ico { color: #ffd166; }

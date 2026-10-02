@@ -161,3 +161,28 @@ test('rooms: the side modes take one flat $0.10 entry; zombies start solo, gold 
   assert.equal(room.world.players.size, 1);
   void credit;
 });
+
+test('zombies: 1000 credits stand the whole downed squad back up; not in other modes', () => {
+  const w = new World({ stake: 100, seed: 9, mode: 'zombies', roundSeconds: 480 });
+  const a = w.addPlayer({ name: 'a', skin: '#fff', weapon: 'rifle' });
+  const b = w.addPlayer({ name: 'b', skin: '#fff', weapon: 'rifle' });
+  const c = w.addPlayer({ name: 'c', skin: '#fff', weapon: 'rifle' });
+  w.step();
+  assert.equal(w.buy(a.id, 'revive'), false, 'nobody is down yet');
+  b.status = 'dead';
+  c.status = 'dead';
+  a.cr = 999;
+  assert.equal(w.buy(a.id, 'revive'), false, 'needs 1000 credits');
+  a.cr = 1200;
+  assert.equal(w.buy(a.id, 'revive'), true);
+  assert.equal(a.cr, 200);
+  assert.equal(b.status, 'alive');
+  assert.equal(c.status, 'alive');
+  assert.ok(w.events.some((e) => e.k === 'revived' && e.n === 2));
+  const g = new World({ stake: 100, seed: 9, mode: 'gl', roundSeconds: 240 });
+  const x = g.addPlayer({ name: 'x', skin: '#fff' });
+  g.addPlayer({ name: 'y', skin: '#fff' });
+  g.step();
+  x.cr = 5000;
+  assert.equal(g.buy(x.id, 'revive'), false, 'guns + lasers has no revive');
+});

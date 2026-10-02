@@ -85,6 +85,7 @@ export const GL = {
     medkit: { cost: 150, heal: 60 },
     turret: { cost: 600, hp: 80, life: 60, range: 470, dmg: 12, cd: 0.25, turn: 7, max: 1 },
     mine: { cost: 350, dmg: 120, r: 110, len: 620, arm: 1.5, max: 2 },
+    revive: { cost: 1000 }, // zombies only: everyone in the squad who is down stands up at once
   },
   // upgrades (walk up to your own turret or mine and press Space): price of level 2 and 3
   UP: { 2: 1500, 3: 3000 },

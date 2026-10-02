@@ -29,7 +29,7 @@ export class Input {
       if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.dashQueued = true;
       if (e.code === 'KeyR') this.reloadQueued = true; // reload now (it also reloads by itself)
       if (e.code === 'KeyQ') this.onBluff?.();
-      const buy = { Digit1: 'medkit', Digit2: 'turret', Digit3: 'mine', Numpad1: 'medkit', Numpad2: 'turret', Numpad3: 'mine' }[e.code];
+      const buy = { Digit1: 'medkit', Digit2: 'turret', Digit3: 'mine', Digit4: 'revive', Numpad1: 'medkit', Numpad2: 'turret', Numpad3: 'mine', Numpad4: 'revive' }[e.code];
       if (buy) this.onBuy?.(buy);
       if (e.code === 'KeyM') this.onMute?.();
       if (e.code === 'KeyN') this.onMusic?.();
@@ -77,7 +77,12 @@ export class Input {
         onMove(dx / R, dy / R);
       };
       zone.addEventListener('pointerdown', (e) => {
-        if (id !== null) return;
+        // a new touch always takes the stick: a finger whose lift was lost must never lock it
+        if (id !== null) {
+          try {
+            zone.releasePointerCapture(id);
+          } catch {}
+        }
         this.onAnyInput?.();
         id = e.pointerId;
         zone.setPointerCapture(id);
@@ -90,15 +95,22 @@ export class Input {
         update(e);
       });
       zone.addEventListener('pointermove', (e) => e.pointerId === id && update(e));
-      const end = (e) => {
-        if (e.pointerId !== id) return;
+      const stop = () => {
         id = null;
         base.classList.remove('on');
         knob.style.transform = '';
         onEnd();
       };
+      const end = (e) => {
+        if (e.pointerId !== id) return;
+        stop();
+      };
       zone.addEventListener('pointerup', end);
       zone.addEventListener('pointercancel', end);
+      // iOS and Android can drop the capture (a system swipe, the full-screen notice) without a
+      // pointerup: the stick would keep running in its last direction
+      zone.addEventListener('lostpointercapture', end);
+      this.stopStick = () => id !== null && stop();
     };
     bindStick(
       root.querySelector('#tz-left'),
@@ -124,6 +136,17 @@ export class Input {
     };
     fire.addEventListener('pointerup', release);
     fire.addEventListener('pointercancel', release);
+    fire.addEventListener('lostpointercapture', release);
+    // no finger left on the screen at all: nothing may stay held
+    const allUp = (e) => {
+      if (e.touches && e.touches.length) return;
+      this.stopStick?.();
+      if (fid !== null) release({ pointerId: fid });
+    };
+    document.addEventListener('touchend', allUp, { passive: true });
+    document.addEventListener('touchcancel', allUp, { passive: true });
+    addEventListener('blur', () => allUp({}));
+    document.addEventListener('visibilitychange', () => document.hidden && allUp({}));
     root.querySelector('#t-dash').addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.dashQueued = true;

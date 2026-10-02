@@ -1,6 +1,18 @@
 // The team's analytics page. The server only answers the admin wallets (ADMIN_WALLETS): this page
 // sends the game session of this browser, so sign in to the game with one of them first.
 import { BOX, PACK } from '../shared/cosmetics.js';
+import { ADMIN_LANGS, LOCALE, tr, localize } from './admin-i18n.js';
+
+// the page's language: picked in the header, remembered in this browser
+const lang = (() => {
+  try {
+    const v = localStorage.getItem('darkbags.adminLang');
+    if (v && LOCALE[v]) return v;
+  } catch {}
+  const n = (navigator.language || 'en').slice(0, 2);
+  return LOCALE[n] ? n : 'en';
+})();
+document.documentElement.lang = lang;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -26,16 +38,16 @@ const adminKey = (() => {
 })();
 
 // ------------------------------------------------------------ formatting
-const nf = new Intl.NumberFormat('uk-UA');
+const nf = new Intl.NumberFormat(LOCALE[lang]);
 const num = (n) => nf.format(Math.round(n ?? 0));
-const usd = (mills, d = 2) => (mills == null ? '—' : `$${(mills / 1000).toLocaleString('uk-UA', { minimumFractionDigits: d, maximumFractionDigits: d })}`);
+const usd = (mills, d = 2) => (mills == null ? '—' : `$${(mills / 1000).toLocaleString(LOCALE[lang], { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const cents = (c) => usd((c ?? 0) * 10);
 const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1)}%` : '—');
 const units = (u, dec, max = 4) => {
   const v = Number(BigInt(u)) / 10 ** dec;
   return nf.format(+v.toFixed(v >= 1000 ? 0 : max));
 };
-const dt = (t) => (t ? new Date(t).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+const dt = (t) => (t ? new Date(t).toLocaleString(LOCALE[lang], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—');
 const dur = (s) => {
   s = Math.round(s);
@@ -139,7 +151,7 @@ function hourChart(hours, h = 150) {
     <text x="${pad.l - 6}" y="${y(0) + 4}" fill="#7d8497" font-size="11" text-anchor="end" font-family="IBM Plex Mono">0</text>
     ${hours
       .map((x, i) => {
-        const tip = `${new Date(x.h).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}: пік ${x.n} онлайн`;
+        const tip = `${new Date(x.h).toLocaleString(LOCALE[lang], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}: пік ${x.n} онлайн`;
         return `<rect x="${pad.l + i * bw}" y="0" width="${bw}" height="${h}" fill="transparent" data-tip="${esc(tip)}"/>${x.n ? `<rect x="${pad.l + i * bw + 1}" y="${y(x.n)}" width="${Math.max(1, bw - 2)}" height="${y(0) - y(x.n)}" rx="2" fill="var(--s1)" data-tip="${esc(tip)}"/>` : ''}`;
       })
       .join('')}
@@ -370,6 +382,20 @@ function sys() {
 
 const VIEWS = { over: overview, players, matches, shop, chain, sys };
 
+function langPicker() {
+  return `<span class="pill langs" role="group" aria-label="Language">${ADMIN_LANGS.map(([id, label]) => `<button type="button" data-lang="${id}" class="${id === lang ? 'on' : ''}">${label}</button>`).join('')}</span>`;
+}
+function wireLang() {
+  for (const b of document.querySelectorAll('[data-lang]'))
+    b.onclick = () => {
+      if (b.dataset.lang === lang) return;
+      try {
+        localStorage.setItem('darkbags.adminLang', b.dataset.lang);
+      } catch {}
+      location.reload();
+    };
+}
+
 function render() {
   $('tabs').innerHTML = TABS.map(([id, l]) => `<button type="button" data-t="${id}" class="${id === tab ? 'on' : ''}">${l}</button>`).join('');
   for (const b of $('tabs').querySelectorAll('button'))
@@ -381,7 +407,10 @@ function render() {
       render();
     };
   $('view').innerHTML = VIEWS[tab]();
-  $('meta').innerHTML = `<span class="pill net${D.network === 'mainnet' ? '' : ' test'}">${esc(D.network)}</span><span class="pill"><span class="dot"></span>${num(D.live.online)} онлайн</span><span class="pill">оновлено ${new Date(D.at).toLocaleTimeString('uk-UA')}</span>`;
+  $('meta').innerHTML = `<span class="pill net${D.network === 'mainnet' ? '' : ' test'}">${esc(D.network)}</span><span class="pill"><span class="dot"></span>${num(D.live.online)} онлайн</span><span class="pill">оновлено ${new Date(D.at).toLocaleTimeString(LOCALE[lang])}</span>${langPicker()}`;
+  localize($('app'), lang);
+  localize($('meta'), lang);
+  wireLang();
   wire();
 }
 
@@ -432,7 +461,7 @@ function wire() {
         const t = e.target.closest('[data-tip]');
         if (!t) return void (tip.hidden = true);
         const r = ch.getBoundingClientRect();
-        show(esc(t.dataset.tip), e.clientX - r.left, e.clientY - r.top - 6);
+        show(esc(tr(t.dataset.tip, lang)), e.clientX - r.left, e.clientY - r.top - 6);
       });
       svg.addEventListener('pointerleave', () => (tip.hidden = true));
     }
@@ -445,7 +474,7 @@ function tick() {
   const s = Math.max(0, Math.floor((Date.now() - D.game.born) / 1000));
   const d = Math.floor(s / 86400);
   const p2 = (n) => String(n).padStart(2, '0');
-  $('age').innerHTML = `${d}<i>д</i>${p2(Math.floor((s % 86400) / 3600))}<i>год</i>${p2(Math.floor((s % 3600) / 60))}<i>хв</i>${p2(s % 60)}<i>с</i>`;
+  $('age').innerHTML = `${d}<i>${tr('д', lang)}</i>${p2(Math.floor((s % 86400) / 3600))}<i>${tr('год', lang)}</i>${p2(Math.floor((s % 3600) / 60))}<i>${tr('хв', lang)}</i>${p2(s % 60)}<i>${tr('с', lang)}</i>`;
 }
 
 function gate(kind) {
@@ -456,6 +485,9 @@ function gate(kind) {
       ? `<h2>Доступ закрито</h2><p>Ця сторінка відкривається лише двом адмін-гаманцям. Увійдіть у гру одним із них (у цьому ж браузері), потім поверніться сюди.</p><p><a class="cta" href="/">До гри</a></p><p class="note">${token ? 'Сесію знайдено, але гаманець не адмінський або вхід застарів.' : 'У цьому браузері ще немає сесії гри.'}</p>`
       : `<h2>Сервер не відповів</h2><p>Спробуйте ще раз за хвилину.</p><p><button type="button" class="cta" id="retry">Оновити</button></p>`;
   $('retry')?.addEventListener('click', load);
+  $('gate').insertAdjacentHTML('beforeend', `<p>${langPicker()}</p>`);
+  localize($('gate'), lang);
+  wireLang();
 }
 
 async function load() {
@@ -479,6 +511,9 @@ async function load() {
   }
 }
 
+// the static header and the tab title, once
+localize(document.querySelector('header.top'), lang);
+document.title = tr(document.title, lang);
 load();
 setInterval(load, 30_000);
 setInterval(tick, 1000);
