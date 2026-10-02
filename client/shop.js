@@ -2,7 +2,7 @@
 // limited editions, and the opening show. The server decides every roll; this page
 // only stages it: the box charges up in the colour of the best drop, bursts, and the
 // cards flip one by one.
-import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY, FIRST_TOPUP_MAX, firstBonus, boxCatalog } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY, FIRST_TOPUP_MAX, firstBonus, boxCatalog, rollRarity } from '../shared/cosmetics.js';
 import { isStable } from '../shared/assets.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { figureStill, drawPreview } from './stickman.js';
@@ -74,7 +74,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
         return list.length ? `<section class="box-group"><p class="eyebrow">${t(`shop.g.${g}`)}</p><div class="box-grid">${list.map(boxCard).join('')}</div></section>` : '';
       }).join('')}
       ${limited.length ? `<section class="limited"><p class="eyebrow">${t('shop.limited')}</p><div class="lim-row">${limited.map(limCard).join('')}</div></section>` : ''}`;
-    for (const b of root.querySelectorAll('[data-pack]')) b.addEventListener('click', () => send({ t: 'topup', id: b.dataset.pack }));
+    for (const b of root.querySelectorAll('[data-pack]')) b.addEventListener('click', () => (demoOnly() ? toast(t('err.online_only')) : send({ t: 'topup', id: b.dataset.pack })));
     for (const b of root.querySelectorAll('[data-fam]'))
       b.addEventListener('click', () => {
         st.family = b.dataset.fam;
@@ -118,7 +118,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
       </div>
       <div class="qty-chips">${QTY.map((q) => `<button type="button" data-qq="${q}" aria-pressed="${q === n}">×${q}</button>`).join('')}</div>
       <p class="bulk-note${gift ? ' on' : ''}">${gift ? t('shop.bulkOn', { n: gift }) : t('shop.bulk', { n: BULK_FREE_EVERY })}</p>
-      <button type="button" class="cta box-go" ${cost > reach() ? 'disabled' : ''}>${cta}</button>
+      ${demoOnly() ? `<button type="button" class="cta box-go demo">${t('shop.demo')}</button>` : `<button type="button" class="cta box-go" ${cost > reach() ? 'disabled' : ''}>${cta}</button>`}
     </article>`;
   }
 
@@ -161,7 +161,25 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     el.querySelector('[data-q="+"]').addEventListener('click', () => set(qty(id) + 1));
     el.querySelector('input').addEventListener('change', (e) => set(e.target.value));
     for (const c of el.querySelectorAll('[data-qq]')) c.addEventListener('click', () => set(c.dataset.qq));
-    el.querySelector('.box-go').addEventListener('click', () => buy(id, qty(id)));
+    el.querySelector('.box-go').addEventListener('click', () => (demoOnly() ? demo(id) : buy(id, qty(id))));
+  }
+
+  // Practice is free play money, so it buys nothing: the shop there only shows how a bag
+  // opens (the real reel, a random drop by the real odds), and nothing is charged or given.
+  const demoOnly = () => app.mode === 'practice';
+  function demo(id) {
+    if (st.busy) return;
+    const box = BOX[id];
+    st.busy = true;
+    st.demo = true;
+    st.last = { id, n: 1 };
+    sfx.unlock?.();
+    sfx.play('ready');
+    charge(box);
+    const { rarity } = rollRarity(box, null, Math.random);
+    const pool = boxCatalog(box).filter((i) => i.rarity === rarity && !i.basic);
+    const item = pool[Math.floor(Math.random() * pool.length)] ?? boxCatalog(box)[0];
+    setTimeout(() => reveal({ box: id, results: [{ kind: box.family, item: item.id, rarity: item.rarity, dup: false, refund: 0, pity: false, jackpot: false }] }), 500);
   }
 
   function buy(id, n) {
@@ -308,7 +326,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     const o = itemOf(res);
     const r = RARITIES[res.rarity];
     const lim = o.limited && res.serial ? `<span class="op-serial">#${res.serial}/${o.limited}</span>` : '';
-    const tag = res.dup ? `<span class="op-dup">${t('shop.dup', { v: usd(res.refund) })}</span>` : `<span class="op-new">${t('shop.new')}</span>`;
+    const tag = st.demo ? `<span class="op-new">${t('shop.demo')}</span>` : res.dup ? `<span class="op-dup">${t('shop.dup', { v: usd(res.refund) })}</span>` : `<span class="op-new">${t('shop.new')}</span>`;
     return `<div class="op-card r-${res.rarity}${big ? ' big' : ''}" style="--r:${r.color}">
       <div class="op-face op-back">${boxArt(BOX[st.last?.id] ?? BOXES[0], 64)}</div>
       <div class="op-face op-front">
@@ -375,6 +393,12 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
       back += r.refund;
     }
     const o = itemOf(best);
+    if (st.demo) {
+      // a demo ends with a word on how it works for real, and a way out
+      $('op-actions').innerHTML = `<p class="op-tally">${t('shop.demoNote')}</p><div class="op-btns"><button type="button" class="cta" data-op="close">${t('share.close')}</button></div>`;
+      $('op-actions').querySelector('[data-op="close"]').addEventListener('click', close);
+      return;
+    }
     const again = st.last;
     const held = L().boxes?.[box.id] ?? 0;
     const cost = boxCost(box, Math.max(0, again.n - held));
@@ -398,6 +422,8 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
   }
 
   function close() {
+    st.demo = false;
+    st.busy = false;
     $('opening').hidden = true;
     $('opening').className = 'opening';
     render();
@@ -437,7 +463,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     render,
     onMessage,
     // open a bag or crate from anywhere (inventory, the battle pass): the ones you hold are free
-    open: (id, n = 1) => BOX[id] && buy(id, n),
+    open: (id, n = 1) => BOX[id] && (demoOnly() ? demo(id) : buy(id, n)),
     family(f) {
       if (f === 'outfit' || f === 'weapon') st.family = f;
     },
