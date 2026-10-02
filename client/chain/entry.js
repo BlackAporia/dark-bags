@@ -46,13 +46,18 @@ export async function walletBalance(chain, t, address) {
 // ------------------------------------------------------------ extensions
 
 let store = null;
+export const isCartridgeEntry = (name) => /^(cartridge )?controller$|^cartridge$/i.test(String(name ?? '').trim());
 export function listWallets() {
   store ??= createStore();
   // extensions that inject window.starknet_* after the page loaded are only seen on a rescan
   store._refreshInjectedWallets?.();
-  const found = store.getWallets().map((w) => ({ id: w.name, name: w.name, icon: typeof w.icon === 'string' ? w.icon : '', installed: true, wallet: w }));
+  // "Controller" is not a browser extension: it is the Cartridge SDK registering itself once
+  // the game has started Cartridge. Cartridge has its own button, so it is left out here.
+  const found = store.getWallets()
+    .filter((w) => !isCartridgeEntry(w.name))
+    .map((w) => ({ id: w.name, name: w.name, icon: typeof w.icon === 'string' ? w.icon : '', installed: true, wallet: w }));
   const have = new Set(found.map((w) => w.name.toLowerCase()));
-  const missing = KNOWN_WALLETS.filter((k) => !have.has(k.name.toLowerCase()) && !have.has(k.id.toLowerCase())).map((k) => ({
+  const missing = KNOWN_WALLETS.filter((k) => !isCartridgeEntry(k.name) && !isCartridgeEntry(k.id) && !have.has(k.name.toLowerCase()) && !have.has(k.id.toLowerCase())).map((k) => ({
     id: k.id,
     name: k.name,
     icon: k.icon,
@@ -191,13 +196,44 @@ function starkzapFacade(kind, name, wallet, chain) {
   };
 }
 
+// The Cartridge SDK keeps one keychain iframe per page: a second Controller finds the first one's
+// container in the page, never mounts its own iframe and never gets ready ("Cartridge Controller
+// failed to initialize"). So the page keeps the one connected wallet, and before a fresh attempt
+// (after a cancel or a failure) the old container goes, so the new iframe can mount.
+let cartridge = null; // { key, wallet, name }
+function clearCartridgeFrames() {
+  if (typeof document === 'undefined') return;
+  document.getElementById('controller')?.remove();
+  for (const f of document.querySelectorAll('iframe#controller-keychain, iframe[id^="controller-"]')) f.remove();
+}
 export async function connectCartridge(chain, session, base) {
+  const key = `${chain.network}|${chain.rpcUrl}`;
+  if (cartridge?.key === key) return cartridgeFacade(chain);
+  clearCartridgeFrames();
+  cartridge = null;
   const sdk = sdkFor(chain, session, base);
   // pre-approve deposits so they go through without a popup each time
   const policies = chain.tokens.map((t) => ({ target: t.id, method: 'transfer' }));
-  const { wallet } = await sdk.onboard({ strategy: OnboardStrategy.Cartridge, cartridge: { policies }, deploy: 'if_needed' });
-  const name = (await wallet.username?.().catch(() => null)) || 'Cartridge';
-  return starkzapFacade('cartridge', name, wallet, chain);
+  try {
+    const { wallet } = await sdk.onboard({ strategy: OnboardStrategy.Cartridge, cartridge: { policies }, deploy: 'if_needed' });
+    const name = (await wallet.username?.().catch(() => null)) || 'Cartridge';
+    cartridge = { key, wallet, name };
+  } catch (e) {
+    clearCartridgeFrames();
+    if (/failed to initialize/i.test(String(e?.message))) throw new Error('Cartridge did not load. Check that x.cartridge.gg is not blocked (ad blocker, strict tracking protection, VPN) and try again.');
+    throw e;
+  }
+  return cartridgeFacade(chain);
+}
+function cartridgeFacade(chain) {
+  const f = starkzapFacade('cartridge', cartridge.name, cartridge.wallet, chain);
+  const off = f.disconnect;
+  f.disconnect = async () => {
+    cartridge = null;
+    await off().catch(() => {});
+    clearCartridgeFrames();
+  };
+  return f;
 }
 
 // ------------------------------------------------------------------ Privy
