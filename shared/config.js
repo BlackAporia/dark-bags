@@ -29,6 +29,8 @@ export const CFG = {
   MULTI_WINDOW: 4,        // seconds between kills to chain a double/triple/... kill
   SPAWN_SHIELD: 3,        // seconds of spawn protection; firing drops it early
   VISION: 520,            // you only see this far (and not through walls)
+  HEAD_R: 5,              // a round passing this close to the centre of a body is a headshot
+  HEADSHOT: 2,            // headshot damage multiplier (guns only, every mode)
 
   // weapons live in weapons.js (Arms Race ladder)
 

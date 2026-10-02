@@ -916,4 +916,10 @@ export default {
   'nyx.shopCase': "Bienvenue à la boutique ! Dépensons tes gains. Touche Ouvrir sur ce sac. C'est payé directement depuis ton portefeuille !",
   'nyx.shopEquip': "Oh, regarde ce que tu as eu ! Touche le bouton, et c'est à toi !",
   'nyx.bye': "C'est tout ! Tu sais jouer, gagner et acheter. Fonce, coureur ! Tu peux me rappeler quand tu veux dans les Réglages.",
+  'hud.headshot': "EN PLEINE TÊTE",
+  'inv.open': "Ouvrir",
+  'bp.later': "Plus tard",
+  'ach.sharpshooter': "Tireur d'élite",
+  'ach.headhunter': "Chasseur de têtes",
+  'achd.headshots': "Place {n} tirs en pleine tête",
 };

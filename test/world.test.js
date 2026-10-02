@@ -441,3 +441,27 @@ test('achievement counters: kills by weapon family, one-hit kills, clutch and fl
   assert.equal(titleTier('neon_legend'), 'mythic');
   assert.ok(ACHIEVEMENTS.length >= 70);
 });
+
+test('headshots: a centred round does double damage in every mode; an edge hit does not', () => {
+  for (const mode of ['raid', 'br', 'dm', 'zombies']) {
+    const w = new World({ stake: 1000, seed: 21, mode, botFill: 2 });
+    const a = w.addPlayer({ name: 'a', skin: '#fff', weapon: 'pistol' });
+    const v = mode === 'zombies' ? null : w.addPlayer({ name: 'v', skin: '#fff' });
+    w.step();
+    if (!v) {
+      assert.ok(w.headshot({ cause: 'shot', x: 0, y: 0, vx: 1000, vy: 0, speed: 1000 }, { x: 50, y: 2 }));
+      continue;
+    }
+    v.shield = 0;
+    const shoot = (dy) => w.headshot({ cause: 'shot', x: v.x - 60, y: v.y + dy, vx: 1000, vy: 0, speed: 1000 }, v);
+    assert.ok(shoot(0), `${mode}: dead centre`);
+    assert.ok(shoot(-3), `${mode}: within the head`);
+    assert.ok(!shoot(12), `${mode}: the edge of the body`);
+    assert.ok(!w.headshot({ cause: 'turret', x: v.x - 60, y: v.y, vx: 1000, vy: 0, speed: 1000 }, v), 'turrets never headshot');
+    const hp = v.hp;
+    w.damage(v, a, 20, 'shot', true);
+    assert.equal(a.headshots, 1);
+    assert.equal(hp - v.hp, 20);
+  }
+  assert.equal(CFG.HEADSHOT, 2);
+});

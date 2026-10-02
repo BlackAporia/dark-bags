@@ -436,6 +436,8 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
   return {
     render,
     onMessage,
+    // open a bag or crate from anywhere (inventory, the battle pass): the ones you hold are free
+    open: (id, n = 1) => BOX[id] && buy(id, n),
     family(f) {
       if (f === 'outfit' || f === 'weapon') st.family = f;
     },

@@ -10,7 +10,7 @@ import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createPass({ app, send, sfx, toast }) {
+export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
   const L = () => app.locker;
   let raf = 0;
 
@@ -46,7 +46,7 @@ export function createPass({ app, send, sfx, toast }) {
       <div class="bp-art">${rewardArt(rw)}</div>
       <p class="bp-name">${esc(rewardName(rw))}</p>
       ${seasonal ? `<span class="bp-ltd">${t('bp.limited')}</span>` : ''}
-      ${can ? `<button type="button" class="cta bp-claim" data-claim="${track}:${tier}">${t('bp.claim')}</button>` : claimed ? `<span class="bp-ok">✓ ${t('bp.claimed')}</span>` : locked ? `<span class="bp-lock">🔒</span>` : ''}
+      ${can ? `<button type="button" class="cta bp-claim" data-claim="${track}:${tier}">${t('bp.claim')}</button>` : claimed && rw.k === 'box' && (L().boxes?.[rw.id] ?? 0) > 0 ? `<button type="button" class="cta bp-claim" data-open="${rw.id}">${t('inv.open')}</button>` : claimed ? `<span class="bp-ok">✓ ${t('bp.claimed')}</span>` : locked ? `<span class="bp-lock">🔒</span>` : ''}
     </div>`;
   }
 
@@ -107,6 +107,7 @@ export function createPass({ app, send, sfx, toast }) {
       }
     });
     root.querySelector('[data-buy]')?.addEventListener('click', () => send({ t: 'pass_buy' }));
+    for (const b of root.querySelectorAll('[data-open]')) b.addEventListener('click', () => openBox(b.dataset.open));
     for (const b of root.querySelectorAll('[data-tequip]')) b.addEventListener('click', () => send({ t: 'tequip', id: b.dataset.tequip || null }));
     live(items.apex);
   }
@@ -141,13 +142,31 @@ export function createPass({ app, send, sfx, toast }) {
     if (m.op === 'pass_claim') {
       const rw = m.result.reward;
       sfx.play(rw.k === 'credit' || rw.k === 'box' ? 'coin' : 'bag');
-      toast(t('bp.got', { x: rewardName(rw) }));
+      if (rw.k === 'box') gotBox(rw.id);
+      else toast(t('bp.got', { x: rewardName(rw) }));
     }
     if (m.op === 'pass_buy') {
       sfx.music?.sting(true);
       toast(t('bp.owned'));
     }
     if (app.page === 'pass') render();
+  }
+
+  // a bag or crate from the pass: show it, and offer to open it right away
+  function gotBox(id) {
+    document.getElementById('bp-got')?.remove();
+    const d = document.createElement('div');
+    d.id = 'bp-got';
+    d.className = 'bp-got';
+    d.innerHTML = `<div class="bp-got-card">${boxArt(BOX[id], 110)}<p class="eyebrow">${t('bp.claimed')}</p><b>${esc(t(`box.${id}`))}</b><div class="bp-got-btns"><button type="button" class="cta" data-o>${t('inv.open')}</button><button type="button" class="ghost" data-l>${t('bp.later')}</button></div></div>`;
+    document.body.append(d);
+    const close = () => d.remove();
+    d.querySelector('[data-o]').addEventListener('click', () => {
+      close();
+      openBox(id);
+    });
+    d.querySelector('[data-l]').addEventListener('click', close);
+    d.addEventListener('click', (e) => e.target === d && close());
   }
 
   // after a raid: the pass moved up a tier (or more)

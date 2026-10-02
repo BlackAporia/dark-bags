@@ -167,7 +167,7 @@ const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: (
 const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
 const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
 const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }) });
-const inventory = createInventory({ app, send, go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
+const inventory = createInventory({ app, send, openBox: (id) => shop.open(id), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
 const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
 const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
 const settingsUi = createSettingsUi();
@@ -222,8 +222,8 @@ const social = createSocial({
 });
 const news = createNews();
 document.addEventListener('darkbags:news', () => news.open());
-const pass = createPass({ app, send, sfx, toast: (m) => toast(m) });
-const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p) });
+const pass = createPass({ app, send, sfx, toast: (m) => toast(m), openBox: (id) => shop.open(id) });
+const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id) });
 const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked };
 document.addEventListener('darkbags:mode', () => {
   store.set('darkbags.gmode', app.gameMode);

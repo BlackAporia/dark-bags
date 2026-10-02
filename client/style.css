@@ -2027,3 +2027,11 @@ body.gold-on #bag { color: #ffd166; }
 @keyframes tour-nudge { 10%, 90% { translate: -2px 0; } 20%, 80% { translate: 4px 0; } 30%, 50%, 70% { translate: -7px 0; } 40%, 60% { translate: 7px 0; } }
 .tour-spot.flash { box-shadow: 0 0 0 9999px rgba(4, 6, 10, 0.8), 0 0 0 3px #fff, 0 0 40px 12px rgba(247, 147, 26, 0.85); }
 .tour #tour-next:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* opening a bag where you got it: the inventory tile and the battle pass pop-up */
+.inv-box { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.inv-open { margin-top: 4px; padding: 6px 14px; font-size: 12px; }
+.bp-got { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; background: rgba(4, 6, 10, 0.7); backdrop-filter: blur(4px); animation: tour-in 0.3s ease-out; }
+.bp-got-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 26px; border-radius: 18px; border: 1px solid rgba(255, 209, 102, 0.5); background: linear-gradient(160deg, rgba(30, 26, 14, 0.97), rgba(10, 12, 18, 0.97)); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 209, 102, 0.15); text-align: center; }
+.bp-got-card b { font-size: 18px; }
+.bp-got-btns { display: flex; gap: 10px; margin-top: 6px; }
