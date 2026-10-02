@@ -4,6 +4,7 @@
 // cards flip one by one.
 import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY, FIRST_TOPUP_MAX, firstBonus, boxCatalog } from '../shared/cosmetics.js';
 import { isStable } from '../shared/assets.js';
+import { WEAPONS } from '../shared/weapons.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { boxArt, weaponStill } from './locker.js';
 import { esc } from './game.js';
@@ -29,6 +30,16 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
     return Number(c);
   };
   const reach = () => (L()?.credit ?? 0) + stableCents();
+  // the card shows what was pulled: the outfit worn, or the skin in hand with its own finish
+  const shareLook = (res) => {
+    const L_ = L();
+    const ws = {};
+    for (const [w, f] of Object.entries(L_?.wequip ?? {})) if (L_.wowned?.includes(`${w}.${f}`)) ws[w] = f;
+    const base = { outfit: L_?.outfit ?? 'basic-0', body: L_?.body ?? 'm', ws };
+    if (res.kind !== 'weapon') return { look: { ...base, outfit: res.item } };
+    const s = WSKIN[res.item];
+    return { look: { ...base, ws: { ...ws, [s.weapon]: s.finish } }, weapon: Math.max(0, WEAPONS.findIndex((x) => x.id === s.weapon)), skin: res.item };
+  };
   const itemOf = (res) => (res.kind === 'weapon' ? WSKIN[res.item] : OUTFIT[res.item]);
   const imgOf = (res, w = 84, h = 112) => (res.kind === 'weapon' ? weaponStill(res.item, Math.max(150, w), Math.round(Math.max(150, w) * 0.66)) : figureStill({ outfit: res.item, body: L()?.body ?? 'm' }, w, h));
 
@@ -381,7 +392,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
       equip(best);
       close();
     });
-    act('share', () => share(best.jackpot ? 'boxHit' : 'boxMiss', { result: best, outfit: { name: o.name, rarity: best.rarity }, box: { ...box, name: t(`box.${box.id}`) }, look: best.kind === 'outfit' ? { outfit: best.item, body: L()?.body ?? 'm' } : { outfit: L()?.outfit ?? 'basic-0', body: L()?.body ?? 'm' } }));
+    act('share', () => share(best.jackpot ? 'boxHit' : 'boxMiss', { result: best, outfit: { name: o.name, rarity: best.rarity }, box: { ...box, name: t(`box.${box.id}`) }, ...shareLook(best) }));
     act('again', () => buy(again.id, again.n));
     act('close', close);
   }
