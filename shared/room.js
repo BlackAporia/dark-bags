@@ -25,7 +25,7 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ guard = null, referrals = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
+  constructor({ stats = null, guard = null, referrals = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
@@ -39,6 +39,7 @@ export class RoomCore {
     this.inventory = inventory;
     this.referrals = referrals;
     this.guard = guard;
+    this.stats = stats; // the team's analytics (online only)
     this.practice = practice;
     this.wallet = wallet;
     this.prices = prices;
@@ -328,6 +329,7 @@ export class RoomCore {
         this.totals.rake += w.ledger.rake;
         this.totals.paidOut += w.ledger.paidOut;
         this.totals.sponsorIn += w.ledger.sponsorIn;
+        if (!this.practice) this.stats?.raid({ mode: this.mode, stake: this.stake, humans: this.accounts.size, stakes: w.ledger.stakesIn, rake: w.ledger.rake, paid: w.ledger.paidOut, seconds: w.time ?? 0, golden: !!w.golden });
         this.state = 'results';
         this.resT = CFG.INTERMISSION;
         this.broadcastPrep();

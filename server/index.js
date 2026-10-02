@@ -18,6 +18,8 @@ import { Guard } from '../shared/guard.js';
 import { createBridge } from './bridge.js';
 import { MailBook, cleanGift } from '../shared/mail.js';
 import { FortuneBook } from '../shared/fortune.js';
+import { StatsBook } from '../shared/stats.js';
+import { createAnalytics, adminSet } from './analytics.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -30,13 +32,26 @@ const BOTS = false;
 const DATA = existsSync('/data') ? '/data' : '';
 const NET = process.env.CHAIN && process.env.CHAIN !== 'off' ? process.env.CHAIN : 'test';
 const WALLET_FILE = process.env.WALLET_FILE || '';
-const RANKS_FILE = process.env.RANKS_FILE || (DATA ? `${DATA}/ranks.json` : '');
+const RANKS_FILE = process.env.RANKS_FILE || (DATA ? `${DATA}/${NET}-ranks.json` : '');
 const LOCKER_FILE = process.env.LOCKER_FILE || (DATA ? `${DATA}/${NET}-locker.json` : '');
 const REFERRAL_FILE = process.env.REFERRAL_FILE || (DATA ? `${DATA}/${NET}-referrals.json` : '');
 const GUARD_FILE = process.env.GUARD_FILE || (DATA ? `${DATA}/${NET}-guard.json` : '');
 const MAIL_FILE = process.env.MAIL_FILE || (DATA ? `${DATA}/${NET}-mail.json` : '');
 const FORTUNE_FILE = process.env.FORTUNE_FILE || (DATA ? `${DATA}/${NET}-fortune.json` : '');
-const SOCIAL_FILE = process.env.SOCIAL_FILE || (existsSync('/data') ? '/data/social.json' : '');
+const SOCIAL_FILE = process.env.SOCIAL_FILE || (DATA ? `${DATA}/${NET}-social.json` : '');
+const STATS_FILE = process.env.STATS_FILE || (DATA ? `${DATA}/${NET}-stats.json` : '');
+// Ranks and players used to be one file for every network, so Sepolia test wallets showed up in the
+// mainnet leaderboard and player list. Each network has its own files now; the old shared ones move
+// out of the game once (to <data>/archive/shared-<time>/), so every network starts clean.
+if (DATA) {
+  const legacy = [`${DATA}/ranks.json`, `${DATA}/social.json`].filter((f) => existsSync(f));
+  if (legacy.length) {
+    const dir = path.join(DATA, 'archive', `shared-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    mkdirSync(dir, { recursive: true });
+    for (const f of legacy) renameSync(f, path.join(dir, path.basename(f)));
+    console.warn(`ranks and players are kept per network now: the old shared files (test data included) moved to ${dir}`);
+  }
+}
 if (NET === 'mainnet' && (!LOCKER_FILE || !REFERRAL_FILE)) {
   console.error('On mainnet the locker (shop $ and skins bought with real money) and the referral book must live on a persistent disk: mount /data or set LOCKER_FILE and REFERRAL_FILE.');
   process.exit(1);
@@ -198,6 +213,29 @@ const fortune = new FortuneBook({
   },
 });
 
+// ------------------------------------------------------------------- stats
+// the team's analytics (players, matches, modes, purchases, online): kept across data epochs
+let statsTimer = null;
+const stats = new StatsBook({
+  data: STATS_FILE && existsSync(STATS_FILE) ? JSON.parse(readFileSync(STATS_FILE, 'utf8')) : {},
+  onChange: (sb) => {
+    if (!STATS_FILE || statsTimer) return;
+    statsTimer = setTimeout(async () => {
+      statsTimer = null;
+      await saveJSON(STATS_FILE, sb.toJSON()).catch((e) => console.error('stats save failed', e));
+    }, 5000);
+  },
+});
+stats.changed();
+const admins = adminSet();
+const norm64 = (a) => {
+  try {
+    return `0x${BigInt(a).toString(16).padStart(64, '0')}`;
+  } catch {
+    return null;
+  }
+};
+
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
 const send = (cid, msg) => {
@@ -208,6 +246,8 @@ const send = (cid, msg) => {
   s.ws.send(JSON.stringify(msg));
 };
 const lobby = new Lobby({
+  stats,
+  isAdmin: (account) => admins.has(norm64(account)),
   wallet,
   cashier: real?.cashier ?? null,
   // in-game swaps: always with test tokens and on Sepolia; on mainnet only when the house
@@ -230,6 +270,8 @@ const lobby = new Lobby({
   waitForStart: process.env.WAIT_FOR_START !== '0',
   newToken: () => crypto.randomBytes(16).toString('hex'),
 });
+
+const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET });
 
 // ------------------------------------------------------------------ static
 const MIME = {
@@ -320,6 +362,14 @@ const server = http.createServer((req, res) => {
       for (const [cid, x] of lobby.sessions) if (lobby.key(x) && (!to || lobby.key(x) === to)) send(cid, { t: 'mailbox', unread: mail.unread(lobby.key(x)), news: { k: 'mail' } });
       console.log(`mail: "${m.title}" to ${to ?? 'everyone'}${m.gift ? ` with ${JSON.stringify(m.gift)}` : ''}`);
       reply(200, { ok: true, id: m.id });
+    });
+    return;
+  }
+  // the team's analytics page (client/admin.html): admin wallets or ADMIN_KEY only
+  if (pathOnly === '/api/admin/stats' && req.method === 'GET') {
+    analytics.handle(req, res).catch((e) => {
+      console.error('analytics failed', e);
+      if (!res.headersSent) res.writeHead(500).end();
     });
     return;
   }
@@ -418,6 +468,7 @@ function loop() {
 loop();
 setInterval(() => lobby.broadcastTables(), 2000);
 setInterval(() => lobby.probe(), 2000);
+setInterval(() => stats.online(sockets.size), 60_000);
 
 server.listen(PORT, () => {
   console.log(`DARK BAGS on http://localhost:${PORT}  (bots ${BOTS ? 'on' : 'off'}, raid ${ROUND_SECONDS}s, ${real ? `${real.cfg.network} tokens` : 'test tokens'})`);
@@ -431,6 +482,7 @@ const shutdown = async () => {
   if (GUARD_FILE) await saveGuard(guard).catch(() => {});
   if (MAIL_FILE) await saveJSON(MAIL_FILE, mail.toJSON()).catch(() => {});
   if (FORTUNE_FILE) await saveJSON(FORTUNE_FILE, fortune.toJSON()).catch(() => {});
+  if (STATS_FILE) await saveJSON(STATS_FILE, stats.toJSON()).catch(() => {});
   if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, social.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await saveJSON(WALLET_FILE, wallet.toJSON()).catch(() => {});
