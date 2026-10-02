@@ -19,7 +19,8 @@ import { spinReel } from './reel.js';
 import { createPass } from './pass.js';
 import { createNews } from './news.js';
 import { createRanked, neonText, neonColor } from './ranked.js';
-import { createAchievements, achName } from './achievements.js';
+import { createAchievements, achName, titleHtml } from './achievements.js';
+import { titleTier } from '../shared/achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
 import { createSwap } from './swap.js';
@@ -737,7 +738,7 @@ function renderPrep() {
         d.className = `slot lit ${s.kind === 'me' ? 'me' : ''} ${s.kind === 'bot' ? 'bot' : ''}`;
         d.style.color = s.c;
         d.dataset.key = `${s.kind}:${s.n}`;
-        d.innerHTML = `<img class="fig" alt="" src="${figureStill({ outfit: s.o, body: s.g }, 60, 84)}"><span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>`;
+        d.innerHTML = `<img class="fig" alt="" src="${figureStill({ outfit: s.o, body: s.g }, 60, 84)}"><span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>${s.tt ? titleHtml(s.tt, 'slot-tt') : ''}`;
         return d;
       }),
     );
@@ -874,6 +875,7 @@ function handleMessage(m) {
       game.myName = app.name || 'runner';
       game.myRank = app.rank?.rank ?? 1;
       game.myTitle = app.career?.title ? achName(app.career.title) : null;
+      game.myTitleTier = app.career?.title ? titleTier(app.career.title) : null;
       game.myNeon = app.career?.neon ?? null;
       game.begin(m, app.skin, app.gore, app.locker);
       renderer.prewarm(m.map.w / 2, m.map.h / 2);

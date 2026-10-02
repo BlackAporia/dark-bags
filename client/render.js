@@ -35,6 +35,9 @@ function glowSprite(color, size = 64) {
   return c;
 }
 
+// achievement title colours by tier (mythic cycles, mystery flickers)
+const TITLE_COL = { common: 'rgba(214, 219, 230, 0.9)', rare: '#4cc9f0', epic: '#c08bff', legendary: '#ffd166' };
+
 // team colours: your side green, the other side red
 const TEAM_ALLY = { fill: 'rgba(61, 220, 151, 0.22)', line: '#3ddc97', glow: 'rgba(61, 220, 151, 0.9)' };
 const TEAM_FOE = { fill: 'rgba(255, 77, 94, 0.24)', line: '#ff4d5e', glow: 'rgba(255, 77, 94, 0.95)' };
@@ -732,11 +735,21 @@ export class Renderer {
         ctx.textAlign = 'center';
       } else ctx.fillText(label, p.head.x, top - 5);
       if (f.title) {
-        // a worn achievement title, small and gold, over the name
-        ctx.font = `700 9px ${F_UI}`;
-        ctx.fillStyle = 'rgba(255, 209, 102, 0.9)';
+        // a worn achievement title over the name, styled by its tier
+        const tier = f.ttier ?? 'common';
+        const now = performance.now();
+        const col = tier === 'mythic' ? `hsl(${(now / 8) % 360}, 95%, 68%)` : tier === 'mystery' ? (Math.sin(now / 90) > 0.92 ? '#ffffff' : '#c084fc') : TITLE_COL[tier] ?? TITLE_COL.common;
+        const mark = tier === 'mystery' ? '◈ ' : tier === 'mythic' ? '✦ ' : tier === 'legendary' ? '★ ' : '';
+        ctx.save();
+        ctx.font = `${tier === 'common' ? 700 : 900} ${tier === 'common' || tier === 'rare' ? 9 : 10}px ${F_UI}`;
         ctx.textAlign = 'center';
-        ctx.fillText(f.title.toUpperCase(), p.head.x, top - 19);
+        if (tier !== 'common' && this.quality >= 1) {
+          ctx.shadowColor = col;
+          ctx.shadowBlur = tier === 'rare' ? 4 : 9;
+        }
+        ctx.fillStyle = col;
+        ctx.fillText(`${mark}${f.title.toUpperCase()}`, p.head.x, top - 19);
+        ctx.restore();
       }
       if (f.neon) {
         // a season title: neon, glowing and flickering, above everything else

@@ -55,16 +55,83 @@ export const ACHIEVEMENTS = [
   { id: 'collector', stat: 'outfits', goal: 5, xp: 200 },
   { id: 'curator', stat: 'outfits', goal: 20, xp: 600 },
   { id: 'hoarder', stat: 'outfits', goal: 50, xp: 3000 },
+  // weapon mastery (kills with a family of guns)
+  { id: 'gunslinger', stat: 'kHandgun', goal: 50, xp: 300 },
+  { id: 'close_quarters', stat: 'kShotgun', goal: 50, xp: 300 },
+  { id: 'spray_and_pray', stat: 'kSmg', goal: 100, xp: 500 },
+  { id: 'rifleman', stat: 'kRifle', goal: 100, xp: 500 },
+  { id: 'marksman', stat: 'kSniper', goal: 50, xp: 600 },
+  { id: 'deadeye', stat: 'kSniper', goal: 250, xp: 2000 },
+  { id: 'blade_dancer', stat: 'kKnife', goal: 25, xp: 400 },
+  { id: 'shadow_blade', stat: 'kKnife', goal: 150, xp: 2500 },
+  // the modes
+  { id: 'deathmatch_king', stat: 'dmWins', goal: 5, xp: 600 },
+  { id: 'duelist', stat: 'duelWins', goal: 10, xp: 800 },
+  { id: 'squad_goals', stat: 'teamWins', goal: 10, xp: 700 },
+  { id: 'one_shot_one_kill', stat: 'hcWins', goal: 3, xp: 900 },
+  { id: 'specialist', stat: 'weaponWins', goal: 5, xp: 500 },
+  { id: 'engineer', stat: 'turretKills', goal: 25, xp: 500 },
+  // ranked
+  { id: 'ranked_debut', stat: 'rankedGames', goal: 1, xp: 100 },
+  { id: 'ranked_grinder', stat: 'rankedGames', goal: 50, xp: 1500 },
+  { id: 'ranked_victor', stat: 'rankedWins', goal: 10, xp: 1200 },
+  { id: 'gold_league', stat: 'bestDiv', goal: 2, xp: 500 },
+  { id: 'diamond_league', stat: 'bestDiv', goal: 4, xp: 1500 },
+  { id: 'neon_legend', stat: 'bestDiv', goal: 6, xp: 6000 },
+  // cases, skins, the pass, season titles
+  { id: 'unboxer', stat: 'opened', goal: 10, xp: 150 },
+  { id: 'case_hunter', stat: 'opened', goal: 100, xp: 800 },
+  { id: 'case_lord', stat: 'opened', goal: 500, xp: 3000 },
+  { id: 'armory', stat: 'wskins', goal: 10, xp: 300 },
+  { id: 'arsenal_baron', stat: 'wskins', goal: 60, xp: 2500 },
+  { id: 'pass_holder', stat: 'passTier', goal: 25, xp: 500 },
+  { id: 'pass_maxed', stat: 'passTier', goal: 50, xp: 1500 },
+  { id: 'neon_bearer', stat: 'stitles', goal: 1, xp: 800 },
+  // secret: hidden until you earn them
+  { id: 'by_a_thread', stat: 'clutch', goal: 1, xp: 700, secret: true },
+  { id: 'untouchable', stat: 'flawless', goal: 1, xp: 900, secret: true },
+  { id: 'ghost_walker', stat: 'ninjaWin', goal: 1, xp: 1200, secret: true },
+  { id: 'one_tap', stat: 'oneShots', goal: 10, xp: 1500, secret: true },
 ];
+
+// What wearing it looks like: a title's tier, from plain to mythic, and the secret ones
+// (mystery). Set by how hard it is to earn.
+export const TITLE_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic', 'mystery'];
+export function titleTier(id) {
+  const a = ACHIEVEMENTS.find((x) => x.id === id);
+  if (!a) return 'common';
+  if (a.secret) return 'mystery';
+  if (a.stat === 'rank') return a.goal >= 90 ? 'mythic' : a.goal >= 60 ? 'legendary' : a.goal >= 30 ? 'epic' : 'rare';
+  return a.xp >= 3000 ? 'mythic' : a.xp >= 1200 ? 'legendary' : a.xp >= 500 ? 'epic' : a.xp >= 200 ? 'rare' : 'common';
+}
 export const ACHIEVEMENT = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 
 // counters that keep the best value instead of adding up
-const MAX_STATS = new Set(['bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits']);
+const MAX_STATS = new Set(['bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles']);
 
 // What one finished raid adds to the career counters. p is the world's player record.
-export function raidStats(p, { golden = false, lastExit = false } = {}) {
+export function raidStats(p, { golden = false, lastExit = false, mode = null } = {}) {
   const out = p.status === 'extracted' || !!p.won;
+  const won = !!p.won;
+  const wk = p.wk ?? {};
+  const secs = Math.max(0, Math.round((p.endedAt ?? 0) - (p.joinedAt ?? 0)));
   return {
+    kHandgun: wk.handgun ?? 0,
+    kShotgun: wk.shotgun ?? 0,
+    kSmg: wk.smg ?? 0,
+    kRifle: wk.rifle ?? 0,
+    kSniper: wk.sniper ?? 0,
+    kKnife: wk.knife ?? 0,
+    turretKills: p.turretKills ?? 0,
+    oneShots: p.oneShots ?? 0,
+    dmWins: won && mode?.kind === 'dm' ? 1 : 0,
+    duelWins: won && mode?.id === 'duel' ? 1 : 0,
+    teamWins: won && mode?.kind === 'team' ? 1 : 0,
+    hcWins: won && mode?.hardcore ? 1 : 0,
+    weaponWins: won && mode?.weapon ? 1 : 0,
+    clutch: out && p.hp > 0 && p.hp <= (p.maxHp ?? 100) * 0.1 ? 1 : 0,
+    flawless: out && !(p.dmgTaken > 0) && secs >= 120 ? 1 : 0,
+    ninjaWin: won && mode && mode.kind !== 'raid' && !p.kills ? 1 : 0,
     wins: p.won ? 1 : 0,
     raids: 1,
     extracts: out ? 1 : 0,

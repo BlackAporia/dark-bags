@@ -3,7 +3,7 @@
 import { rankBadgeSvg } from './rankbadge.js';
 import { esc } from './game.js';
 import { t } from './i18n.js';
-import { achName } from './achievements.js';
+import { achName, titleHtml } from './achievements.js';
 
 const $ = (id) => document.getElementById(id);
 const BANTER = ['gm raiders', 'who took my bag 😤', 'last exit or nothing', 'knife only run?', 'storm is cooked this round', 'duel me', 'just pulled an epic 👀', 'wagmi', 'bags packed, heading in', 'that sniper laser gives you away lol', 'team 4v4 anyone?', 'gg', 'rng hates me today', 'golden raid next!', 'never extract early', 'who has the Void crate skin?'];
@@ -20,7 +20,7 @@ export function createChat({ app, send, isOpen }) {
   }
 
   function line(m) {
-    const title = m.tt ? `<span class="chat-tt">${esc(achName(m.tt))}</span>` : '';
+    const title = m.tt ? titleHtml(m.tt, 'chat-tt') : '';
     const time = new Date(m.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return `<li class="${m.n === (app.name || 'runner') ? 'me' : ''}${m.bot ? ' bot' : ''}">${rankBadgeSvg(m.rk ?? 1, 18)}<div><p class="chat-who"><b>${esc(m.n)}</b>${title}<time>${time}</time></p><p class="chat-text">${esc(m.text)}</p></div></li>`;
   }
