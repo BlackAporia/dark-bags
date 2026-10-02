@@ -32,6 +32,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 const BOT_DAMAGE = 0.75;
 const PRACTICE_BOT_DAMAGE = { easy: 0.5, normal: 0.75, hard: 1 };
 const PRACTICE_SPAWN_SHIELD = 5; // seconds; firing still drops it early
+const ROUND_BREAK = 4; // seconds between rounds
 // gold rush: bags on the ground at once (plus some per runner), how often a new one lands,
 // and the share of big bags (worth three)
 const GOLD = { base: 6, perRunner: 2, every: 0.8, big: 0.1, r: CFG.PLAYER_R + 14 };
@@ -67,7 +68,19 @@ export class World {
     this.zombie = m.kind === 'zombie';
     this.goldRush = m.kind === 'gold';
     this.respawns = this.dm || this.goldRush; // back in a few seconds after you drop
-    this.noLadder = this.zombie || this.goldRush; // you keep the weapon you came with
+    this.noLadder = this.zombie || this.goldRush || !!m.pick; // you keep the weapon you came with
+    this.pick = !!m.pick;
+    // rounds on a clock (teams, ranked): wins needed, round length, the score per side
+    this.rounds = m.rounds ?? 0;
+    if (this.rounds) {
+      this.roundLen = m.round;
+      this.maxRounds = this.rounds * 2 - 1;
+      this.roundNo = 1;
+      this.roundEndsAt = this.roundLen;
+      this.roundBreak = 0;
+      this.score = new Map();
+      roundSeconds = this.maxRounds * (this.roundLen + ROUND_BREAK);
+    }
     this.feeOnly = this.zombie; // the entry is a fee: no pot, it pays XP and titles
     this.zombies = new Map();
     this.packs = new Map(); // medkits the dead leave behind (zombies)
@@ -92,7 +105,7 @@ export class World {
     this.roundNo = roundNo;
     this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
-    this.zonePlan = this.dm || this.zombie || this.goldRush ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);
+    this.zonePlan = this.dm || this.zombie || this.goldRush || this.rounds ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);
     this.horde = this.zombie ? new Horde(this) : null;
     this.zone = zoneAt(this.zonePlan, 0);
     this.exitStates = this.map.extracts.map((e) => exitState(this.zonePlan, this.zone, e));
@@ -104,6 +117,7 @@ export class World {
     this.orbs = new Map();
     this.drops = new Map();
     this.bullets = new Map();
+    this.bulletEnds = [];
     this.events = [];
     this.botsEnabled = bots;
     this.brains = new Map();
@@ -123,6 +137,7 @@ export class World {
   }
 
   get timeLeft() {
+    if (this.rounds) return Math.max(0, (this.roundBreak > 0 ? this.roundEndsAt : Math.min(this.roundEndsAt, this.duration)) - this.time);
     return Math.max(0, this.duration - this.time);
   }
 
@@ -191,7 +206,7 @@ export class World {
     const pos = this.zombie ? this.squadSpot(others) : findSpawn(this.map, this.rnd, others, this.zone);
     // the weapon: the mode's, your pick (zombies), a random gun (gold rush), else the knife
     const pick = WEAPONS.findIndex((w) => w.id === weapon);
-    const w0 = this.fixedWeapon >= 0 ? this.fixedWeapon : this.zombie ? (pick >= 0 ? pick : 1) : this.goldRush ? this.randomGun() : 0;
+    const w0 = this.fixedWeapon >= 0 ? this.fixedWeapon : this.zombie ? (pick >= 0 ? pick : 1) : this.pick ? (pick >= 0 && !isBot ? pick : isBot ? this.randomGun() : 1) : this.goldRush ? this.randomGun() : 0;
     const p = {
       id: this.nextId++,
       name,
@@ -428,10 +443,11 @@ export class World {
     this.pickups();
     this.spawnLoot();
     this.announce();
-    if (this.zombie && this.hadHumans && !this.aliveCount()) this.end(); // the whole squad is down
+    if (this.rounds) this.stepRounds();
+    else if (this.zombie && this.hadHumans && !this.aliveCount()) this.end(); // the whole squad is down
     else if (this.potMode && !this.dm && !this.zombie && !this.goldRush && this.sides > 1 && this.aliveSides().size <= 1) this.end();
     else if (this.time >= this.duration - 1e-9) this.end();
-    else if (this.practice && !this.respawns && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
+    else if (this.practice && !this.respawns && !this.rounds && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
   }
 
   updateZone() {
@@ -540,11 +556,21 @@ export class World {
     }
   }
 
+  // where a round stopped (k: 'p' in a body, 'w' a wall or a gadget, 'r' out of range):
+  // clients draw every tracer exactly to that point, so what you see is where it hit
+  endBullet(b, t, nx, ny, k) {
+    this.bullets.delete(b.id);
+    this.bulletEnds.push({ i: b.id, x: r1(b.x + (nx - b.x) * Math.min(1, t)), y: r1(b.y + (ny - b.y) * Math.min(1, t)), k, t: this.tick });
+  }
+
   stepBullets() {
     const walls = this.map.walls;
+    if (this.bulletEnds.length) this.bulletEnds = this.bulletEnds.filter((e) => e.t > this.tick - 6);
     for (const b of this.bullets.values()) {
-      const nx = b.x + b.vx * DT;
-      const ny = b.y + b.vy * DT;
+      // never past the weapon's range: the last step is cut short where the range runs out
+      const step = Math.min(1, Math.max(0, b.range - b.dist) / (b.speed * DT));
+      const nx = b.x + b.vx * DT * step;
+      const ny = b.y + b.vy * DT * step;
       const tWall = segWalls(b.x, b.y, nx, ny, walls);
       let tMin = tWall >= 0 ? tWall : 1.0001;
       let victim = null;
@@ -570,7 +596,7 @@ export class World {
         }
       }
       if (zed) {
-        this.bullets.delete(b.id);
+        this.endBullet(b, tMin, nx, ny, 'p');
         const hs = this.headshot(b, zed, zed.r / CFG.PLAYER_R);
         this.horde.hit(zed, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, hs);
         if (this.phase !== 'live') return;
@@ -591,24 +617,24 @@ export class World {
         }
       }
       if (gadget) {
-        this.bullets.delete(b.id);
+        this.endBullet(b, tMin, nx, ny, 'w');
         this.hitGadget(gadget, this.players.get(b.owner), b.dmg);
         continue;
       }
       if (victim) {
-        this.bullets.delete(b.id);
+        this.endBullet(b, tMin, nx, ny, 'p');
         const hs = this.headshot(b, victim);
         this.damage(victim, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, b.cause, hs);
         continue;
       }
       if (tWall >= 0) {
-        this.bullets.delete(b.id);
+        this.endBullet(b, tWall, nx, ny, 'w');
         continue;
       }
       b.x = nx;
       b.y = ny;
-      b.dist += b.speed * DT;
-      if (b.dist > b.range || nx < 0 || ny < 0 || nx > this.map.w || ny > this.map.h) this.bullets.delete(b.id);
+      b.dist += b.speed * DT * step;
+      if (b.dist >= b.range - 1e-6 || nx < 0 || ny < 0 || nx > this.map.w || ny > this.map.h) this.endBullet(b, 1, nx, ny, 'r');
     }
   }
 
@@ -691,7 +717,7 @@ export class World {
   // Back in: a fresh spawn away from everyone, full health, a moment of spawn shield.
   // You keep your kills, your place on the weapon ladder and your credits.
   // revive (zombies): back up next to a teammate at the start of a wave, half health
-  respawn(p, revive = false) {
+  respawn(p, revive = false, quiet = false) {
     const others = [...this.players.values()].filter((o) => o.status === 'alive');
     const pos = this.zombie ? this.squadSpot(others) : findSpawn(this.map, this.rnd, others, this.zone);
     Object.assign(p, {
@@ -724,7 +750,7 @@ export class World {
     p.last = sanitizeInput({ s: p.ack });
     this.arm(p);
     this.brains.get(p.id)?.reset();
-    this.emit({ k: 'respawn', to: [p.id], pid: p.id });
+    if (!quiet) this.emit({ k: 'respawn', to: [p.id], pid: p.id });
   }
 
   // kill order, most kills first (fewer deaths breaks a tie for the scoreboard only)
@@ -952,6 +978,90 @@ export class World {
     }
   }
 
+  // -------------------------------------------------------------- rounds
+
+  sideName(side) {
+    if (!side) return null;
+    if (side[0] === 't') return null;
+    return this.players.get(Number(side.slice(1)))?.name ?? null;
+  }
+
+  // the round is over when one side is left, or the clock runs out (most alive, then most
+  // health wins it; a dead heat is nobody's round). First to `rounds` wins takes the match.
+  stepRounds() {
+    if (this.roundBreak > 0) {
+      this.roundBreak -= DT;
+      if (this.roundBreak <= 0) this.startRound();
+      return;
+    }
+    const sides = this.aliveSides();
+    const timeUp = this.time >= this.roundEndsAt - 1e-9;
+    if (!(this.sides > 1 && sides.size <= 1) && !timeUp) return;
+    let win = sides.size === 1 ? [...sides][0] : null;
+    if (!win && sides.size > 1) {
+      const sc = new Map();
+      for (const p of this.players.values()) {
+        if (p.status !== 'alive') continue;
+        const s = sc.get(this.sideOf(p)) ?? { n: 0, hp: 0 };
+        s.n++;
+        s.hp += p.hp;
+        sc.set(this.sideOf(p), s);
+      }
+      const best = [...sc.entries()].sort((a, b) => b[1].n - a[1].n || b[1].hp - a[1].hp);
+      if (best[0] && (!best[1] || best[0][1].n !== best[1][1].n || best[0][1].hp !== best[1][1].hp)) win = best[0][0];
+    }
+    if (win) this.score.set(win, (this.score.get(win) ?? 0) + 1);
+    const top = Math.max(0, ...this.score.values());
+    this.emit({ k: 'roundEnd', n: this.roundNo, win, name: this.sideName(win), score: this.scoreList() });
+    if (top >= this.rounds || this.roundNo >= this.maxRounds) return this.end();
+    this.roundBreak = ROUND_BREAK;
+    this.roundEndsAt = this.time + ROUND_BREAK;
+    // nobody gets hurt between rounds
+    for (const p of this.players.values()) if (p.status === 'alive') p.shield = ROUND_BREAK + 1;
+  }
+
+  startRound() {
+    this.roundNo++;
+    this.roundEndsAt = this.time + this.roundLen;
+    this.bullets.clear();
+    for (const p of this.players.values()) this.respawn(p, false, true);
+    this.emit({ k: 'roundStart', n: this.roundNo, of: this.maxRounds });
+  }
+
+  // [side, wins] with names for solo modes, best first
+  scoreList() {
+    const all = this.teamSize ? ['t0', 't1'] : [...this.players.values()].map((p) => this.sideOf(p));
+    return all.map((s) => [s, this.score.get(s) ?? 0, this.sideName(s)]).sort((a, b) => b[1] - a[1]);
+  }
+
+  roundView(me) {
+    const mine = this.sideOf(me);
+    const list = this.scoreList();
+    return {
+      rd: this.roundNo,
+      rds: this.maxRounds,
+      need: this.rounds,
+      rb: this.roundBreak > 0 ? Math.ceil(this.roundBreak) : 0,
+      my: this.score.get(mine) ?? 0,
+      foe: Math.max(0, ...list.filter((x) => x[0] !== mine).map((x) => x[1])),
+      ...(this.teamSize ? {} : { lead: list[0] && list[0][1] > 0 ? [list[0][2], list[0][1]] : null }),
+    };
+  }
+
+  // the match: most rounds won (then kills) takes the pot; places follow the same order
+  settleRounds() {
+    const kills = new Map();
+    for (const p of this.players.values()) kills.set(this.sideOf(p), (kills.get(this.sideOf(p)) ?? 0) + p.kills);
+    const order = [...new Set([...this.players.values()].map((p) => this.sideOf(p)))].sort((a, b) => (this.score.get(b) ?? 0) - (this.score.get(a) ?? 0) || kills.get(b) - kills.get(a));
+    const top = order[0];
+    const tie = order[1] && (this.score.get(order[1]) ?? 0) === (this.score.get(top) ?? 0) && kills.get(order[1]) === kills.get(top);
+    for (const p of this.players.values()) p.place = order.indexOf(this.sideOf(p)) + 1;
+    const winners = tie || !top ? [] : [...this.players.values()].filter((p) => this.sideOf(p) === top);
+    this.winners = winners.map((p) => p.id);
+    if (!winners.length || this.pot <= 0) return;
+    this.payPot(winners);
+  }
+
   // ----------------------------------------------------------- gold rush
 
   // keep the ground stocked: a bag lands somewhere open every moment, up to a cap
@@ -1090,6 +1200,7 @@ export class World {
       this.emit({ k: 'warn', text });
     };
     // keys the client translates
+    if (this.rounds) return; // each round has its own clock on the HUD
     if (this.zombie) {
       if (tl <= 60) say('60', 'warn.z60');
       if (tl <= 10) say('10', 'warn.z10');
@@ -1109,6 +1220,7 @@ export class World {
   settlePot() {
     if (this.dm) return this.settleKills();
     if (this.goldRush) return this.settleGold();
+    if (this.rounds) return this.settleRounds();
     if (this.zombie) return; // no pot: the entry was a fee
     const alive = [...this.players.values()].filter((p) => p.status === 'alive');
     const score = new Map();
@@ -1181,7 +1293,7 @@ export class World {
       }
       this.zombies.clear();
     }
-    if (this.respawns) {
+    if (this.respawns || this.rounds) {
       // everyone is still in it at the whistle, the fallen included
       for (const p of this.players.values()) {
         if (p.status !== 'dead') continue;
@@ -1364,8 +1476,11 @@ export class World {
     for (const g of this.gold.values()) if (near(g.x, g.y, 60)) gold.push({ i: g.id, x: r1(g.x), y: r1(g.y), v: g.v });
     const bullets = [];
     for (const b of this.bullets.values()) {
-      if (near(b.x, b.y, 120)) bullets.push({ i: b.id, x: r1(b.x), y: r1(b.y), vx: r1(b.vx), vy: r1(b.vy), o: b.owner === me.id ? 1 : 0, ...(b.skin ? { s: b.skin } : {}) });
+      if (near(b.x, b.y, 120)) bullets.push({ i: b.id, x: r1(b.x), y: r1(b.y), vx: r1(b.vx), vy: r1(b.vy), d: r1(b.dist), o: b.owner === me.id ? 1 : 0, ...(b.skin ? { s: b.skin } : {}) });
     }
+    // rounds that stopped since the last snapshot, and where
+    const ends = [];
+    for (const e of this.bulletEnds) if (e.t > this.tick - CFG.SNAP_EVERY && near(e.x, e.y, 120)) ends.push([e.i, e.x, e.y, e.k]);
 
     return {
       time: Math.round(this.time * 1000),
@@ -1404,6 +1519,7 @@ export class World {
         ...(this.teamSize ? { tm: me.team } : {}),
         ...(this.dm ? this.dmView(me) : {}),
         ...(this.goldRush ? this.goldView(me) : {}),
+        ...(this.rounds ? this.roundView(me) : {}),
         ...(this.horde ? { ...this.horde.view(), zk: me.zk } : {}),
         ...(this.shop ? { cr: me.cr } : {}),
       },
@@ -1414,6 +1530,7 @@ export class World {
       orbs,
       drops,
       bullets,
+      ...(ends.length ? { ends } : {}),
       ...(packs.length ? { packs } : {}),
       ...(this.goldRush ? { gold } : {}),
     };

@@ -379,7 +379,7 @@ function renderModes() {
       const waiting = rows.reduce((s, x) => s + (x.state === 'prep' ? x.ready ?? 0 : 0), 0);
       const live = rows.reduce((s, x) => s + (x.humans ?? 0), 0);
       const size = m.kind === 'zombie' ? `1–${m.size}` : m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
-      b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>${waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: waiting }))}</span>` : ''}`;
+      b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${m.rounds ? ` · ${esc(t('mc.rounds', { n: m.rounds * 2 - 1, w: m.rounds }))}` : ''}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>${waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: waiting }))}</span>` : ''}`;
       b.addEventListener('click', () => {
         if (document.body.classList.contains('tour-raid-only') && m.id !== 'raid') return; // Nyx's first raid is a Raid
         app.gameMode = m.id;

@@ -256,8 +256,17 @@ test('team modes: balanced sides, no friendly fire, the winning team splits the 
   w.damage(mate, me, 40);
   assert.equal(mate.hp, hp, 'teammates cannot hurt each other');
   assert.ok(!w.visibleEnemies(me).includes(mate));
-  // wipe the other team: my team wins, and my fallen teammate shares it
+  // wipe the other team twice (two rounds): my team wins, and my fallen teammate shares it
   w.kill(mate, foe);
+  for (const p of w.players.values()) if (p.team !== me.team) w.kill(p, me);
+  w.step();
+  assert.equal(w.phase, 'live', 'one round won, the match goes on');
+  assert.equal(w.score.get(`t${me.team}`), 1);
+  for (let i = 0; i < 30 * 5; i++) w.step();
+  assert.equal(w.roundNo, 2, 'the next round');
+  assert.equal(mate.status, 'alive', 'everyone is back for it');
+  assert.equal(mate.hp, CFG.HP);
+  for (const p of w.players.values()) p.shield = 0;
   for (const p of w.players.values()) if (p.team !== me.team) w.kill(p, me);
   w.step();
   assert.equal(w.phase, 'ended');
@@ -464,4 +473,33 @@ test('headshots: a centred round does double damage in every mode; an edge hit d
     assert.equal(hp - v.hp, 20);
   }
   assert.equal(CFG.HEADSHOT, 2);
+});
+
+test('rounds: a round on the clock goes to the side with more runners standing; ranked picks its winner by rounds', () => {
+  const w = new World({ stake: 1000, seed: 6, mode: 'ranked', botFill: 4 });
+  const me = w.addPlayer({ name: 'me', skin: '#fff', weapon: 'scout' });
+  w.step();
+  assert.equal(WEAPONS[me.w].id, 'scout', 'your pick');
+  assert.ok([...w.players.values()].filter((p) => p.isBot).every((p) => !WEAPONS[p.w].melee), 'bots carry a gun');
+  // round 1: everyone but me goes down
+  for (const p of w.players.values()) if (p !== me) {
+    p.shield = 0;
+    w.kill(p, me);
+  }
+  w.step();
+  assert.equal(w.score.get(`p${me.id}`), 1);
+  for (let i = 0; i < 30 * 5; i++) w.step();
+  assert.equal(w.roundNo, 2);
+  assert.equal(WEAPONS[me.w].id, 'scout', 'the pick stays for every round');
+  // round 2 runs out the clock with two left: the one with more health takes it
+  for (const p of w.players.values()) if (p !== me) p.shield = 0;
+  const others = [...w.players.values()].filter((p) => p !== me);
+  for (const p of others.slice(1)) w.kill(p, me);
+  others[0].hp = 10;
+  w.time = w.roundEndsAt;
+  w.step();
+  assert.equal(w.phase, 'ended');
+  assert.ok(me.won);
+  assert.equal(me.place, 1);
+  assert.ok(w.audit().ok);
 });

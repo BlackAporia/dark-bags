@@ -25,6 +25,10 @@
 //           the most bags takes the whole pot (minus the rake) as shop credit.
 //
 // fixed: the only stake the mode takes (mills); solo: one ready player can start it.
+// pick: you choose your weapon in the ready room and keep it the whole match (bots get a
+// random gun). rounds: the match is played in rounds on a clock; a round goes to the last
+// side standing, or when time runs out to the side with the most runners (then health)
+// alive; the first to win `rounds` rounds takes the pot. Everyone comes back for each round.
 export const MODES = [
   { id: 'raid', kind: 'raid', size: 10 },
   { id: 'br', kind: 'br', size: 20 },
@@ -37,11 +41,13 @@ export const MODES = [
   { id: 'shotguns', kind: 'br', size: 12, weapon: 'shotgun' },
   { id: 'rifles', kind: 'br', size: 12, weapon: 'rifle' },
   { id: 'snipers', kind: 'br', size: 12, weapon: 'sniper' },
-  { id: 'team2', kind: 'team', size: 4, teamSize: 2, seconds: 150 },
-  { id: 'team4', kind: 'team', size: 8, teamSize: 4 },
-  { id: 'team8', kind: 'team', size: 16, teamSize: 8 },
+  // teams and ranked are played in rounds on a clock (rounds: wins needed, round: seconds),
+  // with the weapon you pick in the ready room
+  { id: 'team2', kind: 'team', size: 4, teamSize: 2, pick: true, rounds: 2, round: 60 },
+  { id: 'team4', kind: 'team', size: 8, teamSize: 4, pick: true, rounds: 2, round: 75 },
+  { id: 'team8', kind: 'team', size: 16, teamSize: 8, pick: true, rounds: 2, round: 90 },
   // ranked: a battle royale that also moves your season rating (ranked.js)
-  { id: 'ranked', kind: 'br', size: 10, ranked: true },
+  { id: 'ranked', kind: 'br', size: 10, ranked: true, pick: true, rounds: 2, round: 90 },
   { id: 'zombies', kind: 'zombie', size: 4, seconds: 480, fixed: 100, solo: true, pick: true },
   { id: 'gold', kind: 'gold', size: 8, seconds: 150, fixed: 100 },
 ];

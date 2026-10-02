@@ -11,7 +11,6 @@ import { stepMovement, sanitizeInput } from '../shared/movement.js';
 import { World } from '../shared/world.js';
 import { WEAPONS, XP_PER_LEVEL } from '../shared/weapons.js';
 import { zoneAt, exitState } from '../shared/zone.js';
-import { segWalls } from '../shared/geom.js';
 import { pose, legPiece, FEET, hpColor } from './stickman.js';
 import { Fx } from './fx.js';
 
@@ -125,6 +124,7 @@ export class GameClient {
     this.zombieMode = MODE[this.mode]?.kind === 'zombie'; // co-op waves, a boss on the last
     this.goldMode = MODE[this.mode]?.kind === 'gold'; // grab the most gold bags
     this.respawnMode = this.dmMode || this.goldMode;
+    this.roundsMode = !!MODE[this.mode]?.rounds; // teams, ranked: rounds on a clock
     this.el.glShop.hidden = !this.shopMode;
     document.body.classList.toggle('gl-on', this.shopMode);
     document.body.classList.toggle('z-on', this.zombieMode);
@@ -138,7 +138,7 @@ export class GameClient {
     this.el.bluffChip.hidden = this.potMode;
     const tBag = document.getElementById('t-bag');
     if (tBag) tBag.hidden = this.potMode;
-    const fixed = !!MODE[this.mode]?.weapon || this.zombieMode || this.goldMode; // no ladder to climb
+    const fixed = !!MODE[this.mode]?.weapon || !!MODE[this.mode]?.pick || this.goldMode; // no ladder to climb
     this.el.ladder.hidden = fixed;
     this.el.nextWeapon.hidden = fixed;
     document.querySelector('.xp')?.toggleAttribute('hidden', fixed);
@@ -238,7 +238,9 @@ export class GameClient {
       this.pred = null;
       if (wasAlive && you.st === 'extracted') this.sfx.play('extract');
     }
-    this.diffSnap(prev, s, now);
+    // what the snapshot changed (hits, shots, impacts) plays when the picture gets there: the
+    // world is drawn INTERP_MS behind the server, so the effects wait as long
+    setTimeout(() => this.active && this.diffSnap(prev, s, performance.now()), INTERP_MS);
   }
 
   // Effects other runners cause that we only learn about from snapshots.
@@ -269,18 +271,12 @@ export class GameClient {
       this.fx.muzzle(mx, my, 22, o.a, false, now, o.o === 1 ? '#3ddc97' : '#ff4d5e');
       this.sfx.play('smg', { x: o.x, y: o.y });
     }
-    // bullets that vanished next to a wall: sparks and a ricochet
-    const cur = new Set(s.bullets.map((b) => b.i));
-    for (const b of prev.bullets) {
-      if (cur.has(b.i)) continue;
-      const nx = b.x + b.vx * 0.05;
-      const ny = b.y + b.vy * 0.05;
-      if (segWalls(b.x, b.y, nx, ny, this.map.walls) < 0) continue;
-      const near = s.players.some((p) => Math.hypot(p.x - b.x, p.y - b.y) < 40);
-      if (near) continue;
-      this.fx.sparks(b.x + b.vx * 0.02, b.y + b.vy * 0.02, 18, 6);
-      this.fx.dust(b.x, b.y, 2, 'rgba(180,180,190,0.3)');
-      if (Math.random() < 0.6) this.sfx.play('impact', { x: b.x, y: b.y });
+    // rounds that stopped in a wall: sparks and a ricochet, exactly where they struck
+    for (const [, x, y, k] of s.ends ?? []) {
+      if (k !== 'w') continue;
+      this.fx.sparks(x, y, 18, 6);
+      this.fx.dust(x, y, 2, 'rgba(180,180,190,0.3)');
+      if (Math.random() < 0.6) this.sfx.play('impact', { x, y });
     }
   }
 
@@ -408,7 +404,12 @@ export class GameClient {
     this.sfx.play('grave', { x: a.x, y: a.y });
   }
 
+  // events land with the picture (see onSnap): a hit shows when its tracer gets there
   onEvents(list) {
+    setTimeout(() => this.active && this.applyEvents(list), INTERP_MS);
+  }
+
+  applyEvents(list) {
     const now = performance.now();
     for (const ev of list) {
       switch (ev.k) {
@@ -499,6 +500,22 @@ export class GameClient {
         case 'streak':
           if (ev.tier === 1 || ev.pid === this.pid) this.showStreak(ev.tier, ev.pid === this.pid ? null : ev.name);
           break;
+        case 'roundStart':
+          this.banner(t('hud.roundStart', { n: ev.n, of: ev.of }), 'gold', 1800);
+          this.sfx.play('ready');
+          break;
+        case 'roundEnd': {
+          const mine = this.teamMode ? `t${this.you?.tm}` : `p${this.pid}`;
+          if (ev.win === mine) {
+            this.banner(t('hud.roundWon', { n: ev.n }), 'gold', 2600);
+            this.sfx.play('level');
+          } else if (!ev.win) this.banner(t('hud.roundDraw', { n: ev.n }), 'warn', 2600);
+          else {
+            this.banner(this.teamMode ? t('hud.roundLost', { n: ev.n }) : t('hud.roundTo', { n: ev.n, name: ev.name ?? '?' }), 'warn', 2600);
+            this.sfx.play('beep', { f: 330 });
+          }
+          break;
+        }
         case 'respawn':
           this.banner(t('hud.respawned'), 'money', 1200);
           this.sfx.play('ready');
@@ -798,11 +815,7 @@ export class GameClient {
     this.anims.prune(now);
     this.lastFigures = figures;
     this.lastZombies = zombies;
-    const ba = new Map(a.bullets.map((x) => [x.i, x]));
-    const bullets = b.bullets.map((x) => {
-      const q = ba.get(x.i);
-      return q ? { ...x, x: lerp(q.x, x.x, t), y: lerp(q.y, x.y, t) } : x;
-    });
+    const bullets = this.tracers(a, b, rt);
 
     const you = this.you;
     let eye;
@@ -858,6 +871,41 @@ export class GameClient {
       radar: this.radar,
       target: this.aimTarget,
     };
+  }
+
+  // Every round where it is at the render time: between two snapshots it slides; a round
+  // that stopped flies on to the exact point where it stopped (a body, a wall, the end of
+  // its range) and no further; a round fired after the last snapshot but one starts at the
+  // muzzle, not halfway down its path. tr: how much tail it may show (never behind the gun).
+  tracers(a, b, rt) {
+    const ends = new Map();
+    for (const s of this.snaps) for (const e of s.ends ?? []) ends.set(e[0], e);
+    const out = [];
+    const inB = new Map(b.bullets.map((x) => [x.i, x]));
+    for (const q of a === b ? [] : a.bullets) {
+      if (inB.has(q.i)) continue;
+      const e = ends.get(q.i);
+      if (!e) continue;
+      const sp = Math.hypot(q.vx, q.vy) || 1;
+      const went = (sp * Math.max(0, rt - a.time)) / 1000;
+      const to = Math.hypot(e[1] - q.x, e[2] - q.y);
+      if (went >= to) continue; // it already got there
+      out.push({ ...q, x: q.x + (q.vx / sp) * went, y: q.y + (q.vy / sp) * went, tr: (q.d ?? 999) + went });
+    }
+    for (const x of b.bullets) {
+      const q = a === b ? null : a.bullets.find((y) => y.i === x.i);
+      if (q) {
+        const t = Math.min(1, Math.max(0, (rt - a.time) / Math.max(1, b.time - a.time)));
+        out.push({ ...x, x: lerp(q.x, x.x, t), y: lerp(q.y, x.y, t), tr: lerp(q.d ?? 999, x.d ?? 999, t) });
+        continue;
+      }
+      const sp = Math.hypot(x.vx, x.vy) || 1;
+      const back = (sp * Math.max(0, b.time - rt)) / 1000;
+      const d = x.d ?? 999;
+      if (back >= d) continue; // not fired yet at the render time
+      out.push({ ...x, x: x.x - (x.vx / sp) * back, y: x.y - (x.vy / sp) * back, tr: d - back });
+    }
+    return out;
   }
 
   animSelf(x, y, dt, now) {
@@ -994,7 +1042,10 @@ export class GameClient {
 
     // storm
     const z = this.zone;
-    if (this.zombieMode) {
+    if (this.roundsMode) {
+      el.storm.textContent = you.rb ? t('hud.roundNext', { s: you.rb }) : t('hud.roundScore', { n: you.rd ?? 1, of: you.rds ?? 3, a: you.my ?? 0, b: you.foe ?? 0 });
+      el.storm.classList.toggle('hot', !you.rb && tl <= 15);
+    } else if (this.zombieMode) {
       el.storm.textContent = you.zb != null ? t('hud.bossHp', { p: you.zb }) : you.zbr ? t('hud.zBreak', { s: you.zbr }) : t('hud.zGoal');
       el.storm.classList.toggle('hot', you.zb != null || tl <= 60);
     } else if (this.goldMode) {
@@ -1047,7 +1098,10 @@ export class GameClient {
       el.extName.textContent = best ? best.name : '';
       el.extBar.style.width = `${Math.min(100, you.ext * 100)}%`;
     } else el.extract.hidden = true;
-    if (you.st === 'dead' && this.zombieMode) {
+    if (you.st === 'dead' && this.roundsMode) {
+      el.spect.hidden = false;
+      el.spText.textContent = you.spect ? `${t('hud.roundDown')} · ${t('spect.watching', { name: you.spect })}` : t('hud.roundDown');
+    } else if (you.st === 'dead' && this.zombieMode) {
       el.spect.hidden = false;
       el.spText.textContent = t('hud.zDown');
     } else if (you.st === 'dead' && this.respawnMode) {
