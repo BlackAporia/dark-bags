@@ -267,7 +267,9 @@ const server = http.createServer((req, res) => {
 });
 
 // --------------------------------------------------------------- websocket
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16384 });
+// 128 KB: a passkey (WebAuthn) signature from Cartridge carries the authenticator data and the
+// client JSON as felts, tens of KB; anything past the cap drops the socket without a word
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 128 * 1024 });
 let nextCid = 1;
 
 // behind Railway's proxy the player's address is the hop the proxy appended to x-forwarded-for
