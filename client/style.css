@@ -2097,3 +2097,27 @@ body.gold-on #bag { color: #ffd166; }
 @media (max-width: 720px) {
   .tb-acct { max-width: 120px; padding: 6px 9px 6px 7px; font-size: 12px; }
 }
+
+/* ---------------------------------------------------------------- bridge tab */
+.bridge { display: grid; gap: 10px; }
+.br-dir { margin-bottom: 2px; }
+.br-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bridge label { display: grid; gap: 4px; font-size: 12px; color: #9aa3b5; }
+.bridge select, .bridge input { width: 100%; min-width: 0; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--paper); font: inherit; font-size: 14px; }
+.br-wide input { font-family: ui-monospace, monospace; font-size: 12px; }
+.br-est { margin: 0; min-height: 1.2em; font-size: 13px; }
+.br-est.bad, .bridge .bad { color: #ff8a8a; }
+.br-h { margin: 10px 0 0; }
+.br-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.br-link { display: grid; gap: 2px; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); color: var(--paper); text-decoration: none; }
+.br-link:hover { border-color: var(--loot); }
+.br-link span { font-size: 11px; color: #9aa3b5; }
+.br-dep { display: grid; gap: 8px; }
+.br-dep p { margin: 0; }
+.br-addr { font-size: 13px; }
+.br-status { font-weight: 800; color: #f7c948; }
+.br-status.s-SUCCESS { color: #4ade80; }
+.br-status.s-FAILED, .br-status.s-REFUNDED { color: #ff8a8a; }
+@media (max-width: 520px) {
+  .br-grid { grid-template-columns: 1fr; }
+}

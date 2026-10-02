@@ -5,6 +5,7 @@ import { store } from './store.js';
 import { formatUnits, parseUnits } from '../shared/assets.js';
 import { esc, fmt } from './game.js';
 import { t } from './i18n.js';
+import { createBridgeUi } from './bridge.js';
 
 const $ = (id) => document.getElementById(id);
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '');
@@ -108,6 +109,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         <button type="button" class="cta" data-ap="dep">${t('acct.deposit')}</button>
         <button type="button" class="ghost" data-ap="wd">${t('acct.withdraw')}</button>
       </div>
+      <button type="button" class="ghost ap-wide" data-ap="bridge">🌉 ${t('br.tab')}</button>
       ${cs.kind === 'cartridge' ? `<button type="button" class="ghost ap-wide" data-ap="profile">🎮 ${t('acct.cartridge')}</button>` : ''}
       <button type="button" class="link ap-out" data-ap="out">${t('acct.signout')}</button>`;
     const on = (k, f) => pop.querySelector(`[data-ap="${k}"]`)?.addEventListener('click', f);
@@ -125,6 +127,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     });
     on('dep', () => (closePop(), openCashier('deposit')));
     on('wd', () => (closePop(), openCashier('withdraw')));
+    on('bridge', () => (closePop(), openCashier('bridge')));
     on('profile', async () => {
       closePop();
       try {
@@ -409,6 +412,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     for (const b of document.querySelectorAll('#dlg-cashier [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     for (const p of document.querySelectorAll('#dlg-cashier [data-pane]')) p.hidden = p.dataset.pane !== tab;
     if (tab === 'history') send({ t: 'history' });
+    if (tab === 'bridge') bridge.render();
     renderRoutes();
   }
 
@@ -592,6 +596,22 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         return false;
     }
   }
+
+  // bridges from other chains: coins land in the player's own wallet, then Deposit takes over
+  const bridge = createBridgeUi({
+    base,
+    session: () => app.token,
+    account: () => cs.account,
+    chain: () => cs.chain,
+    facade: () => ensureFacade(),
+    toast,
+    onArrived: (to) => {
+      const id = to?.contractAddress ? norm(to.contractAddress) : null;
+      if (id && token(id)) $('dep-token').value = id;
+      setTab('deposit');
+      refreshWalletBal();
+    },
+  });
 
   // --------------------------------------------------------------- wiring
   $('connect').addEventListener('click', openConnect);

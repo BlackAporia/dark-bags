@@ -15,6 +15,7 @@ import { Inventory } from '../shared/cosmetics.js';
 import { SocialBook } from '../shared/social.js';
 import { ReferralBook } from '../shared/referrals.js';
 import { Guard } from '../shared/guard.js';
+import { createBridge } from './bridge.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -229,6 +230,10 @@ async function serveStatic(req, res) {
   }
 }
 
+// 1Click only bridges real mainnet assets: on by default on mainnet, BRIDGE=1 forces it elsewhere
+const bridge = real && (real.cfg.network === 'mainnet' || process.env.BRIDGE === '1') ? createBridge({ accountFor: (s) => real.cashier.accountFor(s) }) : null;
+if (bridge) console.log(`bridge: NEAR Intents 1Click on, our fee ${bridge.feeBps / 100}%${bridge.feeBps ? '' : ' (set BRIDGE_FEE_RECIPIENT to earn one)'}`);
+
 const server = http.createServer((req, res) => {
   if (req.url === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
@@ -250,6 +255,12 @@ const server = http.createServer((req, res) => {
       res.writeHead(204).end();
       return;
     }
+  }
+  // bridges in and out of Starknet (NEAR Intents 1Click), for signed-in players on a real chain
+  if (pathOnly.startsWith('/api/bridge/')) {
+    if (!bridge) return void res.writeHead(404, { 'content-type': 'application/json' }).end('{"error":"bridge off"}');
+    bridge.handle(req, res).catch(() => !res.headersSent && res.writeHead(500).end());
+    return;
   }
   const route = real?.routes[`${req.method} ${pathOnly}`];
   if (route) {
