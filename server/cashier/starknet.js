@@ -38,6 +38,17 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
     if (normAddr(wallet.address) !== house) log.warn(`HOUSE_PRIVATE_KEY opens ${wallet.address}, not HOUSE_ADDRESS; payouts will come from ${wallet.address}`);
   } else log.warn('cashier: no HOUSE_PRIVATE_KEY, deposits only (cash-outs are off)');
 
+  // the fortune wheel's wallet, apart from the house: jackpots go out from it
+  let fortuneWallet = null;
+  if (cfg.fortune) {
+    try {
+      fortuneWallet = await sdk.connectWallet({ account: { signer: new StarkSigner(cfg.fortune.key) }, accountAddress: fromAddress(normAddr(cfg.fortune.address)), ...(cfg.paymaster ? { feeMode: { type: 'paymaster' } } : {}) });
+      log.log?.(`cashier: fortune wallet ${fortuneWallet.address}`);
+    } catch (e) {
+      log.error('fortune wallet failed to connect; jackpots will be credited in game', e?.message ?? e);
+    }
+  }
+
   const account = wallet?.getAccount();
   const strk20 = await createStrk20({ cfg, account: account ?? { address: house }, provider, log }).catch((e) => {
     log.error('STRK20 setup failed', e?.message ?? e);
@@ -114,6 +125,22 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       const tx = await wallet.transfer(t, transfers, feeMode ? { feeMode } : undefined);
       return { tx: tx.hash };
     },
+
+    // a fortune jackpot straight from the fortune wallet to the winner's address
+    ...(fortuneWallet
+      ? {
+          async payFortune({ token, to, amount }) {
+            const t = byId.get(token);
+            if (!t) throw new Error('unknown token');
+            const transfers = [{ to: fromAddress(to), amount: Amount.fromRaw(amount, t) }];
+            const calls = [fortuneWallet.erc20(t).populateTransfer(transfers)].flat();
+            const pre = await fortuneWallet.preflight({ calls, feeMode }).catch((e) => ({ ok: false, reason: e?.message }));
+            if (!pre.ok) throw new Error(`preflight: ${pre.reason}`);
+            const tx = await fortuneWallet.transfer(t, transfers, feeMode ? { feeMode } : undefined);
+            return { tx: tx.hash };
+          },
+        }
+      : {}),
 
     async payPrivate(a) {
       if (!strk20) throw Object.assign(new Error('private pool off'), { notSent: true });

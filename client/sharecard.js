@@ -328,6 +328,26 @@ export function moment(kind, d) {
         text: `Ranked up to ${r.name} (${d.rank}/90) in DARK BAGS. ${tag}`,
       };
     }
+    case 'fortune': {
+      const jp = d.jackpot;
+      const it = d.item;
+      const r = it ? RARITIES[it.rarity] : null;
+      return {
+        spec: {
+          accent: jp ? '#ffd34d' : r.color,
+          kicker: jp ? 'Fortune wheel · jackpot' : `Fortune wheel · ${r.name}`,
+          title: jp ? jp.usd : it.name.toUpperCase(),
+          titleGlow: true,
+          sub: jp ? `Hit the fortune bank: ${jp.amount} ${jp.symbol}, real coins, on a $0.05 spin.` : `A real ${r.name} skin from a $0.05 spin of the fortune wheel.`,
+          chips: jp ? [['Won', `${jp.amount} ${jp.symbol}`], ['Spin', '$0.05']] : [['Rarity', r.name], ['Spin', '$0.05']],
+          look: d.look ? { ...look, ...d.look } : look,
+          rank: d.rank,
+          stamp: jp ? 'JACKPOT' : null,
+          stampColor: '#ffd34d',
+        },
+        text: jp ? `Hit the DARK BAGS fortune wheel jackpot: ${jp.amount} ${jp.symbol} on a $0.05 spin! ${tag}` : `Pulled ${it.name} (${r.name}) from a $0.05 spin of the DARK BAGS fortune wheel. ${tag}`,
+      };
+    }
     default:
       return null;
   }

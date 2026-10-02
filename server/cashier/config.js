@@ -65,6 +65,8 @@ export function readConfig(env = process.env) {
     clientRpcUrl: env.CLIENT_RPC_URL || null,
     house: env.HOUSE_ADDRESS || null,
     houseKey: env.HOUSE_PRIVATE_KEY || null,
+    // the fortune wheel's own wallet: jackpots are sent from it on chain (else credited in game)
+    fortune: env.FORTUNE_ADDRESS && env.FORTUNE_PRIVATE_KEY ? { address: env.FORTUNE_ADDRESS, key: env.FORTUNE_PRIVATE_KEY } : null,
     tokens: list(env.TOKENS || 'STRK,ETH,USDC,USDT,WBTC').map((s) => s.toUpperCase()),
     extraTokens,
     fixedPrices,

@@ -17,6 +17,7 @@ import { ReferralBook } from '../shared/referrals.js';
 import { Guard } from '../shared/guard.js';
 import { createBridge } from './bridge.js';
 import { MailBook, cleanGift } from '../shared/mail.js';
+import { FortuneBook } from '../shared/fortune.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -34,6 +35,7 @@ const LOCKER_FILE = process.env.LOCKER_FILE || (DATA ? `${DATA}/${NET}-locker.js
 const REFERRAL_FILE = process.env.REFERRAL_FILE || (DATA ? `${DATA}/${NET}-referrals.json` : '');
 const GUARD_FILE = process.env.GUARD_FILE || (DATA ? `${DATA}/${NET}-guard.json` : '');
 const MAIL_FILE = process.env.MAIL_FILE || (DATA ? `${DATA}/${NET}-mail.json` : '');
+const FORTUNE_FILE = process.env.FORTUNE_FILE || (DATA ? `${DATA}/${NET}-fortune.json` : '');
 const SOCIAL_FILE = process.env.SOCIAL_FILE || (existsSync('/data') ? '/data/social.json' : '');
 if (NET === 'mainnet' && (!LOCKER_FILE || !REFERRAL_FILE)) {
   console.error('On mainnet the locker (shop $ and skins bought with real money) and the referral book must live on a persistent disk: mount /data or set LOCKER_FILE and REFERRAL_FILE.');
@@ -155,6 +157,8 @@ const guard = new Guard({
   data: guardData,
   salt: guardSalt,
   sharedIp: process.env.GUARD_SHARED_IP === '1',
+  // GUARD_TRUSTED=0xaddr,0xaddr: the team's test accounts may share a network and a table
+  trusted: (process.env.GUARD_TRUSTED ?? '').split(',').map((x) => x.trim()).filter(Boolean).map((x) => (/^0x[0-9a-f]+$/i.test(x) ? `0x${BigInt(x).toString(16).padStart(64, '0')}` : x)),
   log: (m, a) => console.warn(m, JSON.stringify(a)),
   onChange: (g) => {
     if (!GUARD_FILE || guardTimer) return;
@@ -180,6 +184,20 @@ const mail = new MailBook({
   },
 });
 
+// ----------------------------------------------------------------- fortune
+// the wheel's bank survives restarts and data epochs (it is money players have put in)
+let fortuneTimer = null;
+const fortune = new FortuneBook({
+  data: FORTUNE_FILE && existsSync(FORTUNE_FILE) ? JSON.parse(readFileSync(FORTUNE_FILE, 'utf8')) : {},
+  onChange: (fb) => {
+    if (!FORTUNE_FILE || fortuneTimer) return;
+    fortuneTimer = setTimeout(async () => {
+      fortuneTimer = null;
+      await saveJSON(FORTUNE_FILE, fb.toJSON()).catch((e) => console.error('fortune save failed', e));
+    }, 1000);
+  },
+});
+
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
 const send = (cid, msg) => {
@@ -201,6 +219,7 @@ const lobby = new Lobby({
   referrals,
   guard,
   mail,
+  fortune,
   send,
   bots: BOTS,
   minPlayers: 2,
@@ -408,6 +427,7 @@ const shutdown = async () => {
   if (REFERRAL_FILE) await saveJSON(REFERRAL_FILE, referrals.toJSON()).catch(() => {});
   if (GUARD_FILE) await saveGuard(guard).catch(() => {});
   if (MAIL_FILE) await saveJSON(MAIL_FILE, mail.toJSON()).catch(() => {});
+  if (FORTUNE_FILE) await saveJSON(FORTUNE_FILE, fortune.toJSON()).catch(() => {});
   if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, social.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await saveJSON(WALLET_FILE, wallet.toJSON()).catch(() => {});

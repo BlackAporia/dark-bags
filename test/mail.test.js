@@ -67,3 +67,16 @@ test('welcome bonus: the first top-up gives the Founder title and a letter with 
   assert.ok(last('mailbox').spin.ok);
   assert.equal(last('mailbox').locker.spins, 0);
 });
+
+test('welcome bonus catches up: a player who topped up before it existed gets it on the next visit', () => {
+  const out = [];
+  const lobby = new Lobby({ wallet: new MemoryWallet(), send: (cid, m) => out.push(m), newToken: () => 'tok00002' });
+  lobby.inventory.rec('tok00002').bought = 500; // an old top-up
+  lobby.connect(1);
+  lobby.handle(1, { t: 'hello', token: 'tok00002', name: 'early' });
+  assert.equal(lobby.ranks.title('tok00002'), 'founder');
+  assert.equal(lobby.mail.inbox('tok00002').filter((m) => m.i18n === 'welcome').length, 1);
+  lobby.connect(2);
+  lobby.handle(2, { t: 'hello', token: 'tok00002', name: 'early' });
+  assert.equal(lobby.mail.inbox('tok00002').filter((m) => m.i18n === 'welcome').length, 1, 'once');
+});
