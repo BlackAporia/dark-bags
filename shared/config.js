@@ -28,8 +28,6 @@ export const CFG = {
   HUMAN_GRACE: 8,         // seconds at the start when bots leave humans alone (unless attacked)
   MULTI_WINDOW: 4,        // seconds between kills to chain a double/triple/... kill
   SPAWN_SHIELD: 3,        // seconds of spawn protection; firing drops it early
-  REGEN_DELAY: 4,         // seconds without damage before regen starts
-  REGEN_RATE: 8,          // hp per second
   VISION: 520,            // you only see this far (and not through walls)
 
   // weapons live in weapons.js (Arms Race ladder)
@@ -50,7 +48,7 @@ export const CFG = {
   OPENING_BURST: 0.4,     // share of the loot pool dropped on the map at raid start
 
   // economy (all amounts are integer mills: $1 = 1,000)
-  TIERS: [100, 1000, 10000],
+  TIERS: [100, 1000, 10000, 100000], // $0.10, $1, $10, $100 (players can also type their own)
   RAKE: 0.05,             // house fee taken from each stake
   BAG_SHARE: 0.5,         // share of the net stake you carry in; the rest is scattered as loot
   SWAP_FEE: 0.003,        // in-game swaps: 0.3% spread to the house

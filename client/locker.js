@@ -1,6 +1,6 @@
 // The locker: your character, your outfits and weapon skins. Equip only: skins come
 // from bags and crates in the shop (shop.js). Also draws the box art both use.
-import { OUTFIT, OUTFITS, RARITIES, FINISH, WEAPON_SKINS, WSKIN, SEASON_OUTFITS, SEASON_WSKINS } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, FINISH, WEAPON_SKINS, WSKIN, SEASON_OUTFITS, TURRET_SKIN } from '../shared/cosmetics.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { drawPreview, figureStill, weaponArt, drawWeapon } from './stickman.js';
 import { esc } from './game.js';
@@ -118,10 +118,20 @@ export function weaponStill(skinId, w = 150, h = 100) {
   return url;
 }
 
+// a turret skin as a small picture, for the locker grid
+const tstills = new Map();
+function turretStill(sk) {
+  if (tstills.has(sk.id)) return tstills.get(sk.id);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="120" height="80"><g stroke="#05070b" stroke-width="1.2"><path d="M20 24 L9 36 M20 24 L20 37 M20 24 L31 36" stroke="#3a4253" stroke-width="2.4" stroke-linecap="round"/><rect x="20" y="13" width="15" height="3" fill="${sk.trim}"/><rect x="20" y="19" width="15" height="3" fill="${sk.trim}"/><rect x="9" y="9" width="16" height="16" rx="4" fill="${sk.body}" stroke="${sk.trim}"/><circle cx="17" cy="17" r="3.2" fill="${sk.eye}"/></g></svg>`;
+  const url = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  tstills.set(sk.id, url);
+  return url;
+}
+
 // ------------------------------------------------------------ the locker
 
 export function createLocker({ app, send, sfx, toast, openShop }) {
-  const st = { tab: 'outfits', selected: null, wsel: null, weapon: 'knife', filter: 'all', raf: 0 };
+  const st = { tab: 'outfits', selected: null, wsel: null, tsel: null, weapon: 'knife', rar: 'all', wf: 'all', sort: 'desc', raf: 0 };
   const L = () => app.locker;
   const trialLeft = (id) => Math.max(0, (L()?.trials?.[id] ?? 0) - Date.now());
   const owns = (id) => OUTFIT[id]?.basic || L()?.owned.includes(id) || trialLeft(id) > 0;
@@ -165,7 +175,7 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
     const stage = $('lk-stage');
     if (stage && $('dlg-locker').open) {
       const ws = st.wsel ? { ...myWs(), [WSKIN[st.wsel].weapon]: WSKIN[st.wsel].finish } : myWs();
-      const w = st.tab === 'weapons' ? WEAPONS.findIndex((x) => x.id === st.weapon) : undefined;
+      const w = st.tab === 'weapons' && st.wsel ? WEAPONS.findIndex((x) => x.id === st.weapon) : undefined;
       paint(stage, lookOf(st.selected, { ws, w }), now, 1, true);
     }
   }
@@ -212,10 +222,20 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
   }
 
   // --------------------------------------------------------------- dialog
+  // Your collection only: outfits, weapon skins and turret skins you own, filtered by
+  // rarity and sorted (rarest first, or the other way). A tap previews on the stage, the
+  // button equips. The grid is rebuilt only when the list changes; selecting just moves
+  // the highlight, so even a big collection stays quick on a phone.
+  const R = (r) => RARITY_ORDER.indexOf(r);
+  const ownedOutfits = () => [...SEASON_OUTFITS, ...OUTFITS].filter((o) => owns(o.id));
+  const ownedSkins = () => (L()?.wowned ?? []).map((id) => WSKIN[id]).filter(Boolean);
+  const ownedTurrets = () => (L()?.towned ?? []).map((id) => TURRET_SKIN[id]).filter(Boolean);
+  const wName = (id) => t(`w.${WEAPONS.find((w) => w.id === id)?.name ?? 'Knife'}`);
 
-  function open(tab = st.tab) {
+  function open(tab = 'outfits') {
     st.selected = null;
     st.wsel = null;
+    st.tsel = null;
     setTab(tab);
     $('dlg-locker').showModal();
     sfx.unlock?.();
@@ -223,109 +243,113 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
 
   function setTab(tab) {
     st.tab = tab;
+    st.rar = 'all';
     for (const b of document.querySelectorAll('#dlg-locker [data-lt]')) b.setAttribute('aria-selected', String(b.dataset.lt === tab));
-    for (const p of document.querySelectorAll('#dlg-locker [data-lp]')) p.hidden = p.dataset.lp !== tab;
     render();
   }
+
+  // the items of the current tab, filtered and sorted
+  function items() {
+    const list = st.tab === 'outfits' ? ownedOutfits() : st.tab === 'weapons' ? ownedSkins().filter((x) => st.wf === 'all' || x.weapon === st.wf) : ownedTurrets();
+    const dir = st.sort === 'asc' ? 1 : -1;
+    return list.filter((o) => st.rar === 'all' || o.rarity === st.rar).sort((a, b) => dir * (R(a.rarity) - R(b.rarity)) || a.name.localeCompare(b.name));
+  }
+
+  function equippedId() {
+    if (st.tab === 'outfits') return L().outfit;
+    if (st.tab === 'turrets') return L().tequip ?? null;
+    return null;
+  }
+  const isOn = (o) => (st.tab === 'weapons' ? myWs()[o.weapon] === o.finish : equippedId() === o.id);
+  const thumb = (o) => (st.tab === 'outfits' ? figureStill({ outfit: o.id, body: L().body }, 84, 112) : st.tab === 'weapons' ? weaponStill(o.id) : turretStill(o));
 
   function render() {
     if (!L()) return;
     $('lk-marks').textContent = usdCents(L().credit);
     $('lk-bonus').textContent = '';
     for (const b of document.querySelectorAll('#lk-body [data-body]')) b.setAttribute('aria-checked', String(b.dataset.body === L().body));
-    if (st.tab === 'outfits') {
-      renderDetail();
-      // seasonal armour shows once you own it (it never drops from a box)
-      const all = [...SEASON_OUTFITS.filter((o) => owns(o.id)), ...OUTFITS];
-      renderGrid(all.filter((o) => st.filter === 'all' || (st.filter === 'owned' ? owns(o.id) : o.rarity === st.filter)));
-      const have = OUTFITS.filter((o) => owns(o.id)).length;
-      $('lk-count').textContent = t('lk.collected', { a: have, b: OUTFITS.length });
-    } else renderWeapons();
+    // filter chips: only the rarities you actually have, with counts
+    const all = st.tab === 'outfits' ? ownedOutfits() : st.tab === 'weapons' ? ownedSkins() : ownedTurrets();
+    const have = RARITY_ORDER.filter((r) => all.some((o) => o.rarity === r));
+    $('lk-rar').innerHTML = [['all', t('lk.all'), all.length], ...have.map((r) => [r, rn(r), all.filter((o) => o.rarity === r).length])]
+      .map(([k, label, n]) => `<button type="button" data-rar="${k}" aria-pressed="${st.rar === k}" style="${k !== 'all' ? `--r:${RARITIES[k].color}` : ''}">${esc(label)} <small>${n}</small></button>`)
+      .join('');
+    $('lk-sort').textContent = st.sort === 'asc' ? t('lk.sortAsc') : t('lk.sortDesc');
+    // weapons: which gun
+    const wt = $('lk-wtabs');
+    wt.hidden = st.tab !== 'weapons';
+    if (st.tab === 'weapons') {
+      const guns = WEAPONS.filter((w) => all.some((x) => x.weapon === w.id));
+      wt.innerHTML = [['all', t('lk.allGuns')], ...guns.map((w) => [w.id, t(`w.${w.name}`)])].map(([k, label]) => `<button type="button" data-wf="${k}" aria-pressed="${st.wf === k}">${esc(label)}</button>`).join('');
+    }
+    const list = items();
+    const total = st.tab === 'outfits' ? OUTFITS.length : st.tab === 'weapons' ? WEAPON_SKINS.length : null;
+    $('lk-count').textContent = total ? t('lk.collected', { a: all.length, b: total }) : String(all.length);
+    $('lk-grid').innerHTML = list
+      .map((o) => {
+        const on = isOn(o);
+        const sel = st.tab === 'outfits' ? st.selected === o.id : st.tab === 'weapons' ? st.wsel === o.id : st.tsel === o.id;
+        const trial = st.tab === 'outfits' && !o.basic && !L().owned.includes(o.id) && trialLeft(o.id) > 0;
+        const sub = st.tab === 'weapons' ? wName(o.weapon) : trial ? t('lk.trialLeft', { t: left(trialLeft(o.id)) }) : rn(o.rarity);
+        return `<button type="button" class="lk-item r-${o.rarity}${on ? ' on' : ''}${sel ? ' sel' : ''}${o.limited || o.season ? ' limited' : ''}" data-id="${esc(o.id)}" style="--r:${RARITIES[o.rarity].color}"><span class="lk-shine"></span><img alt="" loading="lazy" decoding="async"${st.tab !== 'outfits' ? ' class="wimg"' : ''} src="${thumb(o)}"><span class="lk-name">${esc(o.name)}${esc(serial(o.id))}</span><span class="lk-state ${on ? 'on' : 'own'}">${on ? t('lk.equipped') : esc(sub)}</span></button>`;
+      })
+      .join('');
+    $('lk-empty').hidden = list.length > 0;
+    $('lk-empty').textContent = t(st.tab === 'turrets' ? 'lk.emptyTurrets' : 'lk.empty');
+    renderDetail();
   }
 
-  function status(o) {
-    const trial = !o.basic && !L().owned.includes(o.id) && trialLeft(o.id) > 0;
-    if (L().outfit === o.id) return { text: trial ? `${t('lk.equipped')} · ${left(trialLeft(o.id))}` : t('lk.equipped'), cls: 'on' };
-    if (trial) return { text: t('lk.trialLeft', { t: left(trialLeft(o.id)) }), cls: 'trial' };
-    if (owns(o.id)) return { text: t('lk.owned'), cls: 'own' };
-    if (o.limited) return { text: t('lk.limited', { n: o.limited }), cls: 'lim' };
-    return { text: rn(o.rarity), cls: 'locked' };
-  }
-
-  function card(o, img, s, onClick, sel) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = `lk-item r-${o.rarity}${s.cls === 'locked' || s.cls === 'lim' ? ' locked' : ''}${sel ? ' sel' : ''}${o.limited ? ' limited' : ''}`;
-    b.style.setProperty('--r', RARITIES[o.rarity].color);
-    b.innerHTML = `<span class="lk-shine"></span><img alt=""${WSKIN[o.id] ? ' class="wimg"' : ''} src="${img}"><span class="lk-name">${esc(o.name)}</span><span class="lk-state ${s.cls}">${esc(s.text)}</span>`;
-    b.addEventListener('click', onClick);
-    return b;
-  }
-
-  function renderGrid(list) {
-    $('lk-grid').replaceChildren(
-      ...list.map((o) =>
-        card(o, figureStill(lookOf(o.id), 84, 112), status(o), () => {
-          st.selected = o.id;
-          sfx.play('beep', { f: 1320, dur: 0.03 });
-          render();
-        }, st.selected === o.id),
-      ),
-    );
-  }
-
+  // the left panel: what is selected (or worn), and the button to wear it
   function renderDetail() {
-    const id = st.selected ?? L().outfit;
-    const o = OUTFIT[id];
-    const r = RARITIES[o.rarity];
     const d = $('lk-detail');
-    d.style.setProperty('--r', r.color);
-    const trial = !o.basic && !L().owned.includes(id) && trialLeft(id) > 0;
-    let action = '';
-    if (L().outfit === id) action = `<span class="lk-tag">${t('lk.equipped')}</span>`;
-    else if (owns(id)) action = `<button type="button" class="cta" data-act="equip">${t('lk.equip')}</button>`;
-    const how = trial ? t('lk.trialHow2', { t: left(trialLeft(id)) }) : owns(id) ? (o.basic ? t('lk.free') : t('lk.inCollection')) : t('lk.fromBags');
-    const fx = [o.fx, o.fx2].filter(Boolean).map((x) => t(`fx.${x}`));
-    if (o.cape) fx.push(t('fx.cape'));
-    const sup = o.limited ? L().supply?.[o.id] : null;
-    d.innerHTML = `<p class="lk-rar">${esc(rn(o.rarity))}${fx.length ? ` · <span>${esc(fx.join(' + '))}</span>` : ''}</p><h3>${esc(o.name)}${esc(serial(id))}</h3>${sup ? `<p class="lk-supply">${t('lk.minted', { a: sup.minted, b: sup.of })}</p>` : ''}<p class="fine">${esc(how)}${st.selected && !owns(id) ? ` ${t('lk.tryingOn')}` : ''}</p><div class="lk-actions">${action}</div>`;
-    for (const b of d.querySelectorAll('[data-act]')) b.addEventListener('click', () => send({ t: 'equip', id }));
+    let o = null;
+    let on = false;
+    let act = '';
+    if (st.tab === 'outfits') {
+      o = OUTFIT[st.selected ?? L().outfit];
+      on = L().outfit === o.id;
+      if (!on) act = `<button type="button" class="cta" data-act="equip">${t('lk.equip')}</button>`;
+    } else if (st.tab === 'weapons') {
+      o = st.wsel ? WSKIN[st.wsel] : null;
+      if (o) {
+        on = myWs()[o.weapon] === o.finish;
+        act = on ? `<button type="button" class="ghost" data-act="plain">${t('lk.takeOff')}</button>` : `<button type="button" class="cta" data-act="equip">${t('lk.equip')}</button>`;
+      }
+    } else {
+      o = st.tsel ? TURRET_SKIN[st.tsel] : L().tequip ? TURRET_SKIN[L().tequip] : null;
+      if (o) {
+        on = L().tequip === o.id;
+        act = on ? `<button type="button" class="ghost" data-act="plain">${t('lk.takeOff')}</button>` : `<button type="button" class="cta" data-act="equip">${t('lk.equip')}</button>`;
+      }
+    }
+    if (!o) {
+      d.innerHTML = `<p class="fine">${esc(t(st.tab === 'weapons' ? 'lk.pickSkin' : 'lk.emptyTurrets'))}</p>`;
+      return;
+    }
+    d.style.setProperty('--r', RARITIES[o.rarity].color);
+    const sub = st.tab === 'weapons' ? ` · ${wName(o.weapon)}` : '';
+    d.innerHTML = `<p class="lk-rar">${esc(rn(o.rarity))}${esc(sub)}${o.season ? ` · ${t('bp.limited')}` : ''}</p><h3>${esc(o.name)}${esc(serial(o.id))}</h3><div class="lk-actions">${on ? `<span class="lk-tag">${t('lk.equipped')}</span>` : ''}${act}</div>`;
+    d.querySelector('[data-act="equip"]')?.addEventListener('click', () => {
+      if (st.tab === 'outfits') send({ t: 'equip', id: o.id });
+      else if (st.tab === 'weapons') send({ t: 'wequip', id: o.id });
+      else send({ t: 'tequip', id: o.id });
+    });
+    d.querySelector('[data-act="plain"]')?.addEventListener('click', () => {
+      if (st.tab === 'weapons') send({ t: 'wequip', id: `${o.weapon}.default` });
+      else send({ t: 'tequip', id: null });
+    });
   }
 
-  // weapon skins: pick a weapon, see every finish for it, equip the ones you own
-  function renderWeapons() {
-    $('lk-wtabs').replaceChildren(
-      ...WEAPONS.map((w) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.setAttribute('aria-pressed', String(w.id === st.weapon));
-        b.textContent = t(`w.${w.name}`);
-        b.addEventListener('click', () => {
-          st.weapon = w.id;
-          st.wsel = null;
-          render();
-        });
-        return b;
-      }),
-    );
-    const list = [...SEASON_WSKINS.filter((s) => s.weapon === st.weapon && L().wowned?.includes(s.id)), ...WEAPON_SKINS.filter((s) => s.weapon === st.weapon)];
-    const on = myWs()[st.weapon] ?? 'default';
-    const plain = { id: `${st.weapon}.default`, name: t('lk.plain'), rarity: 'common' };
-    const cards = [plain, ...list].map((s) => {
-      const own = s.id.endsWith('.default') || L().wowned.includes(s.id);
-      const eq = s.id === `${st.weapon}.${on}`;
-      const stt = eq ? { text: t('lk.equipped'), cls: 'on' } : own ? { text: t('lk.owned'), cls: 'own' } : s.limited ? { text: t('lk.limited', { n: s.limited }), cls: 'lim' } : { text: rn(s.rarity), cls: 'locked' };
-      return card(s, weaponStill(s.id), stt, () => {
-        st.wsel = s.id.endsWith('.default') ? null : s.id;
-        if (own && !eq) send({ t: 'wequip', id: s.id });
-        else if (!own) toast(t('lk.fromCrates'));
-        sfx.play('beep', { f: 1320, dur: 0.03 });
-        render();
-      }, st.wsel === s.id);
-    });
-    $('lk-wgrid').replaceChildren(...cards);
-    const f = FINISH[on];
-    $('lk-detail').innerHTML = `<p class="lk-rar">${esc(f ? rn(f.rarity) : '')}</p><h3>${esc(f ? `${f.name} ${t(`w.${WEAPONS.find((w) => w.id === st.weapon).name}`)}` : t('lk.plain'))}</h3><p class="fine">${esc(t('lk.weaponHow'))}</p>`;
+  // a tap selects (and previews) without rebuilding the grid
+  function select(id) {
+    if (st.tab === 'outfits') st.selected = id;
+    else if (st.tab === 'weapons') {
+      st.wsel = id;
+      st.weapon = WSKIN[id].weapon;
+    } else st.tsel = id;
+    for (const b of $('lk-grid').children) b.classList.toggle('sel', b.dataset.id === id);
+    sfx.play('beep', { f: 1320, dur: 0.03 });
+    renderDetail();
   }
 
   // ------------------------------------------------------------- messages
@@ -344,7 +368,7 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
     app.locker = m.locker;
     if (m.balances) app.balances = m.balances;
     renderTile();
-    if (m.op === 'equip' || m.op === 'wequip') sfx.play('bag');
+    if (m.op === 'equip' || m.op === 'wequip' || m.op === 'tequip') sfx.play('bag');
     if ($('dlg-locker').open) render();
   }
 
@@ -357,12 +381,36 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
   });
   for (const b of document.querySelectorAll('#dlg-locker [data-lt]')) b.addEventListener('click', () => setTab(b.dataset.lt));
   for (const b of document.querySelectorAll('#lk-body [data-body]')) b.addEventListener('click', () => send({ t: 'body', id: b.dataset.body }));
-  for (const b of document.querySelectorAll('#lk-filter [data-f]'))
-    b.addEventListener('click', () => {
-      st.filter = b.dataset.f;
-      for (const x of document.querySelectorAll('#lk-filter [data-f]')) x.setAttribute('aria-pressed', String(x === b));
-      render();
-    });
+  // one listener per container (the buttons inside are rebuilt)
+  $('lk-grid').addEventListener('click', (e) => {
+    const b = e.target.closest('.lk-item');
+    if (b) select(b.dataset.id);
+  });
+  $('lk-grid').addEventListener('dblclick', (e) => {
+    // a double tap wears it at once
+    const b = e.target.closest('.lk-item');
+    if (!b) return;
+    const id = b.dataset.id;
+    if (st.tab === 'outfits') send({ t: 'equip', id });
+    else if (st.tab === 'weapons') send({ t: 'wequip', id });
+    else send({ t: 'tequip', id });
+  });
+  $('lk-rar').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rar]');
+    if (!b) return;
+    st.rar = b.dataset.rar;
+    render();
+  });
+  $('lk-wtabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-wf]');
+    if (!b) return;
+    st.wf = b.dataset.wf;
+    render();
+  });
+  $('lk-sort').addEventListener('click', () => {
+    st.sort = st.sort === 'asc' ? 'desc' : 'asc';
+    render();
+  });
   st.raf = requestAnimationFrame(loop);
 
   return { onMessage, renderTile, open, lookOf, serial };

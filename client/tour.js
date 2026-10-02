@@ -31,7 +31,7 @@ export const NYX_LINES = {
   loot: "See that orange glow? That's money! Run right over it!",
   pickup: "Yay! Your bag just got heavier!",
   kill: "First blood! Nice shot! Grab what they dropped. Ooh, and a better gun!",
-  hurt: "Ouch, you're hurt! Back off for a few seconds, and you'll heal up!",
+  hurt: "Ouch, you're hurt! Health doesn't come back in a fight, so play it safe!",
   storm: "The storm is coming! Stay inside the circle, quick!",
   exit: "Ooh, that bag looks good on you! Find a green exit ring, and stand in it!",
   extracting: "Hold still! Three seconds! Don't get hit!",
@@ -469,9 +469,10 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
 
   function maybeStart(who = 'device') {
     const seen = store.get(SEEN, []);
-    if (seen.includes(who)) return;
+    if (seen.includes(who)) return false;
     store.set(SEEN, [...seen, who].slice(-50));
     setTimeout(start, who === 'device' ? 600 : 300);
+    return true;
   }
 
   function onResult(m) {

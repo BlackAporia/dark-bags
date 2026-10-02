@@ -233,7 +233,7 @@ export class Renderer {
     if (v.showArrows) this.drawExitArrows(v.eye, v.exitStates);
     if (v.storm && v.zone) this.drawSafeArrow(v.eye, v.zone, t);
     this.drawVignette(v.hurt, v.storm, t);
-    this.drawMini(v.eye, t, v.meAlive, v.zone, v.exitStates);
+    this.drawMini(v.eye, t, v.meAlive, v.zone, v.exitStates, v.radar);
   }
 
   // ------------------------------------------------------------- pieces
@@ -694,11 +694,13 @@ export class Renderer {
     const top = p.head.y - p.head.r - 8;
     const frac = Math.max(0, Math.min(1, f.hp / 100));
     const side = f.ally === true ? TEAM_ALLY : f.ally === false ? TEAM_FOE : null;
+    // everyone who is not on your side is an enemy: red name, red health bar, in every mode
+    const foe = !f.isMe && f.ally !== true;
     const w = side ? 40 : 34;
     ctx.fillStyle = 'rgba(4, 6, 10, 0.8)';
     ctx.fillRect(p.head.x - w / 2 - 1, top - 1, w + 2, 6);
     // team modes: the bar in the side's colour (red for enemies, green for allies)
-    ctx.fillStyle = side ? side.line : hpColor(frac);
+    ctx.fillStyle = side ? side.line : foe ? TEAM_FOE.line : hpColor(frac);
     ctx.fillRect(p.head.x - w / 2, top, w * frac, 4);
     if (side) {
       ctx.strokeStyle = side.line;
@@ -712,10 +714,10 @@ export class Renderer {
       ctx.fillStyle = f.ping < 80 ? '#3ddc97' : f.ping < 160 ? '#ffd166' : '#ff6b6b';
       ctx.fillText(`${f.ping}ms`, p.head.x + w / 2 + 3, top + 4);
     }
-    if (f.isMe || !f.noName || side) {
+    if (f.isMe || !f.noName || side || foe) {
       // your own name too, in gold, so you can find yourself in a fight
       // team modes: allies green, enemies red
-      ctx.fillStyle = f.isMe ? '#ffd166' : f.ally === true ? '#3ddc97' : f.ally === false ? '#ff6b6b' : 'rgba(235, 229, 214, 0.9)';
+      ctx.fillStyle = f.isMe ? '#ffd166' : f.ally === true ? '#3ddc97' : '#ff6b6b';
       ctx.font = `600 11px ${F_UI}`;
       ctx.textAlign = 'center';
       const label = `${f.name}${f.pr ? ` ${'★'.repeat(Math.min(3, f.pr))}` : ''}`;
@@ -945,7 +947,7 @@ export class Renderer {
     return true;
   }
 
-  drawMini(eye, t, alive, zone, states) {
+  drawMini(eye, t, alive, zone, states, radar = null) {
     const m = this.mctx;
     if (!m || !this.map || this.mini.offsetParent === null) return;
     if (!this.miniBase && !this.buildMini()) return;
@@ -981,6 +983,23 @@ export class Renderer {
       m.beginPath();
       m.arc(e.x * k, e.y * k, 4 * this.dpr + (st === 'closed' ? 0 : pulse), 0, TAU);
       m.fill();
+    }
+    // every runner still standing: enemies red and pulsing, teammates green
+    if (radar) {
+      const glow = this.reduced ? 1 : 0.75 + 0.25 * Math.sin(t / 180);
+      for (const [x, y, ally] of radar) {
+        m.fillStyle = ally ? 'rgba(61, 220, 151, 0.95)' : `rgba(255, 77, 94, ${glow})`;
+        m.beginPath();
+        m.arc(x * 10 * k, y * 10 * k, (ally ? 2.6 : 2.8) * this.dpr, 0, TAU);
+        m.fill();
+        if (!ally) {
+          m.strokeStyle = `rgba(255, 77, 94, ${0.35 * glow})`;
+          m.lineWidth = 1.2 * this.dpr;
+          m.beginPath();
+          m.arc(x * 10 * k, y * 10 * k, 5 * this.dpr, 0, TAU);
+          m.stroke();
+        }
+      }
     }
     m.fillStyle = alive ? C.loot : C.dust;
     m.beginPath();

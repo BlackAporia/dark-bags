@@ -310,17 +310,16 @@
         <div class="mode lk-tabs" role="tablist">
           <button type="button" class="seg" role="tab" data-lt="outfits" data-i18n="lk.outfits">Outfits</button>
           <button type="button" class="seg" role="tab" data-lt="weapons" data-i18n="lk.weapons">Weapon skins</button>
+          <button type="button" class="seg" role="tab" data-lt="turrets" data-i18n="bp.turrets">Turret skins</button>
         </div>
-        <div data-lp="outfits" class="lk-pane">
-          <div class="lk-bar"><div id="lk-filter" class="lk-filter">
-            <button type="button" data-f="all" aria-pressed="true" data-i18n="lk.all">All</button><button type="button" data-f="owned" data-i18n="lk.owned">Owned</button><button type="button" data-f="common" data-i18n="r.common">Common</button><button type="button" data-f="rare" data-i18n="r.rare">Rare</button><button type="button" data-f="epic" data-i18n="r.epic">Epic</button><button type="button" data-f="legendary" data-i18n="r.legendary">Legendary</button><button type="button" data-f="mythic" data-i18n="r.mythic">Mythic</button><button type="button" data-f="exotic" data-i18n="r.exotic">Exotic</button>
-          </div><span id="lk-count" class="fine"></span></div>
-          <div id="lk-grid" class="lk-grid"></div>
+        <div class="lk-bar">
+          <div id="lk-rar" class="lk-filter" role="group"></div>
+          <button type="button" id="lk-sort" class="ghost lk-sort"></button>
+          <span id="lk-count" class="fine"></span>
         </div>
-        <div data-lp="weapons" class="lk-pane" hidden>
-          <div id="lk-wtabs" class="lk-filter lk-wtabs"></div>
-          <div id="lk-wgrid" class="lk-grid"></div>
-        </div>
+        <div id="lk-wtabs" class="lk-filter lk-wtabs" hidden></div>
+        <div id="lk-grid" class="lk-grid"></div>
+        <p id="lk-empty" class="fine lk-empty" hidden></p>
         <p class="fine lk-note" data-i18n="lk.onlyBags">Skins come only from bags and crates in the shop.</p>
         <button id="lk-to-shop" type="button" class="cta" data-i18n="lk.toShop">Open the shop</button>
       </section>
@@ -329,6 +328,14 @@
 </dialog>
 
 <!-- real-token mode: sign in -->
+<!-- what's new: opens once after an update -->
+<dialog id="dlg-news" class="dlg dlg-news" aria-labelledby="news-title">
+  <div class="dlg-inner">
+    <header class="dlg-head"><h2 id="news-title" data-i18n="news.title">What's new</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <div id="news-body" class="news-body"></div>
+    <button type="button" id="news-ok" class="cta" data-i18n="news.ok">Got it</button>
+  </div>
+</dialog>
 <dialog id="dlg-profile" class="dlg dlg-profile" aria-label="Player">
   <div class="dlg-inner">
     <header class="dlg-head"><h2 data-i18n="pf.title">Player</h2><button type="button" class="x" id="dlg-profile-x" aria-label="Close">×</button></header>

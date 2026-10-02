@@ -172,3 +172,47 @@ test('the social book survives a restart', () => {
   assert.equal(t.get('k2').in[0], s.get('k1').id);
   assert.equal(t.keyOf(s.get('k1').id), 'k1');
 });
+
+test('guild invites reach anyone who has played (online: a card; always: a note in the inbox)', () => {
+  const { lobby, ranks, client, last, tick } = setup();
+  const a = client('a', 'alice');
+  const b = client('b', 'bob');
+  const c = client('c', 'carol');
+  lobby.disconnect('c'); // played once, now away
+  lobby.handle('a', { t: 'guild_invite', id: b.id });
+  assert.match(last('a', 'err').msg, /guild first/);
+  lobby.social.markPurchase(a.token);
+  ranks.add(a.token, 10_000_000);
+  lobby.handle('a', { t: 'guild_create', name: 'Night Shift', tag: 'NS' });
+  const gid = last('a', 'guildDone').id;
+  lobby.handle('a', { t: 'players' });
+  assert.deepEqual(last('a', 'players').list.map((p) => p.n).sort(), ['bob', 'carol'], 'the offline player is still in the directory');
+  lobby.handle('a', { t: 'guild_invite', id: b.id });
+  assert.equal(last('a', 'ginvSent').id, b.id);
+  assert.equal(last('b', 'guildInvited').guild.id, gid);
+  tick(3000);
+  lobby.handle('a', { t: 'guild_invite', id: c.id });
+  assert.equal(last('a', 'ginvSent').id, c.id);
+  assert.ok(lobby.social.unreadTotal(c.token) >= 1, 'the invite waits in the inbox');
+  lobby.handle('b', { t: 'guild_join', id: gid });
+  tick(40000);
+  lobby.handle('a', { t: 'guild_invite', id: b.id });
+  assert.match(last('a', 'err').msg, /Already/);
+});
+
+test('a stake of your own: any whole cents from $0.10 to $10,000 opens a table', () => {
+  const { lobby, client, last } = setup();
+  const a = client('a', 'alice');
+  assert.ok(lobby.roomFor('raid', 2500), '$2.50');
+  assert.equal(lobby.roomFor('raid', 50), null, 'below $0.10');
+  assert.equal(lobby.roomFor('raid', 10_000_010), null, 'above $10,000');
+  assert.equal(lobby.roomFor('raid', 2505), null, 'not whole cents');
+  assert.ok(lobby.rooms.has('raid:100000'), '$100 is a standard table');
+  lobby.handle('a', { t: 'join', mode: 'raid', stake: 7770, name: 'alice' });
+  assert.ok(lobby.rooms.has('raid:7770'));
+  lobby.handle('a', { t: 'leave' });
+  lobby.tick();
+  assert.equal(lobby.rooms.has('raid:7770'), false, 'an empty custom table goes away');
+  void a;
+  void last;
+});

@@ -200,6 +200,7 @@ export class GameClient {
     if (this.snaps.length > 30) this.snaps.shift();
     this.recvTl = { tl: s.tl, at: now };
     const you = s.you;
+    if (s.radar) this.radar = s.radar;
     const wasAlive = this.you?.st === 'alive';
     if (you.rl > 0 && !(this.you?.rl > 0) && you.st === 'alive') this.sfx.play('reload', { secs: WEAPONS[you.w]?.reload });
     this.you = you;
@@ -708,6 +709,7 @@ export class GameClient {
       showArrows: true,
       gore: this.gore,
       meAlive: alive,
+      radar: this.radar,
       target: this.aimTarget,
     };
   }

@@ -188,15 +188,22 @@ export async function renderCard(spec) {
   }
 
   // rank badge + footer
+  // whose card it is: the player's name, big, next to their rank insignia
+  const nameX = spec.rank ? 128 : 40;
   if (spec.rank) {
     const img = await svgImage(rankBadgeSvg(spec.rank, 96));
     if (img) ctx.drawImage(img, 40, 36, 76, 76);
-    ctx.fillStyle = '#ebe5d6';
-    ctx.font = `700 22px ${UI}`;
-    ctx.fillText(`RANK ${spec.rank}`, 128, 70);
+  }
+  if (spec.player) {
+    ctx.fillStyle = '#ffd166';
+    const ns = fitText(ctx, spec.player, `900 {s}px ${DISPLAY}`, 36, 460);
+    ctx.font = `900 ${ns}px ${DISPLAY}`;
+    ctx.fillText(spec.player, nameX, 72);
+  }
+  if (spec.rank) {
     ctx.fillStyle = '#8d93a6';
-    ctx.font = `500 18px ${UI}`;
-    ctx.fillText(RANKS[spec.rank - 1]?.name ?? '', 128, 96);
+    ctx.font = `600 18px ${UI}`;
+    ctx.fillText(`RANK ${spec.rank} · ${RANKS[spec.rank - 1]?.name ?? ''}`, nameX, spec.player ? 100 : 70);
   }
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   ctx.fillRect(0, H - 64, W, 64);
@@ -288,6 +295,10 @@ let current = null;
 export async function openShare(kind, data) {
   const m = moment(kind, data);
   if (!m) return;
+  if (data.player) {
+    m.spec.player = data.player;
+    m.text = `${data.player}: ${m.text}`;
+  }
   const dlg = $('dlg-share');
   $('share-status').textContent = 'Drawing your card…';
   $('share-img').removeAttribute('src');
