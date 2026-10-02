@@ -16,6 +16,7 @@ import { SocialBook } from '../shared/social.js';
 import { ReferralBook } from '../shared/referrals.js';
 import { Guard } from '../shared/guard.js';
 import { createBridge } from './bridge.js';
+import { MailBook, cleanGift } from '../shared/mail.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -32,6 +33,7 @@ const RANKS_FILE = process.env.RANKS_FILE || (DATA ? `${DATA}/ranks.json` : '');
 const LOCKER_FILE = process.env.LOCKER_FILE || (DATA ? `${DATA}/${NET}-locker.json` : '');
 const REFERRAL_FILE = process.env.REFERRAL_FILE || (DATA ? `${DATA}/${NET}-referrals.json` : '');
 const GUARD_FILE = process.env.GUARD_FILE || (DATA ? `${DATA}/${NET}-guard.json` : '');
+const MAIL_FILE = process.env.MAIL_FILE || (DATA ? `${DATA}/${NET}-mail.json` : '');
 const SOCIAL_FILE = process.env.SOCIAL_FILE || (existsSync('/data') ? '/data/social.json' : '');
 if (NET === 'mainnet' && (!LOCKER_FILE || !REFERRAL_FILE)) {
   console.error('On mainnet the locker (shop $ and skins bought with real money) and the referral book must live on a persistent disk: mount /data or set LOCKER_FILE and REFERRAL_FILE.');
@@ -47,7 +49,7 @@ const EPOCH_FILE = process.env.EPOCH_FILE || (DATA ? `${DATA}/epoch.json` : '');
 if (EPOCH_FILE) {
   const was = existsSync(EPOCH_FILE) ? JSON.parse(readFileSync(EPOCH_FILE, 'utf8')).epoch ?? null : null;
   if (was !== CFG.EPOCH) {
-    const files = [WALLET_FILE, RANKS_FILE, LOCKER_FILE, REFERRAL_FILE, GUARD_FILE, SOCIAL_FILE].filter((f) => f && existsSync(f));
+    const files = [WALLET_FILE, RANKS_FILE, LOCKER_FILE, REFERRAL_FILE, GUARD_FILE, SOCIAL_FILE, MAIL_FILE].filter((f) => f && existsSync(f));
     if (NET === 'mainnet' && files.length && process.env.EPOCH_RESET_MAINNET !== '1') {
       console.warn(`data epoch ${was} → ${CFG.EPOCH}: mainnet keeps its files (set EPOCH_RESET_MAINNET=1 to start over)`);
     } else if (files.length) {
@@ -165,6 +167,19 @@ const guard = new Guard({
 for (const k of (process.env.GUARD_CLEAR ?? '').split(',').map((x) => x.trim()).filter(Boolean)) guard.clear(k);
 if (guard.flags.size) console.warn(`guard: ${guard.flags.size} account(s) under fair-play review (withdrawals held):`, [...guard.flags.keys()].join(', '));
 
+// -------------------------------------------------------------------- mail
+let mailTimer = null;
+const mail = new MailBook({
+  data: MAIL_FILE && existsSync(MAIL_FILE) ? JSON.parse(readFileSync(MAIL_FILE, 'utf8')) : {},
+  onChange: (mb) => {
+    if (!MAIL_FILE || mailTimer) return;
+    mailTimer = setTimeout(async () => {
+      mailTimer = null;
+      await saveJSON(MAIL_FILE, mb.toJSON()).catch((e) => console.error('mail save failed', e));
+    }, 1500);
+  },
+});
+
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
 const send = (cid, msg) => {
@@ -185,6 +200,7 @@ const lobby = new Lobby({
   social,
   referrals,
   guard,
+  mail,
   send,
   bots: BOTS,
   minPlayers: 2,
@@ -255,6 +271,35 @@ const server = http.createServer((req, res) => {
       res.writeHead(204).end();
       return;
     }
+  }
+  // the team's mail to players: POST /api/admin/mail with header x-admin-key: ADMIN_KEY and
+  // { to: 'all' | '<account or token>', title, body, gift?: { k: 'credit', v: cents } | { k: 'box', id } | { k: 'spin', n } | { k: 'trial'|'wtrial', id } }
+  if (pathOnly === '/api/admin/mail' && req.method === 'POST') {
+    const reply = (code, body) => res.writeHead(code, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+    const key = process.env.ADMIN_KEY;
+    const given = String(req.headers['x-admin-key'] ?? '');
+    if (!key || key.length < 16 || given.length !== key.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(key))) return reply(403, { error: 'forbidden' });
+    let raw = '';
+    req.on('data', (c) => {
+      raw += c;
+      if (raw.length > 20000) req.destroy();
+    });
+    req.on('end', () => {
+      let b;
+      try {
+        b = JSON.parse(raw);
+      } catch {
+        return reply(400, { error: 'json' });
+      }
+      if (!b?.title) return reply(400, { error: 'title' });
+      const to = b.to && b.to !== 'all' ? String(b.to).toLowerCase().startsWith('0x') && real ? `0x${BigInt(b.to).toString(16).padStart(64, '0')}` : String(b.to) : null;
+      const m = mail.send({ key: to, title: b.title, body: b.body ?? '', gift: cleanGift(b.gift), kind: b.gift ? 'gift' : 'news' });
+      // tell whoever is online now
+      for (const [cid, x] of lobby.sessions) if (lobby.key(x) && (!to || lobby.key(x) === to)) send(cid, { t: 'mailbox', unread: mail.unread(lobby.key(x)), news: { k: 'mail' } });
+      console.log(`mail: "${m.title}" to ${to ?? 'everyone'}${m.gift ? ` with ${JSON.stringify(m.gift)}` : ''}`);
+      reply(200, { ok: true, id: m.id });
+    });
+    return;
   }
   // bridges in and out of Starknet (NEAR Intents 1Click), for signed-in players on a real chain
   if (pathOnly.startsWith('/api/bridge/')) {
@@ -362,6 +407,7 @@ const shutdown = async () => {
   if (LOCKER_FILE) await saveJSON(LOCKER_FILE, inventory.toJSON()).catch(() => {});
   if (REFERRAL_FILE) await saveJSON(REFERRAL_FILE, referrals.toJSON()).catch(() => {});
   if (GUARD_FILE) await saveGuard(guard).catch(() => {});
+  if (MAIL_FILE) await saveJSON(MAIL_FILE, mail.toJSON()).catch(() => {});
   if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, social.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await saveJSON(WALLET_FILE, wallet.toJSON()).catch(() => {});

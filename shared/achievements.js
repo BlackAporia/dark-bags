@@ -107,6 +107,8 @@ export const ACHIEVEMENTS = [
   // headshots: clean, centred hits (double damage)
   { id: 'sharpshooter', stat: 'headshots', goal: 25, xp: 300 },
   { id: 'headhunter', stat: 'headshots', goal: 250, xp: 1500 },
+  // premium: the welcome bonus of a first top-up or deposit, worn in animated gold
+  { id: 'founder', stat: 'deposits', goal: 1, xp: 500, premium: true },
   // secret: hidden until you earn them
   { id: 'by_a_thread', stat: 'clutch', goal: 1, xp: 700, secret: true },
   { id: 'untouchable', stat: 'flawless', goal: 1, xp: 900, secret: true },
@@ -116,11 +118,12 @@ export const ACHIEVEMENTS = [
 
 // What wearing it looks like: a title's tier, from plain to mythic, and the secret ones
 // (mystery). Set by how hard it is to earn.
-export const TITLE_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic', 'mystery'];
+export const TITLE_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic', 'mystery', 'premium'];
 export function titleTier(id) {
   const a = ACHIEVEMENTS.find((x) => x.id === id);
   if (!a) return 'common';
   if (a.secret) return 'mystery';
+  if (a.premium) return 'premium';
   if (a.stat === 'rank') return a.goal >= 90 ? 'mythic' : a.goal >= 60 ? 'legendary' : a.goal >= 30 ? 'epic' : 'rare';
   return a.xp >= 3000 ? 'mythic' : a.xp >= 1200 ? 'legendary' : a.xp >= 500 ? 'epic' : a.xp >= 200 ? 'rare' : 'common';
 }

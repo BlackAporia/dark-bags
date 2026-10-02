@@ -231,7 +231,9 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
   // the highlight, so even a big collection stays quick on a phone.
   const R = (r) => RARITY_ORDER.indexOf(r);
   const ownedOutfits = () => [...SEASON_OUTFITS, ...OUTFITS].filter((o) => owns(o.id));
-  const ownedSkins = () => (L()?.wowned ?? []).map((id) => WSKIN[id]).filter(Boolean);
+  // weapon skins you own, and the ones you are trying for 72h (fortune wheel)
+  const wtrialLeft = (id) => Math.max(0, (L()?.wtrials?.[id] ?? 0) - Date.now());
+  const ownedSkins = () => [...new Set([...(L()?.wowned ?? []), ...Object.keys(L()?.wtrials ?? {}).filter((id) => wtrialLeft(id) > 0)])].map((id) => WSKIN[id]).filter(Boolean);
   const ownedTurrets = () => (L()?.towned ?? []).map((id) => TURRET_SKIN[id]).filter(Boolean);
   const wName = (id) => t(`w.${WEAPONS.find((w) => w.id === id)?.name ?? 'Knife'}`);
 
@@ -293,7 +295,8 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
         const on = isOn(o);
         const sel = st.tab === 'outfits' ? st.selected === o.id : st.tab === 'weapons' ? st.wsel === o.id : st.tsel === o.id;
         const trial = st.tab === 'outfits' && !o.basic && !L().owned.includes(o.id) && trialLeft(o.id) > 0;
-        const sub = st.tab === 'weapons' ? wName(o.weapon) : trial ? t('lk.trialLeft', { t: left(trialLeft(o.id)) }) : rn(o.rarity);
+        const wtrial = st.tab === 'weapons' && !L().wowned.includes(o.id) && wtrialLeft(o.id) > 0;
+        const sub = wtrial ? t('lk.trialLeft', { t: left(wtrialLeft(o.id)) }) : st.tab === 'weapons' ? wName(o.weapon) : trial ? t('lk.trialLeft', { t: left(trialLeft(o.id)) }) : rn(o.rarity);
         return `<button type="button" class="lk-item r-${o.rarity}${on ? ' on' : ''}${sel ? ' sel' : ''}${o.limited || o.season ? ' limited' : ''}" data-id="${esc(o.id)}" style="--r:${RARITIES[o.rarity].color}"><span class="lk-shine"></span><img alt="" loading="lazy" decoding="async"${st.tab !== 'outfits' ? ' class="wimg"' : ''} src="${thumb(o)}"><span class="lk-name">${esc(o.name)}${esc(serial(o.id))}</span><span class="lk-state ${on ? 'on' : 'own'}">${on ? t('lk.equipped') : esc(sub)}</span></button>`;
       })
       .join('');

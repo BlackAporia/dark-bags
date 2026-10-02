@@ -14,7 +14,7 @@ export const achName = (id) => t(`ach.${id}`);
 export function titleHtml(id, cls = '') {
   if (!id || !ACHIEVEMENT[id]) return '';
   const tier = titleTier(id);
-  return `<span class="ttl t-${tier}${cls ? ` ${cls}` : ''}" title="${esc(t(`r.${tier}`))}">${tier === 'mystery' ? '◈ ' : tier === 'mythic' ? '✦ ' : tier === 'legendary' ? '★ ' : ''}${esc(achName(id))}</span>`;
+  return `<span class="ttl t-${tier}${cls ? ` ${cls}` : ''}" title="${esc(t(`r.${tier}`))}">${tier === 'premium' ? '♛ ' : tier === 'mystery' ? '◈ ' : tier === 'mythic' ? '✦ ' : tier === 'legendary' ? '★ ' : ''}${esc(achName(id))}</span>`;
 }
 
 // "Get 25 kills", "Spend 1 h inside raids", …

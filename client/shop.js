@@ -34,7 +34,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
   const shareLook = (res) => {
     const L_ = L();
     const ws = {};
-    for (const [w, f] of Object.entries(L_?.wequip ?? {})) if (L_.wowned?.includes(`${w}.${f}`)) ws[w] = f;
+    for (const [w, f] of Object.entries(L_?.wequip ?? {})) if (L_.wowned?.includes(`${w}.${f}`) || (L_.wtrials?.[`${w}.${f}`] ?? 0) > Date.now()) ws[w] = f;
     const base = { outfit: L_?.outfit ?? 'basic-0', body: L_?.body ?? 'm', ws };
     if (res.kind !== 'weapon') return { look: { ...base, outfit: res.item } };
     const s = WSKIN[res.item];

@@ -479,12 +479,27 @@ function migrate(r) {
   r.serials ??= {};
   r.towned ??= [];
   r.tequip ??= null;
+  r.wtrials ??= {};
+  r.spins ??= 0;
   return r;
 }
 
 function fresh() {
-  return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
+  return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, wtrials: {}, spins: 0, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
 }
+
+// The fortune wheel (one spin with the welcome bonus, more from mail gifts): a 72h trial outfit,
+// a 72h trial weapon skin, or a little shop $ (never withdrawn or sold). w: chance of the slot.
+export const WHEEL = [
+  { k: 'trial', w: 18 },
+  { k: 'credit', v: 25, w: 14 },
+  { k: 'wtrial', w: 17 },
+  { k: 'credit', v: 50, w: 10 },
+  { k: 'trial', w: 18 },
+  { k: 'credit', v: 100, w: 4 },
+  { k: 'wtrial', w: 17 },
+  { k: 'credit', v: 200, w: 2 },
+];
 
 /**
  * Per-player inventory (same keys as balances and ranks). Every method returns
@@ -504,6 +519,12 @@ export class Inventory {
   rec(key) {
     if (!this.data.has(key)) this.data.set(key, fresh());
     return this.data.get(key);
+  }
+
+  // a weapon skin you own, or are trying for 72h
+  ownsW(key, id) {
+    const r = this.rec(key);
+    return r.wowned.includes(id) || (r.wtrials[id] ?? 0) > this.now();
   }
 
   owns(key, id) {
@@ -535,6 +556,7 @@ export class Inventory {
     const r = this.rec(key);
     const now = this.now();
     for (const [id, until] of Object.entries(r.trials)) if (until <= now) delete r.trials[id];
+    for (const [id, until] of Object.entries(r.wtrials)) if (until <= now) delete r.wtrials[id];
     return {
       credit: r.credit,
       firstTopup: !r.bought, // the first top-up still doubles
@@ -543,6 +565,8 @@ export class Inventory {
       wequip: r.wequip,
       serials: r.serials,
       trials: r.trials,
+      wtrials: r.wtrials,
+      spins: r.spins,
       boxes: r.boxes,
       outfit: r.outfit,
       body: r.body,
@@ -559,7 +583,7 @@ export class Inventory {
   look(key) {
     const r = this.rec(key);
     const ws = {};
-    for (const [w, f] of Object.entries(r.wequip)) if (r.wowned.includes(`${w}.${f}`)) ws[w] = f;
+    for (const [w, f] of Object.entries(r.wequip)) if (this.ownsW(key, `${w}.${f}`)) ws[w] = f;
     const ts = r.tequip && r.towned.includes(r.tequip) ? r.tequip : null;
     return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm', ws, ...(ts ? { ts } : {}) };
   }
@@ -618,7 +642,7 @@ export class Inventory {
     if (!WEAPONS.some((x) => x.id === w)) return { ok: false, error: 'Unknown weapon.' };
     const r = this.rec(key);
     if (f === 'default') delete r.wequip[w];
-    else if (!r.wowned.includes(id)) return { ok: false, error: 'You do not own that skin.' };
+    else if (!this.ownsW(key, id)) return { ok: false, error: 'You do not own that skin.' };
     else r.wequip[w] = f;
     this.changed();
     return { ok: true };
@@ -690,7 +714,54 @@ export class Inventory {
       delete r.trials[rw.id];
     } else if (rw.k === 'wskin' && !r.wowned.includes(rw.id)) r.wowned.push(rw.id);
     else if (rw.k === 'turret' && !r.towned.includes(rw.id)) r.towned.push(rw.id);
+    else if (rw.k === 'spin') r.spins += Math.max(1, Math.min(10, rw.n ?? 1));
+    else if (rw.k === 'trial' && OUTFIT[rw.id]) r.trials[rw.id] = Math.max(r.trials[rw.id] ?? 0, this.now()) + TRIAL_MS;
+    else if (rw.k === 'wtrial' && WSKIN[rw.id]) r.wtrials[rw.id] = Math.max(r.wtrials[rw.id] ?? 0, this.now()) + TRIAL_MS;
     this.changed();
+  }
+
+  // the welcome bonus is given once per account (the first top-up or deposit)
+  welcome(key) {
+    const r = this.rec(key);
+    if (r.welcomed) return false;
+    r.welcomed = this.now();
+    this.changed();
+    return true;
+  }
+
+  // one turn of the fortune wheel: the slot it stops on and what it paid
+  spin(key) {
+    const r = this.rec(key);
+    if (!(r.spins > 0)) return { ok: false, error: 'No spins left.' };
+    const total = WHEEL.reduce((s, x) => s + x.w, 0);
+    let roll = this.rnd() * total;
+    let slot = WHEEL.length - 1;
+    for (let i = 0; i < WHEEL.length; i++) {
+      if (roll < WHEEL[i].w) {
+        slot = i;
+        break;
+      }
+      roll -= WHEEL[i].w;
+    }
+    const seg = WHEEL[slot];
+    // the skins: one you neither own nor are trying, rare to legendary, never exotic or limited
+    const pickOf = (list, owned, trying) => {
+      const pool = list.filter((o) => !o.basic && !o.limited && ['rare', 'epic', 'legendary'].includes(o.rarity) && !owned.includes(o.id) && !((trying[o.id] ?? 0) > this.now()));
+      return pool.length ? pool[Math.floor(this.rnd() * pool.length)] : null;
+    };
+    let prize;
+    if (seg.k === 'trial') {
+      const o = pickOf(OUTFITS, r.owned, r.trials);
+      prize = o ? { k: 'trial', id: o.id } : { k: 'credit', v: 50 };
+    } else if (seg.k === 'wtrial') {
+      const o = pickOf(WEAPON_SKINS, r.wowned, r.wtrials);
+      prize = o ? { k: 'wtrial', id: o.id } : { k: 'credit', v: 50 };
+    } else prize = { k: 'credit', v: seg.v };
+    r.spins -= 1;
+    this.give(key, prize);
+    if (prize.k === 'trial') prize.until = r.trials[prize.id];
+    if (prize.k === 'wtrial') prize.until = r.wtrials[prize.id];
+    return { ok: true, slot, prize };
   }
 
   setBody(key, body) {
