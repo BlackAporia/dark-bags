@@ -237,6 +237,23 @@ const MODELS = {
   lmg: [['lmg'], ['lmg'], ['lmg', 'minigun'], ['minigun', 'lmg'], ['minigun'], ['minigun']],
   magnum: [['magnum'], ['magnum', 'bolt'], ['bolt', 'magnum'], ['rail', 'magnum'], ['rail'], ['rail']],
 };
+// Blades are the one exception to "looks only": a longer blade reaches a little further.
+// reach: how far past your body the swing lands (the plain knife: 44); arc: how wide (rad)
+export const MELEE = {
+  knife: { reach: 44, arc: 1.9 },
+  dagger: { reach: 44, arc: 1.9 },
+  tanto: { reach: 48, arc: 1.9 },
+  cleaver: { reach: 50, arc: 2.0 },
+  machete: { reach: 54, arc: 2.0 },
+  axe: { reach: 54, arc: 2.0 },
+  dual: { reach: 52, arc: 2.4 },
+  hammer: { reach: 56, arc: 2.2 },
+  katana: { reach: 62, arc: 2.0 },
+  esword: { reach: 64, arc: 2.0 },
+  scythe: { reach: 66, arc: 2.4 },
+};
+export const meleeOf = (finishId) => MELEE[modelFor('knife', finishId)] ?? MELEE.knife;
+
 export function modelFor(weapon, finishId) {
   const f = FINISH[finishId];
   const list = MODELS[weapon];

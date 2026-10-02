@@ -1,19 +1,24 @@
-// The zombie mode: ten waves of the dead coming over the cemetery fence from every side,
-// each wave bigger, tougher and faster than the last, and on the tenth a boss with its
-// escort. Kill the boss and the run is cleared. The squad (one to four runners) shares
+// The zombie mode: twenty waves of the dead coming over the cemetery fence from every side,
+// each wave bigger, tougher and faster than the last; a boss on the tenth, and the final
+// boss on the twentieth. Kill the final boss and the run is cleared. No clock: you hold out
+// as long as you can. Every kill pays credits for the buy menu (medkits, sentry turrets,
+// laser tripmines), the same one as Guns + Lasers. The squad (one to four runners) shares
 // the fight: no friendly fire, and anyone who went down climbs back up when the next
 // wave starts, as long as somebody held on. Between waves everyone patches up a little.
 //
 // Runs inside World (world.js) on the same tick; zombies are not players, they live in
 // world.zombies and only humans' bullets and knives hurt them.
-import { CFG } from './config.js';
+import { CFG, GL } from './config.js';
 import { moveCircle, hasLOS, circleHitsRect } from './geom.js';
 import { NavGrid } from './nav.js';
 
-export const WAVES = 10;
+export const WAVES = 20;
+export const MID_BOSS = 10; // a boss halfway, the final one on the last wave
+// credits per kill, for the buy menu
+export const ZCR = { walker: 40, runner: 40, brute: 120, boss: 800 };
 export const WAVE_BREAK = 6; // seconds between waves (and before the first)
 export const WAVE_HEAL = 35; // health back for everyone standing when a wave is cleared
-const MAX_ALIVE = 36;
+const MAX_ALIVE = 44;
 
 // base stats; waves scale them up
 export const ZTYPES = {
@@ -27,12 +32,13 @@ export const BOSS = { slamEvery: 5, slamR: 170, slamDmg: 30, summonEvery: 14, su
 // how big a wave is and what it is made of
 export function wavePlan(n, squad = 1) {
   const k = 1 + 0.6 * (squad - 1);
-  if (n >= WAVES) return { count: Math.round(12 * k), boss: true, mix: { walker: 0.5, runner: 0.4, brute: 0.1 } };
-  const count = Math.round((8 + 5 * (n - 1)) * k);
-  const mix = n >= 7 ? { walker: 0.5, runner: 0.35, brute: 0.15 } : n >= 5 ? { walker: 0.65, runner: 0.25, brute: 0.1 } : n >= 3 ? { walker: 0.75, runner: 0.25, brute: 0 } : { walker: 1, runner: 0, brute: 0 };
-  return { count, boss: false, mix };
+  const boss = n === MID_BOSS || n >= WAVES;
+  const count = Math.round(Math.min(110, (boss ? 0.6 : 1) * (8 + 4 * (n - 1))) * k);
+  const mix = n >= 16 ? { walker: 0.4, runner: 0.38, brute: 0.22 } : n >= 11 ? { walker: 0.48, runner: 0.35, brute: 0.17 } : n >= 7 ? { walker: 0.5, runner: 0.35, brute: 0.15 } : n >= 5 ? { walker: 0.65, runner: 0.25, brute: 0.1 } : n >= 3 ? { walker: 0.75, runner: 0.25, brute: 0 } : { walker: 1, runner: 0, brute: 0 };
+  return { count, boss, mix };
 }
-export const waveScale = (n) => ({ hp: 1 + 0.16 * (n - 1), speed: 1 + 0.035 * (n - 1), dmg: 1 + 0.1 * (n - 1) });
+// every wave harder: more health, more bite, faster (speed levels off so it stays playable)
+export const waveScale = (n) => ({ hp: 1 + 0.13 * (n - 1), speed: Math.min(1.45, 1 + 0.025 * (n - 1)), dmg: 1 + 0.08 * (n - 1) });
 
 export class Horde {
   constructor(world) {
@@ -119,7 +125,8 @@ export class Horde {
     const sc = waveScale(this.wave);
     const gates = w.map.gates;
     const g = at ?? gates[Math.floor(w.rnd() * gates.length)];
-    const hpK = type === 'boss' ? 1 + 0.7 * (this.squad - 1) : sc.hp;
+    // the halfway boss is lighter than the final one
+    const hpK = type === 'boss' ? (1 + 0.7 * (this.squad - 1)) * (this.wave < WAVES ? 0.55 : 1) : sc.hp;
     const z = {
       id: w.nextId++,
       type,
@@ -260,6 +267,8 @@ export class Horde {
     this.zombies.delete(z.id);
     if (by) {
       by.zk = (by.zk ?? 0) + 1;
+      by.cr = Math.min(GL.MAX, (by.cr ?? 0) + ZCR[z.type]);
+      w.emit({ k: 'zcr', to: [by.id], v: ZCR[z.type], x: Math.round(z.x), y: Math.round(z.y) });
       if (z.type === 'brute') by.zBrutes = (by.zBrutes ?? 0) + 1;
     }
     w.emit({ k: 'zdead', zid: z.id, type: z.type, x: Math.round(z.x), y: Math.round(z.y), kid: by?.id ?? 0, ...(hs ? { hs: 1 } : {}) });
@@ -268,7 +277,12 @@ export class Horde {
       const m = { id: w.nextId++, x: z.x, y: z.y, heal: 30 };
       w.packs.set(m.id, m);
     }
-    if (z.type === 'boss') {
+    if (z.type === 'boss' && this.wave < WAVES) {
+      // the halfway boss: down, and the wave goes on
+      this.bossId = null;
+      if (by) by.bossKill = true;
+      w.emit({ k: 'bossDown', name: by?.name ?? null, mid: 1 });
+    } else if (z.type === 'boss') {
       this.bossDown = true;
       if (by) by.bossKill = true;
       // the boss falls: the rest of the horde falls with it

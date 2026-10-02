@@ -1,6 +1,7 @@
 import { CFG, GL } from './config.js';
 import { NavGrid } from './nav.js';
 import { WEAPONS, BOT_RANGE } from './weapons.js';
+import { meleeOf } from './cosmetics.js';
 
 const NAMES = [
   'hodl_rat', 'wagmi_wolf', 'rekt_ronin', 'sat_stacker', 'moon_mole', 'bag_goblin', 'fud_fox', 'ape_42',
@@ -280,7 +281,7 @@ export class BotBrain {
       const maxErr = ((1 - this.skill) * 0.4 + 0.05) * (wp.laser ? 0.35 : 1) * (this.easy ? 1.5 : 1);
       this.aimErr = Math.max(-maxErr, Math.min(maxErr, this.aimErr));
       aim = Math.atan2(ty - p.y, tx - p.x) + this.aimErr;
-      const reach = wp.melee ? wp.reach + CFG.PLAYER_R * 2 - 4 : wp.range * 0.9;
+      const reach = wp.melee ? meleeOf(p.ws?.[wp.id]).reach + CFG.PLAYER_R * 2 - 4 : wp.range * 0.9;
       if (this.easy) {
         this.burstT -= dt;
         if (this.burstT <= 0) {

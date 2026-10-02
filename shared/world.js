@@ -4,7 +4,7 @@ import { generateMap, generateArena, findSpawn, randomLootPoint, pointFree } fro
 import { stepMovement, sanitizeInput } from './movement.js';
 import { BotBrain, botName } from './bot.js';
 import { botRank } from './ranks.js';
-import { botLook, OUTFIT } from './cosmetics.js';
+import { botLook, OUTFIT, meleeOf } from './cosmetics.js';
 import { planZone, staticZone, zoneAt, exitState, outsideZone } from './zone.js';
 import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 import { MODE } from './modes.js';
@@ -514,7 +514,9 @@ export class World {
   }
 
   // Knife: hits the closest runner in front of you, within reach and not through walls.
-  slash(p, wp) {
+  slash(p, base) {
+    // the blade you hold sets the reach and the width of the swing (a katana reaches further)
+    const wp = { ...base, ...meleeOf(p.ws?.[base.id]) };
     let best = null;
     let bd = Infinity;
     for (const q of this.players.values()) {
@@ -774,7 +776,7 @@ export class World {
 
   // can this gadget hurt (or be hurt by) that runner? Never its owner or the owner's team.
   hostile(o, p) {
-    if (!p || p.id === o.owner) return false;
+    if (!p || p.id === o.owner || this.zombie) return false; // zombies: gadgets are the squad's
     return !(this.teamSize && p.team === o.team);
   }
 
@@ -791,7 +793,12 @@ export class World {
       if (p.hp >= this.maxHp) return no('full');
       p.hp = Math.min(this.maxHp, p.hp + it.heal);
     } else if (item === 'turret') {
-      if ([...this.turrets.values()].filter((o) => o.owner === p.id).length >= it.max) return no('limit');
+      const own = [...this.turrets.values()].filter((o) => o.owner === p.id);
+      if (own.length >= it.max + (this.zombie ? 1 : 0)) {
+        // zombies: a new turret replaces your oldest one (a fresh one, full health and time)
+        if (!this.zombie) return no('limit');
+        this.turrets.delete(own[0].id);
+      }
       // set down a step in front of you, or at your feet if a wall is in the way
       const fx = p.x + Math.cos(p.aim) * 34;
       const fy = p.y + Math.sin(p.aim) * 34;
@@ -800,7 +807,10 @@ export class World {
       this.turrets.set(o.id, o);
     } else if (item === 'mine') {
       const mine = [...this.mines.values()].filter((o) => o.owner === p.id);
-      if (mine.length >= it.max) return no('limit');
+      if (mine.length >= it.max) {
+        if (!this.zombie) return no('limit');
+        this.mines.delete(mine[0].id); // zombies: the oldest tripmine makes way for the new one
+      }
       // the beam runs from your feet the way you aim, to the first wall
       const ex = p.x + Math.cos(p.aim) * it.len;
       const ey = p.y + Math.sin(p.aim) * it.len;
@@ -838,8 +848,9 @@ export class World {
       o.cd = Math.max(0, o.cd - DT);
       let best = null;
       let bd = it.range;
-      for (const p of this.players.values()) {
-        if (p.status !== 'alive' || p.shield > 0 || !this.hostile(o, p)) continue;
+      // zombies: turrets shoot the dead; otherwise the nearest enemy runner
+      const targets = this.zombie ? this.zombies.values() : [...this.players.values()].filter((p) => p.status === 'alive' && p.shield <= 0 && this.hostile(o, p));
+      for (const p of targets) {
         const d = Math.hypot(p.x - o.x, p.y - o.y);
         if (d < bd && hasLOS(o.x, o.y, p.x, p.y, this.map.walls)) {
           bd = d;
@@ -867,19 +878,30 @@ export class World {
     for (const o of this.mines.values()) {
       if (this.time < o.armAt) continue;
       let trip = null;
-      for (const p of this.players.values()) {
-        if (p.status !== 'alive' || p.shield > 0 || !this.hostile(o, p)) continue;
-        if (segCircle(o.x, o.y, o.x2, o.y2, p.x, p.y, CFG.PLAYER_R) >= 0) {
-          trip = p;
-          break;
+      if (this.zombie) {
+        for (const z of this.zombies.values()) if (segCircle(o.x, o.y, o.x2, o.y2, z.x, z.y, z.r) >= 0) trip = z;
+      } else
+        for (const p of this.players.values()) {
+          if (p.status !== 'alive' || p.shield > 0 || !this.hostile(o, p)) continue;
+          if (segCircle(o.x, o.y, o.x2, o.y2, p.x, p.y, CFG.PLAYER_R) >= 0) {
+            trip = p;
+            break;
+          }
         }
-      }
       if (!trip) continue;
       this.mines.delete(o.id);
       const bx = trip.x;
       const by = trip.y;
       this.emit({ k: 'boom', x: r1(bx), y: r1(by), mid: o.id });
       const owner = this.players.get(o.owner);
+      if (this.zombie) {
+        for (const z of [...this.zombies.values()]) {
+          const d = Math.hypot(z.x - bx, z.y - by);
+          if (d <= it.r + z.r) this.horde.hit(z, owner, it.dmg * 1.5 * (1 - (0.5 * d) / (it.r + z.r)));
+          if (this.phase !== 'live') return;
+        }
+        continue;
+      }
       for (const p of this.players.values()) {
         if (p.status !== 'alive' || !this.hostile(o, p)) continue;
         const d = Math.hypot(p.x - bx, p.y - by);
@@ -1201,11 +1223,7 @@ export class World {
     };
     // keys the client translates
     if (this.rounds) return; // each round has its own clock on the HUD
-    if (this.zombie) {
-      if (tl <= 60) say('60', 'warn.z60');
-      if (tl <= 10) say('10', 'warn.z10');
-      return;
-    }
+    if (this.zombie) return; // no clock in zombies
     if (this.goldRush) {
       if (tl <= 30) say('30', 'warn.gold30');
       if (tl <= 10) say('10', 'warn.gold10');
@@ -1392,7 +1410,7 @@ export class World {
   // turrets and tripmines in sight range (tripmines by either end of the beam)
   gadgetsNear(me, near) {
     const pct = (o) => Math.ceil((o.hp / GL.ITEMS.turret.hp) * 100);
-    const mine = (o) => (o.owner === me.id ? 1 : this.teamSize && o.team === me.team ? 2 : 0);
+    const mine = (o) => (o.owner === me.id ? 1 : (this.teamSize && o.team === me.team) || this.zombie ? 2 : 0);
     const turrets = [];
     for (const o of this.turrets.values()) if (near(o.x, o.y, 40)) turrets.push({ i: o.id, x: r1(o.x), y: r1(o.y), a: r2(o.a), h: pct(o), fc: o.fc, o: mine(o), tl: Math.ceil(o.until - this.time), ...(o.sk ? { sk: o.sk } : {}) });
     const mines = [];

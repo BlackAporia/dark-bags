@@ -90,6 +90,7 @@ export const ACHIEVEMENTS = [
   // zombies: survive the waves, clear the boss, top the squad
   { id: 'graveyard_shift', stat: 'zRuns', goal: 1, xp: 80 },
   { id: 'hold_the_line', stat: 'bestWave', goal: 5, xp: 300 },
+  { id: 'last_stand', stat: 'bestWave', goal: 15, xp: 1500 },
   { id: 'undertaker', stat: 'zKills', goal: 100, xp: 300 },
   { id: 'exterminator', stat: 'zKills', goal: 1000, xp: 1500 },
   { id: 'giant_slayer', stat: 'zBoss', goal: 1, xp: 1200 },
