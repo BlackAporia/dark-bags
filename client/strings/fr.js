@@ -1078,4 +1078,12 @@ export default {
   'fw.title': "Roue de la fortune",
   'fw.trial': "Skin de coureur 72 h",
   'fw.wtrial': "Skin d'arme 72 h",
+  'coin.import': "Importer une crypto",
+  'coin.search': "Recherche : symbole, nom ou adresse",
+  'coin.added': "ajoutée",
+  'coin.add': "Ajouter",
+  'coin.none': "Rien trouvé",
+  'coin.note': "N'importe quelle crypto Starknet de la liste vérifiée d'AVNU ou d'Ekubo. Une fois ajoutée, dépose-la et mise avec comme les autres ; les gains reviennent dedans.",
+  'coin.done': "{s} ajoutée : dépose-la et choisis-la pour miser.",
+  'coin.noPrice': "{s} ajoutée ; son prix apparaît dans une minute.",
 };

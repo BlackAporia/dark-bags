@@ -1078,4 +1078,12 @@ export default {
   'fw.title': "幸运转盘",
   'fw.trial': "72 小时角色皮肤",
   'fw.wtrial': "72 小时武器皮肤",
+  'coin.import': "导入代币",
+  'coin.search': "搜索：代号、名称或地址",
+  'coin.added': "已添加",
+  'coin.add': "添加",
+  'coin.none': "没有找到",
+  'coin.note': "AVNU 认证列表或 Ekubo 列表中的任意 Starknet 代币。添加后即可充值并像其他代币一样下注，奖金以同一代币返还。",
+  'coin.done': "已添加 {s}：充值后即可选它下注。",
+  'coin.noPrice': "已添加 {s}；价格将在一分钟内显示。",
 };

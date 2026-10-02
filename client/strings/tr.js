@@ -1078,4 +1078,12 @@ export default {
   'fw.title': "Şans çarkı",
   'fw.trial': "72 saatlik koşucu kostümü",
   'fw.wtrial': "72 saatlik silah kaplaması",
+  'coin.import': "Coin içe aktar",
+  'coin.search': "Ara: sembol, ad ya da adres",
+  'coin.added': "eklendi",
+  'coin.add': "Ekle",
+  'coin.none': "Hiçbir şey bulunamadı",
+  'coin.note': "AVNU'nun doğrulanmış listesindeki ya da Ekubo listesindeki her Starknet coini. Ekledikten sonra yatır ve diğerleri gibi bahis yap; kazanç aynı coinle döner.",
+  'coin.done': "{s} eklendi: yatır ve bahis için seç.",
+  'coin.noPrice': "{s} eklendi; fiyatı bir dakika içinde görünür.",
 };

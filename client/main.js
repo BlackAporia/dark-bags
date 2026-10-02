@@ -32,6 +32,7 @@ import { createIntro } from './intro.js';
 import { createInvite, captureRef, deviceId } from './invite.js';
 import { createMail } from './mail.js';
 import { createFortune } from './fortune.js';
+import { createCoinImport } from './coins.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
@@ -172,6 +173,7 @@ const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: (
 // the menu pages
 const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
 const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
+const coinImport = createCoinImport({ app, send, toast: (m) => toast(m) });
 const fortune = createFortune({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
 const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }), onRender: (root) => fortune.mount(root) });
 const inventory = createInventory({ app, send, openBox: (id) => shop.open(id), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
@@ -362,6 +364,7 @@ function renderAssets() {
       return b;
     }),
   );
+  coinImport.attach(list); // + import any coin from the AVNU / Ekubo lists (real tokens)
   const info = assetInfo(app.asset);
   $('paywith').hidden = app.balances === null || !ids.length;
   // one short line under Play: what the stake costs, or what's wrong
@@ -912,6 +915,7 @@ function onMessage(m) {
   if (m.t === 'ref' || m.t === 'welcome' || m.t === 'authed') invite.onMessage(m);
   if (m.t === 'mailbox' || m.t === 'welcome' || m.t === 'authed' || m.t === 'locker') mail.onMessage(m);
   if (m.t === 'fortune' || m.t === 'err') fortune.onMessage(m);
+  if (m.t === 'coins' || m.t === 'err') coinImport.onMessage(m);
   if (m.t === 'balance' && app.page === 'shop') fortune.paint();
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
@@ -996,6 +1000,13 @@ function handleMessage(m) {
       }
       app.wantResult = false;
       showResult(m);
+      break;
+    case 'chain':
+      // a coin was imported: new prices and the cashier's token list
+      app.chain = m.chain;
+      app.assets = m.assets ?? app.assets;
+      app.prices = new PriceBook(app.assets);
+      renderLobby();
       break;
     case 'err':
       // fair-play refusals carry a code, and read in the player's language

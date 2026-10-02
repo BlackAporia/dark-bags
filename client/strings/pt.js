@@ -1078,4 +1078,12 @@ export default {
   'fw.title': "Roleta da sorte",
   'fw.trial': "Skin de corredor 72 h",
   'fw.wtrial': "Skin de arma 72 h",
+  'coin.import': "Importar moeda",
+  'coin.search': "Buscar: símbolo, nome ou endereço",
+  'coin.added': "adicionada",
+  'coin.add': "Adicionar",
+  'coin.none': "Nada encontrado",
+  'coin.note': "Qualquer moeda Starknet da lista verificada da AVNU ou da Ekubo. Depois de adicionada, deposite e aposte como qualquer outra; os ganhos voltam nela.",
+  'coin.done': "{s} adicionada: deposite e escolha para apostar.",
+  'coin.noPrice': "{s} adicionada; o preço aparece em um minuto.",
 };

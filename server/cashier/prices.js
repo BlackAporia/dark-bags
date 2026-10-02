@@ -57,6 +57,22 @@ export class PriceFeed {
     }
   }
 
+  // price one token now (a freshly imported coin should not wait for the next round)
+  async refreshOne(t) {
+    try {
+      const usd = await this.quoteOne(t);
+      if (usd > 0) {
+        this.last.set(t.id, { at: this.now(), usd });
+        this.publish(t, usd);
+        return usd;
+      }
+    } catch (e) {
+      this.log.warn?.(`price ${t.symbol}: ${e?.message ?? e}`);
+    }
+    this.publish(t, 0);
+    return 0;
+  }
+
   async refresh() {
     // WBTC first: the other BTC wrappers are checked against it
     const order = [...this.tokens].sort((a, b) => (b.symbol.toUpperCase() === 'WBTC') - (a.symbol.toUpperCase() === 'WBTC'));

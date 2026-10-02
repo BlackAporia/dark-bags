@@ -123,6 +123,7 @@ export class Cashier {
     this.withdrawals = data.withdrawals ?? []; // journal, newest last
     this.privyWallets = data.privyWallets ?? {}; // Privy user id → { walletId, publicKey, account }
     this.deposits = data.deposits ?? []; // [{ id, account, token, amount, route, at }]
+    this.imported = data.imported ?? []; // coins players brought from the AVNU / Ekubo lists
     this.logins = new Map(); // session token → { nonce, issued, at }
     this.pending = new Map(); // public deposit tx → { account, at }
     this.queue = Promise.resolve(); // withdrawals go out one at a time (house nonce)
@@ -176,7 +177,15 @@ export class Cashier {
       withdrawals: this.withdrawals.slice(-5000),
       deposits: this.deposits.slice(-5000),
       privyWallets: this.privyWallets,
+      imported: this.imported,
     };
+  }
+
+  // a token added to the chain after start (an imported coin)
+  addToken(t) {
+    this.tokenIds.add(t.id);
+    if (!this.imported.some((x) => x.address === t.id)) this.imported.push({ address: t.id, symbol: t.symbol, name: t.name, decimals: t.decimals });
+    this.persist();
   }
 
   persist() {
