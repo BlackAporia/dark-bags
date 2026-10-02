@@ -181,7 +181,16 @@ const tour = createTour({
   pickRaid: () => {
     app.gameMode = 'raid';
     store.set('darkbags.gmode', 'raid');
+    // the guided raid is played for $1 of practice money
+    if (app.stake !== 1000) app.stake = 1000;
     renderLobby();
+  },
+  // the guided raid: easy bots, only a few, and four minutes to find an exit (then back to
+  // the player's own practice settings)
+  tune: (on) => {
+    if (app.mode !== 'practice') return;
+    if (on) send({ t: 'practice_cfg', difficulty: 'easy', runners: 6, seconds: 240 });
+    else sendPracticeCfg();
   },
   practice: () => {
     if (app.mode !== 'practice') setMode('practice');
@@ -944,7 +953,9 @@ function handleMessage(m) {
       store.set('darkbags.raids', store.get('darkbags.raids', 0) + 1);
       if (m.rank) app.rank = m.rank.after;
       // went down with others still inside: watch them first, results when you want them
-      if (game.active && m.status === 'dead' && app.prep?.state === 'live' && !app.wantResult) {
+      // (not during Nyx's tour: she takes you straight to the next try)
+      if (tour.open && game.active && m.status === 'dead') send({ t: 'watch', d: 0 });
+      else if (game.active && m.status === 'dead' && app.prep?.state === 'live' && !app.wantResult) {
         app.pendingResult = m;
         break;
       }

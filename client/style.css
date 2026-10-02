@@ -2018,3 +2018,12 @@ body.gold-on #bag { color: #ffd166; }
   .zp-row { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
   .zp img { width: 66px; height: 32px; }
 }
+
+/* the tour: above every overlay (shop opening included), hidden while the raid or a rank-up
+   show runs, and a shake when you press something she did not ask for */
+.tour { z-index: 95; }
+.tour.hold { opacity: 0 !important; visibility: hidden; }
+.tour-card.nudge { animation: tour-nudge 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes tour-nudge { 10%, 90% { translate: -2px 0; } 20%, 80% { translate: 4px 0; } 30%, 50%, 70% { translate: -7px 0; } 40%, 60% { translate: 7px 0; } }
+.tour-spot.flash { box-shadow: 0 0 0 9999px rgba(4, 6, 10, 0.8), 0 0 0 3px #fff, 0 0 40px 12px rgba(247, 147, 26, 0.85); }
+.tour #tour-next:disabled { opacity: 0.45; cursor: not-allowed; }
