@@ -5,7 +5,7 @@ import { botName } from './bot.js';
 import { PriceBook, unitsAtEntryRate } from './assets.js';
 import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
-import { MODE } from './modes.js';
+import { MODE, ZOMBIE_WEAPONS } from './modes.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, seasonAt } from './cosmetics.js';
 import { spinChance, rollLottery, titleBonus, DIVISIONS } from './ranked.js';
 
@@ -28,9 +28,11 @@ export class RoomCore {
     this.waitForStart = waitForStart && !practice;
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
-    this.stake = stake;
     this.mode = MODE[mode] ? mode : 'raid';
     const m = MODE[this.mode];
+    this.stake = m.fixed ?? stake; // zombies and the gold rush take one flat entry
+    if (m.solo) this.minPlayers = 1; // zombies: you may go in alone
+    this.noBots = m.kind === 'zombie'; // the squad is humans only
     if (m.seconds) roundSeconds = m.seconds;
     this.ranks = ranks;
     this.inventory = inventory;
@@ -60,7 +62,7 @@ export class RoomCore {
   // --------------------------------------------------------------- clients
 
   addClient(cid, { token, name, skin }) {
-    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true });
+    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle' });
     if (this.state === 'idle') this.openPrep();
     this.broadcastPrep();
   }
@@ -105,9 +107,15 @@ export class RoomCore {
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
         this.broadcastPrep();
         break;
+      case 'pick':
+        // zombies: the weapon you take in (changeable until the run starts)
+        if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
+        this.broadcastPrep();
+        break;
       case 'ready':
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
+        if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
         this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'USDC');
         break;
       case 'unready':
@@ -196,7 +204,7 @@ export class RoomCore {
     // bots for the next raid are rolled now so their icons can light up by name
     const taken = new Set();
     this.roster = [];
-    for (let i = 0; i < this.botFill; i++) {
+    for (let i = 0; i < (this.noBots ? 0 : this.botFill); i++) {
       const n = botName(Math.random, taken);
       taken.add(n);
       const look = botLook(Math.random);
@@ -215,7 +223,7 @@ export class RoomCore {
   }
 
   botsNeeded() {
-    return this.bots ? Math.max(0, this.botFill - this.readyList().length) : 0;
+    return this.bots && !this.noBots ? Math.max(0, this.botFill - this.readyList().length) : 0;
   }
 
   botsShown() {
@@ -253,7 +261,7 @@ export class RoomCore {
     }
     for (const c of ready) {
       const look = this.inventory.look(c.token);
-      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), neon: this.ranks.neon(c.token), ...look });
+      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), neon: this.ranks.neon(c.token), weapon: c.weapon, ...look });
       this.accounts.set(p.id, { token: c.token, ...c.escrow });
       this.book(c.escrow.asset, 'in', c.escrow.units);
       c.pid = p.id;
@@ -361,7 +369,7 @@ export class RoomCore {
       min: this.minPlayers,
       waiting: this.waitForStart && this.state === 'prep' && this.countT === null, // no timer: start when you like
       bots,
-      pot: (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,
+      pot: this.noBots ? 0 : (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,
     };
     for (const c of this.clients.values()) {
       if (onlyIdle && this.inRaid(c)) continue;
@@ -370,9 +378,9 @@ export class RoomCore {
         slots: ready.map((r) => {
           const look = this.inventory.look(r.token);
           const tt = this.ranks.title(r.token);
-          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(tt ? { tt } : {}), me: r === c ? 1 : 0 };
+          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(tt ? { tt } : {}), ...(this.noBots ? { wp: r.weapon } : {}), me: r === c ? 1 : 0 };
         }),
-        me: { ready: c.ready, inRaid: this.inRaid(c), escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
+        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
         balances: this.wallet.balances(c.token),
       });
     }
@@ -391,7 +399,14 @@ export class RoomCore {
     const byPid = new Map();
     for (const c of this.clients.values()) if (c.pid) byPid.set(c.pid, c);
     for (const ev of w.events) {
-      if (ev.k === 'payout') {
+      if (ev.k === 'payout' && ev.credit) {
+        // gold rush: the pot is paid as shop credit (cents), not coins
+        const acct = this.accounts.get(ev.pid);
+        if (acct) {
+          acct.credit = Math.floor(ev.amount / 10);
+          this.inventory.give(acct.token, { k: 'credit', v: acct.credit });
+        }
+      } else if (ev.k === 'payout') {
         // pay out in the token they entered with, at their entry rate
         const acct = this.accounts.get(ev.pid);
         if (acct) {
@@ -444,9 +459,9 @@ export class RoomCore {
       if (w.potMode && p.status === 'dead' && w.phase !== 'ended') continue;
       c.reported = true;
       // career rank: every raid pays, win or lose
-      const earned = raidXp(p, { practice: this.practice });
+      const earned = raidXp(p, { practice: this.practice, kind: MODE[this.mode].kind });
       // achievements: career counters, each completed one pays its XP once
-      const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit, mode: MODE[this.mode] });
+      const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit, mode: MODE[this.mode], squad: w.players.size, mvp: w.zombie && p.won && [...w.players.values()].every((q) => q === p || (q.zk ?? 0) < (p.zk ?? 0)), goldWin: w.goldRush && !!p.won });
       // ranked: the finish moves the season rating, and may earn a bonus spin
       let ranked = null;
       if (MODE[this.mode]?.ranked && !this.practice && (w.phase === 'ended' || p.status === 'dead')) {
@@ -493,6 +508,8 @@ export class RoomCore {
         stake: p.stake,
         kills: p.kills,
         ...(w.dm ? { deaths: p.deaths, place: w.standings().indexOf(p) + 1, top: w.standings()[0]?.kills ?? 0 } : {}),
+        ...(w.zombie ? { zWave: p.zWave ?? 0, zk: p.zk ?? 0, waves: 10, squad: w.players.size } : {}),
+        ...(w.goldRush ? { gb: p.gb, place: w.goldOrder().indexOf(p) + 1, top: w.goldOrder()[0]?.gb ?? 0, deaths: p.deaths, credit: this.accounts.get(p.id)?.credit ?? 0 } : {}),
         secs: Math.round((p.endedAt ?? w.time) - p.joinedAt),
         killer: p.killerName,
         cause: p.cause,

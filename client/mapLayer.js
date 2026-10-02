@@ -30,6 +30,18 @@ function hazardPattern(ctx) {
 // reads as a crate and a long bar as a container or a wall.
 function classifyWalls(map) {
   const rnd = mulberry32(map.seed ^ 0x51ed);
+  // the arenas: a graveyard of headstones, crypts and low walls; a quarry of rock and timber
+  if (map.theme === 'graveyard')
+    return map.walls.map((w) => {
+      if (Math.max(w.w, w.h) <= 50) return { kind: 'grave', c: Math.floor(rnd() * 3) };
+      if (Math.min(w.w, w.h) <= 26) return { kind: 'lowwall' };
+      return { kind: 'crypt' };
+    });
+  if (map.theme === 'mine')
+    return map.walls.map((w) => {
+      const long = Math.max(w.w, w.h) / Math.min(w.w, w.h) > 2.5;
+      return long ? { kind: rnd() < 0.5 ? 'timber' : 'crate' } : { kind: 'rock', c: Math.floor(rnd() * 3) };
+    });
   return map.walls.map((w) => {
     const inVault = map.vaults.some((v) => rectsOverlap(v, w, 1) && (w.w <= 24 || w.h <= 24));
     if (inVault) return { kind: 'steel' };
@@ -41,6 +53,7 @@ function classifyWalls(map) {
 
 // A few painted "roads" crossing the map, fixed per map.
 function planRoads(map) {
+  if (map.theme) return []; // arenas have paths of their own
   const rnd = mulberry32(map.seed ^ 0x70ad);
   const roads = [];
   for (let i = 0; i < 2; i++) roads.push({ vertical: true, at: 300 + rnd() * (map.w - 600), w: 110 });
@@ -169,6 +182,134 @@ export class MapLayer {
     // decals, seeded per chunk (flat paint and dirt only: nothing here looks solid)
     const rnd = mulberry32((map.seed * 131 + cx * 7919 + cy * 104729) >>> 0);
     const inMap = (px, py) => px > 20 && py > 20 && px < map.w - 20 && py < map.h - 20;
+    if (map.theme) this.arenaGround(x, map, cx, cy, rnd, inMap, near);
+    else this.cityDecals(x, map, cx, cy, rnd, inMap);
+    // vault floors, exits, the fence and the walls
+    this.buildRest(x, map, near, view, tex);
+    return c;
+  }
+
+  // the graveyard: dark grass, a cobbled plaza in the middle, bones and wilted flowers, and the
+  // broken gates the dead come through. The quarry: dust, ore glints and cart rails.
+  arenaGround(x, map, cx, cy, rnd, inMap, near) {
+    const grave = map.theme === 'graveyard';
+    x.fillStyle = grave ? 'rgba(18, 38, 22, 0.62)' : 'rgba(118, 78, 34, 0.42)';
+    x.fillRect(0, 0, map.w, map.h);
+    const mx = map.w / 2;
+    const my = map.h / 2;
+    if (grave && near({ x: mx - 280, y: my - 280, w: 560, h: 560 })) {
+      const g = x.createRadialGradient(mx, my, 40, mx, my, 270);
+      g.addColorStop(0, 'rgba(150, 150, 140, 0.22)');
+      g.addColorStop(0.85, 'rgba(120, 120, 110, 0.16)');
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      x.fillStyle = g;
+      x.beginPath();
+      x.arc(mx, my, 270, 0, Math.PI * 2);
+      x.fill();
+      x.strokeStyle = 'rgba(200, 200, 190, 0.08)';
+      x.lineWidth = 2;
+      for (let r = 60; r < 260; r += 40) {
+        x.beginPath();
+        x.arc(mx, my, r, 0, Math.PI * 2);
+        x.stroke();
+      }
+    }
+    if (!grave) {
+      // rails between the sheds
+      for (const [vert, at] of [[true, map.w * 0.3], [false, map.h * 0.62]]) {
+        const rect = vert ? { x: at - 20, y: 0, w: 40, h: map.h } : { x: 0, y: at - 20, w: map.w, h: 40 };
+        if (!near(rect)) continue;
+        x.strokeStyle = 'rgba(70, 50, 30, 0.9)';
+        x.lineWidth = 6;
+        for (let k = -10; k < (vert ? map.h : map.w); k += 22) {
+          x.beginPath();
+          if (vert) {
+            x.moveTo(at - 16, k);
+            x.lineTo(at + 16, k);
+          } else {
+            x.moveTo(k, at - 16);
+            x.lineTo(k, at + 16);
+          }
+          x.stroke();
+        }
+        x.strokeStyle = 'rgba(160, 165, 175, 0.55)';
+        x.lineWidth = 3;
+        x.beginPath();
+        for (const o of [-10, 10]) {
+          if (vert) {
+            x.moveTo(at + o, 0);
+            x.lineTo(at + o, map.h);
+          } else {
+            x.moveTo(0, at + o);
+            x.lineTo(map.w, at + o);
+          }
+        }
+        x.stroke();
+      }
+    }
+    const n = 10 + Math.floor(rnd() * 8);
+    for (let i = 0; i < n; i++) {
+      const px = cx * CHUNK + rnd() * CHUNK;
+      const py = cy * CHUNK + rnd() * CHUNK;
+      if (!inMap(px, py)) continue;
+      const kind = rnd();
+      if (grave) {
+        if (kind < 0.6) {
+          // a tuft of dead grass
+          x.strokeStyle = `rgba(${70 + rnd() * 40}, ${100 + rnd() * 40}, 60, 0.5)`;
+          x.lineWidth = 1.5;
+          x.beginPath();
+          for (let b = 0; b < 5; b++) {
+            x.moveTo(px + b * 2 - 4, py);
+            x.lineTo(px + b * 2 - 4 + (rnd() - 0.5) * 6, py - 5 - rnd() * 6);
+          }
+          x.stroke();
+        } else if (kind < 0.8) {
+          // a bone
+          x.strokeStyle = 'rgba(225, 220, 200, 0.45)';
+          x.lineWidth = 3;
+          const a = rnd() * Math.PI;
+          x.beginPath();
+          x.moveTo(px - Math.cos(a) * 7, py - Math.sin(a) * 7);
+          x.lineTo(px + Math.cos(a) * 7, py + Math.sin(a) * 7);
+          x.stroke();
+        } else {
+          // a fresh mound of earth
+          x.fillStyle = 'rgba(40, 28, 18, 0.55)';
+          x.beginPath();
+          x.ellipse(px, py, 22, 11, rnd() * 0.4, 0, Math.PI * 2);
+          x.fill();
+        }
+      } else if (kind < 0.55) {
+        // a fleck of ore
+        x.fillStyle = `rgba(255, ${190 + rnd() * 50}, 80, ${0.35 + rnd() * 0.3})`;
+        x.fillRect(px, py, 2 + rnd() * 3, 2 + rnd() * 2);
+      } else {
+        // pale dust
+        const r = 20 + rnd() * 30;
+        const g = x.createRadialGradient(px, py, 0, px, py, r);
+        g.addColorStop(0, 'rgba(210, 170, 110, 0.18)');
+        g.addColorStop(1, 'rgba(210, 170, 110, 0)');
+        x.fillStyle = g;
+        x.beginPath();
+        x.arc(px, py, r, 0, Math.PI * 2);
+        x.fill();
+      }
+    }
+    // the gates: torn fence and a stain of light where the dead climb through
+    for (const gt of map.gates ?? []) {
+      if (!grave || !near({ x: gt.x - 70, y: gt.y - 70, w: 140, h: 140 })) continue;
+      const g = x.createRadialGradient(gt.x, gt.y, 5, gt.x, gt.y, 90);
+      g.addColorStop(0, 'rgba(120, 255, 120, 0.22)');
+      g.addColorStop(1, 'rgba(120, 255, 120, 0)');
+      x.fillStyle = g;
+      x.beginPath();
+      x.arc(gt.x, gt.y, 90, 0, Math.PI * 2);
+      x.fill();
+    }
+  }
+
+  cityDecals(x, map, cx, cy, rnd, inMap) {
     const n = 2 + Math.floor(rnd() * 3);
     for (let i = 0; i < n; i++) {
       const px = cx * CHUNK + rnd() * CHUNK;
@@ -237,6 +378,9 @@ export class MapLayer {
     // gravel
     x.fillStyle = 'rgba(160, 170, 190, 0.08)';
     for (let i = 0; i < 40; i++) x.fillRect(cx * CHUNK + rnd() * CHUNK, cy * CHUNK + rnd() * CHUNK, 2 + rnd() * 3, 2 + rnd() * 2);
+  }
+
+  buildRest(x, map, near, view, tex) {
 
     // vault floors + hazard striping that only shows in the doorways
     for (const v of map.vaults) {
@@ -309,7 +453,6 @@ export class MapLayer {
       for (const [w] of walls) x.fillRect(w.x + 7, w.y + 9, w.w, w.h);
     }
     for (const [w, k] of walls) this.drawWall(x, w, k, tex);
-    return c;
   }
 
   drawFence(x, view) {
@@ -354,7 +497,86 @@ export class MapLayer {
     }
   }
 
+  // headstones, crypts and low walls; rocks and timber
+  drawArenaWall(x, w, k, tex) {
+    if (k.kind === 'grave') {
+      const stone = ['#7d828c', '#6c6f76', '#8f8a80'][k.c];
+      const r = Math.min(w.w, w.h) / 2;
+      x.fillStyle = stone;
+      x.strokeStyle = 'rgba(0,0,0,0.75)';
+      x.lineWidth = 2;
+      x.beginPath();
+      x.moveTo(w.x, w.y + w.h);
+      x.lineTo(w.x, w.y + r);
+      x.arc(w.x + w.w / 2, w.y + r, w.w / 2, Math.PI, 0);
+      x.lineTo(w.x + w.w, w.y + w.h);
+      x.closePath();
+      x.fill();
+      x.stroke();
+      x.fillStyle = 'rgba(255,255,255,0.14)';
+      x.fillRect(w.x + 2, w.y + r, 3, w.h - r - 2);
+      x.strokeStyle = 'rgba(20, 20, 24, 0.7)';
+      x.lineWidth = 2.5;
+      x.beginPath();
+      x.moveTo(w.x + w.w / 2, w.y + r * 0.6);
+      x.lineTo(w.x + w.w / 2, w.y + w.h * 0.72);
+      x.moveTo(w.x + w.w * 0.3, w.y + r * 1.2);
+      x.lineTo(w.x + w.w * 0.7, w.y + r * 1.2);
+      x.stroke();
+      // moss at the foot
+      x.fillStyle = 'rgba(60, 110, 50, 0.55)';
+      x.fillRect(w.x, w.y + w.h - 5, w.w, 5);
+      return;
+    }
+    if (k.kind === 'rock') {
+      x.fillStyle = pattern(x, tex.cinder);
+      x.fillRect(w.x, w.y, w.w, w.h);
+      x.fillStyle = ['rgba(120, 80, 40, 0.55)', 'rgba(90, 70, 50, 0.6)', 'rgba(140, 100, 60, 0.5)'][k.c];
+      x.fillRect(w.x, w.y, w.w, w.h);
+      x.strokeStyle = 'rgba(20, 12, 6, 0.55)';
+      x.lineWidth = 2;
+      x.beginPath();
+      x.moveTo(w.x + w.w * 0.2, w.y);
+      x.lineTo(w.x + w.w * 0.45, w.y + w.h * 0.5);
+      x.lineTo(w.x + w.w * 0.3, w.y + w.h);
+      x.moveTo(w.x + w.w * 0.45, w.y + w.h * 0.5);
+      x.lineTo(w.x + w.w, w.y + w.h * 0.4);
+      x.stroke();
+      // a vein of gold
+      x.strokeStyle = 'rgba(255, 200, 80, 0.55)';
+      x.lineWidth = 1.5;
+      x.beginPath();
+      x.moveTo(w.x + w.w * 0.6, w.y + w.h * 0.15);
+      x.lineTo(w.x + w.w * 0.75, w.y + w.h * 0.35);
+      x.stroke();
+    } else {
+      x.fillStyle = pattern(x, k.kind === 'crypt' ? tex.brick : k.kind === 'lowwall' ? tex.cinder : tex.planks);
+      x.fillRect(w.x, w.y, w.w, w.h);
+      if (k.kind === 'crypt' || k.kind === 'lowwall') {
+        x.fillStyle = 'rgba(40, 60, 45, 0.45)';
+        x.fillRect(w.x, w.y, w.w, w.h);
+      }
+      if (k.kind === 'crypt') {
+        x.fillStyle = 'rgba(10, 12, 14, 0.85)';
+        const dw = Math.min(34, w.w * 0.3);
+        x.fillRect(w.x + w.w / 2 - dw / 2, w.y + w.h - 26, dw, 26);
+        x.fillStyle = 'rgba(220, 215, 200, 0.18)';
+        x.font = '900 18px "Big Shoulders Stencil Display", Impact, sans-serif';
+        x.textAlign = 'center';
+        x.fillText('R.I.P.', w.x + w.w / 2, w.y + 24);
+      }
+    }
+    x.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    x.fillRect(w.x, w.y, w.w, 3);
+    x.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    x.fillRect(w.x, w.y + w.h - 4, w.w, 4);
+    x.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    x.lineWidth = 1.5;
+    x.strokeRect(w.x + 0.75, w.y + 0.75, w.w - 1.5, w.h - 1.5);
+  }
+
   drawWall(x, w, k, tex) {
+    if (['grave', 'crypt', 'lowwall', 'rock', 'timber'].includes(k.kind)) return this.drawArenaWall(x, w, k, tex);
     const vertical = w.h > w.w;
     const pick = () => {
       switch (k.kind) {

@@ -31,7 +31,7 @@ export class BotBrain {
     // practice difficulty: easy bots are slower to react, sloppier and fire in short bursts;
     // normal plays like online bots; hard ones aim and react like veterans
     const diff = world.difficulty ?? (world.practice ? 'easy' : 'normal');
-    this.ffa = !!world.practice || world.dm; // practice and deathmatch: every bot for itself
+    this.ffa = !!world.practice || world.dm || world.goldRush; // practice, deathmatch, gold rush: every bot for itself
     this.shopT = 1 + rnd() * 2; // guns + lasers: when to think about buying next
     this.easy = diff === 'easy';
     this.skill = this.easy ? 0.05 + rnd() * 0.3 : diff === 'hard' ? 0.5 + rnd() * 0.45 : 0.15 + rnd() * 0.4; // online: a new player survives first contact more often than not
@@ -167,6 +167,16 @@ export class BotBrain {
         best = d;
       }
     }
+    // gold rush: bags of gold, the big ones and the spills worth the detour
+    for (const g of this.w.gold?.values() ?? []) {
+      const d2 = (g.x - p.x) ** 2 + (g.y - p.y) ** 2;
+      if (d2 > R2) continue;
+      const s = (g.v * 100) / (Math.sqrt(d2) + 80);
+      if (s > score) {
+        score = s;
+        best = g;
+      }
+    }
     for (const o of this.w.orbs.values()) {
       const d2 = (o.x - p.x) ** 2 + (o.y - p.y) ** 2;
       if (d2 > R2 || !this.safe(o.x, o.y)) continue;
@@ -220,7 +230,7 @@ export class BotBrain {
     // Either way, humans get HUMAN_GRACE seconds to find their feet, and then at most
     // HUMAN_HUNTERS bots press one human at a time (unless that human started it):
     // a lone player gets fights, not a pile-on.
-    const truce = w.time < CFG.BOT_TRUCE && !w.dm;
+    const truce = w.time < CFG.BOT_TRUCE && !w.dm && !w.goldRush;
     const hunter = this.brave > 0.68;
     const foes = w
       .visibleEnemies(p)
@@ -322,12 +332,12 @@ export class BotBrain {
       move = inZone ? { mx: 0, my: 0 } : this.goTo(exit.x, exit.y);
     } else {
       this.decideT -= dt;
-      if (this.decideT <= 0 || (this.lootTarget && !w.orbs.has(this.lootTarget.id) && !w.drops.has(this.lootTarget.id))) {
+      if (this.decideT <= 0 || (this.lootTarget && !w.orbs.has(this.lootTarget.id) && !w.drops.has(this.lootTarget.id) && !w.gold?.has(this.lootTarget.id))) {
         this.decideT = 0.3;
         this.lootTarget = this.pickLoot();
       }
       if (this.lootTarget) move = this.goTo(this.lootTarget.x, this.lootTarget.y);
-      else if (w.dm) {
+      else if (w.dm || w.goldRush) {
         this.huntT = (this.huntT ?? 0) - dt;
         if (!this.wander || dist(this.wander, p) < 60 || this.huntT <= 0) {
           this.huntT = 2;

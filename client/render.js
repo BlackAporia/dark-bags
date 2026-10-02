@@ -7,6 +7,7 @@ import { pose, drawFigure, FEET, hpColor } from './stickman.js';
 import { textures, canvas } from './textures.js';
 import { FINISH, RARITY_ORDER, TURRET_SKIN } from '../shared/cosmetics.js';
 import { neonText, neonColor } from './ranked.js';
+import { drawZombie, drawZombieTag, drawGoldBag, drawMedkit } from './zombie.js';
 
 const C = {
   void: '#07090f',
@@ -181,6 +182,8 @@ export class Renderer {
     for (const o of v.orbs) if (inView(o.x, o.y, 40)) this.drawOrb(o, t, v.golden);
     for (const d of v.drops) if (inView(d.x, d.y, 40)) this.drawDrop(d, t);
     for (const m of v.mines ?? []) this.drawMineBase(m, t);
+    for (const g of v.gold ?? []) if (inView(g.x, g.y, 40)) drawGoldBag(ctx, g, t, this.reduced);
+    for (const m of v.packs ?? []) if (inView(m.x, m.y, 40)) drawMedkit(ctx, m, t, this.reduced);
 
     // 4. runners and graves, sorted by depth
     const items = [];
@@ -197,6 +200,7 @@ export class Renderer {
       }
     }
     for (const f of v.figures) if (inView(f.a.x, f.a.y, 80)) items.push({ y: f.a.y + FEET, draw: () => this.drawRunner(f, t, v.gore) });
+    for (const z of v.zombies ?? []) if (inView(z.a.x, z.a.y, 120)) items.push({ y: z.a.y + FEET, draw: () => drawZombie(ctx, z, t, v.gore) });
     for (const g of v.fx.graveItems(t, v.gore)) items.push(g);
     for (const o of v.turrets ?? []) if (inView(o.x, o.y, 60)) items.push({ y: o.y, draw: () => this.drawTurret(o, t) });
     items.sort((a, b) => a.y - b.y);
@@ -229,6 +233,7 @@ export class Renderer {
       ctx.fillText(label, e.x, e.y - e.r - 12);
     }
     for (const f of v.figures) if (inView(f.a.x, f.a.y, 60) && f.p) this.drawTag(f);
+    for (const z of v.zombies ?? []) if (inView(z.a.x, z.a.y, 120)) drawZombieTag(ctx, z, F_UI);
     v.fx.drawFloaters(ctx);
 
     // 9. screen space
@@ -1001,11 +1006,11 @@ export class Renderer {
     if (radar) {
       const glow = this.reduced ? 1 : 0.75 + 0.25 * Math.sin(t / 180);
       for (const [x, y, ally] of radar) {
-        m.fillStyle = ally ? 'rgba(61, 220, 151, 0.95)' : `rgba(255, 77, 94, ${glow})`;
+        m.fillStyle = ally === 1 ? 'rgba(61, 220, 151, 0.95)' : `rgba(255, 77, 94, ${glow})`;
         m.beginPath();
-        m.arc(x * 10 * k, y * 10 * k, (ally ? 2.6 : 2.8) * this.dpr, 0, TAU);
+        m.arc(x * 10 * k, y * 10 * k, (ally === 2 ? 5 : ally ? 2.6 : 2.8) * this.dpr, 0, TAU);
         m.fill();
-        if (!ally) {
+        if (ally !== 1) {
           m.strokeStyle = `rgba(255, 77, 94, ${0.35 * glow})`;
           m.lineWidth = 1.2 * this.dpr;
           m.beginPath();

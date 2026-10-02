@@ -11,10 +11,10 @@ import { store } from './store.js';
 import { PriceBook, formatUnits, usdText } from '../shared/assets.js';
 import { createCashierUi } from './cashier.js';
 import { rankBadgeSvg } from './rankbadge.js';
-import { createLocker } from './locker.js';
+import { createLocker, gunStill } from './locker.js';
 import { figureStill } from './stickman.js';
 import { openShare, wireShare } from './sharecard.js';
-import { OUTFIT, OUTFITS, RARITIES } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, usd } from '../shared/cosmetics.js';
 import { spinReel } from './reel.js';
 import { createPass } from './pass.js';
 import { createNews } from './news.js';
@@ -29,7 +29,7 @@ import { createSettingsUi } from './settingsui.js';
 import { createTour } from './tour.js';
 import { createIntro } from './intro.js';
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
-import { MODE, MODES } from '../shared/modes.js';
+import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -123,7 +123,8 @@ const app = {
   prices: new PriceBook([]),
   asset: store.get('darkbags.asset', 'USDC'),
   tables: [],
-  stake: validStake(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
+  _stake: validStake(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
+  zweapon: ZOMBIE_WEAPONS.includes(store.get('darkbags.zweapon', 'rifle')) ? store.get('darkbags.zweapon', 'rifle') : 'rifle',
   name: store.get('darkbags.name', ''),
   skin: SKINS.includes(store.get('darkbags.skin', '')) ? store.get('darkbags.skin') : SKINS[Math.floor(Math.random() * SKINS.length)],
   gore: settings.gore,
@@ -136,6 +137,14 @@ const app = {
   lastCount: null,
   inRoom: false,
 };
+// the stake you play at: zombies and the gold rush take one flat entry, whatever you picked
+Object.defineProperty(app, 'stake', {
+  get: () => MODE[app.gameMode]?.fixed ?? app._stake,
+  set: (v) => {
+    app._stake = v;
+  },
+  enumerable: true,
+});
 const send = (m) => app.transport?.send(m);
 const game = new GameClient({ renderer, input, sfx, send, el });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
@@ -346,7 +355,7 @@ function tableInfo(stake) {
 }
 
 // the mode picker: a card per mode with what it is and how the money works
-const MODE_ICON = { ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
+const MODE_ICON = { zombies: '🧟', gold: '💰', ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
 function renderModes() {
   const box = $('modes');
   box.replaceChildren(
@@ -360,7 +369,7 @@ function renderModes() {
       const rows = app.tables.filter((x) => x.mode === m.id);
       const waiting = rows.reduce((s, x) => s + (x.state === 'prep' ? x.ready ?? 0 : 0), 0);
       const live = rows.reduce((s, x) => s + (x.humans ?? 0), 0);
-      const size = m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
+      const size = m.kind === 'zombie' ? `1–${m.size}` : m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
       b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>${waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: waiting }))}</span>` : ''}`;
       b.addEventListener('click', () => {
         if (document.body.classList.contains('tour-raid-only') && m.id !== 'raid') return; // Nyx's first raid is a Raid
@@ -447,8 +456,10 @@ function renderLobby() {
   else st.textContent = t('net.down');
 
   const list = $('tables');
+  const fixed = MODE[app.gameMode]?.fixed;
+  list.classList.toggle('fixed', !!fixed);
   list.replaceChildren(
-    ...CFG.TIERS.map((stake) => {
+    ...(fixed ? [fixed] : CFG.TIERS).map((stake) => {
       const tb = tableInfo(stake);
       const b = document.createElement('button');
       b.type = 'button';
@@ -471,6 +482,7 @@ function renderLobby() {
         state = t('tb.golden');
         cls = 'gold';
       } else if (!state && tb?.jackpot > 0) state = t('tb.jackpot', { v: money(tb.jackpot) });
+      if (fixed && !state) state = t(MODE[app.gameMode].kind === 'zombie' ? 'tb.zFee' : 'tb.goldFee');
       b.innerHTML = `<span class="stake">${money(stake)}</span>${state ? `<span class="state ${cls}">${esc(state)}</span>` : ''}`;
       b.addEventListener('click', () => {
         app.stake = stake;
@@ -479,7 +491,7 @@ function renderLobby() {
       });
       return b;
     }),
-    customStake(),
+    ...(fixed ? [] : [customStake()]),
   );
 
   $('gore').checked = app.gore;
@@ -693,7 +705,8 @@ const figureSvg = (color) =>
 function renderPrep() {
   const p = app.prep;
   if (!p) return;
-  $('prep-kicker').textContent = `${t('prep.raid', { n: p.round, s: money(p.stake) })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
+  const fixedMode = MODE[app.gameMode]?.fixed;
+  $('prep-kicker').textContent = fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: money(p.stake) })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
   const count = $('prep-count');
   const status = $('prep-status');
   count.classList.remove('wait');
@@ -729,7 +742,7 @@ function renderPrep() {
   const lineup = $('lineup');
   const want = [...p.slots.map((s) => ({ ...s, kind: s.me ? 'me' : 'human' })), ...p.bots.map((b) => ({ ...b, kind: 'bot' }))];
   const total = Math.max(p.slotsTotal, want.length);
-  const keys = want.map((s) => `${s.kind}:${s.n}`);
+  const keys = want.map((s) => `${s.kind}:${s.n}:${s.wp ?? ''}`);
   const cur = [...lineup.children].map((c) => c.dataset.key || '');
   if (cur.join('|') !== [...keys, ...Array(total - keys.length).fill('')].join('|')) {
     lineup.replaceChildren(
@@ -743,13 +756,16 @@ function renderPrep() {
         }
         d.className = `slot lit ${s.kind === 'me' ? 'me' : ''} ${s.kind === 'bot' ? 'bot' : ''}`;
         d.style.color = s.c;
-        d.dataset.key = `${s.kind}:${s.n}`;
-        d.innerHTML = `<img class="fig" alt="" src="${figureStill({ outfit: s.o, body: s.g }, 60, 84)}"><span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>${s.tt ? titleHtml(s.tt, 'slot-tt') : ''}`;
+        d.dataset.key = `${s.kind}:${s.n}:${s.wp ?? ''}`;
+        d.innerHTML = `<img class="fig" alt="" src="${figureStill({ outfit: s.o, body: s.g }, 60, 84)}"><span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>${s.tt ? titleHtml(s.tt, 'slot-tt') : ''}${s.wp ? `<span class="slot-wp">${esc(t(`w.${WEAPONS.find((w) => w.id === s.wp)?.name}`))}</span>` : ''}`;
         return d;
       }),
     );
   }
-  $('pot').textContent = money(p.pot);
+  const zed = MODE[app.gameMode]?.kind === 'zombie';
+  $('pot').textContent = zed ? t('prep.zFee', { v: money(p.stake) }) : money(p.pot);
+  $('pot-k').textContent = t(zed ? 'prep.zSquad' : MODE[app.gameMode]?.kind === 'gold' ? 'prep.goldPot' : 'prep.pot');
+  renderZPick(MODE[app.gameMode]?.pick && p.state !== 'live', p.me?.weapon);
   $('prep-start').hidden = !(p.waiting && p.me?.ready);
   $('prep-start').disabled = p.slots.length < (p.min ?? 1); // online needs two players or more
   $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
@@ -765,6 +781,33 @@ function renderPrep() {
   }
   ready.disabled = !me.ready && (q === null || units(app.asset) < q);
   $('prep-balance').textContent = `${assetInfo(app.asset).symbol}: ${coinAndUsd(app.asset, units(app.asset))}`;
+}
+
+// zombies: the weapon you take in, picked in the ready room (each with how hard and how
+// fast it hits, so the choice means something)
+function renderZPick(show, current) {
+  const box = $('zpick');
+  box.hidden = !show;
+  if (!show) return;
+  const cur = current ?? app.zweapon;
+  const key = `${cur}|${getLang()}`;
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  const maxDps = Math.max(...WEAPONS.map((w) => (w.dmg * (w.pellets ?? 1)) / w.cd));
+  box.innerHTML = `<p class="eyebrow">${esc(t('zp.title'))}</p><div class="zp-row">${ZOMBIE_WEAPONS.map((id) => {
+    const w = WEAPONS.find((x) => x.id === id);
+    const dps = (w.dmg * (w.pellets ?? 1)) / w.cd;
+    return `<button type="button" class="zp${id === cur ? ' on' : ''}" data-zw="${id}" aria-pressed="${id === cur}"><img alt="" src="${gunStill(id, 120, 56)}"><b>${esc(t(`w.${w.name}`))}</b><span class="zp-bar" title="${esc(t('zp.power'))}"><i style="width:${Math.round((dps / maxDps) * 100)}%"></i></span><small>${w.melee ? esc(t('zp.melee')) : `${w.mag} · ${w.reload}s`}</small></button>`;
+  }).join('')}</div>`;
+  for (const b of box.querySelectorAll('[data-zw]'))
+    b.addEventListener('click', () => {
+      app.zweapon = b.dataset.zw;
+      store.set('darkbags.zweapon', app.zweapon);
+      send({ t: 'pick', weapon: app.zweapon });
+      sfx.play('reload', { secs: 0.6 });
+      box.dataset.key = '';
+      renderZPick(true, app.zweapon);
+    });
 }
 
 // ------------------------------------------------------------- transport
@@ -1040,7 +1083,20 @@ function showResult(m) {
   // the announcer calls the big endings
   if (m.won) sfx.say('victory', getLang());
   else if (m.status === 'extracted') sfx.say('extracted', getLang());
-  if (pot && m.won) {
+  if (MODE[m.mode]?.kind === 'zombie') {
+    const w = m.zWave ?? 0;
+    k.textContent = m.won ? t('res.zCleared') : t('res.zFell', { n: Math.min(m.waves ?? 10, w + 1) });
+    k.className = `res-kicker ${m.won ? 'win' : 'loss'}`;
+    amt.textContent = t('res.zWaves', { n: w, of: m.waves ?? 10 });
+    amt.className = `res-amount${m.won ? ' win' : ''}`;
+    det.innerHTML = `${t(m.won ? 'res.zWonText' : 'res.zText', { k: `<b>${m.zk ?? 0}</b>`, s: `<b>${m.squad ?? 1}</b>` })} ${t('res.zTime', { t: mmss(m.secs) })}.`;
+  } else if (MODE[m.mode]?.kind === 'gold') {
+    k.textContent = m.won ? t('res.goldWon') : t('res.goldLost', { p: m.place ?? '?' });
+    k.className = `res-kicker ${m.won ? 'win' : 'loss'}`;
+    amt.textContent = m.won ? `+${usd(m.credit ?? 0)}` : `−${money(m.stake)}`;
+    amt.className = `res-amount${m.won ? ' win' : ''}`;
+    det.innerHTML = m.won ? t('res.goldWonText', { b: `<b>${m.gb ?? 0}</b>`, c: `<b>${usd(m.credit ?? 0)}</b>` }) : t('res.goldText', { b: `<b>${m.gb ?? 0}</b>`, top: `<b>${m.top ?? 0}</b>` });
+  } else if (pot && m.won) {
     k.textContent = t(MODE[m.mode].kind === 'team' ? 'res.teamWon' : 'res.victory');
     k.className = 'res-kicker win';
     amt.textContent = money(m.payout);
@@ -1107,7 +1163,7 @@ function goToTable() {
 function toggleReady() {
   sfx.unlock();
   if (app.prep?.me?.ready) send({ t: 'unready' });
-  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset });
+  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon });
 }
 
 $('name').value = app.name;
@@ -1154,11 +1210,12 @@ $('prep-back').addEventListener('click', () => {
 $('res-share').addEventListener('click', () => {
   const m = app.lastResult;
   if (!m) return;
-  shareMoment(m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
+  const kind = MODE[m.mode]?.kind;
+  shareMoment(kind === 'zombie' ? 'zombie' : kind === 'gold' ? 'goldRush' : m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
-  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset });
+  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon });
   showScreen('prep');
 });
 $('res-tables').addEventListener('click', () => {

@@ -1,6 +1,6 @@
 import { CFG, GL } from './config.js';
 import { mulberry32, hasLOS, segWalls, segCircle } from './geom.js';
-import { generateMap, findSpawn, randomLootPoint } from './map.js';
+import { generateMap, generateArena, findSpawn, randomLootPoint, pointFree } from './map.js';
 import { stepMovement, sanitizeInput } from './movement.js';
 import { BotBrain, botName } from './bot.js';
 import { botRank } from './ranks.js';
@@ -8,6 +8,7 @@ import { botLook, OUTFIT } from './cosmetics.js';
 import { planZone, staticZone, zoneAt, exitState, outsideZone } from './zone.js';
 import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 import { MODE } from './modes.js';
+import { Horde } from './horde.js';
 
 const DT = 1 / CFG.TICK_RATE;
 // weapon families, for the mastery achievements
@@ -31,6 +32,11 @@ const r2 = (v) => Math.round(v * 100) / 100;
 const BOT_DAMAGE = 0.75;
 const PRACTICE_BOT_DAMAGE = { easy: 0.5, normal: 0.75, hard: 1 };
 const PRACTICE_SPAWN_SHIELD = 5; // seconds; firing still drops it early
+// gold rush: bags on the ground at once (plus some per runner), how often a new one lands,
+// and the share of big bags (worth three)
+const GOLD = { base: 6, perRunner: 2, every: 0.8, big: 0.1, r: CFG.PLAYER_R + 14 };
+// the guns a gold-rush runner may be handed (anything but the knife)
+const GUNS = WEAPONS.map((w, i) => (w.melee ? -1 : i)).filter((i) => i >= 0);
 
 export class World {
   constructor({
@@ -57,6 +63,16 @@ export class World {
     this.hardcore = !!m.hardcore; // one hit and you're down
     this.shop = !!m.shop; // guns + lasers: credits buy medkits, turrets and tripmines
     this.maxHp = this.hardcore ? 1 : CFG.HP;
+    // side modes on their own arenas: zombies (co-op waves, horde.js) and the gold rush
+    this.zombie = m.kind === 'zombie';
+    this.goldRush = m.kind === 'gold';
+    this.respawns = this.dm || this.goldRush; // back in a few seconds after you drop
+    this.noLadder = this.zombie || this.goldRush; // you keep the weapon you came with
+    this.feeOnly = this.zombie; // the entry is a fee: no pot, it pays XP and titles
+    this.zombies = new Map();
+    this.packs = new Map(); // medkits the dead leave behind (zombies)
+    this.gold = new Map(); // gold bags on the ground (gold rush)
+    this.goldT = 0;
     this.turrets = new Map();
     this.mines = new Map();
     this.leaderId = null;
@@ -71,12 +87,13 @@ export class World {
     this.stake = stake;
     this.seed = seed;
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
-    this.map = generateMap(seed);
+    this.map = this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed);
     this.nav = null; // built lazily by the first bot
     this.roundNo = roundNo;
     this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
-    this.zonePlan = this.dm ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);
+    this.zonePlan = this.dm || this.zombie || this.goldRush ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);
+    this.horde = this.zombie ? new Horde(this) : null;
     this.zone = zoneAt(this.zonePlan, 0);
     this.exitStates = this.map.extracts.map((e) => exitState(this.zonePlan, this.zone, e));
     this.time = 0;
@@ -149,10 +166,10 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
-    const rake = Math.floor(stake * CFG.RAKE);
+    const rake = this.feeOnly ? stake : Math.floor(stake * CFG.RAKE);
     const net = stake - rake;
     const bag = this.potMode ? 0 : Math.floor(net * CFG.BAG_SHARE);
     const loot = net - bag;
@@ -170,7 +187,11 @@ export class World {
     }
 
     const others = [...this.players.values()].filter((o) => o.status === 'alive');
-    const pos = findSpawn(this.map, this.rnd, others, this.zone);
+    // zombies: the squad starts together on the plaza in the middle
+    const pos = this.zombie ? this.squadSpot(others) : findSpawn(this.map, this.rnd, others, this.zone);
+    // the weapon: the mode's, your pick (zombies), a random gun (gold rush), else the knife
+    const pick = WEAPONS.findIndex((w) => w.id === weapon);
+    const w0 = this.fixedWeapon >= 0 ? this.fixedWeapon : this.zombie ? (pick >= 0 ? pick : 1) : this.goldRush ? this.randomGun() : 0;
     const p = {
       id: this.nextId++,
       name,
@@ -198,7 +219,7 @@ export class World {
       startBag: bag,
       stake,
       fireCd: 0,
-      w: this.fixedWeapon >= 0 ? this.fixedWeapon : 0, // weapon index: the knife, unless the mode fixes one
+      w: w0, // weapon index
       ammo: 0, // rounds in the magazine (set by arm())
       reloadT: 0, // seconds left on a reload
       team,
@@ -228,12 +249,34 @@ export class World {
       inStorm: false,
       lostBag: 0,
       payout: 0,
+      zk: 0, // zombies killed
+      gb: 0, // gold bags held (gold rush)
+      gbAt: 0, // when that count was reached (the earlier one wins a tie)
     };
     this.arm(p);
     this.players.set(p.id, p);
     if (isBot) this.brains.set(p.id, new BotBrain(this, p, this.rnd));
     this.sides = this.teamSize ? new Set([...this.players.values()].map((o) => o.team)).size : this.players.size;
     return p;
+  }
+
+  randomGun() {
+    return GUNS[Math.floor(this.rnd() * GUNS.length)];
+  }
+
+  // a free spot on the plaza next to the rest of the squad
+  squadSpot(others) {
+    const cx = this.map.w / 2;
+    const cy = this.map.h / 2;
+    const near = others[0] ?? { x: cx, y: cy };
+    for (let i = 0; i < 40; i++) {
+      const a = this.rnd() * Math.PI * 2;
+      const d = 50 + this.rnd() * (others.length ? 90 : 160);
+      const x = near.x + Math.cos(a) * d;
+      const y = near.y + Math.sin(a) * d;
+      if (pointFree(this.map, x, y, CFG.PLAYER_R + 4)) return { x, y };
+    }
+    return { x: cx, y: cy };
   }
 
   queueInput(id, raw) {
@@ -298,7 +341,9 @@ export class World {
     this.tick++;
     this.time += DT;
     this.updateZone();
-    if (this.dm) for (const p of this.players.values()) if (p.status === 'dead' && p.respawnAt !== null && this.time >= p.respawnAt) this.respawn(p);
+    if (this.respawns) for (const p of this.players.values()) if (p.status === 'dead' && p.respawnAt !== null && this.time >= p.respawnAt) this.respawn(p);
+    if (this.horde && this.phase === 'live') this.horde.step(DT);
+    if (this.goldRush) this.spawnGold();
 
     for (const [id, brain] of this.brains) {
       const p = this.players.get(id);
@@ -377,13 +422,16 @@ export class World {
       this.stepTurrets();
       this.stepMines();
     }
+    if (this.phase !== 'live') return; // the boss fell this tick
     this.stepBullets();
+    if (this.phase !== 'live') return;
     this.pickups();
     this.spawnLoot();
     this.announce();
-    if (this.potMode && !this.dm && this.sides > 1 && this.aliveSides().size <= 1) this.end();
+    if (this.zombie && this.hadHumans && !this.aliveCount()) this.end(); // the whole squad is down
+    else if (this.potMode && !this.dm && !this.zombie && !this.goldRush && this.sides > 1 && this.aliveSides().size <= 1) this.end();
     else if (this.time >= this.duration - 1e-9) this.end();
-    else if (this.practice && !this.dm && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
+    else if (this.practice && !this.respawns && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
   }
 
   updateZone() {
@@ -470,6 +518,17 @@ export class World {
       }
     }
     if (best) return this.damage(best, p, wp.dmg);
+    if (this.zombie) {
+      for (const z of this.zombies.values()) {
+        const d = Math.hypot(z.x - p.x, z.y - p.y);
+        if (d > wp.reach + CFG.PLAYER_R + z.r) continue;
+        let da = Math.atan2(z.y - p.y, z.x - p.x) - p.aim;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        if (Math.abs(da) <= wp.arc / 2) return this.horde.hit(z, p, wp.dmg);
+      }
+      return;
+    }
     // nobody in reach: a knife still wrecks a turret or a tripmine
     if (!this.shop) return;
     for (const o of [...this.turrets.values(), ...this.mines.values()]) {
@@ -496,6 +555,25 @@ export class World {
           tMin = t;
           victim = p;
         }
+      }
+      // zombies: the squad's bullets fly through each other and stop in the dead
+      let zed = null;
+      if (this.zombie) {
+        victim = null;
+        tMin = tWall >= 0 ? tWall : 1.0001;
+        for (const z of this.zombies.values()) {
+          const t = segCircle(b.x, b.y, nx, ny, z.x, z.y, z.r + 3);
+          if (t >= 0 && t < tMin) {
+            tMin = t;
+            zed = z;
+          }
+        }
+      }
+      if (zed) {
+        this.bullets.delete(b.id);
+        this.horde.hit(zed, this.players.get(b.owner), b.dmg);
+        if (this.phase !== 'live') return;
+        continue;
       }
       // guns + lasers: turrets and tripmines stop bullets and can be shot to pieces
       let gadget = null;
@@ -535,6 +613,7 @@ export class World {
   damage(v, shooter, amount, cause = 'shot') {
     if (v.shield > 0) return;
     if (shooter && shooter !== v && this.teamSize && shooter.team === v.team) return; // no friendly fire
+    if (shooter && this.zombie) return; // zombies: the squad never hurts itself
     if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE[this.difficulty] ?? 0.5 : BOT_DAMAGE;
     if (this.hardcore) amount = Math.max(amount, v.hp); // one hit is enough
     if (shooter && shooter !== v) {
@@ -577,7 +656,14 @@ export class World {
     }
     v.bag = 0;
     v.deaths++;
-    if (this.dm && this.phase === 'live') v.respawnAt = this.time + CFG.RESPAWN;
+    // gold rush: half of what you carried spills where you fell
+    if (this.goldRush && v.gb > 1) {
+      const n = Math.floor(v.gb / 2);
+      v.gb -= n;
+      const g = { id: this.nextId++, x: v.x, y: v.y, v: n, drop: 1 };
+      this.gold.set(g.id, g);
+    }
+    if (this.respawns && this.phase === 'live') v.respawnAt = this.time + CFG.RESPAWN;
     if (killer && killer !== v) {
       killer.kills++;
       if (this.shop) killer.cr = Math.min(GL.MAX, killer.cr + GL.KILL);
@@ -593,9 +679,10 @@ export class World {
 
   // Back in: a fresh spawn away from everyone, full health, a moment of spawn shield.
   // You keep your kills, your place on the weapon ladder and your credits.
-  respawn(p) {
+  // revive (zombies): back up next to a teammate at the start of a wave, half health
+  respawn(p, revive = false) {
     const others = [...this.players.values()].filter((o) => o.status === 'alive');
-    const pos = findSpawn(this.map, this.rnd, others, this.zone);
+    const pos = this.zombie ? this.squadSpot(others) : findSpawn(this.map, this.rnd, others, this.zone);
     Object.assign(p, {
       x: pos.x,
       y: pos.y,
@@ -613,6 +700,8 @@ export class World {
       inStorm: false,
       watchId: null,
     });
+    if (revive) p.hp = Math.ceil(this.maxHp / 2);
+    if (this.goldRush) p.w = this.randomGun(); // a new gun every life
     p.queue.length = 0;
     p.last = sanitizeInput({ s: p.ack });
     this.arm(p);
@@ -776,7 +865,7 @@ export class World {
   addXp(p, amount) {
     if (p.status !== 'alive' || amount <= 0) return;
     p.xp += amount;
-    if (this.fixedWeapon >= 0) {
+    if (this.fixedWeapon >= 0 || this.noLadder) {
       p.xp %= XP_PER_LEVEL; // one weapon for the whole raid: no arms race
       return;
     }
@@ -807,6 +896,20 @@ export class World {
   pickups() {
     for (const p of this.players.values()) {
       if (p.status !== 'alive') continue;
+      for (const m of this.packs.values()) {
+        if ((m.x - p.x) ** 2 + (m.y - p.y) ** 2 > (CFG.PLAYER_R + 14) ** 2 || p.hp >= this.maxHp) continue;
+        p.hp = Math.min(this.maxHp, p.hp + m.heal);
+        this.packs.delete(m.id);
+        this.emit({ k: 'medkit', to: [p.id], x: r1(m.x), y: r1(m.y) });
+      }
+      for (const g of this.gold.values()) {
+        if ((g.x - p.x) ** 2 + (g.y - p.y) ** 2 > GOLD.r ** 2) continue;
+        p.gb += g.v;
+        p.gbAt = this.time;
+        this.gold.delete(g.id);
+        this.emit({ k: 'gold', to: [p.id], v: g.v, n: p.gb, x: r1(g.x), y: r1(g.y) });
+        this.checkGoldLead();
+      }
       for (const o of this.orbs.values()) {
         const r = CFG.PLAYER_R + CFG.ORB_TIERS[o.t].r;
         if (Math.abs(o.x - p.x) > r || Math.abs(o.y - p.y) > r) continue;
@@ -827,6 +930,63 @@ export class World {
         }
       }
     }
+  }
+
+  // ----------------------------------------------------------- gold rush
+
+  // keep the ground stocked: a bag lands somewhere open every moment, up to a cap
+  spawnGold() {
+    this.goldT -= DT;
+    const want = GOLD.base + GOLD.perRunner * this.players.size;
+    let loose = 0;
+    for (const g of this.gold.values()) if (!g.drop) loose++;
+    if (this.goldT > 0 || loose >= want) return;
+    const first = this.tick <= 1;
+    this.goldT = GOLD.every;
+    const n = first ? want : 1; // the opening: the whole field at once
+    for (let i = 0; i < n; i++) {
+      const pos = randomLootPoint(this.map, this.rnd, false, null);
+      if (!pos) continue;
+      const big = this.rnd() < GOLD.big;
+      const g = { id: this.nextId++, x: pos.x, y: pos.y, v: big ? 3 : 1 };
+      this.gold.set(g.id, g);
+    }
+  }
+
+  // most bags first; a tie goes to whoever got there first
+  goldOrder() {
+    return [...this.players.values()].sort((a, b) => b.gb - a.gb || a.gbAt - b.gbAt || a.id - b.id);
+  }
+
+  checkGoldLead() {
+    const [a, b] = this.goldOrder();
+    const lead = a && a.gb > 0 && (!b || a.gb > b.gb) ? a : null;
+    if (!lead || lead.id === this.leaderId) return;
+    const old = this.leaderId ? this.players.get(this.leaderId) : null;
+    this.leaderId = lead.id;
+    this.emit({ k: 'lead', to: [lead.id], pid: lead.id });
+    if (old) this.emit({ k: 'lostLead', to: [old.id], pid: old.id });
+  }
+
+  goldView(me) {
+    const order = this.goldOrder();
+    return {
+      gb: me.gb,
+      pl: order.indexOf(me) + 1,
+      dth: me.deaths,
+      rs: me.status === 'dead' && me.respawnAt !== null ? r2(Math.max(0, me.respawnAt - this.time)) : 0,
+      top: order.slice(0, 3).map((p) => [p.name, p.gb, p.id === me.id ? 1 : 0]),
+    };
+  }
+
+  // only one winner: the most bags (the earliest to that count on a tie); nobody with a
+  // single bag means no winner and the pot waits for the next rush
+  settleGold() {
+    const top = this.goldOrder()[0];
+    const winners = top && top.gb > 0 ? [top] : [];
+    this.winners = winners.map((p) => p.id);
+    if (!winners.length || this.pot <= 0) return;
+    this.payPot(winners);
   }
 
   // ----------------------------------------------------------------- loot
@@ -887,7 +1047,7 @@ export class World {
 
   // Bots only enter at the start, alongside the humans: everyone begins together.
   fillBots() {
-    if (!this.botsEnabled || !this.canJoin()) return;
+    if (!this.botsEnabled || !this.canJoin() || this.zombie) return; // zombies: humans only
     for (let i = this.aliveCount(); i < this.botFill; i++) this.addBot();
   }
 
@@ -910,6 +1070,16 @@ export class World {
       this.emit({ k: 'warn', text });
     };
     // keys the client translates
+    if (this.zombie) {
+      if (tl <= 60) say('60', 'warn.z60');
+      if (tl <= 10) say('10', 'warn.z10');
+      return;
+    }
+    if (this.goldRush) {
+      if (tl <= 30) say('30', 'warn.gold30');
+      if (tl <= 10) say('10', 'warn.gold10');
+      return;
+    }
     if (tl <= 30) say('30', this.potMode ? 'warn.pot30' : 'warn.exit30');
     if (tl <= 10) say('10', this.potMode ? 'warn.pot10' : 'warn.exit10');
   }
@@ -918,6 +1088,8 @@ export class World {
   // with the most runners alive wins (then most kills); a dead heat splits it among them.
   settlePot() {
     if (this.dm) return this.settleKills();
+    if (this.goldRush) return this.settleGold();
+    if (this.zombie) return; // no pot: the entry was a fee
     const alive = [...this.players.values()].filter((p) => p.status === 'alive');
     const score = new Map();
     for (const p of this.players.values()) {
@@ -966,14 +1138,30 @@ export class World {
       p.place = 1;
       if (p.isBot) this.ledger.botPaidOut += amount;
       else this.ledger.paidOut += amount;
-      this.emit({ k: 'payout', to: [p.id], pid: p.id, amount });
+      // gold rush pays shop credit, not coins
+      this.emit({ k: 'payout', to: [p.id], pid: p.id, amount, ...(this.goldRush ? { credit: 1 } : {}) });
     }
     this.pot = 0;
     this.emit({ k: 'winners', names: winners.map((p) => p.name), team: this.teamSize ? winners[0].team : null });
   }
 
   end() {
-    if (this.dm) {
+    if (this.phase !== 'live') return;
+    if (this.zombie) {
+      // a cleared run is the whole squad's, the fallen included
+      const cleared = !!this.horde.bossDown;
+      for (const p of this.players.values()) {
+        p.zWave = this.horde.cleared;
+        p.won = cleared;
+        if (cleared) p.place = 1;
+        if (p.status === 'alive') {
+          p.status = cleared ? 'won' : 'mia';
+          p.endedAt = this.time;
+        }
+      }
+      this.zombies.clear();
+    }
+    if (this.respawns) {
       // everyone is still in it at the whistle, the fallen included
       for (const p of this.players.values()) {
         if (p.status !== 'dead') continue;
@@ -1008,6 +1196,8 @@ export class World {
     this.bullets.clear();
     this.turrets.clear();
     this.mines.clear();
+    this.packs.clear();
+    this.gold.clear();
     this.lootPool = 0;
     this.emit({ k: 'end' });
   }
@@ -1088,7 +1278,13 @@ export class World {
     const out = [];
     for (const p of this.players.values()) {
       if (p === me || p.status !== 'alive') continue;
-      out.push([Math.round(p.x / 10), Math.round(p.y / 10), this.teamSize && p.team === me.team ? 1 : 0]);
+      out.push([Math.round(p.x / 10), Math.round(p.y / 10), (this.teamSize && p.team === me.team) || this.zombie ? 1 : 0]);
+    }
+    // zombies: the horde too (the boss marked 2)
+    let n = 0;
+    for (const z of this.zombies.values()) {
+      if (n++ > 60) break;
+      out.push([Math.round(z.x / 10), Math.round(z.y / 10), z.type === 'boss' ? 2 : 0]);
     }
     return out;
   }
@@ -1132,10 +1328,20 @@ export class World {
         g: p.body,
       });
     }
+    // the dead travel with the runners, marked by their kind (zb), in sight or not:
+    // a horde you can't see coming through the dark is no fun
+    for (const z of this.zombies.values()) {
+      if (!near(z.x, z.y, 200)) continue;
+      players.push({ i: z.id, zb: z.type, x: r1(z.x), y: r1(z.y), a: r2(z.a), h: Math.max(1, Math.ceil((z.hp / z.max) * 100)), fc: z.fc, w: 0 });
+    }
     const orbs = [];
     for (const o of this.orbs.values()) if (near(o.x, o.y, 40)) orbs.push({ i: o.id, x: r1(o.x), y: r1(o.y), t: o.t });
     const drops = [];
     for (const d of this.drops.values()) if (near(d.x, d.y, 40)) drops.push({ i: d.id, x: r1(d.x), y: r1(d.y) });
+    const packs = [];
+    for (const m of this.packs.values()) if (near(m.x, m.y, 40)) packs.push({ i: m.id, x: r1(m.x), y: r1(m.y) });
+    const gold = [];
+    for (const g of this.gold.values()) if (near(g.x, g.y, 60)) gold.push({ i: g.id, x: r1(g.x), y: r1(g.y), v: g.v });
     const bullets = [];
     for (const b of this.bullets.values()) {
       if (near(b.x, b.y, 120)) bullets.push({ i: b.id, x: r1(b.x), y: r1(b.y), vx: r1(b.vx), vy: r1(b.vy), o: b.owner === me.id ? 1 : 0, ...(b.skin ? { s: b.skin } : {}) });
@@ -1177,6 +1383,8 @@ export class World {
         ...(this.potMode ? { pot: this.pot, sides: this.aliveSides().size } : {}),
         ...(this.teamSize ? { tm: me.team } : {}),
         ...(this.dm ? this.dmView(me) : {}),
+        ...(this.goldRush ? this.goldView(me) : {}),
+        ...(this.horde ? { ...this.horde.view(), zk: me.zk } : {}),
         ...(this.shop ? { cr: me.cr } : {}),
       },
       players,
@@ -1186,6 +1394,8 @@ export class World {
       orbs,
       drops,
       bullets,
+      ...(packs.length ? { packs } : {}),
+      ...(this.goldRush ? { gold } : {}),
     };
   }
 }

@@ -306,6 +306,20 @@ export function moment(kind, d) {
         text: hit ? `Pulled ${o.name} (${r.name}) from a ${d.box.name} in DARK BAGS. ${tag}` : `Chased the ${jackpot} in a ${d.box.name}, got ${o.name} (${r.name}). Next one. ${tag}`,
       };
     }
+    case 'zombie': {
+      const w = d.zWave ?? 0;
+      const of = d.waves ?? 10;
+      return {
+        spec: { accent: d.won ? '#9be36b' : '#ff4d5e', kicker: d.won ? 'Zombies · cleared' : `Zombies · overrun on wave ${Math.min(of, w + 1)}`, title: d.won ? 'BOSS DOWN' : `WAVE ${w}/${of}`, titleGlow: !!d.won, sub: d.won ? `Ten waves of the dead and their boss, ${d.squad > 1 ? `with a squad of ${d.squad}` : 'alone'}.` : `Held the graveyard for ${w} ${w === 1 ? 'wave' : 'waves'} before the dead got through.`, chips: [['Waves', `${w} / ${of}`], ['Zombies', String(d.zk ?? 0)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon, pose: d.won ? 'stand' : 'down', stamp: d.won ? null : 'OVERRUN', stampColor: '#ff4d5e' },
+        text: d.won ? `Cleared all ${of} zombie waves and dropped the boss in DARK BAGS (${d.zk ?? 0} zombies). ${tag}` : `Held off ${w} waves of zombies (${d.zk ?? 0} down) in DARK BAGS. ${tag}`,
+      };
+    }
+    case 'goldRush': {
+      return {
+        spec: { accent: '#ffd166', kicker: d.won ? 'Gold rush · first' : `Gold rush · place ${d.place ?? '?'}`, title: `${d.gb ?? 0} BAGS`, titleGlow: !!d.won, sub: d.won ? `Grabbed more gold than anyone and took the whole pot: ${usd(d.credit ?? 0)} to spend in the shop.` : `${d.gb ?? 0} bags of gold; the winner had ${d.top ?? 0}.`, chips: [['Bags', String(d.gb ?? 0)], ['Kills', String(d.kills ?? 0)], d.won ? ['Won', usd(d.credit ?? 0)] : ['Place', String(d.place ?? '?')]], look, rank: d.rank, weapon: d.weapon },
+        text: d.won ? `Won the gold rush with ${d.gb} bags of gold in DARK BAGS. ${tag}` : `${d.gb ?? 0} bags of gold in the DARK BAGS gold rush. Next one is mine. ${tag}`,
+      };
+    }
     case 'rankUp': {
       const r = RANKS[d.rank - 1];
       const trial = d.rewards?.find((x) => x.trial)?.trial;

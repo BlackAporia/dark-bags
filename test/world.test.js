@@ -270,8 +270,10 @@ test('team modes: balanced sides, no friendly fire, the winning team splits the 
 test('every mode is playable to the end with its own line-up', () => {
   for (const m of MODES) {
     const w = new World({ stake: 100, seed: 3, mode: m.id, botFill: m.size, roundSeconds: 60 });
+    // zombies: a squad of humans, no bots
+    if (m.kind === 'zombie') for (let i = 0; i < 2; i++) w.addPlayer({ name: `h${i}`, skin: '#fff', weapon: 'lmg' });
     w.step();
-    assert.equal(w.players.size, m.size, `${m.id} fills to ${m.size}`);
+    assert.equal(w.players.size, m.kind === 'zombie' ? 2 : m.size, `${m.id} fills to ${m.size}`);
     playOut(w);
     assert.equal(w.phase, 'ended');
     assert.ok(w.audit().ok, `${m.id} audit`);
