@@ -140,7 +140,13 @@ const send = (m) => app.transport?.send(m);
 const game = new GameClient({ renderer, input, sfx, send, el });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
 // share cards: everything that happens can be posted
-const myLook = () => ({ outfit: app.locker?.outfit ?? 'basic-0', body: app.locker?.body ?? 'm' });
+// the runner as others see them: outfit, body and every weapon skin they have equipped
+const myLook = () => {
+  const L = app.locker;
+  const ws = {};
+  for (const [w, f] of Object.entries(L?.wequip ?? {})) if (!L.wowned || L.wowned.includes(`${w}.${f}`)) ws[w] = f;
+  return { outfit: L?.outfit ?? 'basic-0', body: L?.body ?? 'm', ws };
+};
 function shareMoment(kind, data = {}) {
   return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, player: (app.name || '').trim() || null, ...data });
 }

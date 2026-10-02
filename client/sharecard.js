@@ -3,6 +3,7 @@
 // attach images, so "Post on X" copies the card to the clipboard first (paste it into
 // the post), and "Share…" hands the image file to the phone's share sheet.
 import { drawPreview } from './stickman.js';
+import { weaponStill } from './locker.js';
 import { rankBadgeSvg } from './rankbadge.js';
 import { OUTFIT, RARITIES, usd } from '../shared/cosmetics.js';
 import { usdText } from '../shared/assets.js';
@@ -126,7 +127,9 @@ export async function renderCard(spec) {
     ctx.rotate(-Math.PI / 2 + 0.08);
     drawPreview(ctx, spec.look, { x: 0, y: 0, scale: 6.2, t: 1400, w: spec.weapon ?? 0, aim: 0.1 });
   } else {
-    drawPreview(ctx, spec.look, { x: 290, y: floorY, scale: 7.2, t: 1400, w: spec.weapon ?? 3, aim: -0.3, moveK: 0.2, phase: 0.6 });
+    // long guns (rifles and up) are held lower and a touch smaller, so the barrel stays on the runner's side
+    const long = (spec.weapon ?? 3) >= 7;
+    drawPreview(ctx, spec.look, { x: long ? 250 : 290, y: floorY, scale: long ? 6.4 : 7.2, t: 1400, w: spec.weapon ?? 3, aim: long ? 0.32 : -0.3, moveK: 0.2, phase: 0.6 });
   }
   ctx.restore();
   if (spec.stamp) {
@@ -185,6 +188,31 @@ export async function renderCard(spec) {
       y += 88;
     }
     cx += chip(ctx, cx, y, label, value, A) + 12;
+  }
+  // a pulled weapon skin, up close: the real model and finish, on a lit plate
+  if (spec.skin) {
+    const top = y + 96;
+    const h = Math.min(190, H - 64 - 20 - top);
+    if (h > 90) {
+      const img = await new Promise((resolve) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = () => resolve(null);
+        i.src = weaponStill(spec.skin, Math.round(h * 2.6), h);
+      });
+      if (img) {
+        const w = h * 2.6;
+        const plate = ctx.createRadialGradient(x0 + w / 2, top + h / 2, 10, x0 + w / 2, top + h / 2, w / 2);
+        plate.addColorStop(0, `${A}40`);
+        plate.addColorStop(1, `${A}00`);
+        ctx.fillStyle = plate;
+        ctx.fillRect(x0, top, w, h);
+        ctx.shadowColor = A;
+        ctx.shadowBlur = 24;
+        ctx.drawImage(img, x0, top, w, h);
+        ctx.shadowBlur = 0;
+      }
+    }
   }
 
   // rank badge + footer
@@ -270,6 +298,8 @@ export function moment(kind, d) {
           sub: hit ? `Pulled a ${r.name} from the ${d.box.name}.${d.result.pity ? ' Pity kicked in, as promised.' : ''}` : `Went for the ${jackpot}. Got ${/^[aeiou]/i.test(r.name) ? 'an' : 'a'} ${r.name} instead.${d.result.dup ? ` Duplicate: +${usd(d.result.refund)} back.` : ''}`,
           chips: [['Rarity', r.name], ['Bag', d.box.name], d.result.dup ? ['Back', `+${usd(d.result.refund)}`] : ['Status', 'New']],
           look,
+          weapon: d.weapon,
+          skin: d.skin,
           rank: d.rank,
           stamp: hit ? null : 'SO CLOSE',
         },
@@ -280,7 +310,7 @@ export function moment(kind, d) {
       const r = RANKS[d.rank - 1];
       const trial = d.rewards?.find((x) => x.trial)?.trial;
       return {
-        spec: { accent: '#ffd166', kicker: `Rank up · ${d.rank}`, title: r.name.toUpperCase(), titleGlow: true, sub: `Climbed to rank ${d.rank} of 90 in DARK BAGS.`, chips: [['Rank', `${d.rank} / 90`], trial ? ['New look', OUTFIT[trial.id]?.name ?? '72h'] : ['Next', `rank ${d.rank + 1}`]], look, rank: d.rank },
+        spec: { accent: '#ffd166', kicker: `Rank up · ${d.rank}`, title: r.name.toUpperCase(), titleGlow: true, sub: `Climbed to rank ${d.rank} of 90 in DARK BAGS.`, chips: [['Rank', `${d.rank} / 90`], trial ? ['New look', OUTFIT[trial.id]?.name ?? '72h'] : ['Next', `rank ${d.rank + 1}`]], look: trial && OUTFIT[trial.id] ? { ...look, outfit: trial.id } : look, rank: d.rank },
         text: `Ranked up to ${r.name} (${d.rank}/90) in DARK BAGS. ${tag}`,
       };
     }
