@@ -830,6 +830,18 @@ export class Lobby {
   }
 
   // periodic refresh for people browsing tables
+  // A restart is coming: give back every stake still on a table and tell everyone.
+  abortAll() {
+    const refunds = [];
+    for (const room of this.rooms.values()) refunds.push(...room.abort());
+    for (const [cid, s] of this.sessions) {
+      if (!s.token) continue;
+      this.send(cid, { t: 'err', code: 'restart', msg: 'The server is restarting for an update. Any stake on a table is back in your balance. Join again in a minute.' });
+      s.room = null;
+    }
+    return refunds;
+  }
+
   broadcastTables() {
     const t = this.tables();
     const online = this.online();

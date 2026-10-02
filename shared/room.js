@@ -189,6 +189,33 @@ export class RoomCore {
     c.ready = false;
   }
 
+  // The server is going down (a deploy, a restart): nothing of this room survives it, so every
+  // stake that has not been paid out goes back as it came in. Stakes waiting in the ready room,
+  // and stakes of runners still in a live raid (in pot modes, everyone: no pot was paid yet).
+  // Runners who already extracted were paid and get nothing more. Returns the refunds made.
+  abort() {
+    const out = [];
+    for (const c of this.clients.values()) {
+      if (c.escrow) {
+        out.push({ token: c.token, asset: c.escrow.asset, units: String(c.escrow.units) });
+        this.refund(c);
+      }
+    }
+    const w = this.world;
+    if (w && this.state === 'live') {
+      for (const [pid, acc] of this.accounts) {
+        const p = w.players.get(pid);
+        if (!acc?.units || !p || p.isBot) continue;
+        if (acc.paidUnits != null || acc.credit != null || p.status === 'extracted') continue; // paid out already
+        this.wallet.credit(acc.token, acc.asset, BigInt(acc.units));
+        out.push({ token: acc.token, asset: acc.asset, units: String(acc.units) });
+      }
+      this.accounts.clear();
+      this.state = 'idle';
+    }
+    return out;
+  }
+
   book(asset, key, units) {
     const t = (this.totals.byAsset[asset] ??= { in: 0n, out: 0n });
     t[key] += BigInt(units);
