@@ -220,7 +220,10 @@ export class Cashier {
       }
       console.error('signature check failed', e?.message ?? e);
     }
-    if (!ok) throw new CashierError('The signature did not check out. Make sure the wallet is on the right network and try again.');
+    if (!ok) {
+      console.warn(`login: signature did not verify for ${account} (${signature.length} felts)`);
+      throw new CashierError('The signature did not check out. Make sure the wallet is on the right network and try again.');
+    }
     if (!this.allowed(account)) throw new CashierError(`Closed beta: ${account} is not on the list yet. Send this address to the team.`);
     this.sessions.set(session, { account, at: this.now() });
     this.ledger.ensure(account);

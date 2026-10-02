@@ -149,7 +149,10 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       const sig = await f.signTypedData(td);
       cs.facade = f;
       cs.kind = kind;
-      send({ t: 'auth', address: f.address, signature: (Array.isArray(sig) ? sig : sig?.signature ?? []).map(String) });
+      const parts = Array.isArray(sig) ? sig : Array.isArray(sig?.signature) ? sig.signature : sig?.r != null ? [sig.r, sig.s] : [];
+      if (!parts.length) throw new Error('The wallet returned no signature.');
+      cs.authPending = true; // the server's answer may come while the dialog is out of the way
+      send({ t: 'auth', address: f.address, signature: parts.map((x) => (typeof x === 'bigint' ? `0x${x.toString(16)}` : String(x))) });
     } catch (e) {
       if (inPage(kind) && !$('dlg-connect').open) $('dlg-connect').showModal();
       setStatus('connect-status', friendly(e), true);
@@ -406,6 +409,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         cs.waiter?.resolve(m.typedData);
         return true;
       case 'authed':
+        cs.authPending = false;
         cs.account = m.account;
         if (m.privy) cs.privyWallet = m.privy;
         if (!m.account) {
@@ -453,6 +457,11 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         renderHistory(m);
         return true;
       case 'err':
+        // a refused sign-in: bring the sign-in window back with the reason
+        if (cs.authPending) {
+          cs.authPending = false;
+          if (!$('dlg-connect').open) $('dlg-connect').showModal();
+        }
         if ($('dlg-connect').open) setStatus('connect-status', m.msg, true);
         if ($('dlg-cashier').open) {
           setStatus('cash-status', m.msg, true);
