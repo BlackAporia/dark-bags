@@ -2,7 +2,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, rename } from 'node:fs/promises';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
@@ -13,6 +13,8 @@ import { createCashier } from './cashier/index.js';
 import { RankBook } from '../shared/ranks.js';
 import { Inventory } from '../shared/cosmetics.js';
 import { SocialBook } from '../shared/social.js';
+import { ReferralBook } from '../shared/referrals.js';
+import { Guard } from '../shared/guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -20,9 +22,26 @@ const ROUND_SECONDS = Number(process.env.ROUND_SECONDS || CFG.ROUND_SECONDS);
 const PREP_SECONDS = Number(process.env.PREP_SECONDS || CFG.PREP_SECONDS);
 // bots play only in practice (in the browser): online every seat is a real player
 const BOTS = false;
+// with a data volume (/data on Railway) everything is kept there by default; the locker (skins
+// and shop $ bought with real money) gets one file per network so test and real never mix
+const DATA = existsSync('/data') ? '/data' : '';
+const NET = process.env.CHAIN && process.env.CHAIN !== 'off' ? process.env.CHAIN : 'test';
 const WALLET_FILE = process.env.WALLET_FILE || '';
-const RANKS_FILE = process.env.RANKS_FILE || '';
-const LOCKER_FILE = process.env.LOCKER_FILE || '';
+const RANKS_FILE = process.env.RANKS_FILE || (DATA ? `${DATA}/ranks.json` : '');
+const LOCKER_FILE = process.env.LOCKER_FILE || (DATA ? `${DATA}/${NET}-locker.json` : '');
+const REFERRAL_FILE = process.env.REFERRAL_FILE || (DATA ? `${DATA}/${NET}-referrals.json` : '');
+const GUARD_FILE = process.env.GUARD_FILE || (DATA ? `${DATA}/${NET}-guard.json` : '');
+if (NET === 'mainnet' && (!LOCKER_FILE || !REFERRAL_FILE)) {
+  console.error('On mainnet the locker (shop $ and skins bought with real money) and the referral book must live on a persistent disk: mount /data or set LOCKER_FILE and REFERRAL_FILE.');
+  process.exit(1);
+}
+
+// a save never leaves a half-written file behind: write a temp file, then swap it in
+async function saveJSON(file, obj) {
+  const tmp = `${file}.tmp`;
+  await writeFile(tmp, JSON.stringify(obj));
+  await rename(tmp, file);
+}
 // players, friends, messages, guilds: on the data volume when there is one
 const SOCIAL_FILE = process.env.SOCIAL_FILE || (existsSync('/data') ? '/data/social.json' : '');
 
@@ -40,7 +59,7 @@ const wallet = new MemoryWallet({
     if (!WALLET_FILE || saveTimer) return;
     saveTimer = setTimeout(async () => {
       saveTimer = null;
-      await writeFile(WALLET_FILE, JSON.stringify(w.toJSON())).catch((e) => console.error('wallet save failed', e));
+      await saveJSON(WALLET_FILE, w.toJSON()).catch((e) => console.error('wallet save failed', e));
     }, 2000);
   },
 });
@@ -54,7 +73,7 @@ const ranks = new RankBook({
     if (!RANKS_FILE || rankTimer) return;
     rankTimer = setTimeout(async () => {
       rankTimer = null;
-      await writeFile(RANKS_FILE, JSON.stringify(r.toJSON())).catch((e) => console.error('ranks save failed', e));
+      await saveJSON(RANKS_FILE, r.toJSON()).catch((e) => console.error('ranks save failed', e));
     }, 2000);
   },
 });
@@ -68,7 +87,7 @@ const inventory = new Inventory({
     if (!LOCKER_FILE || lockerTimer) return;
     lockerTimer = setTimeout(async () => {
       lockerTimer = null;
-      await writeFile(LOCKER_FILE, JSON.stringify(inv.toJSON())).catch((e) => console.error('locker save failed', e));
+      await saveJSON(LOCKER_FILE, inv.toJSON()).catch((e) => console.error('locker save failed', e));
     }, 1000);
   },
 });
@@ -81,17 +100,55 @@ const social = new SocialBook({
     if (!SOCIAL_FILE || socialTimer) return;
     socialTimer = setTimeout(async () => {
       socialTimer = null;
-      await writeFile(SOCIAL_FILE, JSON.stringify(sb.toJSON())).catch((e) => console.error('social save failed', e));
+      await saveJSON(SOCIAL_FILE, sb.toJSON()).catch((e) => console.error('social save failed', e));
     }, 1500);
   },
 });
+
+// -------------------------------------------------------------- referrals
+let refTimer = null;
+const referrals = new ReferralBook({
+  data: REFERRAL_FILE && existsSync(REFERRAL_FILE) ? JSON.parse(readFileSync(REFERRAL_FILE, 'utf8')) : {},
+  onChange: (rb) => {
+    if (!REFERRAL_FILE || refTimer) return;
+    refTimer = setTimeout(async () => {
+      refTimer = null;
+      await saveJSON(REFERRAL_FILE, rb.toJSON()).catch((e) => console.error('referrals save failed', e));
+    }, 1500);
+  },
+});
+
+// -------------------------------------------------------------- fair play
+// Networks and devices are kept as salted hashes. The salt stays with the file (or GUARD_SALT), so
+// the hashes still match after a restart. GUARD_CLEAR=key1,key2 lifts an aim review on boot;
+// GUARD_SHARED_IP=1 lets one network seat several accounts at a table (a LAN cafe).
+const guardData = GUARD_FILE && existsSync(GUARD_FILE) ? JSON.parse(readFileSync(GUARD_FILE, 'utf8')) : {};
+const guardSalt = process.env.GUARD_SALT || guardData.salt || crypto.randomBytes(16).toString('hex');
+let guardTimer = null;
+const saveGuard = (g) => saveJSON(GUARD_FILE, { ...g.toJSON(), salt: process.env.GUARD_SALT ? undefined : guardSalt });
+const guard = new Guard({
+  data: guardData,
+  salt: guardSalt,
+  sharedIp: process.env.GUARD_SHARED_IP === '1',
+  log: (m, a) => console.warn(m, JSON.stringify(a)),
+  onChange: (g) => {
+    if (!GUARD_FILE || guardTimer) return;
+    guardTimer = setTimeout(async () => {
+      guardTimer = null;
+      await saveGuard(g).catch((e) => console.error('guard save failed', e));
+    }, 3000);
+  },
+});
+for (const k of (process.env.GUARD_CLEAR ?? '').split(',').map((x) => x.trim()).filter(Boolean)) guard.clear(k);
+if (guard.flags.size) console.warn(`guard: ${guard.flags.size} account(s) under fair-play review (withdrawals held):`, [...guard.flags.keys()].join(', '));
 
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
 const send = (cid, msg) => {
   const s = sockets.get(cid);
   if (!s || s.ws.readyState !== 1) return;
-  if (msg.t === 'snap' && s.ws.bufferedAmount > 512 * 1024) return; // slow link: drop frames, not the player
+  // a slow link: drop stale frames instead of queueing them (a queue is lag); ~4 s of snapshots
+  if (msg.t === 'snap' && s.ws.bufferedAmount > 48 * 1024) return;
   s.ws.send(JSON.stringify(msg));
 };
 const lobby = new Lobby({
@@ -103,6 +160,8 @@ const lobby = new Lobby({
   ranks,
   inventory,
   social,
+  referrals,
+  guard,
   send,
   bots: BOTS,
   minPlayers: 2,
@@ -189,19 +248,34 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16384 });
 let nextCid = 1;
 
-wss.on('connection', (ws) => {
+// behind Railway's proxy the player's address is the hop the proxy appended to x-forwarded-for
+// (the last one: anything before it the client could have written itself)
+const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
+const ipOf = (req) => (TRUST_PROXY ? String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim() : '') || req.socket.remoteAddress || '';
+
+wss.on('connection', (ws, req) => {
+  const ip = ipOf(req);
+  const net = guard.net(ip);
+  // fair play: so many sockets per network, no more
+  if (!guard.open(net)) return ws.close(1008, 'too many connections');
   const cid = nextCid++;
-  const s = { ws, msgs: 0, windowStart: Date.now() };
+  const s = { ws, msgs: 0, windowStart: Date.now(), floods: 0 };
   sockets.set(cid, s);
-  lobby.connect(cid);
+  lobby.connect(cid, { ip });
 
   ws.on('message', (data) => {
     const now = Date.now();
     if (now - s.windowStart > 1000) {
+      if (s.msgs > 90) s.floods++;
+      else s.floods = Math.max(0, s.floods - 1);
       s.windowStart = now;
       s.msgs = 0;
     }
-    if (++s.msgs > 90) return; // inputs arrive at 30 Hz; far above that is noise or abuse
+    // inputs arrive at 30 Hz; far above that is noise or abuse, and a socket that keeps at it goes
+    if (++s.msgs > 90) {
+      if (s.floods >= 5) ws.close(1008, 'flood');
+      return;
+    }
     let msg;
     try {
       msg = JSON.parse(data);
@@ -211,6 +285,7 @@ wss.on('connection', (ws) => {
     lobby.handle(cid, msg);
   });
   ws.on('close', () => {
+    guard.close(net);
     lobby.disconnect(cid);
     sockets.delete(cid);
   });
@@ -248,10 +323,13 @@ server.listen(PORT, () => {
 });
 
 const shutdown = async () => {
-  if (RANKS_FILE) await writeFile(RANKS_FILE, JSON.stringify(ranks.toJSON())).catch(() => {});
-  if (LOCKER_FILE) await writeFile(LOCKER_FILE, JSON.stringify(inventory.toJSON())).catch(() => {});
+  if (RANKS_FILE) await saveJSON(RANKS_FILE, ranks.toJSON()).catch(() => {});
+  if (LOCKER_FILE) await saveJSON(LOCKER_FILE, inventory.toJSON()).catch(() => {});
+  if (REFERRAL_FILE) await saveJSON(REFERRAL_FILE, referrals.toJSON()).catch(() => {});
+  if (GUARD_FILE) await saveGuard(guard).catch(() => {});
+  if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, social.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
-  else if (WALLET_FILE) await writeFile(WALLET_FILE, JSON.stringify(wallet.toJSON())).catch(() => {});
+  else if (WALLET_FILE) await saveJSON(WALLET_FILE, wallet.toJSON()).catch(() => {});
   process.exit(0);
 };
 process.on('SIGINT', shutdown);

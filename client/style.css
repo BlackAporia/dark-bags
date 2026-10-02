@@ -2044,3 +2044,27 @@ body.gold-on #bag { color: #ffd166; }
 .tbtn.upbtn { left: 50%; transform: translateX(-50%); bottom: calc(110px + var(--safe-b)); width: auto; min-width: 74px; height: 50px; padding: 0 12px; font-size: 20px; color: #0b0d12; background: linear-gradient(180deg, #ffd166, #f7931a); border-color: #ffd166; }
 .tbtn.upbtn em { font: 700 11px var(--f-num); font-style: normal; margin-left: 4px; }
 .tbtn.upbtn[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- invite friends */
+.ref { display: grid; gap: 12px; max-width: 860px; margin: 0 auto; }
+.ref-card { padding: 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(180deg, rgba(20, 24, 34, 0.92), rgba(10, 12, 18, 0.92)); }
+.ref-hero { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; border-color: rgba(255, 196, 0, 0.35); background: radial-gradient(90% 140% at 100% 50%, rgba(255, 196, 0, 0.18), transparent 60%), linear-gradient(135deg, #141826, #0a0c12); }
+.ref-title { margin: 0 0 6px; font: 900 clamp(24px, 3.6vw, 38px)/1.05 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; background: linear-gradient(90deg, #ffd34d, #ff8a3d); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ref-lead { margin: 0; color: #d9deea; line-height: 1.45; }
+.ref-code { display: grid; gap: 2px; justify-items: center; padding: 10px 16px; border-radius: 14px; border: 1px dashed rgba(255, 211, 77, 0.6); background: rgba(0, 0, 0, 0.35); }
+.ref-code small { color: #9aa3b5; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+.ref-code b { font: 900 28px/1 var(--f-display); letter-spacing: 0.18em; color: #ffd34d; }
+.ref-lbl { display: block; margin-bottom: 8px; color: #9aa3b5; font-size: 13px; }
+.ref-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ref-in { flex: 1 1 220px; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(0, 0, 0, 0.35); color: #fff; font: 600 14px/1.2 ui-monospace, monospace; }
+.ref-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ref-stat { display: grid; gap: 4px; justify-items: center; padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(14, 17, 25, 0.92); }
+.ref-stat b { font: 900 24px/1 var(--f-display); color: #fff; }
+.ref-stat small { color: #9aa3b5; font-size: 12px; text-align: center; }
+.ref-h { margin: 0 0 8px; font-size: 16px; }
+.ref-steps { margin: 0; padding-inline-start: 20px; display: grid; gap: 6px; color: #d9deea; line-height: 1.4; }
+.ref-fair { margin: 12px 0 0; color: #9aa3b5; font-size: 13px; line-height: 1.4; }
+@media (max-width: 560px) {
+  .ref-hero { grid-template-columns: 1fr; }
+  .ref-stat b { font-size: 19px; }
+}
