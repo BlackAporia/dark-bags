@@ -372,7 +372,7 @@ export class Renderer {
     const y = b.y - GUN_Z;
     const f = b.s ? FINISH[b.s] : null;
     const tier = f ? RARITY_ORDER.indexOf(f.rarity) : -1;
-    const base = Math.min(46, sp * 0.028);
+    const base = Math.min(46, sp * 0.028, b.tr ?? 46); // never a tail behind the gun
     if (tier < 1) {
       const c = f ? f.color : b.o ? '#ffc478' : '#fff0d2';
       ctx.globalAlpha = 0.9;
@@ -385,7 +385,7 @@ export class Renderer {
       ctx.globalAlpha = 1;
       return;
     }
-    const len = base * [1, 1.5, 2.1, 2.5, 3.2, 3.8][tier];
+    const len = Math.min(base * [1, 1.5, 2.1, 2.5, 3.2, 3.8][tier], b.tr ?? 999);
     // the skin's own colour is the neon; mythic and up burn hotter in the accent at the core
     const neon = f.fx === 'rainbow' ? `hsl(${(t / 3 + b.i * 37) % 360}, 100%, 62%)` : f.color;
     const hot = f.fx === 'rainbow' ? `hsl(${(t / 3 + b.i * 37 + 60) % 360}, 100%, 70%)` : tier >= 4 && f.accent ? f.accent : f.color;

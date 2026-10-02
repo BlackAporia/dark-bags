@@ -924,4 +924,13 @@ export default {
   'achd.headshots': "Acerte {n} tiros na cabeça",
   'hud.demoted': "Morte: volta para {w}",
   'hud.crit': "CRÍTICO",
+  'hud.roundStart': "Rodada {n} de {of}",
+  'hud.roundWon': "Rodada {n} é sua!",
+  'hud.roundLost': "Rodada {n} perdida",
+  'hud.roundDraw': "Rodada {n}: empate",
+  'hud.roundTo': "Rodada {n} vai para {name}",
+  'hud.roundNext': "Próxima rodada em {s} s",
+  'hud.roundScore': "Rodada {n}/{of} · {a} : {b}",
+  'hud.roundDown': "Caiu. Volta na próxima rodada",
+  'mc.rounds': "{w} de {n} rodadas",
 };
