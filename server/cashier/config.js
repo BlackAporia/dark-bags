@@ -2,6 +2,8 @@
 //
 // CHAIN                 off (default: test tokens) | sepolia | mainnet
 // RPC_URL               Starknet JSON-RPC for the server (default: Starkzap's preset)
+// RPC_FALLBACKS         more RPC URLs, comma separated, tried in order when the first does not answer
+//                       (built in: Cartridge's v0_10 endpoint on mainnet)
 // CLIENT_RPC_URL        RPC the browser uses for Starkzap wallets (default: same preset)
 // HOUSE_ADDRESS         the house account (receives deposits, pays withdrawals)
 // HOUSE_PRIVATE_KEY     its Stark key; without it the cashier takes deposits but cannot pay out
@@ -21,6 +23,11 @@ export const STRK20_POOL_MAINNET = '0x040337b1af3c663e86e333bab5a4b28da8d4652a15
 export const STRK20_FEED = {
   mainnet: 'https://strk20.nullref.cc/mainnet/feed',
   sepolia: 'https://strk20.nullref.cc/sepolia/feed',
+};
+// spare nodes, tried after RPC_URL / the preset when they do not answer
+export const RPC_SPARES = {
+  mainnet: ['https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10'],
+  sepolia: [],
 };
 export const AVNU_PAYMASTER = {
   mainnet: 'https://starknet.paymaster.avnu.fi',
@@ -54,6 +61,7 @@ export function readConfig(env = process.env) {
     network,
     chainId: network === 'mainnet' ? 'SN_MAIN' : 'SN_SEPOLIA',
     rpcUrl: env.RPC_URL || null,
+    rpcFallbacks: [...list(env.RPC_FALLBACKS), ...RPC_SPARES[network]],
     clientRpcUrl: env.CLIENT_RPC_URL || null,
     house: env.HOUSE_ADDRESS || null,
     houseKey: env.HOUSE_PRIVATE_KEY || null,

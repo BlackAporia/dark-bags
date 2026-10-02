@@ -24,11 +24,23 @@ const tokenOf = (t) => ({ name: t.name ?? t.symbol, symbol: t.symbol, decimals: 
 
 // What an address holds of a token, read straight from the chain (any sign-in kind), so
 // the cashier can show "in your wallet" and stop a deposit the wallet cannot cover.
+// Spare nodes (chain.rpcUrls) are tried in turn; the one that answered is asked first next time.
 const providers = new Map();
+let goodNode = null;
 export async function walletBalance(chain, t, address) {
-  if (!providers.has(chain.rpcUrl)) providers.set(chain.rpcUrl, new RpcProvider({ nodeUrl: chain.rpcUrl }));
-  const r = await providers.get(chain.rpcUrl).callContract({ contractAddress: t.id, entrypoint: 'balanceOf', calldata: [address] });
-  return BigInt(r[0]) + (BigInt(r[1] ?? 0) << 128n);
+  const nodes = [...new Set([goodNode, chain.rpcUrl, ...(chain.rpcUrls ?? [])].filter(Boolean))];
+  let last;
+  for (const url of nodes) {
+    try {
+      if (!providers.has(url)) providers.set(url, new RpcProvider({ nodeUrl: url }));
+      const r = await providers.get(url).callContract({ contractAddress: t.id, entrypoint: 'balanceOf', calldata: [address] });
+      goodNode = url;
+      return BigInt(r[0]) + (BigInt(r[1] ?? 0) << 128n);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
 }
 
 // ------------------------------------------------------------ extensions

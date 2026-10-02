@@ -129,3 +129,19 @@ test('deposit caps apply on mainnet; Sepolia test tokens are never capped unless
   assert.equal(sep.maxTotalUsd, 0);
   assert.equal(readConfig({ CHAIN: 'sepolia', SEPOLIA_CAPS: '1', ...caps }).maxBalanceUsd, 20);
 });
+
+test('the cashier takes the first Starknet node that answers on the right chain', async () => {
+  const { pickNode } = await import('../server/cashier/starknet.js');
+  const { readConfig } = await import('../server/cashier/config.js');
+  const quiet = { warn: () => {}, error: () => {} };
+  const answers = { 'https://down': null, 'https://other': '0x534e5f4d41494e', 'https://ok': '0x534e5f5345504f4c4941' };
+  const fakeFetch = async (url) => {
+    if (answers[url] == null) throw new Error('connect refused');
+    return { json: async () => ({ result: answers[url] }) };
+  };
+  assert.equal(await pickNode(['https://down', 'https://other', 'https://ok'], 'SN_SEPOLIA', quiet, fakeFetch), 'https://ok');
+  assert.equal(await pickNode(['https://down'], 'SN_SEPOLIA', quiet, fakeFetch), null);
+  // the spare mainnet node is always in the list, after RPC_URL and RPC_FALLBACKS
+  const cfg = readConfig({ CHAIN: 'mainnet', RPC_FALLBACKS: 'https://a,https://b' });
+  assert.deepEqual(cfg.rpcFallbacks, ['https://a', 'https://b', 'https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10']);
+});
