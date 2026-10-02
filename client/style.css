@@ -2069,3 +2069,31 @@ body.gold-on #bag { color: #ffd166; }
   .ref-hero { grid-template-columns: 1fr; }
   .ref-stat b { font-size: 19px; }
 }
+
+/* ---------------------------------------------------- the account chip and wallet panel */
+.tb-right { position: relative; }
+.topbar { position: relative; z-index: 30; } /* the wallet panel drops over the page */
+.tb-acct { flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; max-width: 190px; padding: 7px 12px 7px 8px; border: 1px solid color-mix(in srgb, var(--loot) 55%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--loot) 12%, var(--glass)); color: var(--paper); font: 700 13px/1 var(--f-ui, inherit); cursor: pointer; }
+.tb-acct:hover { border-color: var(--loot); }
+.tb-acct.in { border-color: rgba(70, 220, 140, 0.55); background: rgba(70, 220, 140, 0.1); }
+.tb-acct-ico { font-size: 15px; }
+.tb-acct-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, monospace; }
+.acct-pop { position: absolute; top: calc(100% + 10px); right: 0; z-index: 60; width: min(360px, calc(100vw - 24px)); display: grid; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: linear-gradient(180deg, #161a25, #0c0e14); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6); }
+.acct-pop[hidden] { display: none; }
+.ap-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ap-kind { font: 900 15px/1 var(--f-display); letter-spacing: 0.06em; color: var(--loot); }
+.ap-net { font-size: 11px; color: #9aa3b5; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; }
+.ap-name { margin: 0; font-weight: 800; font-size: 16px; }
+.ap-addr { margin: 0; padding: 8px 10px; border-radius: 10px; background: rgba(0, 0, 0, 0.35); font: 600 12px/1.35 ui-monospace, monospace; word-break: break-all; user-select: all; }
+.ap-row { display: flex; gap: 8px; }
+.ap-row > * { flex: 1; text-align: center; padding: 9px 10px; text-decoration: none; }
+.ap-wide { width: 100%; padding: 9px 10px; }
+.ap-bal { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ap-bal li { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: center; font-size: 13px; }
+.ap-bal li b { text-align: end; font-weight: 700; }
+.ap-th span { font-size: 11px; color: #9aa3b5; text-align: end; }
+.ap-sym { font-weight: 800; color: var(--c); }
+.ap-out { justify-self: center; color: #ff8a8a; }
+@media (max-width: 720px) {
+  .tb-acct { max-width: 120px; padding: 6px 9px 6px 7px; font-size: 12px; }
+}
