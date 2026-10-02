@@ -1,4 +1,5 @@
 import './polyfills.js'; // first: older phone browsers need it before anything draws
+import './epoch.js'; // second: a new data epoch wipes old progress before anything reads it
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
 import { WEAPONS } from '../shared/weapons.js';
@@ -371,8 +372,11 @@ function tableInfo(stake) {
 const MODE_ICON = { zombies: '🧟', gold: '💰', ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
 function renderModes() {
   const box = $('modes');
+  // ranked is online only: practice never shows it
+  const practice = app.mode === 'practice';
+  if (practice && MODE[app.gameMode]?.ranked) app.gameMode = 'raid';
   box.replaceChildren(
-    ...MODES.map((m) => {
+    ...MODES.filter((m) => !(practice && m.ranked)).map((m) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `mode-card k-${m.kind}`;
@@ -595,6 +599,12 @@ function renderRankResult(res) {
   const { before, after, gained, parts } = res;
   const up = after.rank > before.rank;
   el.hidden = false;
+  // practice pays no XP or rewards: say so instead of a "+0"
+  if (app.mode === 'practice') {
+    el.classList.remove('up');
+    el.innerHTML = `<div class="rr-head">${rankBadgeSvg(before.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">${t('rk.rank')} ${before.rank}</span> <b>${esc(before.name)}</b></p><p class="rr-gain">${t('res.practiceNoXp')}</p></div></div>`;
+    return;
+  }
   el.classList.toggle('up', up);
   el.innerHTML = `<div class="rr-head">${rankBadgeSvg(before.rank, 52)}<div class="rk-body"><p class="rk-title"><span class="eyebrow">${t('rk.rank')} ${before.rank}</span> <b>${esc(before.name)}</b></p><div class="rk-bar"><i style="width:${pct(before)}%"></i></div><p class="rr-gain"><b>+${fmt(gained)}</b> ${t('rk.xp')}</p></div></div>
     <ul class="rr-parts">${parts.map((p) => `<li><span>${esc(xpLabel(p))}</span><b>${p.xp >= 0 ? '+' : '−'}${fmt(Math.abs(p.xp))}</b></li>`).join('')}</ul>`;

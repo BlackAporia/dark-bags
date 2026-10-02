@@ -36,6 +36,8 @@ export async function walletBalance(chain, t, address) {
 let store = null;
 export function listWallets() {
   store ??= createStore();
+  // extensions that inject window.starknet_* after the page loaded are only seen on a rescan
+  store._refreshInjectedWallets?.();
   const found = store.getWallets().map((w) => ({ id: w.name, name: w.name, icon: typeof w.icon === 'string' ? w.icon : '', installed: true, wallet: w }));
   const have = new Set(found.map((w) => w.name.toLowerCase()));
   const missing = KNOWN_WALLETS.filter((k) => !have.has(k.name.toLowerCase()) && !have.has(k.id.toLowerCase())).map((k) => ({
@@ -53,15 +55,36 @@ export function onWalletsChanged(fn) {
   return store.subscribe(() => fn(listWallets()));
 }
 
-export async function connectExtension(entry) {
+// 'SN_SEPOLIA' / 'SN_MAIN' as the felt a wallet reports
+const chainFelt = (id) => `0x${[...String(id)].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')}`;
+const sameChain = (a, b) => {
+  try {
+    return BigInt(a) === BigInt(b);
+  } catch {
+    return String(a) === String(b);
+  }
+};
+
+export async function connectExtension(entry, chain = null) {
   const w = entry.wallet;
   const api = w.features['starknet:walletApi'];
+  if (!api || !w.features['standard:connect']) throw new Error(`${w.name} is not a Starknet wallet this game can talk to.`);
   const request = (type, params) => api.request(params === undefined ? { type } : { type, params });
   // wallet-standard connect takes an input object; some wallets (Ready X) destructure it
   // without a default and throw on a bare connect()
   await w.features['standard:connect'].connect({ silent: false });
   const [address] = await request('wallet_requestAccounts', {});
   if (!address) throw new Error('The wallet shared no account.');
+  // the wallet must be on the game's network, or the sign-in can never check out
+  if (chain?.chainId) {
+    const want = chainFelt(chain.chainId);
+    const have = await request('wallet_requestChainId').catch(() => null);
+    if (have && !sameChain(have, want)) {
+      const switched = await request('wallet_switchStarknetChain', { chainId: want }).catch(() => false);
+      const now = switched ? await request('wallet_requestChainId').catch(() => null) : have;
+      if (!now || !sameChain(now, want)) throw new Error(`${w.name} is on another network. Switch it to Starknet ${chain.network === 'mainnet' ? 'Mainnet' : 'Sepolia'} and try again.`);
+    }
+  }
   let strk20 = null; // unknown until tried; set on first use
   const facade = {
     kind: 'extension',

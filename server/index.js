@@ -3,7 +3,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { readFile, writeFile, rename } from 'node:fs/promises';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { CFG } from '../shared/config.js';
@@ -31,9 +31,32 @@ const RANKS_FILE = process.env.RANKS_FILE || (DATA ? `${DATA}/ranks.json` : '');
 const LOCKER_FILE = process.env.LOCKER_FILE || (DATA ? `${DATA}/${NET}-locker.json` : '');
 const REFERRAL_FILE = process.env.REFERRAL_FILE || (DATA ? `${DATA}/${NET}-referrals.json` : '');
 const GUARD_FILE = process.env.GUARD_FILE || (DATA ? `${DATA}/${NET}-guard.json` : '');
+const SOCIAL_FILE = process.env.SOCIAL_FILE || (existsSync('/data') ? '/data/social.json' : '');
 if (NET === 'mainnet' && (!LOCKER_FILE || !REFERRAL_FILE)) {
   console.error('On mainnet the locker (shop $ and skins bought with real money) and the referral book must live on a persistent disk: mount /data or set LOCKER_FILE and REFERRAL_FILE.');
   process.exit(1);
+}
+
+// A new data epoch (CFG.EPOCH) starts every player over: the game files (ranks, locker, friends,
+// referrals, fair-play records, play money) move to <data>/archive/<old epoch>-<time>/ and the
+// server boots empty. The cashier journal (real deposits) is never moved. On mainnet the locker
+// and referrals hold things bought with real money, so there it only happens with
+// EPOCH_RESET_MAINNET=1.
+const EPOCH_FILE = process.env.EPOCH_FILE || (DATA ? `${DATA}/epoch.json` : '');
+if (EPOCH_FILE) {
+  const was = existsSync(EPOCH_FILE) ? JSON.parse(readFileSync(EPOCH_FILE, 'utf8')).epoch ?? null : null;
+  if (was !== CFG.EPOCH) {
+    const files = [WALLET_FILE, RANKS_FILE, LOCKER_FILE, REFERRAL_FILE, GUARD_FILE, SOCIAL_FILE].filter((f) => f && existsSync(f));
+    if (NET === 'mainnet' && files.length && process.env.EPOCH_RESET_MAINNET !== '1') {
+      console.warn(`data epoch ${was} → ${CFG.EPOCH}: mainnet keeps its files (set EPOCH_RESET_MAINNET=1 to start over)`);
+    } else if (files.length) {
+      const dir = path.join(path.dirname(EPOCH_FILE), 'archive', `${was ?? 'pre'}-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+      mkdirSync(dir, { recursive: true });
+      for (const f of files) renameSync(f, path.join(dir, path.basename(f)));
+      console.warn(`data epoch ${was ?? 'none'} → ${CFG.EPOCH}: every player starts over; old files are in ${dir}`);
+    }
+    writeFileSync(EPOCH_FILE, JSON.stringify({ epoch: CFG.EPOCH, at: new Date().toISOString() }));
+  }
 }
 
 // a save never leaves a half-written file behind: write a temp file, then swap it in
@@ -43,7 +66,6 @@ async function saveJSON(file, obj) {
   await rename(tmp, file);
 }
 // players, friends, messages, guilds: on the data volume when there is one
-const SOCIAL_FILE = process.env.SOCIAL_FILE || (existsSync('/data') ? '/data/social.json' : '');
 
 // ------------------------------------------------------------------ wallet
 // CHAIN=sepolia|mainnet: real tokens through the cashier (server/cashier). Otherwise test tokens.

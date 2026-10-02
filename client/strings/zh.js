@@ -975,4 +975,7 @@ export default {
   'err.guard_seat': "你的网络或设备上已有另一个账号在这张桌上",
   'err.guard_new': "你的网络今天新建账号过多，请明天再来",
   'err.guard_faucet': "你的网络今天已领取过测试代币",
+  'res.practiceNoXp': "练习免费：不获得经验和奖励。联网游戏才能升级。",
+  'online.only': "仅限联网。练习免费，不计入通行证和排位。请在「开始」页面切换到联网。",
+  'err.online_only': "仅在联网时可用",
 };

@@ -975,4 +975,7 @@ export default {
   'err.guard_seat': "Un autre compte de ton réseau ou appareil est déjà à cette table",
   'err.guard_new': "Trop de nouveaux comptes depuis ton réseau aujourd'hui. Reviens demain",
   'err.guard_faucet': "Ton réseau a déjà reçu ses jetons de test aujourd'hui",
+  'res.practiceNoXp': "L'entraînement est gratuit : ni XP ni récompenses. Joue en ligne pour monter en rang.",
+  'online.only': "En ligne uniquement. L'entraînement est gratuit, il ne compte ni pour la passe ni pour le classement. Passe en ligne sur la page Jouer.",
+  'err.online_only': "Ça ne marche qu'en ligne",
 };

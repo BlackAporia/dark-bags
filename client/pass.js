@@ -8,6 +8,9 @@ import { figureStill, drawPreview } from './stickman.js';
 import { esc } from './game.js';
 import { t } from './i18n.js';
 
+// a page that only exists in online play
+const onlineOnly = (title) => `<div class="ref-card online-only"><h2 class="ref-title">${t(title)}</h2><p class="muted">${t('online.only')}</p></div>`;
+
 const $ = (id) => document.getElementById(id);
 
 export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
@@ -52,7 +55,9 @@ export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
 
   function render() {
     const root = $('pass-root');
-    if (!root || !L()) return;
+    if (!root) return;
+    if (app.mode === 'practice') return (root.innerHTML = onlineOnly('nav.pass'));
+    if (!L()) return;
     const ps = L().pass ?? { sid: seasonAt().id, xp: 0, tier: 0, premium: false, claimed: { f: [], p: [] } };
     const S = seasonInfo(ps.sid);
     const T = S.theme;

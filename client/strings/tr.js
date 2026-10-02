@@ -975,4 +975,7 @@ export default {
   'err.guard_seat': "Ağından ya da cihazından başka bir hesap zaten bu masada",
   'err.guard_new': "Bugün ağından çok fazla yeni hesap açıldı. Yarın gel",
   'err.guard_faucet': "Ağın bugünkü test jetonlarını aldı",
+  'res.practiceNoXp': "Antrenman ücretsiz: XP ya da ödül yok. Rütbe atlamak için çevrim içi oyna.",
+  'online.only': "Yalnızca çevrim içi. Antrenman ücretsiz olduğu için savaş biletine ve derecelendirmeye sayılmaz. Oyna sayfasında Çevrim içi'ne geç.",
+  'err.online_only': "Bu yalnızca çevrim içi çalışır",
 };

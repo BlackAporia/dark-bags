@@ -214,9 +214,16 @@ export class Cashier {
     try {
       ok = await this.chain.verifySignature(account, td, signature.map(String));
     } catch (e) {
+      // a fresh wallet has an address but no contract on chain yet: it can't prove a signature
+      if (/contract not found|is not deployed|\b20\b.*not found|uninitialized/i.test(String(e?.message))) {
+        throw new CashierError('This wallet is not activated on Starknet yet. Activate (deploy) it in the wallet, or send any transaction from it once, then sign in again.');
+      }
       console.error('signature check failed', e?.message ?? e);
     }
-    if (!ok) throw new CashierError('The signature did not check out. Is the account deployed?');
+    if (!ok) {
+      console.warn(`login: signature did not verify for ${account} (${signature.length} felts)`);
+      throw new CashierError('The signature did not check out. Make sure the wallet is on the right network and try again.');
+    }
     if (!this.allowed(account)) throw new CashierError(`Closed beta: ${account} is not on the list yet. Send this address to the team.`);
     this.sessions.set(session, { account, at: this.now() });
     this.ledger.ensure(account);
