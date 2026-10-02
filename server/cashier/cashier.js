@@ -211,9 +211,15 @@ export class Cashier {
     if (!Array.isArray(signature) || !signature.length || signature.length > 64) throw new CashierError('The wallet returned no signature.');
     const td = loginTypedData({ chainId: this.chain.info().chainId, nonce: l.nonce, issued: l.issued });
     let ok = false;
+    console.log(`login: checking ${account} (${signature.length} felts)`);
     try {
-      ok = await this.chain.verifySignature(account, td, signature.map(String));
+      // a stuck RPC must not leave the player waiting forever
+      ok = await Promise.race([
+        this.chain.verifySignature(account, td, signature.map(String)),
+        new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('verify timeout'), { timeout: true })), 20000)),
+      ]);
     } catch (e) {
+      if (e?.timeout) throw new CashierError('Starknet did not answer in time. Try again in a minute.');
       // a fresh wallet has an address but no contract on chain yet: it can't prove a signature
       if (/contract not found|is not deployed|\b20\b.*not found|uninitialized/i.test(String(e?.message))) {
         throw new CashierError('This wallet is not activated on Starknet yet. Activate (deploy) it in the wallet, or send any transaction from it once, then sign in again.');
@@ -225,6 +231,7 @@ export class Cashier {
       throw new CashierError('The signature did not check out. Make sure the wallet is on the right network and try again.');
     }
     if (!this.allowed(account)) throw new CashierError(`Closed beta: ${account} is not on the list yet. Send this address to the team.`);
+    console.log(`login: ${account} signed in`);
     this.sessions.set(session, { account, at: this.now() });
     this.ledger.ensure(account);
     this.persist();

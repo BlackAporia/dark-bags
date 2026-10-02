@@ -131,6 +131,13 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     }
   }
 
+  const within = (p, ms, msg) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error(msg)), ms))]);
+  // progress in the dialog, and as a toast while the dialog is out of the way
+  const say = (msg) => {
+    setStatus('connect-status', msg);
+    if (!$('dlg-connect').open) toast(msg);
+  };
+
   // wallet facade → server challenge → signature → session bound to the address
   async function signInWith(kind, connect) {
     if (inPage(kind)) {
@@ -146,13 +153,22 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         send({ t: 'auth_start' });
         setTimeout(() => reject(new Error('The server did not answer.')), 15000);
       });
-      const sig = await f.signTypedData(td);
+      const sig = await within(f.signTypedData(td), 180000, 'The wallet did not return a signature. Try again.');
+      say('Signed. Checking the signature on Starknet…');
       cs.facade = f;
       cs.kind = kind;
       const parts = Array.isArray(sig) ? sig : Array.isArray(sig?.signature) ? sig.signature : sig?.r != null ? [sig.r, sig.s] : [];
       if (!parts.length) throw new Error('The wallet returned no signature.');
       cs.authPending = true; // the server's answer may come while the dialog is out of the way
       send({ t: 'auth', address: f.address, signature: parts.map((x) => (typeof x === 'bigint' ? `0x${x.toString(16)}` : String(x))) });
+      // never wait in silence: no answer in time brings the dialog back with a reason
+      clearTimeout(cs.authTimer);
+      cs.authTimer = setTimeout(() => {
+        if (!cs.authPending) return;
+        cs.authPending = false;
+        if (!$('dlg-connect').open) $('dlg-connect').showModal();
+        setStatus('connect-status', 'The server did not confirm the sign-in in time. Try again.', true);
+      }, 45000);
     } catch (e) {
       if (inPage(kind) && !$('dlg-connect').open) $('dlg-connect').showModal();
       setStatus('connect-status', friendly(e), true);
@@ -410,6 +426,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         return true;
       case 'authed':
         cs.authPending = false;
+        clearTimeout(cs.authTimer);
         cs.account = m.account;
         if (m.privy) cs.privyWallet = m.privy;
         if (!m.account) {
@@ -460,6 +477,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         // a refused sign-in: bring the sign-in window back with the reason
         if (cs.authPending) {
           cs.authPending = false;
+          clearTimeout(cs.authTimer);
           if (!$('dlg-connect').open) $('dlg-connect').showModal();
         }
         if ($('dlg-connect').open) setStatus('connect-status', m.msg, true);
