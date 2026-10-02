@@ -14,16 +14,14 @@ const $ = (id) => document.getElementById(id);
 // what she says, exactly (the voice clips in voice/nyx/<key>.mp3)
 export const NYX_LINES = {
   hello: "Hiii, runner! I'm Nyx, your guide tonight! Stick with me, and you'll walk out of your very first raid... rich!",
-  name: "Okay, first things first! Type a name. Everyone will see it, right above your head!",
+  name: "Okay, first things first! Type a name for your runner, then tap Done. Everyone will see it, right above your head!",
   nameOk: "Ooh, cute name! I like it!",
   practice: "Now tap Practice! It's free, it's just bots. Perfect for your first run!",
   practiceOk: "Yesss! Good call!",
   modes: "These are the game modes! Today we play Raid, the classic one. Loot, fight, and get out! Tap Raid!",
   modeOk: "Raid it is! Let's go!",
+  stake: "This is your stake: what you put in your bag. In practice it's play money, so there's nothing to lose. We'll play for one dollar!",
   bag: "Here's the deal! Your stake goes in your bag. Take someone down, and their bag is yours! Go down... and yours is theirs. Eek!",
-  shop: "Outfits and weapon skins come from bags and crates, right here in the shop! And psst... there's a free one waiting for you!",
-  social: "Friends, messages, guilds! Bring your squad. Everything's more fun together!",
-  wallet: "Want real stakes? Sign in with a wallet, or just an email! Cash-outs only ever go back to your own address. Safe and sound!",
   play: "Ready? Hit Play!",
   ready: "This is the ready room! Press Ready, and we drop in! Woo!",
   start: "We're in! Move with W, A, S, D. Aim with the mouse, and click to shoot! Space to dash!",
@@ -35,28 +33,46 @@ export const NYX_LINES = {
   storm: "The storm is coming! Stay inside the circle, quick!",
   exit: "Ooh, that bag looks good on you! Find a green exit ring, and stand in it!",
   extracting: "Hold still! Three seconds! Don't get hit!",
-  won: "You made it out! I knew you could do it! See you next raid, runner!",
-  dead: "Aww, it happens! Practice is free, so let's run it back!",
+  retry: "Aww, you went down! It happens, practice is free! Tap Play again. This time grab a little loot, then run for a green exit!",
+  resultWon: "You made it out! You won! I knew you could do it! The money is in your wallet now. Tap Tables, and let's go spend some of it!",
+  shopGo: "Now tap the Shop!",
+  shopCase: "Welcome to the shop! Let's spend your winnings. Tap Open on this bag. It's paid straight from your wallet!",
+  shopEquip: "Ooh, look what you got! Tap the button, and it's yours!",
+  social: "Friends, messages, guilds! Bring your squad. Everything's more fun together!",
+  wallet: "Want real stakes? Sign in with a wallet, or just an email! Cash-outs only ever go back to your own address. Safe and sound!",
+  bye: "That's everything! You can play, win, and shop. Go get 'em, runner! You can call me again anytime, in Settings.",
 };
 
-// the menu part: `wait` is what the player has to do (the step moves on by itself when they
-// do it); `ok` is her reaction. `when` skips a step that does not apply.
-const LOBBY = [
+// the first unopened bag in the shop: the tutorial buys it with the money just won
+const freshBox = () => [...document.querySelectorAll('#shop-root .box-card')].find((c) => !c.querySelector('.held-badge') && !c.querySelector('.box-go')?.disabled)?.querySelector('.box-go') ?? null;
+
+// The whole first session, in order. The player can only do what the step asks: everything
+// else on the screen is locked until the tour is over.
+//   target: what she points at (and the only thing that can be pressed); wait: what has to
+//   happen for the step to move on (by itself); ok: her reaction; raid: the guided match;
+//   hold: hide the card until the target shows up.
+const FLOW = [
   { key: 'hello' },
   { key: 'name', target: ['#name'], wait: 'name', ok: 'nameOk' },
   { key: 'practice', target: ['#mode-practice'], wait: 'practice', ok: 'practiceOk' },
   { key: 'modes', target: ['#modes .mode-card[data-mode="raid"]', '#modes'], wait: 'mode', ok: 'modeOk' },
+  { key: 'stake', target: ['#tables .table-btn[aria-pressed="true"]', '#tables'] },
   { key: 'bag', target: ['#play'] },
-  { key: 'shop', target: ['.nav-btn[data-page="shop"]'] },
-  { key: 'social', target: ['.nav-btn[data-page="friends"]', '.nav-btn[data-page="guilds"]'] },
-  { key: 'wallet', target: ['#connect', '#tb-wallet'] },
   { key: 'play', target: ['#play'], wait: 'play' },
   { key: 'ready', target: ['#ready'], wait: 'game' },
+  { key: 'raid', raid: true },
+  { key: 'resultWon', target: ['#res-tables'], wait: 'lobby' },
+  { key: 'shopGo', target: ['.nav-btn[data-page="shop"]'], wait: 'shop' },
+  { key: 'shopCase', target: [freshBox], wait: 'opening', hold: true },
+  { key: 'shopEquip', target: ['#op-actions [data-op="equip"]', '#op-actions [data-op="close"]'], wait: 'closed', hold: true },
+  { key: 'social', target: ['.nav-btn[data-page="friends"]', '.nav-btn[data-page="guilds"]'] },
+  { key: 'wallet', target: ['#connect', '#tb-wallet'] },
+  { key: 'bye' },
 ];
 
 const SEEN = 'darkbags.tour.seen'; // who has had the tour on this device: 'device', wallet addresses
 
-export function createTour({ app, go, practice, touch = () => false, sfx = null, game = null, pickRaid = () => {} }) {
+export function createTour({ app, go, practice, touch = () => false, sfx = null, game = null, pickRaid = () => {}, tune = () => {} }) {
   let el = null;
   let nyx = null;
   let steps = [];
@@ -65,6 +81,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
   let pollT = 0;
   let dock = null; // the in-raid companion
   let raid = null; // { said: Set, t0, bag0, k0 }
+  let active = false; // the tour is running: everything but the step's target is locked
   let raidT = 0;
 
   // ------------------------------------------------------------------ voice
@@ -173,9 +190,11 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
   }
 
   // ----------------------------------------------------------------- lobby
+  // a target is a selector, or a function that finds the element
+  const resolve = (sel) => (typeof sel === 'function' ? sel() : document.querySelector(sel));
   const visible = (sel) => {
     for (const s of sel ?? []) {
-      const n = document.querySelector(s);
+      const n = resolve(s);
       if (!n) continue;
       const r = n.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) return n;
@@ -200,7 +219,6 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
           <p class="tour-move" id="tour-move" hidden>👆 ${t('tour.yourMove')}</p>
           <div class="tour-dots" id="tour-dots" aria-hidden="true"></div>
           <div class="tour-actions">
-            <button type="button" class="link tour-skip" id="tour-skip">${t('tour.skip')}</button>
             <span class="tour-grow"></span>
             <button type="button" class="cta" id="tour-next">${t('tour.next')}</button>
           </div>
@@ -209,21 +227,31 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     document.body.append(el);
     nyx = createNyx($('tour-nyx'));
     mouthOf = nyx;
-    $('tour-skip').addEventListener('click', () => end(true));
-    $('tour-next').addEventListener('click', () => advance());
+    $('tour-next').addEventListener('click', () => {
+      const s = steps[i];
+      if (s?.wait === 'name') return nameDone();
+      if (!s?.wait) advance();
+    });
     $('tour-nyx').addEventListener('click', () => say(steps[i].key, { show: (k) => subtitle(el, k) }));
     $('tour-voice').addEventListener('click', toggleVoice);
     paintVoice();
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') end(true);
-    });
     addEventListener('resize', place);
   }
 
+  // the name step: Done takes whatever is typed (it has to be something)
+  function nameDone() {
+    const input = $('name');
+    if (!input?.value.trim()) {
+      input?.focus();
+      nudge();
+      return;
+    }
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    store.set('darkbags.tour.named', true);
+  }
+
   function paintVoice() {
-    const b = $('tour-voice') ?? dock?.querySelector('.tour-voice');
     for (const x of [$('tour-voice'), dock?.querySelector('.tour-voice')]) if (x) x.textContent = voiceOn() ? '🔊' : '🔇';
-    return b;
   }
   function toggleVoice() {
     store.set('darkbags.tour.mute', voiceOn());
@@ -233,9 +261,15 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
 
   function place() {
     if (!el || !steps[i]) return;
+    const s = steps[i];
     const spot = $('tour-spot');
     const card = $('tour-card');
-    const n = visible(steps[i].target);
+    const n = visible(s.target);
+    // out of the way during the raid, behind a rank-up show, or until the target turns up
+    const rk = $('rankup');
+    const hold = s.raid || (rk && !rk.hidden) || (s.hold && !n);
+    el.classList.toggle('hold', !!hold);
+    if (s.wait === 'name') $('tour-next').disabled = !$('name')?.value.trim();
     card.classList.remove('top');
     if (!n) {
       spot.className = 'tour-spot none';
@@ -243,16 +277,15 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     }
     // once per step: bring the target into view (a step that asks you to act puts it at the top,
     // clear of the card)
-    if (!steps[i].scrolled) {
-      steps[i].scrolled = true;
-      n.scrollIntoView?.({ block: steps[i].wait ? 'start' : 'nearest', behavior: settings.motion ? 'smooth' : 'auto' });
+    if (!s.scrolled) {
+      s.scrolled = true;
+      n.scrollIntoView?.({ block: s.wait ? 'center' : 'nearest', behavior: settings.motion ? 'smooth' : 'auto' });
     }
     const r = n.getBoundingClientRect();
     const pad = 8;
-    spot.className = `tour-spot${steps[i].wait ? ' act' : ''}`;
+    spot.className = `tour-spot${s.wait ? ' act' : ''}`;
     Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
-    // the card goes where it hides less of the target (on a phone held sideways neither side is
-    // fully clear)
+    // the card goes where it hides less of the target
     const cr = card.getBoundingClientRect();
     const hideBelow = Math.max(0, r.bottom + pad - (innerHeight - cr.height - 18));
     const hideAbove = Math.max(0, 18 + cr.height - (r.top - pad));
@@ -266,6 +299,10 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     if (wait === 'mode') return store.get('darkbags.tour.picked', false);
     if (wait === 'play') return app.screen === 'prep' || app.screen === 'game';
     if (wait === 'game') return app.screen === 'game';
+    if (wait === 'lobby') return app.screen === 'lobby';
+    if (wait === 'shop') return app.screen === 'lobby' && app.page === 'shop';
+    if (wait === 'opening') return !$('opening')?.hidden;
+    if (wait === 'closed') return !!$('opening')?.hidden;
     return false;
   }
 
@@ -273,26 +310,35 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     i = Math.max(0, Math.min(steps.length - 1, n));
     const s = steps[i];
     el.dataset.step = s.key;
-    // the menu steps live on the Play page; the ready room is its own screen
-    if (s.wait !== 'game' && app.screen === 'lobby' && app.page !== 'play') go('play');
-    if (s.wait === 'play' && app.gameMode !== 'raid') pickRaid();
+    if (s.raid) {
+      el.classList.add('hold');
+      if (app.screen === 'game') startRaid();
+      return;
+    }
+    closeDock();
+    // the lobby steps live on the Play page (until she sends you to the shop)
+    const lobbyStep = ['name', 'practice', 'modes', 'stake', 'bag', 'play', 'hello'].includes(s.key);
+    if (lobbyStep && app.screen === 'lobby' && app.page !== 'play') go('play');
+    if (['stake', 'bag', 'play'].includes(s.key)) pickRaid();
+    if (s.key === 'play') tune(true); // the guided raid: easy bots, a few of them, a little more time
     el.classList.toggle('acting', !!s.wait);
     $('tour-move').hidden = !s.wait;
     $('tour-next').hidden = !!s.wait && s.wait !== 'name';
-    $('tour-next').textContent = s.wait === 'name' ? t('tour.skipStep') : t('tour.next');
-    $('tour-dots').innerHTML = steps.map((_, k) => `<i class="${k === i ? 'on' : k < i ? 'past' : ''}"></i>`).join('');
+    $('tour-next').textContent = s.wait === 'name' ? t('tour.nameDone') : i === steps.length - 1 ? t('tour.finish') : t('tour.next');
+    const dots = steps.filter((x) => !x.extra);
+    const at = dots.indexOf(s.extra ? steps[i + 1] : s);
+    $('tour-dots').innerHTML = dots.map((_, k) => `<i class="${k === at ? 'on' : k < at ? 'past' : ''}"></i>`).join('');
     say(s.key, { show: (k) => subtitle(el, k) });
     requestAnimationFrame(place);
     setTimeout(place, 400);
-    if (!s.wait) $('tour-next').focus({ preventScroll: true });
+    if (s.wait === 'name') setTimeout(() => $('name')?.focus({ preventScroll: true }), 300);
+    else if (!s.wait) $('tour-next').focus({ preventScroll: true });
   }
 
   function advance() {
     if (!el) return;
-    const s = steps[i];
-    if (i >= steps.length - 1) return end(false);
+    if (i >= steps.length - 1) return end();
     show(i + 1);
-    return s;
   }
 
   // the player did what the step asked: a short reaction, then on
@@ -317,14 +363,71 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     pollT = setInterval(() => {
       if (!el || !steps[i]) return;
       const s = steps[i];
+      if (s.raid) {
+        if (app.screen === 'game' && !dock) startRaid();
+        return;
+      }
       if (s.wait && done(s.wait) && !s.fired) {
         s.fired = true;
-        if (s.wait === 'game') return startRaid();
         acted();
       }
-      if (el && steps[i]?.target) place();
+      place();
     }, 250);
   }
+
+  // ------------------------------------------------------------------ the lock
+  // While the tour runs only the highlighted thing (and Nyx's own card) can be pressed. In the
+  // raid you play freely, but cannot open the menu to leave. The language picker always works.
+  function allowed(node) {
+    if (!active || !node?.closest) return true;
+    if (node.closest('#tour-card, .nyx-dock, .lang-pick')) return true;
+    if (node.closest('#rankup [data-ru="close"], #rankup [data-lt="ok"]')) return true;
+    const s = steps[i];
+    if (!s) return true;
+    if (s.raid) return !node.closest('#pause-btn, #pause, .pause-btn');
+    for (const sel of s.target ?? []) {
+      const n = resolve(sel);
+      if (n && (n === node || n.contains(node))) return true;
+    }
+    return false;
+  }
+  function nudge() {
+    const card = $('tour-card');
+    if (!card) return;
+    card.classList.remove('nudge');
+    void card.offsetWidth;
+    card.classList.add('nudge');
+    $('tour-spot')?.classList.add('flash');
+    setTimeout(() => $('tour-spot')?.classList.remove('flash'), 600);
+    sfx?.play?.('beep', { f: 240, dur: 0.07 });
+  }
+  function block(e) {
+    if (allowed(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    if (e.type === 'pointerdown' || e.type === 'keydown') nudge();
+  }
+  for (const type of ['pointerdown', 'mousedown', 'touchstart', 'click', 'dblclick', 'contextmenu', 'change', 'input'])
+    document.addEventListener(type, (e) => active && (type !== 'change' && type !== 'input' ? block(e) : !allowed(e.target) && e.stopImmediatePropagation()), { capture: true, passive: false });
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (!active) return;
+      if (steps[i]?.raid) {
+        // play freely, but no menu (and no leaving) during the guided raid
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          nudge();
+        }
+        return;
+      }
+      if (e.key === 'Tab') return; // moving focus is fine; pressing something else is not
+      block(e);
+    },
+    true,
+  );
 
   // events the waits listen for
   document.addEventListener('change', (e) => {
@@ -343,12 +446,14 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     go('play');
     store.set('darkbags.tour.named', false);
     store.set('darkbags.tour.picked', false);
-    steps = LOBBY.filter((s) => !s.when || s.when(app)).map((s) => ({ ...s }));
+    store.set('darkbags.tour.active', true);
+    store.set('darkbags.tour.done', false);
+    steps = FLOW.map((s) => ({ ...s }));
     preload(steps.flatMap((s) => [s.key, s.ok].filter(Boolean)));
     preload(['start', 'startTouch', 'loot', 'pickup', 'kill']);
     build();
-    // the guided match is a Raid (the loot, the bags, the exits she talks about): the other
-    // modes wait until the tour is over
+    active = true;
+    // the guided match is a Raid (the loot, the bags, the exits she talks about)
     pickRaid();
     document.body.classList.add('touring', 'tour-raid-only');
     requestAnimationFrame(() => el?.classList.add('in'));
@@ -367,30 +472,32 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     document.body.classList.remove('touring', 'tour-raid-only');
   }
 
-  // skipped: everything closes; finished: the raid companion takes over if a raid is starting
-  function end(skipped) {
+  // the end of the tour: everything unlocks
+  function end() {
+    active = false;
     stopVoice();
     closeCard();
     closeDock();
-    if (skipped) store.set('darkbags.tour.done', true);
+    tune(false);
+    store.set('darkbags.tour.done', true);
+    store.set('darkbags.tour.active', false);
   }
 
   // -------------------------------------------------------------- the raid
   function startRaid() {
-    closeCard();
+    if (dock) return;
     dock = document.createElement('div');
     dock.className = 'nyx-dock';
-    dock.innerHTML = `<div class="nyx-face" id="nyx-face"></div><div class="nyx-says"><p class="nyx-who"><b>NYX</b><button type="button" class="tour-voice" title="${t('tour.voice')}"></button><button type="button" class="nyx-x" aria-label="${t('tour.skip')}">✕</button></p><p class="nyx-en"></p><p class="nyx-tr" hidden></p></div>`;
+    dock.innerHTML = `<div class="nyx-face" id="nyx-face"></div><div class="nyx-says"><p class="nyx-who"><b>NYX</b><button type="button" class="tour-voice" title="${t('tour.voice')}"></button></p><p class="nyx-en"></p><p class="nyx-tr" hidden></p></div>`;
     document.body.append(dock);
     document.body.classList.add('nyx-on');
     const face = createNyx(dock.querySelector('#nyx-face'));
     mouthOf = face;
     dock._face = face;
     dock.querySelector('.tour-voice').addEventListener('click', toggleVoice);
-    dock.querySelector('.nyx-x').addEventListener('click', () => end(true));
     paintVoice();
     raid = { said: new Set(), t0: performance.now(), bag0: null, k0: null };
-    preload(['hurt', 'storm', 'exit', 'extracting', 'won', 'dead']);
+    preload(['hurt', 'storm', 'exit', 'extracting', 'retry', 'resultWon']);
     callout(touch() ? 'startTouch' : 'start', true);
     clearInterval(raidT);
     raidT = setInterval(raidTick, 250);
@@ -410,43 +517,22 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
   }
 
   function raidTick() {
-    if (!dock || !raid || raid.over) return;
-    if (app.screen !== 'game' && app.screen !== 'result') return;
+    if (!dock || !raid) return;
+    if (app.screen !== 'game') return;
     const you = game?.you;
-    if (!you) return;
+    if (!you || you.st !== 'alive') return;
     raid.bag0 ??= you.bag;
     raid.k0 ??= you.k ?? 0;
     const since = (performance.now() - raid.t0) / 1000;
-    if (you.st === 'alive') {
-      const raidMode = !game?.potMode && !game?.dmMode; // loot on the map, bags, exits
-      if ((you.k ?? 0) > raid.k0) callout('kill', true);
-      else if (raidMode && you.bag > raid.bag0) callout('pickup'); // the first coins, however they came
-      if (raidMode && since > 7 && you.bag <= raid.bag0) callout('loot');
-      if (you.ext > 0) callout('extracting', true);
-      else if (you.hp < 40) callout('hurt'); // not over "hold still" while extracting
-      if (you.storm && !(you.ext > 0)) callout('storm', true);
-      const tl = game?.recvTl ? game.recvTl.tl : 999;
-      // where to go: once the bag is worth it, when time runs low, or after a while anyway
-      if (raidMode && since > 20 && (you.bag >= (you.stake || 1) * 1.2 || tl < 100 || since > 50)) callout('exit');
-    } else if (you.st === 'extracted' || you.st === 'won') {
-      finishRaid('won');
-    } else if (you.st === 'dead' && !game?.dmMode) {
-      finishRaid('dead');
-    }
-  }
-
-  function finishRaid(key) {
-    if (raid.over) return;
-    raid.over = true;
-    queue = [];
-    callout(key, true);
-    store.set('darkbags.tour.done', true);
-    // and where to find her again
-    const hint = document.createElement('p');
-    hint.className = 'nyx-replay';
-    hint.textContent = t('tour.replayHint');
-    dock?.querySelector('.nyx-says')?.append(hint);
-    setTimeout(() => closeDock(), 10000);
+    if ((you.k ?? 0) > raid.k0) callout('kill', true);
+    else if (you.bag > raid.bag0) callout('pickup'); // the first coins, however they came
+    if (since > 7 && you.bag <= raid.bag0) callout('loot');
+    if (you.ext > 0) callout('extracting', true);
+    else if (you.hp < 40) callout('hurt'); // not over "hold still" while extracting
+    if (you.storm && !(you.ext > 0)) callout('storm', true);
+    const tl = game?.recvTl ? game.recvTl.tl : 999;
+    // where to go: once the bag is worth it, when time runs low, or after a while anyway
+    if (since > 20 && (you.bag >= (you.stake || 1) * 1.2 || tl < 100 || since > 50)) callout('exit');
   }
 
   function closeDock() {
@@ -455,38 +541,43 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     dock?.remove();
     dock = null;
     raid = null;
+    mouthOf = nyx;
     document.body.classList.remove('nyx-on');
   }
 
-  // the screen changed under the tour: the ready room keeps the card; a raid hands over to the
-  // companion; anything else ends the menu part
-  function onScreen(name) {
-    if (dock && name === 'lobby') return closeDock();
-    if (!el) return;
-    if (name === 'prep' || name === 'game') return;
-    if (name !== 'lobby') closeCard();
+  // the raid is over: a win moves the tour on to the shop; a loss sends you back in until you win
+  function onResult(m) {
+    if (!active || !steps[i]?.raid) return;
+    closeDock();
+    const won = m.status === 'extracted' || !!m.won;
+    if (!won) steps.splice(i + 1, 0, { key: 'retry', target: ['#res-again'], wait: 'game', extra: true }, { key: 'raid', raid: true, extra: true });
+    setTimeout(() => active && show(i + 1), 600);
   }
 
+  function onScreen(name) {
+    if (!active) return;
+    if (name === 'game' && steps[i]?.raid) startRaid();
+  }
+
+  // a new device or wallet gets the tour; a tour cut short (a reload) starts over until finished
   function maybeStart(who = 'device') {
+    if (active) return false;
     const seen = store.get(SEEN, []);
-    if (seen.includes(who)) return false;
-    store.set(SEEN, [...seen, who].slice(-50));
+    const unfinished = store.get('darkbags.tour.active', false) && !store.get('darkbags.tour.done', false);
+    if (seen.includes(who) && !unfinished) return false;
+    if (!seen.includes(who)) store.set(SEEN, [...seen, who].slice(-50));
     setTimeout(start, who === 'device' ? 600 : 300);
     return true;
-  }
-
-  function onResult(m) {
-    if (dock && raid) finishRaid(m.status === 'extracted' || m.won ? 'won' : 'dead');
   }
 
   return {
     start,
     onResult,
-    close: () => end(false),
+    close: () => end(),
     onScreen,
     maybeStart,
     get open() {
-      return !!el || !!dock;
+      return active;
     },
   };
 }
