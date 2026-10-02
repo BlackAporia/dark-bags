@@ -11,7 +11,10 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
   const { StarkZap, StarkSigner, Amount, fromAddress, EkuboSwapProvider, ChainId, mainnetTokens, sepoliaTokens, networks } = starkzap;
   const mainnet = cfg.network === 'mainnet';
   const chainId = mainnet ? ChainId.MAINNET : ChainId.SEPOLIA;
-  const rpcUrl = cfg.rpcUrl || networks[cfg.network].rpcUrl;
+  // the first node that answers on the right chain; the rest stay as spares for the browser
+  const nodes = [...new Set([cfg.rpcUrl || networks[cfg.network].rpcUrl, ...(cfg.rpcFallbacks ?? [])])];
+  const rpcUrl = (await pickNode(nodes, mainnet ? 'SN_MAIN' : 'SN_SEPOLIA', log)) ?? nodes[0];
+  cfg = { ...cfg, rpcUrl }; // the STRK20 pool and the prover use the same node
   const sdk = new StarkZap({
     network: cfg.network,
     rpcUrl,
@@ -57,6 +60,7 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       network: cfg.network,
       chainId: cfg.chainId,
       rpcUrl: cfg.clientRpcUrl || networks[cfg.network].rpcUrl,
+      rpcUrls: [...new Set([cfg.clientRpcUrl || networks[cfg.network].rpcUrl, ...(cfg.rpcFallbacks ?? [])])],
       house,
       pool: strk20?.pool ?? null,
       routes,
@@ -130,4 +134,29 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
     },
   };
   return chain;
+}
+
+// Ask each node for its chain id (5 s each) and take the first that answers with the right one.
+const felt = (s) => `0x${[...s].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')}`;
+export async function pickNode(nodes, chainId, log = console, fetchImpl = fetch) {
+  for (const url of nodes) {
+    try {
+      const res = await fetchImpl(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'starknet_chainId', params: [] }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const id = (await res.json())?.result;
+      if (id && BigInt(id) === BigInt(felt(chainId))) {
+        if (url !== nodes[0]) log.warn(`cashier: ${nodes[0]} did not answer, using ${url}`);
+        return url;
+      }
+      log.warn(`cashier: ${url} is on another chain (${id})`);
+    } catch (e) {
+      log.warn(`cashier: ${url} did not answer (${e?.message ?? e})`);
+    }
+  }
+  log.error('cashier: no Starknet node answered; trying the first one anyway');
+  return null;
 }
