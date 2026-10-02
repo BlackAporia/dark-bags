@@ -332,3 +332,25 @@ test('online (no bots): a raid needs two ready players; one alone cannot start i
   assert.equal(room.world.players.size, 2, 'two people, no bots');
   assert.ok([...room.world.players.values()].every((p) => !p.isBot));
 });
+
+test('a restart mid-raid gives every unpaid stake back; the ready room too', () => {
+  const { lobby, wallet, client, ticks } = setup({ roundSeconds: 120, minPlayers: 2, waitForStart: true });
+  const a = client(1, 'a');
+  const b = client(2, 'b');
+  const c = client(3, 'c');
+  const before = [a, b, c].map((x) => wallet.balance(x.token, 'USDC'));
+  for (const x of [a, b]) {
+    lobby.handle(x.cid, { t: 'join', mode: 'dm', stake: 1000 });
+    lobby.handle(x.cid, { t: 'ready', asset: 'USDC' });
+  }
+  lobby.handle(1, { t: 'start' });
+  ticks(8);
+  lobby.handle(3, { t: 'join', mode: 'raid', stake: 1000 });
+  lobby.handle(3, { t: 'ready', asset: 'USDC' });
+  assert.ok(wallet.balance(a.token, 'USDC') < before[0], 'stake taken');
+  assert.ok(wallet.balance(c.token, 'USDC') < before[2], 'ready stake escrowed');
+  const refunds = lobby.abortAll();
+  assert.equal(refunds.length, 3);
+  for (const [i, x] of [a, b, c].entries()) assert.equal(wallet.balance(x.token, 'USDC'), before[i], 'every stake back');
+  assert.equal(a.last('err').code, 'restart');
+});

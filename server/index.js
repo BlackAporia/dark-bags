@@ -491,7 +491,14 @@ server.listen(PORT, () => {
   real?.start();
 });
 
+let shuttingDown = false;
 const shutdown = async () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  // stakes on the tables come back before anything is saved (the cashier journal is flushed below)
+  const refunds = lobby.abortAll();
+  if (refunds.length) console.warn(`shutdown: refunded ${refunds.length} stake(s) still on the tables`);
+  await new Promise((r) => setTimeout(r, 300)); // let the notices reach the players
   if (RANKS_FILE) await saveJSON(RANKS_FILE, ranks.toJSON()).catch(() => {});
   if (LOCKER_FILE) await saveJSON(LOCKER_FILE, inventory.toJSON()).catch(() => {});
   if (REFERRAL_FILE) await saveJSON(REFERRAL_FILE, referrals.toJSON()).catch(() => {});
