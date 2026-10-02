@@ -55,11 +55,11 @@ test('the shotgun fires a spread of pellets', () => {
   assert.equal(w.bullets.size, WEAPONS[a.w].pellets);
 });
 
-test('the ladder wraps from the laser sniper back to the knife with a prestige', () => {
+test('the ladder wraps from the laser sniper back to the pistol (never the knife) with a prestige', () => {
   const { w, a } = duel();
   a.w = WEAPONS.length - 1;
   w.addXp(a, XP_PER_LEVEL);
-  assert.equal(a.w, 0);
+  assert.equal(a.w, 1);
   assert.equal(a.prestige, 1);
   assert.ok(w.events.some((e) => e.k === 'arsenal' && e.pid === a.id));
 });
@@ -150,4 +150,25 @@ test('a half-empty magazine tops up by itself once you stop shooting; the knife 
 test('the arsenal: every gun has a magazine, a reload and a sound', () => {
   assert.ok(WEAPONS.length >= 12);
   for (const wp of WEAPONS) if (!wp.melee) assert.ok(wp.mag > 0 && wp.reload > 0 && wp.snd, wp.id);
+});
+
+test('the knife is only for the start: each death in a respawn mode costs a step, never below the pistol', () => {
+  const w = new World({ stake: 1000, seed: 31, mode: 'dm', botFill: 3, roundSeconds: 60 });
+  const a = w.addPlayer({ name: 'a', skin: '#fff' });
+  w.step();
+  assert.equal(a.w, 0, 'everyone starts with the knife');
+  a.shield = 0;
+  w.kill(a, null, 'shot');
+  w.respawn(a);
+  assert.equal(a.w, 1, 'down from the knife is the pistol');
+  a.w = 7;
+  w.kill(a, null, 'shot');
+  w.respawn(a);
+  assert.equal(a.w, 6, 'one step down');
+  assert.ok(w.events.some((e) => e.k === 'demote' && e.w === 6));
+  // one-weapon modes keep their weapon
+  const k = new World({ stake: 1000, seed: 32, mode: 'knives', botFill: 2 });
+  const b = k.addPlayer({ name: 'b', skin: '#fff' });
+  k.respawn(b);
+  assert.equal(WEAPONS[b.w].id, 'knife');
 });

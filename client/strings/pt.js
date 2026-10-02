@@ -81,7 +81,7 @@ export default {
   'hud.goldenStart': 'Incursão dourada · saque do jackpot lá dentro',
   'hud.start': 'Faca na mão · pegue o laranja · ache uma saída',
   'hud.bagOpened': 'Bolsa aberta · +{v}',
-  'hud.arsenal': 'Arsenal completo · de volta à faca ★',
+  'hud.arsenal': "Arsenal completo · de volta à pistola ★",
   'hud.unlocked': '{w} desbloqueada',
   'hud.pnl': '{d} contra a aposta de {s}',
   'hud.alive': '{n} lá dentro',
@@ -922,4 +922,6 @@ export default {
   'ach.sharpshooter': "Atirador certeiro",
   'ach.headhunter': "Caçador de cabeças",
   'achd.headshots': "Acerte {n} tiros na cabeça",
+  'hud.demoted': "Morte: volta para {w}",
+  'hud.crit': "CRÍTICO",
 };

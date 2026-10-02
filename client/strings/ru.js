@@ -81,7 +81,7 @@ export default {
   'hud.goldenStart': 'Золотой рейд · лут из джекпота внутри',
   'hud.start': 'Нож в руки · собирай оранжевое · ищи выход',
   'hud.bagOpened': 'Сумка вскрыта · +{v}',
-  'hud.arsenal': 'Арсенал пройден · снова нож ★',
+  'hud.arsenal': "Арсенал пройден · снова пистолет ★",
   'hud.unlocked': '{w} открыто',
   'hud.pnl': '{d} к ставке {s}',
   'hud.alive': 'Внутри: {n}',
@@ -922,4 +922,6 @@ export default {
   'ach.sharpshooter': "Меткий стрелок",
   'ach.headhunter': "Охотник за головами",
   'achd.headshots': "Попадите {n} раз в голову",
+  'hud.demoted': "Смерть: оружие понижено до «{w}»",
+  'hud.crit': "КРИТ",
 };

@@ -81,7 +81,7 @@ export default {
   'hud.goldenStart': 'Raid doré · butin du jackpot à l’intérieur',
   'hud.start': 'Couteau en main · prenez l’orange · trouvez une sortie',
   'hud.bagOpened': 'Sac ouvert · +{v}',
-  'hud.arsenal': 'Arsenal complet · retour au couteau ★',
+  'hud.arsenal': "Arsenal complet · retour au pistolet ★",
   'hud.unlocked': '{w} débloqué',
   'hud.pnl': '{d} par rapport à la mise de {s}',
   'hud.alive': '{n} à l’intérieur',
@@ -922,4 +922,6 @@ export default {
   'ach.sharpshooter': "Tireur d'élite",
   'ach.headhunter': "Chasseur de têtes",
   'achd.headshots': "Place {n} tirs en pleine tête",
+  'hud.demoted': "Mort : retour à {w}",
+  'hud.crit': "CRITIQUE",
 };

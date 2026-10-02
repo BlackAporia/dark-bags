@@ -1,5 +1,6 @@
 // Arms Race: everyone enters equal (knife, 100 HP). Experience moves you up the
-// ladder one weapon at a time; after the laser sniper you wrap back to the knife.
+// ladder one weapon at a time; after the laser sniper you start over at the pistol (the knife
+// is only for the start of a match), and in the respawn modes every death costs one step.
 // A counter-strike style arsenal: pistols, shotguns, SMGs, rifles, a machine gun and
 // snipers. Every gun has a magazine and reloads by itself, on PC and phone alike: at once
 // when it runs dry, or after a short pause in the shooting when it is half empty. For

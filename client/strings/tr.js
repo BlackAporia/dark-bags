@@ -81,7 +81,7 @@ export default {
   'hud.goldenStart': 'Altın baskın · içeride jackpot ganimeti',
   'hud.start': 'Bıçak elde · turuncuyu topla · çıkış bul',
   'hud.bagOpened': 'Çanta açıldı · +{v}',
-  'hud.arsenal': 'Cephanelik tamam · yine bıçak ★',
+  'hud.arsenal': "Cephanelik tamam · yine tabanca ★",
   'hud.unlocked': '{w} açıldı',
   'hud.pnl': '{s} bahse karşı {d}',
   'hud.alive': 'İçeride {n}',
@@ -922,4 +922,6 @@ export default {
   'ach.sharpshooter': "Keskin Nişancı",
   'ach.headhunter': "Kafa Avcısı",
   'achd.headshots': "{n} kafadan vuruş yap",
+  'hud.demoted': "Öldün: {w} silahına düştün",
+  'hud.crit': "KRİTİK",
 };
