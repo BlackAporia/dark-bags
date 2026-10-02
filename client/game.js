@@ -1,4 +1,5 @@
 import { CFG, GL } from '../shared/config.js';
+import { titleTier } from '../shared/achievements.js';
 import { OUTFIT, FINISH, RARITY_ORDER, modelFor } from '../shared/cosmetics.js';
 import { MODE } from '../shared/modes.js';
 import { usdText } from '../shared/assets.js';
@@ -651,7 +652,7 @@ export class GameClient {
       const skins = settings.skins === 'all'; // settings: draw others' outfits and weapon skins?
       const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c, outfit: skins ? p.o : null, body: p.g, ws: skins ? p.ws : null });
       this.woundCheck(an, p.h, now);
-      figures.push({ a: an, color: p.c, name: p.n, ping: p.pg, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, neon: p.nt && settings.titles ? p.nt : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
+      figures.push({ a: an, color: p.c, name: p.n, ping: p.pg, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, ttier: p.tt ? titleTier(p.tt) : null, neon: p.nt && settings.titles ? p.nt : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
     this.anims.prune(now);
     this.lastFigures = figures;
@@ -669,7 +670,7 @@ export class GameClient {
       const y = this.pred.y + this.corr.y;
       const me = (this.meAnim = this.animSelf(x, y, dt, now));
       this.woundCheck(me, you.hp, now);
-      figures.push({ a: me, color: this.skin, name: this.myName || 'you', rk: this.myRank, title: settings.titles ? this.myTitle : null, neon: settings.titles ? this.myNeon : null, hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
+      figures.push({ a: me, color: this.skin, name: this.myName || 'you', rk: this.myRank, title: settings.titles ? this.myTitle : null, ttier: this.myTitleTier ?? null, neon: settings.titles ? this.myNeon : null, hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
       eye = { x, y };
       // look a little ahead of where you aim
       const la = Math.min(1, 1 - Math.exp(-dt * 6));

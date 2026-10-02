@@ -3,7 +3,7 @@
 import { t } from './i18n.js';
 import { esc } from './game.js';
 import { rankBadgeSvg } from './rankbadge.js';
-import { achName } from './achievements.js';
+import { achName, titleHtml } from './achievements.js';
 import { figureStill } from './stickman.js';
 import { MODE } from '../shared/modes.js';
 import { usdText } from '../shared/assets.js';
@@ -68,7 +68,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     return `<li class="so-row">
       <button type="button" class="so-who" data-act="profile" data-id="${c.id}">
         <i class="so-dot ${c.st}" aria-hidden="true"></i>${rankBadgeSvg(c.rk ?? 1, 18)}
-        <span class="so-name"><b>${esc(c.n)}</b>${c.g ? `<em class="so-g">[${esc(c.g)}]</em>` : ''}${c.tt ? `<span class="so-tt">${esc(achName(c.tt))}</span>` : ''}<small>${esc(statusText(c))}</small></span>
+        <span class="so-name"><b>${esc(c.n)}</b>${c.g ? `<em class="so-g">[${esc(c.g)}]</em>` : ''}${c.tt ? titleHtml(c.tt, 'so-tt') : ''}<small>${esc(statusText(c))}</small></span>
       </button>
       <span class="so-acts">${inv}${ginv}${invite ? '' : add}${invite ? '' : `<button type="button" class="ghost sm" data-act="msg" data-id="${c.id}">${t('so.message')}</button>`}</span>
     </li>`;
@@ -307,7 +307,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
         <img class="pf-fig" alt="" src="${figureStill({ outfit: m.look?.outfit, body: m.look?.body }, 90, 124)}">
         <div class="pf-id">
           <p class="pf-name">${rankBadgeSvg(c.rk ?? 1, 26)}<b>${esc(c.n)}</b>${c.g ? `<em class="so-g">[${esc(c.g)}]</em>` : ''}</p>
-          ${c.tt ? `<p class="so-tt">${esc(achName(c.tt))}</p>` : ''}
+          ${c.tt ? `<p>${titleHtml(c.tt, 'so-tt big')}</p>` : ''}
           <p class="fine"><i class="so-dot ${c.st}"></i> ${esc(statusText(c))} · ${t('pf.rank', { n: c.rk })}</p>
           ${m.guild ? `<p class="fine">${t('pf.guild', { g: `${m.guild.name} [${m.guild.tag}]` })}</p>` : ''}
         </div>

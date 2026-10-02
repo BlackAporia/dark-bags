@@ -10,6 +10,8 @@ import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 import { MODE } from './modes.js';
 
 const DT = 1 / CFG.TICK_RATE;
+// weapon families, for the mastery achievements
+const WEAPON_CLASS = { knife: 'knife', pistol: 'handgun', deagle: 'handgun', shotgun: 'shotgun', autoshotgun: 'shotgun', smg: 'smg', pdw: 'smg', rifle: 'rifle', carbine: 'rifle', lmg: 'rifle', scout: 'sniper', magnum: 'sniper', sniper: 'sniper' };
 const AUTO_RELOAD_IDLE = 1.2; // seconds without shooting before a half-empty magazine tops up
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -541,7 +543,10 @@ export class World {
       this.addXp(shooter, Math.min(amount, Math.max(0, v.hp)) * XP.damage * k);
       v.lastAttacker = shooter.id;
     }
+    const full = v.hp >= this.maxHp;
     v.hp -= amount;
+    v.dmgTaken = (v.dmgTaken ?? 0) + amount; // for "untouchable"
+    if (full && v.hp <= 0 && shooter && shooter !== v && !this.hardcore) shooter.oneShots = (shooter.oneShots ?? 0) + 1; // full health to nothing in one hit
     v.lastHit = this.time;
     v.ext = 0;
     this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y) });
@@ -549,6 +554,15 @@ export class World {
   }
 
   kill(v, killer, cause = 'shot') {
+    // kills by weapon class (achievements), and turret kills (Guns + Lasers)
+    if (killer && killer !== v) {
+      if (cause === 'turret') killer.turretKills = (killer.turretKills ?? 0) + 1;
+      else {
+        const cls = WEAPON_CLASS[WEAPONS[killer.w]?.id] ?? 'other';
+        killer.wk ??= {};
+        killer.wk[cls] = (killer.wk[cls] ?? 0) + 1;
+      }
+    }
     v.hp = 0;
     v.place ??= this.aliveCount(); // finishing place (before this death: the alive count)
     v.status = 'dead';

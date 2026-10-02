@@ -7,7 +7,7 @@ import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
 import { MODE } from './modes.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, seasonAt } from './cosmetics.js';
-import { spinChance, rollLottery, titleBonus } from './ranked.js';
+import { spinChance, rollLottery, titleBonus, DIVISIONS } from './ranked.js';
 
 /**
  * A table at one stake level.
@@ -369,7 +369,8 @@ export class RoomCore {
         ...base,
         slots: ready.map((r) => {
           const look = this.inventory.look(r.token);
-          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, me: r === c ? 1 : 0 };
+          const tt = this.ranks.title(r.token);
+          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(tt ? { tt } : {}), me: r === c ? 1 : 0 };
         }),
         me: { ready: c.ready, inRaid: this.inRaid(c), escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
         balances: this.wallet.balances(c.token),
@@ -445,8 +446,20 @@ export class RoomCore {
       // career rank: every raid pays, win or lose
       const earned = raidXp(p, { practice: this.practice });
       // achievements: career counters, each completed one pays its XP once
-      const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit });
-      const done = this.ranks.progress(c.token, { ...stats, outfits: this.inventory.view(c.token).owned.length });
+      const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit, mode: MODE[this.mode] });
+      // ranked: the finish moves the season rating, and may earn a bonus spin
+      let ranked = null;
+      if (MODE[this.mode]?.ranked && !this.practice && (w.phase === 'ended' || p.status === 'dead')) {
+        const place = p.won ? 1 : p.place ?? w.players.size;
+        ranked = this.ranks.rankedResult(c.token, { place, size: w.players.size, kills: p.kills, won: !!p.won });
+        if (Math.random() < spinChance(place)) ranked.spin = this.lottery(c.token);
+        ranked.view = this.ranks.rankedView(c.token);
+        stats.rankedGames = 1;
+        stats.rankedWins = place === 1 ? 1 : 0;
+        stats.bestDiv = DIVISIONS.findIndex((d) => d.id === ranked.div);
+      }
+      const lv = this.inventory.view(c.token);
+      const done = this.ranks.progress(c.token, { ...stats, outfits: lv.owned.length, wskins: lv.wowned.length, opened: lv.opened, passTier: lv.pass?.tier ?? 0, stitles: this.ranks.seasonTitles(c.token).length });
       for (const a of done) if (a.xp) earned.parts.push({ label: 'Achievement', ach: a.id, xp: a.xp });
       earned.total += done.reduce((s, a) => s + a.xp, 0);
       // a season title in neon adds its bonus to everything earned, while its season lasts
@@ -455,14 +468,6 @@ export class RoomCore {
         const extra = Math.round(earned.total * bonus);
         earned.parts.push({ label: 'Season title', xp: extra });
         earned.total += extra;
-      }
-      // ranked: the finish moves the season rating, and may earn a bonus spin
-      let ranked = null;
-      if (MODE[this.mode]?.ranked && !this.practice && (w.phase === 'ended' || p.status === 'dead')) {
-        const place = p.won ? 1 : p.place ?? w.players.size;
-        ranked = this.ranks.rankedResult(c.token, { place, size: w.players.size, kills: p.kills, won: !!p.won });
-        if (Math.random() < spinChance(place)) ranked.spin = this.lottery(c.token);
-        ranked.view = this.ranks.rankedView(c.token);
       }
       const { before, after } = this.ranks.add(c.token, earned.total);
       done.push(...this.ranks.progress(c.token, { rank: after.rank }));

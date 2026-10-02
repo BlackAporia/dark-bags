@@ -420,3 +420,22 @@ test('health never comes back by itself (only Guns + Lasers medkits heal)', () =
   for (let i = 0; i < CFG.TICK_RATE * 20; i++) w.step();
   assert.equal(a.hp, CFG.HP / 2);
 });
+
+test('achievement counters: kills by weapon family, one-hit kills, clutch and flawless exits', async () => {
+  const { raidStats, titleTier, ACHIEVEMENTS } = await import('../shared/achievements.js');
+  const w = new World({ stake: 1000, seed: 4, bots: false });
+  const a = w.addPlayer({ name: 'a', skin: '#fff' });
+  const b = w.addPlayer({ name: 'b', skin: '#fff' });
+  Object.assign(b, { shield: 0 });
+  a.w = WEAPONS.findIndex((x) => x.id === 'magnum');
+  w.damage(b, a, 200);
+  assert.equal(a.wk.sniper, 1);
+  assert.equal(a.oneShots, 1);
+  const s = raidStats({ status: 'extracted', hp: 8, kills: 0, dmgTaken: 0, joinedAt: 0, endedAt: 130, stake: 1000, payout: 500 }, { mode: { id: 'raid', kind: 'raid' } });
+  assert.equal(s.clutch, 1);
+  assert.equal(s.flawless, 1);
+  assert.equal(titleTier('by_a_thread'), 'mystery');
+  assert.equal(titleTier('rookie'), 'common');
+  assert.equal(titleTier('neon_legend'), 'mythic');
+  assert.ok(ACHIEVEMENTS.length >= 70);
+});

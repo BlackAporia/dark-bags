@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-02c',
+    at: '2026-10-02T13:59:00+03:00',
+    items: {
+      en: ["Titles now have tiers, from plain to rare, epic, legendary (gold), mythic (rainbow aura) and mystery (secret, violet smoke): over your name in matches, in chat, friends, the ready room and on your player card", "32 new achievements: weapon mastery, deathmatch, duels, teams, hardcore, one-weapon wins, turrets, ranked leagues, cases, skins, the battle pass, season titles, and 4 secret ones"],
+      uk: ["Титули тепер мають рівні: звичайний, рідкісний, епічний, легендарний (золото), міфічний (райдужна аура) і таємничий (секретні, фіолетовий дим) — над ніком у матчі, у чаті, друзях, кімнаті очікування та на картці гравця", "32 нові досягнення: майстерність зброї, бій на смерть, дуелі, команди, хардкор, перемоги з однією зброєю, турелі, рейтингові ліги, кейси, скіни, бойовий пропуск, сезонні титули і 4 таємні"],
+      ru: ["У титулов теперь есть уровни: обычный, редкий, эпический, легендарный (золото), мифический (радужная аура) и таинственный (секретные, фиолетовый дым) — над ником в матче, в чате, друзьях, комнате ожидания и на карточке игрока", "32 новых достижения: мастерство оружия, бой насмерть, дуэли, команды, хардкор, победы с одним оружием, турели, рейтинговые лиги, кейсы, скины, боевой пропуск, сезонные титулы и 4 тайных"],
+      es: ["Los títulos tienen niveles: común, raro, épico, legendario (oro), mítico (aura arcoíris) y misterio (secretos, humo violeta), sobre tu nombre, en el chat, amigos, la sala y tu tarjeta", "32 logros nuevos: maestría de armas, todos contra todos, duelos, equipos, hardcore, un arma, torretas, ligas clasificatorias, cajas, skins, pase, títulos de temporada y 4 secretos"],
+      fr: ["Les titres ont des niveaux : commun, rare, épique, légendaire (or), mythique (aura arc-en-ciel) et mystère (secrets, fumée violette), au-dessus de ton nom, dans le chat, les amis, la salle et ta carte", "32 nouveaux succès : maîtrise des armes, deathmatch, duels, équipes, hardcore, une arme, tourelles, ligues classées, caisses, skins, passe, titres de saison et 4 secrets"],
+      pt: ["Os títulos têm níveis: comum, raro, épico, lendário (ouro), mítico (aura arco-íris) e mistério (secretos, fumaça violeta), acima do seu nome, no chat, amigos, sala e no seu cartão", "32 conquistas novas: domínio de armas, mata-mata, duelos, equipes, hardcore, uma arma, torretas, ligas ranqueadas, caixas, skins, passe, títulos da temporada e 4 secretas"],
+      tr: ["Unvanların artık seviyeleri var: sıradan, nadir, epik, efsanevi (altın), mitik (gökkuşağı aurası) ve gizem (gizli, mor duman); maçta adının üstünde, sohbette, arkadaşlarda, bekleme odasında ve oyuncu kartında", "32 yeni başarım: silah ustalığı, ölüm maçı, düellolar, takımlar, hardcore, tek silah, taretler, dereceli ligler, kasalar, görünümler, savaş bileti, sezon unvanları ve 4 gizli"],
+      zh: ["称号现在有等级：普通、稀有、史诗、传说（金色）、神话（彩虹光环）和神秘（隐藏、紫色烟雾），显示在比赛中名字上方、聊天、好友、准备室和玩家卡片上", "32 个新成就：武器精通、死斗、决斗、团队、硬核、单武器、炮塔、排位联赛、箱子、皮肤、通行证、赛季称号，以及 4 个隐藏成就"],
+      hi: ["टाइटल के अब स्तर हैं: सामान्य, दुर्लभ, एपिक, लीजेंडरी (सोना), मिथिक (इंद्रधनुषी आभा) और रहस्य (गुप्त, बैंगनी धुआँ) — मैच में नाम के ऊपर, चैट, दोस्तों, रेडी रूम और प्लेयर कार्ड पर", "32 नई उपलब्धियाँ: हथियार महारत, डेथमैच, द्वंद्व, टीमें, हार्डकोर, एक-हथियार, टर्रेट, रैंक्ड लीग, केस, स्किन, बैटल पास, सीज़न टाइटल और 4 गुप्त"],
+      ar: ["للألقاب الآن مستويات: عادي، نادر، ملحمي، أسطوري (ذهبي)، خرافي (هالة قوس قزح) وغامض (سرية، دخان بنفسجي) — فوق اسمك في المباراة، في الدردشة، الأصدقاء، غرفة الاستعداد وبطاقة اللاعب", "32 إنجازاً جديداً: إتقان الأسلحة، القتال حتى الموت، المبارزات، الفرق، هاردكور، السلاح الواحد، الأبراج، دوريات المصنّفة، الصناديق، الأشكال، التذكرة، ألقاب الموسم و4 إنجازات سرية"],
+    },
+  },
+  {
     id: '2026-10-02b',
     at: '2026-10-02T13:45:00+03:00',
     items: {

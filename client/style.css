@@ -1960,3 +1960,34 @@ body:has(#pause:not([hidden])) .now-playing { display: none; }
 .stake-own input { width: 100%; min-width: 0; border: 0; background: none; color: inherit; font: inherit; padding: 0; outline: none; -moz-appearance: textfield; }
 .stake-own input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .stake-own.on { border-color: var(--loot); box-shadow: 0 0 0 1px var(--loot); }
+/* achievement titles by tier: common → rare → epic → legendary → mythic, and mystery */
+.ttl { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 999px; font: 800 10.5px/1.6 var(--f-ui); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; border: 1px solid transparent; vertical-align: middle; }
+.ttl.big { font-size: 12px; padding: 2px 10px; }
+.ttl.t-common { color: #d6dbe6; border-color: rgba(214, 219, 230, 0.25); background: rgba(214, 219, 230, 0.06); }
+.ttl.t-rare { color: #4cc9f0; border-color: rgba(76, 201, 240, 0.5); background: rgba(76, 201, 240, 0.08); box-shadow: 0 0 10px -3px #4cc9f0; }
+.ttl.t-epic { color: #d3b0ff; border-color: rgba(179, 123, 255, 0.6); background: radial-gradient(120% 140% at 50% 0%, rgba(179, 123, 255, 0.28), rgba(40, 14, 70, 0.4)); box-shadow: 0 0 14px -3px #b37bff; text-shadow: 0 0 8px rgba(179, 123, 255, 0.8); animation: ttl-pulse 2.4s ease-in-out infinite; }
+.ttl.t-legendary { position: relative; overflow: hidden; color: #1a1205; border-color: #ffd166; background: linear-gradient(90deg, #f7931a, #ffd166, #fff3c4, #ffd166, #f7931a); box-shadow: 0 0 18px -2px rgba(255, 209, 102, 0.8); }
+.ttl.t-legendary::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.85) 50%, transparent 70%); transform: translateX(-120%); animation: ttl-sweep 2.8s ease-in-out infinite; }
+.ttl.t-mythic { position: relative; color: #fff; border: 0; background: linear-gradient(#10121a, #10121a) padding-box, conic-gradient(from var(--spin, 0deg), #00f0ff, #ff3dd4, #ffd166, #7dff9b, #00f0ff) border-box; border: 1.5px solid transparent; animation: prism-spin 4s linear infinite; box-shadow: 0 0 20px -2px rgba(255, 61, 212, 0.7), 0 0 30px -6px rgba(0, 240, 255, 0.7); text-shadow: 0 0 10px rgba(255, 255, 255, 0.7); }
+.ttl.t-mystery { color: #e9d5ff; border-color: rgba(192, 132, 252, 0.6); background: radial-gradient(140% 160% at 50% 50%, rgba(88, 28, 135, 0.7), rgba(10, 4, 20, 0.9)); box-shadow: 0 0 18px -2px rgba(168, 85, 247, 0.85), inset 0 0 10px rgba(168, 85, 247, 0.5); text-shadow: 1px 0 rgba(0, 245, 255, 0.6), -1px 0 rgba(255, 45, 212, 0.6); animation: ttl-glitch 3.2s steps(1) infinite; }
+@keyframes ttl-pulse { 50% { box-shadow: 0 0 22px -2px #b37bff; } }
+@keyframes ttl-sweep { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes ttl-glitch { 0%, 92%, 100% { transform: none; opacity: 1; } 93% { transform: translateX(1px) skewX(-6deg); opacity: 0.7; } 95% { transform: translateX(-1px); } 97% { opacity: 0.85; } }
+.ach-tier { margin-left: 6px; font: 800 9px var(--f-ui); letter-spacing: 0.12em; text-transform: uppercase; }
+.ach-tier.t-common { color: #9aa3b5; } .ach-tier.t-rare { color: #4cc9f0; } .ach-tier.t-epic { color: #b37bff; } .ach-tier.t-legendary { color: #ffd166; } .ach-tier.t-mythic { color: #ff3dd4; } .ach-tier.t-mystery { color: #c084fc; }
+.ach.tier-mystery:not(.done) { background: radial-gradient(120% 140% at 0% 50%, rgba(88, 28, 135, 0.25), transparent 70%); }
+.ach.done.tier-legendary { box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.45); }
+.ach.done.tier-mythic { box-shadow: inset 0 0 0 1px rgba(255, 61, 212, 0.5), 0 0 20px -10px #ff3dd4; }
+/* the player card wears the aura of its title */
+.hero[data-tier] { position: relative; }
+.hero[data-tier="rare"] { box-shadow: 0 0 0 1px rgba(76, 201, 240, 0.4), 0 0 28px -12px #4cc9f0; }
+.hero[data-tier="epic"] { box-shadow: 0 0 0 1px rgba(179, 123, 255, 0.5), 0 0 36px -10px #b37bff; }
+.hero[data-tier="legendary"] { box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.6), 0 0 44px -10px #ffd166; }
+.hero[data-tier="mythic"] { box-shadow: 0 0 0 1.5px rgba(255, 61, 212, 0.6), 0 0 50px -8px rgba(255, 61, 212, 0.7), 0 0 70px -20px rgba(0, 240, 255, 0.8); }
+.hero[data-tier="mystery"] { box-shadow: 0 0 0 1px rgba(192, 132, 252, 0.6), 0 0 50px -8px rgba(168, 85, 247, 0.8); }
+.hero[data-tier="mythic"]::before, .hero[data-tier="mystery"]::before, .hero[data-tier="legendary"]::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: prism-spin 5s linear infinite; }
+.hero[data-tier="mythic"]::before { background: conic-gradient(from var(--spin, 0deg), #00f0ff, #ff3dd4, #ffd166, #7dff9b, #00f0ff); }
+.hero[data-tier="legendary"]::before { background: conic-gradient(from var(--spin, 0deg), #f7931a, #fff3c4, #ffd166, #f7931a); }
+.hero[data-tier="mystery"]::before { background: conic-gradient(from var(--spin, 0deg), #581c87, #c084fc, #00f5ff, #581c87); }
+@media (prefers-reduced-motion: reduce) { .ttl, .ttl::after, .hero::before { animation: none !important; } }
+.slot-tt { font-size: 8.5px; padding: 0 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
