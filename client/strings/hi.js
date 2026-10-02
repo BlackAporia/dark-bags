@@ -81,7 +81,7 @@ export default {
   'hud.goldenStart': 'गोल्डन रेड · अंदर जैकपॉट की लूट',
   'hud.start': 'चाकू उठाओ · नारंगी उठाओ · निकास ढूँढो',
   'hud.bagOpened': 'बैग खुला · +{v}',
-  'hud.arsenal': 'शस्त्रागार पूरा · फिर से चाकू ★',
+  'hud.arsenal': "शस्त्रागार पूरा · फिर से पिस्तौल ★",
   'hud.unlocked': '{w} अनलॉक',
   'hud.pnl': '{s} दांव के मुक़ाबले {d}',
   'hud.alive': 'अंदर {n}',
@@ -922,4 +922,6 @@ export default {
   'ach.sharpshooter': "अचूक निशानेबाज़",
   'ach.headhunter': "सिर का शिकारी",
   'achd.headshots': "{n} हेडशॉट लगाओ",
+  'hud.demoted': "मौत: हथियार घटकर {w}",
+  'hud.crit': "क्रिट",
 };

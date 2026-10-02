@@ -86,7 +86,7 @@ export default {
   'hud.goldenStart': 'Golden raid · jackpot loot inside',
   'hud.start': 'Knife up · grab the orange · find an exit',
   'hud.bagOpened': 'Bag opened · +{v}',
-  'hud.arsenal': 'Arsenal complete · back to the knife ★',
+  'hud.arsenal': "Arsenal complete · back to the pistol ★",
   'hud.unlocked': '{w} unlocked',
   'hud.pnl': '{d} vs {s} stake',
   'hud.alive': '{n} inside',
@@ -930,4 +930,6 @@ export default {
   'ach.sharpshooter': "Sharpshooter",
   'ach.headhunter': "Headhunter",
   'achd.headshots': "Land {n} headshots",
+  'hud.demoted': "Died: down to the {w}",
+  'hud.crit': "CRIT",
 };

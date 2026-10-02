@@ -255,14 +255,14 @@ export class Horde {
     if (hs && by) by.headshots = (by.headshots ?? 0) + 1;
     if (by) by.zDmg = (by.zDmg ?? 0) + Math.min(dmg, Math.max(0, z.hp + dmg));
     if (z.type === 'boss' && by) by.bossDmg = (by.bossDmg ?? 0) + dmg;
-    w.emit({ k: 'zhit', to: by ? [by.id] : undefined, zid: z.id, x: Math.round(z.x), y: Math.round(z.y), ...(hs ? { hs: 1 } : {}) });
+    w.emit({ k: 'zhit', to: by ? [by.id] : undefined, zid: z.id, x: Math.round(z.x), y: Math.round(z.y), ...(hs ? { hs: 1 } : {}), ...(z.hp <= 0 ? { fatal: 1 } : {}) });
     if (z.hp > 0) return;
     this.zombies.delete(z.id);
     if (by) {
       by.zk = (by.zk ?? 0) + 1;
       if (z.type === 'brute') by.zBrutes = (by.zBrutes ?? 0) + 1;
     }
-    w.emit({ k: 'zdead', zid: z.id, type: z.type, x: Math.round(z.x), y: Math.round(z.y), kid: by?.id ?? 0 });
+    w.emit({ k: 'zdead', zid: z.id, type: z.type, x: Math.round(z.x), y: Math.round(z.y), kid: by?.id ?? 0, ...(hs ? { hs: 1 } : {}) });
     // now and then the dead drop a medkit
     if (z.type !== 'boss' && w.rnd() < (z.type === 'brute' ? 0.35 : 0.05)) {
       const m = { id: w.nextId++, x: z.x, y: z.y, heal: 30 };

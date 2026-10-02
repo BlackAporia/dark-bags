@@ -81,7 +81,7 @@ export default {
   'hud.goldenStart': '黄金局 · 奖池战利品就在里面',
   'hud.start': '拿起刀 · 捡橙色 · 找出口',
   'hud.bagOpened': '包被打开 · +{v}',
-  'hud.arsenal': '武器全通 · 回到刀 ★',
+  'hud.arsenal': "武器全通 · 回到手枪 ★",
   'hud.unlocked': '已解锁 {w}',
   'hud.pnl': '{d}（赌注 {s}）',
   'hud.alive': '场内 {n} 人',
@@ -922,4 +922,6 @@ export default {
   'ach.sharpshooter': "神枪手",
   'ach.headhunter': "猎头者",
   'achd.headshots': "命中 {n} 次爆头",
+  'hud.demoted': "阵亡：武器降为 {w}",
+  'hud.crit': "暴击",
 };

@@ -318,9 +318,23 @@ export class GameClient {
     }
   }
 
-  // your round found the head: a big HEADSHOT over them, a ping, and the announcer (not on
-  // every pellet of a shotgun: once in a while)
-  headshotFx(x, y, now) {
+  // a round in the head that does not kill: CRIT (and the ping)
+  critFx(x, y, now) {
+    this.fx.floater(x, y - 30, t('hud.crit'), '#ffd166', 16, 0.7);
+    this.fx.sparks(x, y, 44, 5, '#ffd166');
+    if (now - (this.hsPing ?? 0) > 120) {
+      this.hsPing = now;
+      this.sfx.play('headshot');
+    }
+  }
+
+  // the kill went through the head: a big HEADSHOT over them, a ping, and the announcer
+  headshotFx(x, y, now, vid = null) {
+    if (vid != null) {
+      // the victim's last known spot (kill events carry no position)
+      const a = this.anims.get(vid) ?? (vid === this.pid ? this.meAnim : null);
+      if (a) ({ x, y } = a);
+    }
     this.fx.floater(x, y - 34, t('hud.headshot'), '#ff3b5c', 20, 0.9);
     this.fx.sparks(x, y, 44, 8, '#ffd166');
     if (now - (this.hsPing ?? 0) > 120) {
@@ -373,14 +387,24 @@ export class GameClient {
     a.wounds = want;
   }
 
-  deathFx(a, color, now) {
-    if (this.gore) {
-      const p = pose(a, now, true);
+  // from: where the killing round came from; a headshot knocks the head clean off, flying
+  // away from the shooter (with gore off too, just without the blood)
+  deathFx(a, color, now, hs = false, from = null) {
+    const p = pose(a, now, true);
+    if (hs) {
+      const dx = from ? a.x - from.x : -a.facing;
+      const dy = from ? a.y - from.y : 0;
+      const l = Math.hypot(dx, dy) || 1;
+      this.fx.head(p.head.x, a.y + FEET, a.y + FEET - p.head.y, color, a.facing, { dx: dx / l, dy: dy / l, clean: !this.gore });
+      if (this.gore) this.fx.blood(p.neck.x, a.y + FEET, a.y + FEET - p.neck.y, dx / l, dy / l - 0.5, 34);
+      else this.fx.sparks(p.neck.x, a.y + FEET, a.y + FEET - p.neck.y, 10, '#ffd166');
+      this.sfx.play('pop', { x: a.x, y: a.y });
+    } else if (this.gore) {
       this.fx.head(p.head.x, a.y + FEET, a.y + FEET - p.head.y, color, a.facing);
       this.fx.blood(p.neck.x, a.y + FEET, a.y + FEET - p.neck.y, 0, -1, 26);
       this.sfx.play('pop', { x: a.x, y: a.y });
     }
-    this.fx.grave(a, { color, headless: this.gore, gore: this.gore }, now);
+    this.fx.grave(a, { color, headless: this.gore || hs, gore: this.gore }, now);
     this.sfx.play('grave', { x: a.x, y: a.y });
   }
 
@@ -406,8 +430,8 @@ export class GameClient {
             this.sfx.play('hurt');
             if (this.meAnim) this.hitFx(this.meAnim, now, 20);
           } else if (ev.sid === this.pid) {
-            if (ev.hs) this.headshotFx(ev.x, ev.y, now);
-            else {
+            if (ev.hs && !ev.fatal) this.critFx(ev.x, ev.y, now);
+            else if (!ev.hs) {
               this.fx.floater(ev.x, ev.y, '✕', '#ebe5d6', 14, 0.25);
               this.sfx.play('hitmark');
             }
@@ -415,14 +439,16 @@ export class GameClient {
           if (ev.hs && ev.vid === this.pid) this.shake = Math.max(this.shake, 16);
           break;
         case 'kill': {
+          const from = ev.kid === this.pid ? this.meAnim : this.anims.get(ev.kid);
+          if (ev.hs && ev.kid === this.pid) this.headshotFx(ev.x ?? from?.x ?? 0, ev.y ?? from?.y ?? 0, now, ev.vid);
           if (ev.vid === this.pid && this.meAnim && !this.dead) {
             this.dead = true;
-            this.deathFx(this.meAnim, this.skin, now);
+            this.deathFx(this.meAnim, this.skin, now, !!ev.hs, from);
             this.sfx.play('death');
           } else {
             const a = this.anims.get(ev.vid);
             if (a && now - a.seen < 400) {
-              this.deathFx(a, a.color, now);
+              this.deathFx(a, a.color, now, !!ev.hs, from);
               this.anims.map.delete(ev.vid);
             }
           }
@@ -460,10 +486,13 @@ export class GameClient {
           break;
         case 'level': {
           const wp = WEAPONS[ev.w];
-          this.banner(ev.w === 0 ? t('hud.arsenal') : t('hud.unlocked', { w: t(`w.${wp.name}`) }), 'gold', 1800);
+          this.banner(ev.wrap ? t('hud.arsenal') : t('hud.unlocked', { w: t(`w.${wp.name}`) }), 'gold', 1800);
           this.sfx.play('level');
           break;
         }
+        case 'demote':
+          this.banner(t('hud.demoted', { w: t(`w.${WEAPONS[ev.w].name}`) }), 'warn', 1800);
+          break;
         case 'arsenal':
           if (ev.pid !== this.pid) this.feed(`<b>${esc(ev.name)}</b> finished the arsenal ★`, 'warnline');
           break;
@@ -524,11 +553,13 @@ export class GameClient {
           const a = this.anims.get(ev.zid);
           this.zDeathFx(a?.x ?? ev.x, a?.y ?? ev.y, ev.type, now);
           this.anims.map.delete(ev.zid);
-          if (ev.kid === this.pid) this.fx.floater(ev.x, ev.y - 30, ev.type === 'boss' ? '☠ BOSS' : '+1', ev.type === 'boss' ? '#ff4d5e' : '#9be36b', ev.type === 'boss' ? 26 : 13, 0.7);
+          if (ev.kid === this.pid && ev.hs) this.headshotFx(ev.x, ev.y, now);
+          else if (ev.kid === this.pid) this.fx.floater(ev.x, ev.y - 30, ev.type === 'boss' ? '☠ BOSS' : '+1', ev.type === 'boss' ? '#ff4d5e' : '#9be36b', ev.type === 'boss' ? 26 : 13, 0.7);
           break;
         }
         case 'zhit':
-          if (ev.hs) this.headshotFx(ev.x, ev.y, now);
+          if (ev.hs && !ev.fatal) this.critFx(ev.x, ev.y, now);
+          else if (ev.hs) break;
           else if (now - (this.zMark ?? 0) > 90) {
             this.zMark = now;
             this.sfx.play('hitmark');
@@ -952,7 +983,7 @@ export class GameClient {
       el.ammoBar.style.width = `${rl > 0 ? (1 - rl / wpn.reload) * 100 : ((you.am ?? 0) / wpn.mag) * 100}%`;
     }
     el.xpBar.style.width = `${Math.min(100, ((you.xp ?? 0) / XP_PER_LEVEL) * 100)}%`;
-    el.nextWeapon.textContent = t('hud.next', { w: t(`w.${WEAPONS[(w + 1) % WEAPONS.length].name}`) });
+    el.nextWeapon.textContent = t('hud.next', { w: t(`w.${WEAPONS[w + 1 >= WEAPONS.length ? 1 : w + 1].name}`) });
     el.prestige.textContent = you.pr ? '★'.repeat(Math.min(5, you.pr)) : '';
     [...el.ladder.children].forEach((d, i) => {
       d.classList.toggle('on', i === w);

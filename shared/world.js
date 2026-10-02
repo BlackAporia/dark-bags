@@ -639,7 +639,7 @@ export class World {
     v.lastHit = this.time;
     v.ext = 0;
     if (hs && shooter && shooter !== v) shooter.headshots = (shooter.headshots ?? 0) + 1;
-    this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y), ...(hs ? { hs: 1 } : {}) });
+    this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y), ...(hs ? { hs: 1 } : {}), ...(v.hp <= 0 ? { fatal: 1 } : {}) });
     if (v.hp <= 0) this.kill(v, shooter, cause, hs);
   }
 
@@ -713,6 +713,13 @@ export class World {
     });
     if (revive) p.hp = Math.ceil(this.maxHp / 2);
     if (this.goldRush) p.w = this.randomGun(); // a new gun every life
+    else if (this.fixedWeapon < 0 && !this.noLadder) {
+      // every death costs a step on the ladder, never below the pistol (no knife after the start)
+      const was = p.w;
+      p.w = Math.max(1, p.w - 1);
+      p.xp = 0;
+      if (p.w !== was) this.emit({ k: 'demote', to: [p.id], w: p.w });
+    }
     p.queue.length = 0;
     p.last = sanitizeInput({ s: p.ack });
     this.arm(p);
@@ -882,14 +889,16 @@ export class World {
     }
     while (p.xp >= XP_PER_LEVEL) {
       p.xp -= XP_PER_LEVEL;
-      p.w = (p.w + 1) % WEAPONS.length;
+      // the knife is only for the start: after the last gun the ladder starts over at the pistol
+      const wrap = p.w + 1 >= WEAPONS.length;
+      p.w = wrap ? 1 : p.w + 1;
       p.fireCd = Math.min(p.fireCd, 0.15);
       this.arm(p);
-      if (p.w === 0) {
+      if (wrap) {
         p.prestige++;
         this.emit({ k: 'arsenal', name: p.name, pid: p.id });
       }
-      this.emit({ k: 'level', to: [p.id], w: p.w, prestige: p.prestige });
+      this.emit({ k: 'level', to: [p.id], w: p.w, prestige: p.prestige, ...(wrap ? { wrap: 1 } : {}) });
     }
   }
 

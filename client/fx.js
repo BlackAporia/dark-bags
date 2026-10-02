@@ -116,8 +116,11 @@ export class Fx {
     this.add({ kind: 'limb', x: piece.x, y: piece.y, z: piece.z, pts: piece.pts, color, vx: dx * rand(60, 150), vy: rand(-40, 40), vz: rand(160, 300), spin: rand(-14, 14), life: 1e9, bounces: 0 });
   }
 
-  head(x, y, z, color, f) {
-    this.add({ kind: 'head', x, y, z, color, f, vx: rand(-80, 80), vy: rand(-50, 50), vz: rand(260, 380), spin: rand(-16, 16), life: 1e9, bounces: 0 });
+  // a head coming off: by default a random pop; a headshot sends it flying away from the
+  // shooter (dx, dy), hard; clean: no blood where it lands (gore off)
+  head(x, y, z, color, f, { dx = 0, dy = 0, clean = false } = {}) {
+    const hard = dx || dy;
+    this.add({ kind: 'head', x, y, z, color, f, clean, vx: hard ? dx * rand(260, 360) + rand(-30, 30) : rand(-80, 80), vy: hard ? dy * rand(260, 360) + rand(-30, 30) : rand(-50, 50), vz: hard ? rand(380, 480) : rand(260, 380), spin: rand(-22, 22), life: 1e9, bounces: 0 });
   }
 
   grave(anim, opts, now) {
@@ -147,7 +150,7 @@ export class Fx {
           p.vy *= 0.5;
           p.spin *= 0.5;
           p.bounces = (p.bounces ?? 0) + 1;
-          if (p.kind === 'limb' || p.kind === 'head') this.splat(p.x, p.y, 6, now);
+          if (p.kind === 'limb' || (p.kind === 'head' && !p.clean)) this.splat(p.x, p.y, 6, now);
           continue;
         }
         p.rest = true;

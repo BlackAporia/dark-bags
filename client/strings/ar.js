@@ -81,7 +81,7 @@ export default {
   'hud.goldenStart': 'غارة ذهبية · غنائم الجائزة الكبرى بالداخل',
   'hud.start': 'السكين بيدك · اجمع البرتقالي · جد مخرجًا',
   'hud.bagOpened': 'فُتحت حقيبة · +{v}',
-  'hud.arsenal': 'اكتملت الترسانة · عودة إلى السكين ★',
+  'hud.arsenal': "اكتملت الترسانة · عودة إلى المسدس ★",
   'hud.unlocked': 'فُتح {w}',
   'hud.pnl': '{d} مقابل رهان {s}',
   'hud.alive': '{n} بالداخل',
@@ -922,4 +922,6 @@ export default {
   'ach.sharpshooter': "القناص الماهر",
   'ach.headhunter': "صائد الرؤوس",
   'achd.headshots': "أصب {n} طلقة في الرأس",
+  'hud.demoted': "موت: تراجعت إلى {w}",
+  'hud.crit': "ضربة حرجة",
 };
