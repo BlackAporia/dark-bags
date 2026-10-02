@@ -83,6 +83,18 @@ export const GL = {
     turret: { cost: 600, hp: 80, life: 60, range: 470, dmg: 12, cd: 0.25, turn: 7, max: 1 },
     mine: { cost: 350, dmg: 120, r: 110, len: 620, arm: 1.5, max: 2 },
   },
+  // upgrades (walk up to your own turret or mine and press Space): price of level 2 and 3
+  UP: { 2: 1500, 3: 3000 },
+  UP_REACH: 70,           // how close you stand to upgrade
+  // turret levels: 1 a light gun, 2 a cannon (heavier shells), 3 rockets that burst
+  TURRET_LV: [
+    null,
+    { hp: 80, dmg: 12, cd: 0.25, speed: 1000 },
+    { hp: 140, dmg: 26, cd: 0.34, speed: 1150, kind: 'c' },
+    { hp: 200, dmg: 40, cd: 0.8, speed: 620, kind: 'r', blast: 95, blastDmg: 55 },
+  ],
+  // tripmine levels: more beams in a fan, and a bigger bang
+  MINE_LV: [null, { dmg: 120, beams: 1 }, { dmg: 150, beams: 2 }, { dmg: 190, beams: 3 }],
 };
 
 export const SKINS = ['#ff5a5f', '#4cc9f0', '#b5e48c', '#f72585', '#ffd166', '#9b5de5', '#00f5d4', '#ff9f1c'];

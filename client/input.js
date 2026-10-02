@@ -24,7 +24,10 @@ export class Input {
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
+      // Space next to your own turret or tripmine upgrades it (the game says so); else it dashes
+      if (e.code === 'Space' && this.onSpace?.()) return;
       if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.dashQueued = true;
+      if (e.code === 'KeyR') this.reloadQueued = true; // reload now (it also reloads by itself)
       if (e.code === 'KeyQ') this.onBluff?.();
       const buy = { Digit1: 'medkit', Digit2: 'turret', Digit3: 'mine', Numpad1: 'medkit', Numpad2: 'turret', Numpad3: 'mine' }[e.code];
       if (buy) this.onBuy?.(buy);
@@ -125,6 +128,14 @@ export class Input {
       e.preventDefault();
       this.dashQueued = true;
     });
+    root.querySelector('#t-reload')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.reloadQueued = true;
+    });
+    root.querySelector('#t-up')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.onSpace?.();
+    });
     root.querySelector('#t-bag').addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.onBluff?.();
@@ -178,6 +189,12 @@ export class Input {
     if (this.blocked) return false;
     if (this.touchOn) return this.tFire || (!!this.tAim && Math.hypot(this.tAim.x, this.tAim.y) > 0.55);
     return this.mouse.down;
+  }
+
+  takeReload() {
+    const r = !!this.reloadQueued;
+    this.reloadQueued = false;
+    return r;
   }
 
   takeDash() {

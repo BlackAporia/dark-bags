@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "الموجة 10 · زعيم يعبر السياج",
   'hud.midBossDown': "سقط الزعيم! بقيت عشر موجات",
   'ach.last_stand': "الصمود الأخير",
+  'gl.upTurret': "تمت ترقية البرج: المستوى {lv}",
+  'gl.upMine': "تمت ترقية اللغم الليزري: {lv} أشعة",
+  'gl.upHint': "المسافة: {what} → المستوى {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → المستوى {lv} · {c} CR",
+  'gl.no.max': "في أعلى مستوى بالفعل",
+  'gl.no.near': "اقترب من برجك أو لغمك",
 };

@@ -503,3 +503,50 @@ test('rounds: a round on the clock goes to the side with more runners standing; 
   assert.equal(me.place, 1);
   assert.ok(w.audit().ok);
 });
+
+test('upgrades: walk up to your turret or tripmine and pay for level 2 and 3; rockets burst', () => {
+  const w = new World({ stake: 1000, seed: 41, mode: 'gl', botFill: 2, roundSeconds: 120 });
+  const me = w.addPlayer({ name: 'me', skin: '#fff' });
+  w.step();
+  me.cr = 9999;
+  assert.ok(w.buy(me.id, 'turret'));
+  const tur = [...w.turrets.values()].find((o) => o.owner === me.id);
+  assert.equal(tur.lv, 1);
+  me.cr = 1000;
+  assert.ok(!w.upgrade(me.id), 'not enough credits');
+  me.cr = GL.UP[2] + GL.UP[3];
+  assert.ok(w.upgrade(me.id));
+  assert.equal(tur.lv, 2);
+  assert.equal(tur.hp, GL.TURRET_LV[2].hp);
+  assert.ok(w.upgrade(me.id));
+  assert.equal(tur.lv, 3);
+  assert.equal(me.cr, 0);
+  me.cr = 9999;
+  assert.ok(!w.upgrade(me.id), 'level 3 is the top');
+  // a level 3 turret fires rockets that burst on a foe
+  const foe = [...w.players.values()].find((p) => p !== me);
+  foe.shield = 0;
+  foe.x = tur.x + 200;
+  foe.y = tur.y;
+  tur.a = 0;
+  tur.cd = 0;
+  for (let i = 0; i < 30 * 3 && foe.status === 'alive' && foe.hp === 100; i++) w.step();
+  assert.ok(foe.hp < 100 || foe.status !== 'alive', 'the rocket hurt');
+  assert.ok(w.events.length >= 0);
+  // tripmines: two beams at level 2, three at level 3
+  const w2 = new World({ stake: 1000, seed: 42, mode: 'gl', botFill: 1, roundSeconds: 120 });
+  const a = w2.addPlayer({ name: 'a', skin: '#fff' });
+  w2.step();
+  a.cr = 9999;
+  a.aim = 0;
+  assert.ok(w2.buy(a.id, 'mine'));
+  const m = [...w2.mines.values()][0];
+  assert.equal(m.lines.length, 1);
+  w2.upgrade(a.id);
+  assert.equal(m.lines.length, 2);
+  w2.upgrade(a.id);
+  assert.equal(m.lines.length, 3);
+  // too far: nothing to upgrade
+  a.x += 300;
+  assert.ok(!w2.upgrade(a.id));
+});

@@ -140,6 +140,9 @@ export class RoomCore {
       case 'buy':
         if (c.pid && this.world && this.state === 'live') this.world.buy(c.pid, String(msg.item));
         break;
+      case 'upgrade':
+        if (c.pid && this.world && this.state === 'live') this.world.upgrade(c.pid);
+        break;
       case 'bluff':
         if (c.pid && this.world && this.state === 'live') this.world.setBluff(c.pid, msg.v);
         break;

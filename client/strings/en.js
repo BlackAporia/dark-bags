@@ -944,4 +944,10 @@ export default {
   'hud.midBossWave': "WAVE 10 · A BOSS COMES OVER THE FENCE",
   'hud.midBossDown': "Boss down! Ten more waves to go",
   'ach.last_stand': "Last Stand",
+  'gl.upTurret': "Turret upgraded: level {lv}",
+  'gl.upMine': "Laser mine upgraded: {lv} beams",
+  'gl.upHint': "Space: {what} → level {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → level {lv} · {c} CR",
+  'gl.no.max': "Already at the top level",
+  'gl.no.near': "Stand next to your turret or mine",
 };

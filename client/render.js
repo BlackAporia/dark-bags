@@ -370,6 +370,52 @@ export class Renderer {
     const ux = b.vx / sp;
     const uy = b.vy / sp;
     const y = b.y - GUN_Z;
+    if (b.k === 'r') {
+      // a turret rocket: smoke behind, a flame, a red-tipped body
+      const tail = Math.min(40, b.tr ?? 40);
+      const g = ctx.createLinearGradient(b.x - ux * tail, y - uy * tail, b.x, y);
+      g.addColorStop(0, 'rgba(160,160,170,0)');
+      g.addColorStop(1, 'rgba(200,200,210,0.55)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(b.x - ux * tail, y - uy * tail);
+      ctx.lineTo(b.x - ux * 6, y - uy * 6);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(b.x - ux * (12 + Math.random() * 6), y - uy * (12 + Math.random() * 6));
+      ctx.lineTo(b.x - ux * 5, y - uy * 5);
+      ctx.stroke();
+      ctx.strokeStyle = '#d9dde6';
+      ctx.lineWidth = 4.5;
+      ctx.beginPath();
+      ctx.moveTo(b.x - ux * 6, y - uy * 6);
+      ctx.lineTo(b.x + ux * 5, y + uy * 5);
+      ctx.stroke();
+      ctx.fillStyle = '#ff4d5e';
+      ctx.beginPath();
+      ctx.arc(b.x + ux * 5, y + uy * 5, 2.4, 0, TAU);
+      ctx.fill();
+      return;
+    }
+    if (b.k === 'c') {
+      // a cannon shell: a fat, hot streak
+      const len = Math.min(34, b.tr ?? 34);
+      ctx.strokeStyle = '#ffb347';
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(b.x - ux * len, y - uy * len);
+      ctx.lineTo(b.x, y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#fff1c9';
+      ctx.lineWidth = 3.2;
+      ctx.stroke();
+      return;
+    }
     const f = b.s ? FINISH[b.s] : null;
     const tier = f ? RARITY_ORDER.indexOf(f.rarity) : -1;
     const base = Math.min(46, sp * 0.028, b.tr ?? 46); // never a tail behind the gun
@@ -584,19 +630,54 @@ export class Renderer {
       ctx.closePath();
       ctx.fill();
     }
-    // head
+    // head: level 1 twin light guns; level 2 a heavy cannon with armour plates and gold
+    // trim; level 3 a rocket pod (two launch tubes with warheads showing)
+    const lv = o.lv ?? 1;
     ctx.translate(o.x, o.y - z);
     ctx.rotate(o.a);
-    ctx.fillStyle = sk ? sk.trim : '#12161f';
     ctx.strokeStyle = col;
     ctx.lineWidth = 1.5;
-    ctx.fillRect(4, -5, sk?.fx ? 24 : 20, 3.5);
-    ctx.fillRect(4, 1.5, sk?.fx ? 24 : 20, 3.5);
-    ctx.fillStyle = sk ? sk.body : '#12161f';
+    if (lv === 1) {
+      ctx.fillStyle = sk ? sk.trim : '#12161f';
+      ctx.fillRect(4, -5, sk?.fx ? 24 : 20, 3.5);
+      ctx.fillRect(4, 1.5, sk?.fx ? 24 : 20, 3.5);
+    } else if (lv === 2) {
+      ctx.fillStyle = '#2a2f3c';
+      ctx.fillRect(4, -3.5, 27, 7);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(26, -4.5, 6, 9); // muzzle brake
+      ctx.strokeRect(4, -3.5, 27, 7);
+    } else {
+      for (const yy of [-8, 2]) {
+        ctx.fillStyle = '#3a4253';
+        ctx.fillRect(2, yy, 22, 6);
+        ctx.strokeRect(2, yy, 22, 6);
+        ctx.fillStyle = '#ff4d5e';
+        ctx.beginPath();
+        ctx.moveTo(24, yy);
+        ctx.lineTo(29, yy + 3);
+        ctx.lineTo(24, yy + 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = sk ? sk.body : lv === 3 ? '#2a1418' : lv === 2 ? '#1b2130' : '#12161f';
     ctx.beginPath();
-    ctx.roundRect(-10, -9, 18, 18, 5);
+    ctx.roundRect(lv > 1 ? -12 : -10, lv > 1 ? -11 : -9, lv > 1 ? 22 : 18, lv > 1 ? 22 : 18, 5);
     ctx.fill();
     ctx.stroke();
+    if (lv > 1) {
+      // armour plates, gold for the cannon, red for the rocket pod
+      ctx.strokeStyle = lv === 3 ? '#ff4d5e' : '#ffd166';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(-9, -8, 16, 16);
+      ctx.beginPath();
+      ctx.moveTo(-12, 0);
+      ctx.lineTo(-16, -6);
+      ctx.moveTo(-12, 0);
+      ctx.lineTo(-16, 6);
+      ctx.stroke();
+    }
     if (sk) {
       // trim plates on the head, and a halo for the mythic ones
       ctx.strokeStyle = sk.trim;
@@ -626,6 +707,21 @@ export class Renderer {
     ctx.arc(o.x, o.y - z, 15, -Math.PI / 2, -Math.PI / 2 + (TAU * Math.max(0, o.h)) / 100);
     ctx.stroke();
     ctx.globalAlpha = 1;
+    this.levelPips(o.x, o.y - z - 22, o.lv ?? 1);
+  }
+
+  // ★ marks over a gadget: its level
+  levelPips(x, y, lv) {
+    if (lv <= 1) return;
+    const ctx = this.ctx;
+    ctx.font = `900 10px ${F_UI}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = lv === 3 ? '#ff4d5e' : '#ffd166';
+    ctx.strokeStyle = 'rgba(4,6,10,0.85)';
+    ctx.lineWidth = 3;
+    const txt = `${'★'.repeat(lv)}`;
+    ctx.strokeText(txt, x, y);
+    ctx.fillText(txt, x, y);
   }
 
   // laser tripmine: a small charge on the floor, blinking until armed
@@ -646,10 +742,16 @@ export class Renderer {
       ctx.arc(m.x, m.y, 2.2, 0, TAU);
       ctx.fill();
     }
+    this.levelPips(m.x, m.y - 10, m.lv ?? 1);
   }
 
   // the beam itself, drawn additively: a soft glow, a hot core, a travelling shimmer
   drawMineBeam(m, t) {
+    // an upgraded tripmine fans out two or three beams: each drawn like the first
+    if (m.ls && !m._one) {
+      for (const [x2, y2] of m.ls) this.drawMineBeam({ ...m, x2, y2, _one: true }, t);
+      return;
+    }
     const ctx = this.ctx;
     const col = this.gadgetColor(m);
     const y0 = m.y - 6;

@@ -562,7 +562,15 @@ export class World {
   // clients draw every tracer exactly to that point, so what you see is where it hit
   endBullet(b, t, nx, ny, k) {
     this.bullets.delete(b.id);
-    this.bulletEnds.push({ i: b.id, x: r1(b.x + (nx - b.x) * Math.min(1, t)), y: r1(b.y + (ny - b.y) * Math.min(1, t)), k, t: this.tick });
+    const x = b.x + (nx - b.x) * Math.min(1, t);
+    const y = b.y + (ny - b.y) * Math.min(1, t);
+    this.bulletEnds.push({ i: b.id, x: r1(x), y: r1(y), k, t: this.tick });
+    // a rocket bursts wherever it stops (the burst does the damage, not the hit)
+    if (b.blast) {
+      this.blast(x, y, { ...b, dmg: b.blastDmg });
+      return true;
+    }
+    return false;
   }
 
   stepBullets() {
@@ -598,7 +606,10 @@ export class World {
         }
       }
       if (zed) {
-        this.endBullet(b, tMin, nx, ny, 'p');
+        if (this.endBullet(b, tMin, nx, ny, 'p')) {
+          if (this.phase !== 'live') return;
+          continue;
+        }
         const hs = this.headshot(b, zed, zed.r / CFG.PLAYER_R);
         this.horde.hit(zed, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, hs);
         if (this.phase !== 'live') return;
@@ -624,7 +635,7 @@ export class World {
         continue;
       }
       if (victim) {
-        this.endBullet(b, tMin, nx, ny, 'p');
+        if (this.endBullet(b, tMin, nx, ny, 'p')) continue;
         const hs = this.headshot(b, victim);
         this.damage(victim, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, b.cause, hs);
         continue;
@@ -804,7 +815,7 @@ export class World {
       const fx = p.x + Math.cos(p.aim) * 34;
       const fy = p.y + Math.sin(p.aim) * 34;
       const free = segWalls(p.x, p.y, fx, fy, this.map.walls) < 0;
-      const o = { id: this.nextId++, kind: 'turret', sk: p.ts, owner: p.id, team: p.team, x: free ? fx : p.x, y: free ? fy : p.y, a: p.aim, hp: it.hp, cd: 0.6, until: this.time + it.life, fc: 0 };
+      const o = { id: this.nextId++, kind: 'turret', sk: p.ts, owner: p.id, team: p.team, x: free ? fx : p.x, y: free ? fy : p.y, a: p.aim, hp: it.hp, cd: 0.6, until: this.time + it.life, fc: 0, lv: 1 };
       this.turrets.set(o.id, o);
     } else if (item === 'mine') {
       const mine = [...this.mines.values()].filter((o) => o.owner === p.id);
@@ -818,12 +829,84 @@ export class World {
       const t = segWalls(p.x, p.y, ex, ey, this.map.walls);
       const k = t >= 0 ? t : 1;
       if (k * it.len < 60) return no('wall');
-      const o = { id: this.nextId++, kind: 'mine', owner: p.id, team: p.team, x: p.x, y: p.y, x2: p.x + (ex - p.x) * k, y2: p.y + (ey - p.y) * k, armAt: this.time + it.arm };
+      const o = { id: this.nextId++, kind: 'mine', owner: p.id, team: p.team, x: p.x, y: p.y, a: p.aim, lv: 1, armAt: this.time + it.arm };
+      this.mineBeams(o);
       this.mines.set(o.id, o);
     }
     p.cr -= it.cost;
     this.emit({ k: 'bought', to: [p.id], item, pid: p.id, x: r1(p.x), y: r1(p.y) });
     return true;
+  }
+
+  // the beams of a tripmine: one straight ahead, a fan of two or three once upgraded, each
+  // stopped by the first wall (x2, y2 is the first; lines holds them all)
+  mineBeams(o) {
+    const it = GL.ITEMS.mine;
+    const n = GL.MINE_LV[o.lv].beams;
+    const spread = 0.32;
+    o.lines = [];
+    for (let i = 0; i < n; i++) {
+      const a = o.a + (n === 1 ? 0 : (i - (n - 1) / 2) * spread);
+      const ex = o.x + Math.cos(a) * it.len;
+      const ey = o.y + Math.sin(a) * it.len;
+      const t = segWalls(o.x, o.y, ex, ey, this.map.walls);
+      const k = t >= 0 ? t : 1;
+      o.lines.push([o.x + (ex - o.x) * k, o.y + (ey - o.y) * k]);
+    }
+    [o.x2, o.y2] = o.lines[n === 2 ? 0 : Math.floor(n / 2)];
+  }
+
+  // Space next to your own turret or tripmine: the next level, for credits. A turret comes
+  // back to full health and a full clock; a tripmine gets another beam.
+  upgrade(id) {
+    const p = this.players.get(id);
+    if (!this.shop || !p || p.status !== 'alive' || this.phase !== 'live') return false;
+    const no = (why) => {
+      this.emit({ k: 'buyFail', to: [p.id], item: 'upgrade', why });
+      return false;
+    };
+    let best = null;
+    let bd = GL.UP_REACH;
+    for (const o of [...this.turrets.values(), ...this.mines.values()]) {
+      if (o.owner !== p.id) continue;
+      const d = Math.hypot(o.x - p.x, o.y - p.y);
+      if (d < bd) {
+        bd = d;
+        best = o;
+      }
+    }
+    if (!best) return no('near');
+    const lv = best.lv ?? 1;
+    if (lv >= 3) return no('max');
+    const cost = GL.UP[lv + 1];
+    if (p.cr < cost) return no('cash');
+    p.cr -= cost;
+    best.lv = lv + 1;
+    if (best.kind === 'turret') {
+      best.hp = GL.TURRET_LV[best.lv].hp;
+      best.until = this.time + GL.ITEMS.turret.life;
+    } else this.mineBeams(best);
+    this.emit({ k: 'upgraded', to: [p.id], kind: best.kind, lv: best.lv, x: r1(best.x), y: r1(best.y) });
+    return true;
+  }
+
+  // a rocket bursts: everything hostile in the blast takes damage, less towards the edge
+  blast(x, y, b) {
+    this.emit({ k: 'boom', x: r1(x), y: r1(y), small: 1 });
+    const owner = this.players.get(b.owner);
+    if (this.zombie) {
+      for (const z of [...this.zombies.values()]) {
+        const d = Math.hypot(z.x - x, z.y - y);
+        if (d <= b.blast + z.r) this.horde.hit(z, owner, b.dmg * (1 - (0.5 * d) / (b.blast + z.r)));
+        if (this.phase !== 'live') return;
+      }
+      return;
+    }
+    for (const p of this.players.values()) {
+      if (p.status !== 'alive' || p.id === b.owner || (this.teamSize && owner && p.team === owner.team)) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d <= b.blast) this.damage(p, owner, b.dmg * (1 - (0.5 * d) / b.blast), 'turret');
+    }
   }
 
   hitGadget(o, by, dmg) {
@@ -865,10 +948,11 @@ export class World {
       const turn = it.turn * DT;
       o.a += Math.max(-turn, Math.min(turn, da));
       if (Math.abs(da) > 0.12 || o.cd > 0) continue;
-      o.cd = it.cd;
+      const L = GL.TURRET_LV[o.lv ?? 1];
+      o.cd = L.cd;
       o.fc = (o.fc + 1) % 1000;
-      const a = o.a + (this.rnd() - 0.5) * 0.06;
-      const b = { id: this.nextId++, owner: o.owner, x: o.x + Math.cos(a) * 18, y: o.y + Math.sin(a) * 18, vx: Math.cos(a) * 1000, vy: Math.sin(a) * 1000, speed: 1000, range: it.range + 40, dmg: it.dmg, dist: 0, skin: null, cause: 'turret' };
+      const a = o.a + (this.rnd() - 0.5) * (L.kind === 'r' ? 0.02 : 0.06);
+      const b = { id: this.nextId++, owner: o.owner, x: o.x + Math.cos(a) * 18, y: o.y + Math.sin(a) * 18, vx: Math.cos(a) * L.speed, vy: Math.sin(a) * L.speed, speed: L.speed, range: it.range + 40, dmg: L.dmg, dist: 0, skin: null, cause: 'turret', ...(L.kind ? { kind: L.kind } : {}), ...(L.blast ? { blast: L.blast, blastDmg: L.blastDmg } : {}) };
       this.bullets.set(b.id, b);
     }
   }
@@ -879,12 +963,14 @@ export class World {
     for (const o of this.mines.values()) {
       if (this.time < o.armAt) continue;
       let trip = null;
+      const lines = o.lines ?? [[o.x2, o.y2]];
+      const crosses = (x, y, r) => lines.some(([x2, y2]) => segCircle(o.x, o.y, x2, y2, x, y, r) >= 0);
       if (this.zombie) {
-        for (const z of this.zombies.values()) if (segCircle(o.x, o.y, o.x2, o.y2, z.x, z.y, z.r) >= 0) trip = z;
+        for (const z of this.zombies.values()) if (crosses(z.x, z.y, z.r)) trip = z;
       } else
         for (const p of this.players.values()) {
           if (p.status !== 'alive' || p.shield > 0 || !this.hostile(o, p)) continue;
-          if (segCircle(o.x, o.y, o.x2, o.y2, p.x, p.y, CFG.PLAYER_R) >= 0) {
+          if (crosses(p.x, p.y, CFG.PLAYER_R)) {
             trip = p;
             break;
           }
@@ -895,10 +981,11 @@ export class World {
       const by = trip.y;
       this.emit({ k: 'boom', x: r1(bx), y: r1(by), mid: o.id });
       const owner = this.players.get(o.owner);
+      const mdmg = GL.MINE_LV[o.lv ?? 1].dmg;
       if (this.zombie) {
         for (const z of [...this.zombies.values()]) {
           const d = Math.hypot(z.x - bx, z.y - by);
-          if (d <= it.r + z.r) this.horde.hit(z, owner, it.dmg * 1.5 * (1 - (0.5 * d) / (it.r + z.r)));
+          if (d <= it.r + z.r) this.horde.hit(z, owner, mdmg * 1.5 * (1 - (0.5 * d) / (it.r + z.r)));
           if (this.phase !== 'live') return;
         }
         continue;
@@ -907,7 +994,7 @@ export class World {
         if (p.status !== 'alive' || !this.hostile(o, p)) continue;
         const d = Math.hypot(p.x - bx, p.y - by);
         if (d > it.r) continue;
-        this.damage(p, owner, it.dmg * (1 - (0.6 * d) / it.r), 'mine');
+        this.damage(p, owner, mdmg * (1 - (0.6 * d) / it.r), 'mine');
       }
     }
   }
@@ -1410,12 +1497,16 @@ export class World {
 
   // turrets and tripmines in sight range (tripmines by either end of the beam)
   gadgetsNear(me, near) {
-    const pct = (o) => Math.ceil((o.hp / GL.ITEMS.turret.hp) * 100);
+    const pct = (o) => Math.ceil((o.hp / GL.TURRET_LV[o.lv ?? 1].hp) * 100);
     const mine = (o) => (o.owner === me.id ? 1 : (this.teamSize && o.team === me.team) || this.zombie ? 2 : 0);
     const turrets = [];
-    for (const o of this.turrets.values()) if (near(o.x, o.y, 40)) turrets.push({ i: o.id, x: r1(o.x), y: r1(o.y), a: r2(o.a), h: pct(o), fc: o.fc, o: mine(o), tl: Math.ceil(o.until - this.time), ...(o.sk ? { sk: o.sk } : {}) });
+    for (const o of this.turrets.values()) if (near(o.x, o.y, 40)) turrets.push({ i: o.id, x: r1(o.x), y: r1(o.y), a: r2(o.a), h: pct(o), fc: o.fc, o: mine(o), lv: o.lv ?? 1, tl: Math.ceil(o.until - this.time), ...(o.sk ? { sk: o.sk } : {}) });
     const mines = [];
-    for (const o of this.mines.values()) if (near(o.x, o.y, 40) || near(o.x2, o.y2, 40) || near((o.x + o.x2) / 2, (o.y + o.y2) / 2, 40)) mines.push({ i: o.id, x: r1(o.x), y: r1(o.y), x2: r1(o.x2), y2: r1(o.y2), o: mine(o), arm: this.time >= o.armAt ? 1 : 0 });
+    for (const o of this.mines.values()) {
+      const lines = o.lines ?? [[o.x2, o.y2]];
+      if (!near(o.x, o.y, 40) && !lines.some(([x, y]) => near(x, y, 40) || near((o.x + x) / 2, (o.y + y) / 2, 40))) continue;
+      mines.push({ i: o.id, x: r1(o.x), y: r1(o.y), x2: r1(o.x2), y2: r1(o.y2), o: mine(o), lv: o.lv ?? 1, ...(lines.length > 1 ? { ls: lines.map(([x, y]) => [r1(x), r1(y)]) } : {}), arm: this.time >= o.armAt ? 1 : 0 });
+    }
     return { turrets, mines };
   }
 
@@ -1495,7 +1586,7 @@ export class World {
     for (const g of this.gold.values()) if (near(g.x, g.y, 60)) gold.push({ i: g.id, x: r1(g.x), y: r1(g.y), v: g.v });
     const bullets = [];
     for (const b of this.bullets.values()) {
-      if (near(b.x, b.y, 120)) bullets.push({ i: b.id, x: r1(b.x), y: r1(b.y), vx: r1(b.vx), vy: r1(b.vy), d: r1(b.dist), o: b.owner === me.id ? 1 : 0, ...(b.skin ? { s: b.skin } : {}) });
+      if (near(b.x, b.y, 120)) bullets.push({ i: b.id, x: r1(b.x), y: r1(b.y), vx: r1(b.vx), vy: r1(b.vy), d: r1(b.dist), o: b.owner === me.id ? 1 : 0, ...(b.kind ? { k: b.kind } : {}), ...(b.skin ? { s: b.skin } : {}) });
     }
     // rounds that stopped since the last snapshot, and where
     const ends = [];

@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "लहर 10 · बाड़ पार कर बॉस आ रहा है",
   'hud.midBossDown': "बॉस ढेर! दस लहरें और",
   'ach.last_stand': "आख़िरी मोर्चा",
+  'gl.upTurret': "टरेट अपग्रेड: स्तर {lv}",
+  'gl.upMine': "लेज़र माइन अपग्रेड: {lv} किरणें",
+  'gl.upHint': "स्पेस: {what} → स्तर {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → स्तर {lv} · {c} CR",
+  'gl.no.max': "पहले से सबसे ऊँचा स्तर",
+  'gl.no.near': "अपने टरेट या माइन के पास जाओ",
 };

@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "第 10 波 · 首领翻过围栏",
   'hud.midBossDown': "首领倒下！还有十波",
   'ach.last_stand': "最后防线",
+  'gl.upTurret': "炮塔升级：{lv} 级",
+  'gl.upMine': "激光地雷升级：{lv} 道光束",
+  'gl.upHint': "空格: {what} → 等级 {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → 等级 {lv} · {c} CR",
+  'gl.no.max': "已是最高等级",
+  'gl.no.near': "靠近你的炮塔或地雷",
 };

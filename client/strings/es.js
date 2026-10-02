@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "OLEADA 10 · UN JEFE SALTA LA VALLA",
   'hud.midBossDown': "¡Jefe abatido! Quedan diez oleadas",
   'ach.last_stand': "Última resistencia",
+  'gl.upTurret': "Torreta mejorada: nivel {lv}",
+  'gl.upMine': "Mina láser mejorada: {lv} rayos",
+  'gl.upHint': "Espacio: {what} → nivel {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → nivel {lv} · {c} CR",
+  'gl.no.max': "Ya está al máximo",
+  'gl.no.near': "Acércate a tu torreta o mina",
 };

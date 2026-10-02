@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "VAGUE 10 · UN BOSS FRANCHIT LA CLÔTURE",
   'hud.midBossDown': "Boss abattu ! Encore dix vagues",
   'ach.last_stand': "Dernier rempart",
+  'gl.upTurret': "Tourelle améliorée : niveau {lv}",
+  'gl.upMine': "Mine laser améliorée : {lv} rayons",
+  'gl.upHint': "Espace: {what} → niveau {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → niveau {lv} · {c} CR",
+  'gl.no.max': "Déjà au niveau max",
+  'gl.no.near': "Approche-toi de ta tourelle ou mine",
 };

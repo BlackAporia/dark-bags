@@ -270,7 +270,7 @@ export class GameClient {
       const mx = o.x + Math.cos(o.a) * 20;
       const my = o.y + Math.sin(o.a) * 20;
       this.fx.muzzle(mx, my, 22, o.a, false, now, o.o === 1 ? '#3ddc97' : '#ff4d5e');
-      this.sfx.play('smg', { x: o.x, y: o.y });
+      this.sfx.play(o.lv === 3 ? 'shotgun' : o.lv === 2 ? 'sniper' : 'smg', { x: o.x, y: o.y, pitch: o.lv === 3 ? 0.6 : o.lv === 2 ? 1.3 : 1 });
     }
     // rounds that stopped in a wall: sparks and a ricochet, exactly where they struck
     for (const [, x, y, k] of s.ends ?? []) {
@@ -549,6 +549,12 @@ export class GameClient {
           this.fx.ring(ev.x, ev.y, '#3ddc97');
           this.banner(t(`gl.${ev.item}`), 'money', 900);
           break;
+        case 'upgraded':
+          this.sfx.play('level');
+          this.fx.ring(ev.x, ev.y, '#ffd166');
+          this.fx.sparks(ev.x, ev.y, 24, 14, '#ffd166');
+          this.banner(t(ev.kind === 'turret' ? 'gl.upTurret' : 'gl.upMine', { lv: ev.lv }), 'gold', 1600);
+          break;
         case 'buyFail':
           this.banner(t(`gl.no.${ev.why}`), 'warn', 1200);
           this.sfx.play('beep', { f: 220, dur: 0.08 });
@@ -564,7 +570,7 @@ export class GameClient {
           this.fx.sparks(ev.x, ev.y, 10, 26, '#ff4d5e');
           this.fx.dust(ev.x, ev.y, 12, 'rgba(255,90,60,0.35)');
           this.sfx.play('boom', { x: ev.x, y: ev.y });
-          if (this.pred && Math.hypot(ev.x - this.pred.x, ev.y - this.pred.y) < 400) this.shake = Math.max(this.shake, 14);
+          if (this.pred && Math.hypot(ev.x - this.pred.x, ev.y - this.pred.y) < 400) this.shake = Math.max(this.shake, ev.small ? 7 : 14);
           break;
         case 'wave':
           this.banner(ev.boss ? t(ev.n >= ev.of ? 'hud.bossWave' : 'hud.midBossWave') : t('hud.wave', { n: ev.n, of: ev.of }), ev.boss ? 'warn' : 'gold', 2600);
@@ -681,6 +687,31 @@ export class GameClient {
     this.bannerT = setTimeout(() => (b.hidden = true), ms);
   }
 
+  // your own turret or tripmine within reach that can still go up a level
+  upgradable() {
+    if (!this.shopMode || !this.pred || this.you?.st !== 'alive') return null;
+    const last = this.snaps[this.snaps.length - 1];
+    let best = null;
+    let bd = GL.UP_REACH;
+    for (const o of [...(last?.turrets ?? []), ...(last?.mines ?? [])]) {
+      if (o.o !== 1 || (o.lv ?? 1) >= 3) continue;
+      const dd = Math.hypot(o.x - this.pred.x, o.y - this.pred.y);
+      if (dd < bd) {
+        bd = dd;
+        best = { ...o, kind: last.turrets?.includes(o) ? 'turret' : 'mine' };
+      }
+    }
+    return best;
+  }
+
+  // Space (or the touch button) next to your gadget: upgrade it instead of dashing
+  tryUpgrade() {
+    const g = this.upgradable();
+    if (!g || !this.active) return false;
+    this.send({ t: 'upgrade' });
+    return true;
+  }
+
   buy(item) {
     if (!this.active || !this.shopMode || this.you?.st !== 'alive') return;
     this.send({ t: 'buy', item });
@@ -718,7 +749,8 @@ export class GameClient {
       }
     }
     const d = this.input.takeDash();
-    const msg = { t: 'in', s: ++this.seq, mx: r3(mv.x), my: r3(mv.y), a: r3(a), f, d };
+    const r = this.input.takeReload();
+    const msg = { t: 'in', s: ++this.seq, mx: r3(mv.x), my: r3(mv.y), a: r3(a), f, d, ...(r ? { r: true } : {}) };
     this.send(msg);
     const inp = sanitizeInput(msg);
     const cdBefore = this.pred.dashCd;
@@ -1026,6 +1058,21 @@ export class GameClient {
     el.hpBar.style.width = `${hp}%`;
     el.hpBar.style.background = hpColor(hp / 100);
     el.hpNum.textContent = this.hardcore ? t('hud.oneHit') : hp;
+    // standing next to your own gadget: what Space does, and what it costs
+    const up = alive ? this.upgradable() : null;
+    if (el.upHint) {
+      el.upHint.hidden = !up;
+      if (up) {
+        const cost = GL.UP[(up.lv ?? 1) + 1];
+        el.upHint.textContent = t(this.input.touchOn ? 'gl.upHintTouch' : 'gl.upHint', { what: t(up.kind === 'turret' ? 'gl.turret' : 'gl.mine'), lv: (up.lv ?? 1) + 1, c: cost });
+        el.upHint.classList.toggle('poor', (you.cr ?? 0) < cost);
+      }
+    }
+    const tUp = document.getElementById('t-up');
+    if (tUp) {
+      tUp.hidden = !up;
+      if (up) tUp.querySelector('em').textContent = GL.UP[(up.lv ?? 1) + 1];
+    }
     if (this.shopMode) {
       const cr = you.cr ?? 0;
       el.glCr.textContent = fmt(cr);
