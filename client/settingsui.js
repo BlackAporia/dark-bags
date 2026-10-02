@@ -44,6 +44,9 @@ export function createSettingsUi() {
         ${row('set.track', tracks(), 'set.trackNote')}
         ${row('set.voice', toggle('voice'), 'set.voiceNote')}
       </section>
+      <section class="set-card"><p class="eyebrow">${t('news.title')}</p>
+        <div class="set-row"><div><p>${t('news.note')}</p></div><button type="button" class="ghost" data-news>${t('news.open')}</button></div>
+      </section>
       <section class="set-card"><p class="eyebrow">${t('set.tour')}</p>
         <div class="set-row"><div><p>${t('set.tourNote')}</p></div><button type="button" class="ghost" data-tour>${t('set.tourBtn')}</button></div>
       </section>
@@ -59,6 +62,7 @@ export function createSettingsUi() {
     for (const i of root.querySelectorAll('[data-tog]')) i.addEventListener('change', () => setSetting(i.dataset.tog, i.checked));
     for (const i of root.querySelectorAll('[data-rng]')) i.addEventListener('input', () => setSetting(i.dataset.rng, Number(i.value)));
     for (const b of root.querySelectorAll('[data-lang]')) b.addEventListener('click', () => setLang(b.dataset.lang));
+    root.querySelector('[data-news]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('darkbags:news')));
     root.querySelector('[data-tour]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('darkbags:tour')));
   }
   return { render };

@@ -35,6 +35,8 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     gUnread: 0,
     gtab: 'chat', // chat | members (your own guild)
     sent: new Set(), // invites sent from this prep screen
+    gsent: new Set(), // guild invites sent
+    myGuild: null, // the id of my guild
   };
 
   const online = () => app.mode === 'online' && app.status === 'open';
@@ -60,13 +62,15 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
       : rel === 'sent' ? `<span class="so-tag">${t('so.sent')}</span>`
       : rel === 'incoming' ? `<button type="button" class="ghost sm" data-act="friend" data-id="${c.id}">${t('so.accept')}</button>`
       : `<button type="button" class="ghost sm" data-act="friend" data-id="${c.id}">${t('so.add')}</button>`;
+    // into my guild: anyone who has played, unless they already have a guild
+    const ginv = !invite && st.myGuild && !c.g ? `<button type="button" class="ghost sm" data-act="ginvite" data-id="${c.id}" ${st.gsent.has(c.id) ? 'disabled' : ''}>${st.gsent.has(c.id) ? t('so.gInvited') : t('so.gInvite')}</button>` : '';
     const inv = invite && c.st !== 'off' && c.st !== 'raid' ? `<button type="button" class="cta sm" data-act="invite" data-id="${c.id}" ${st.sent.has(c.id) ? 'disabled' : ''}>${st.sent.has(c.id) ? t('so.invited') : t('so.invite')}</button>` : '';
     return `<li class="so-row">
       <button type="button" class="so-who" data-act="profile" data-id="${c.id}">
         <i class="so-dot ${c.st}" aria-hidden="true"></i>${rankBadgeSvg(c.rk ?? 1, 18)}
         <span class="so-name"><b>${esc(c.n)}</b>${c.g ? `<em class="so-g">[${esc(c.g)}]</em>` : ''}${c.tt ? `<span class="so-tt">${esc(achName(c.tt))}</span>` : ''}<small>${esc(statusText(c))}</small></span>
       </button>
-      <span class="so-acts">${inv}${invite ? '' : add}${invite ? '' : `<button type="button" class="ghost sm" data-act="msg" data-id="${c.id}">${t('so.message')}</button>`}</span>
+      <span class="so-acts">${inv}${ginv}${invite ? '' : add}${invite ? '' : `<button type="button" class="ghost sm" data-act="msg" data-id="${c.id}">${t('so.message')}</button>`}</span>
     </li>`;
   }
 
@@ -83,7 +87,13 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
           st.sent.add(id);
           b.disabled = true;
           b.textContent = t('so.invited');
-        } else if (b.dataset.act === 'guild') send({ t: 'guild', id });
+        } else if (b.dataset.act === 'ginvite') {
+          send({ t: 'guild_invite', id });
+          st.gsent.add(id);
+          b.disabled = true;
+          b.textContent = t('so.gInvited');
+        } else if (b.dataset.act === 'more') send({ t: 'players', q: st.q, page: (st.players?.page ?? 0) + 1 });
+        else if (b.dataset.act === 'guild') send({ t: 'guild', id });
         else if (b.dataset.act === 'join-guild') send({ t: 'guild_join', id });
       });
     }
@@ -117,7 +127,8 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
       const list = st.players?.list ?? [];
       body = `<form class="so-search"><input id="so-q" type="search" placeholder="${esc(t('so.search'))}" value="${esc(st.q)}" autocomplete="off"></form>
         <p class="fine">${st.players ? t('so.count', { n: st.players.total, on: list.filter((c) => c.st !== 'off').length }) : ''}</p>
-        <ul class="so-list">${list.map((c) => row(c)).join('') || `<li class="so-empty">${st.players ? t('so.none') : '…'}</li>`}</ul>`;
+        <ul class="so-list">${list.map((c) => row(c)).join('') || `<li class="so-empty">${st.players ? t('so.none') : '…'}</li>`}</ul>
+        ${st.players && list.length < st.players.total ? `<button type="button" class="ghost so-more" data-act="more">${t('so.more', { n: st.players.total - list.length })}</button>` : ''}`;
     } else if (st.tab === 'friends') {
       const f = st.friends;
       const req = (f?.incoming ?? []).map((c) => `<li class="so-row"><button type="button" class="so-who" data-act="profile" data-id="${c.id}">${rankBadgeSvg(c.rk ?? 1, 18)}<span class="so-name"><b>${esc(c.n)}</b><small>${t('so.wants')}</small></span></button><span class="so-acts"><button type="button" class="cta sm" data-act="friend" data-id="${c.id}">${t('so.accept')}</button><button type="button" class="ghost sm" data-act="unfriend" data-id="${c.id}">${t('so.decline')}</button></span></li>`).join('');
@@ -355,6 +366,24 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     setTimeout(() => el.remove(), 60000);
   }
 
+  // a guild invite: a card to join at once, or later from the Guilds page
+  function showGuildInvite(m) {
+    const box = $('invites');
+    const el = document.createElement('div');
+    el.className = 'inv-card';
+    el.innerHTML = `<p><b>${esc(m.from.n)}</b> ${t('so.gInvitesYou')}</p><p class="fine">[${esc(m.guild.tag)}] ${esc(m.guild.name)} · ${t('so.gMembers', { n: m.guild.n })}</p>
+      <div class="inv-acts"><button type="button" class="cta sm">${t('so.gJoin')}</button><button type="button" class="ghost sm">${t('so.later')}</button></div>`;
+    const [join, later] = el.querySelectorAll('button');
+    join.addEventListener('click', () => {
+      el.remove();
+      send({ t: 'guild_join', id: m.guild.id });
+    });
+    later.addEventListener('click', () => el.remove());
+    box.prepend(el);
+    while (box.children.length > 3) box.lastChild.remove();
+    setTimeout(() => el.remove(), 90000);
+  }
+
   // ---------------------------------------------------------------- messages
 
   function onMessage(m) {
@@ -367,12 +396,14 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
           st.unread = sm.unread ?? 0;
           st.requests = sm.requests ?? 0;
           st.gUnread = sm.gUnread ?? 0;
+          st.myGuild = sm.guild ?? null;
           badge();
         }
         break;
       }
       case 'players':
-        st.players = m;
+        // page 0 replaces the list, later pages add to it (the whole directory, 40 at a time)
+        st.players = m.page > 0 && st.players && st.players.q === m.q ? { ...m, list: [...st.players.list, ...m.list] } : m;
         if (st.tab === 'players' && isOpen('friends')) render();
         renderInvite();
         break;
@@ -408,6 +439,12 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
         }
         break;
       }
+      case 'guildInvited':
+        showGuildInvite(m);
+        break;
+      case 'ginvSent':
+        toast(t('so.gInviteSent'));
+        break;
       case 'friendReq':
         if (m.rel === 'incoming') {
           st.requests++;
@@ -443,6 +480,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
         guildMsg(m);
         break;
       case 'guildDone':
+        st.myGuild = m.id ?? null;
         st.guild = null;
         st.gchat = null;
         st.gtab = 'chat';

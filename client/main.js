@@ -17,6 +17,7 @@ import { openShare, wireShare } from './sharecard.js';
 import { OUTFIT, OUTFITS, RARITIES } from '../shared/cosmetics.js';
 import { spinReel } from './reel.js';
 import { createPass } from './pass.js';
+import { createNews } from './news.js';
 import { createRanked, neonText, neonColor } from './ranked.js';
 import { createAchievements, achName } from './achievements.js';
 import { createShop } from './shop.js';
@@ -107,6 +108,10 @@ const el = {
   nextWeapon: $('next-weapon'),
 };
 const SERVER = onlineUrl();
+// stakes are in thousandths of a dollar: any whole number of cents from $0.10 to $10,000
+const STAKE_MIN = 100;
+const STAKE_MAX = 10_000_000;
+const validStake = (v) => Number.isInteger(v) && v >= STAKE_MIN && v <= STAKE_MAX && v % 10 === 0;
 const app = {
   mode: null,
   transport: null,
@@ -117,7 +122,7 @@ const app = {
   prices: new PriceBook([]),
   asset: store.get('darkbags.asset', 'USDC'),
   tables: [],
-  stake: CFG.TIERS.includes(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
+  stake: validStake(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
   name: store.get('darkbags.name', ''),
   skin: SKINS.includes(store.get('darkbags.skin', '')) ? store.get('darkbags.skin') : SKINS[Math.floor(Math.random() * SKINS.length)],
   gore: settings.gore,
@@ -136,7 +141,7 @@ game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null);
 // share cards: everything that happens can be posted
 const myLook = () => ({ outfit: app.locker?.outfit ?? 'basic-0', body: app.locker?.body ?? 'm' });
 function shareMoment(kind, data = {}) {
-  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, ...data });
+  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, player: (app.name || '').trim() || null, ...data });
 }
 wireShare();
 
@@ -190,6 +195,8 @@ const social = createSocial({
     goToTable();
   },
 });
+const news = createNews();
+document.addEventListener('darkbags:news', () => news.open());
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m) });
 const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p) });
 const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked };
@@ -465,6 +472,7 @@ function renderLobby() {
       });
       return b;
     }),
+    customStake(),
   );
 
   $('gore').checked = app.gore;
@@ -644,6 +652,31 @@ function rankUpShow(m, next = () => {}) {
       finish();
     });
   }, settings.motion ? 2300 : 0);
+}
+
+// your own stake: type any amount from $0.10 to $10,000
+function customStake() {
+  const own = !CFG.TIERS.includes(app.stake);
+  const wrap = document.createElement('label');
+  wrap.className = `table-btn stake-own${own ? ' on' : ''}`;
+  wrap.setAttribute('aria-pressed', String(own));
+  wrap.innerHTML = `<span class="stake-own-k">${esc(t('stake.own'))}</span><span class="stake-own-in">$<input type="number" inputmode="decimal" min="0.1" max="10000" step="0.01" value="${own ? (app.stake / 1000).toFixed(2).replace(/\.00$/, '') : ''}" placeholder="0.10 – 10 000" aria-label="${esc(t('stake.own'))}"></span>`;
+  const input = wrap.querySelector('input');
+  const apply = () => {
+    if (!input.value) return;
+    const v = Math.round(Number(String(input.value).replace(',', '.')) * 100) * 10; // whole cents
+    if (!validStake(v)) {
+      toast(t('stake.range'));
+      return;
+    }
+    app.stake = v;
+    store.set('darkbags.stake', v);
+    renderLobby();
+  };
+  // re-render after the change event has finished (the input is replaced by the render)
+  input.addEventListener('change', () => setTimeout(apply, 0));
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && input.blur());
+  return wrap;
 }
 
 // ------------------------------------------------------------- ready room
@@ -1212,13 +1245,21 @@ let lastFrame = performance.now();
 // The next frame is booked first: whatever goes wrong in this one, the loop (input, HUD,
 // drawing) keeps running. A frame error is reported once, not a frozen black screen.
 let loopErr = false;
+let attractSkip = false;
+// nobody sees the live map behind a full-screen dialog or show: skip drawing it (that
+// time goes to the locker, the case reel and the rank-up instead)
+const backdropHidden = () => !!document.querySelector('dialog[open]') || !$('opening').hidden || !$('rankup').hidden || app.screen === 'result';
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.1, (now - lastFrame) / 1000);
   lastFrame = now;
   try {
     if (game.active) game.frame(now, dt);
-    else attract.frame(now, dt);
+    else if (!backdropHidden()) {
+      // the live map behind the menus: full rate on a desktop, every other frame on a phone
+      attractSkip = !attractSkip;
+      if (!input.touchOn || attractSkip) attract.frame(now, input.touchOn ? dt * 2 : dt);
+    }
   } catch (e) {
     if (!loopErr) console.error('frame failed', e);
     loopErr = true;
@@ -1250,7 +1291,10 @@ applyI18n();
 const intro = createIntro({
   onDone: () => {
     document.body.classList.add('ready');
-    tour.maybeStart('device');
+    // a new player gets Nyx (the update notes would mean nothing yet); everyone else, once
+    // after an update, the notes
+    if (tour.maybeStart('device')) news.markSeen();
+    else news.maybeShow();
   },
 });
 for (const s of ['fonts', 'world', 'connect', 'profile']) intro.need(s);

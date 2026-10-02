@@ -410,3 +410,13 @@ test('guns + lasers: kills pay credits; medkits, turrets and tripmines cost them
   assert.equal(w.turrets.size + w.mines.size, 0);
   assert.ok(w.audit().ok);
 });
+
+test('health never comes back by itself (only Guns + Lasers medkits heal)', () => {
+  const w = new World({ stake: 1000, seed: 9, bots: false });
+  const a = w.addPlayer({ name: 'a', skin: '#fff' });
+  w.addPlayer({ name: 'b', skin: '#fff' });
+  Object.assign(a, { x: w.zone.x, y: w.zone.y, shield: 0 });
+  a.hp = CFG.HP / 2;
+  for (let i = 0; i < CFG.TICK_RATE * 20; i++) w.step();
+  assert.equal(a.hp, CFG.HP / 2);
+});

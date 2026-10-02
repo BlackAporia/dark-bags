@@ -340,7 +340,8 @@ export class World {
         this.fire(p);
       }
 
-      // the storm: damage outside the circle, and no regen while you're in it
+      // the storm: damage outside the circle. Health never comes back by itself: lost hp
+      // stays lost for the match (Guns + Lasers sells medkits; deathmatch respawns full)
       p.inStorm = outsideZone(this.zone, p.x, p.y);
       if (p.inStorm) {
         p.hp -= ((this.zone.dps * this.maxHp) / CFG.HP) * DT;
@@ -349,8 +350,6 @@ export class World {
           this.kill(p, null, 'storm');
           continue;
         }
-      } else if (p.hp < this.maxHp && this.time - p.lastHit > CFG.REGEN_DELAY) {
-        p.hp = Math.min(this.maxHp, p.hp + ((CFG.REGEN_RATE * this.maxHp) / CFG.HP) * DT);
       }
 
       let zone = null;
@@ -1070,6 +1069,16 @@ export class World {
    * other runners' bags are never serialised, only their own-chosen bluff size,
    * and runners out of sight (distance or walls) are not sent at all.
    */
+  // [x, y, ally] for every other runner alive, in tens of units (ally: 1 for your team)
+  radarFor(me) {
+    const out = [];
+    for (const p of this.players.values()) {
+      if (p === me || p.status !== 'alive') continue;
+      out.push([Math.round(p.x / 10), Math.round(p.y / 10), this.teamSize && p.team === me.team ? 1 : 0]);
+    }
+    return out;
+  }
+
   snapshotFor(id) {
     const me = this.players.get(id);
     if (!me) return null;
@@ -1157,6 +1166,8 @@ export class World {
         ...(this.shop ? { cr: me.cr } : {}),
       },
       players,
+      // the minimap radar: every runner still standing, coarse, a few times a second
+      ...(this.tick % 3 === 0 ? { radar: this.radarFor(me) } : {}),
       ...(this.shop ? this.gadgetsNear(me, near) : {}),
       orbs,
       drops,

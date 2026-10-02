@@ -19,7 +19,10 @@ import { SocialBook, GUILD_RANK } from './social.js';
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
 const PAUSABLE = new Set(['ready', 'box', 'topup', 'swap']);
-const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite']);
+const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite', 'guild_invite']);
+
+export const CUSTOM_MIN = 100; // $0.10 (stakes are in thousandths of a dollar)
+export const CUSTOM_MAX = 10_000_000; // $10,000
 
 export class Lobby {
   constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
@@ -45,13 +48,26 @@ export class Lobby {
     this.sessions = new Map();
     // one table per mode and stake
     this.rooms = new Map();
-    for (const m of MODES) for (const stake of tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers }));
+    this.roomArgs = { wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    for (const m of MODES) for (const stake of tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
     this.roundSeconds = roundSeconds;
   }
 
   tables() {
     return [...this.rooms.values()].map((r) => r.info());
+  }
+
+  // A table at a stake of your own ($0.10 to $10,000 in whole cents): made when someone
+  // sits down, removed again once it stands empty.
+  roomFor(mode, stake) {
+    const id = `${MODE[mode] ? mode : 'raid'}:${stake}`;
+    if (this.rooms.has(id)) return this.rooms.get(id);
+    if (!Number.isInteger(stake) || stake < CUSTOM_MIN || stake > CUSTOM_MAX || stake % 10) return null;
+    const room = new RoomCore({ stake, mode: MODE[mode] ? mode : 'raid', ...this.roomArgs });
+    room.custom = true;
+    this.rooms.set(id, room);
+    return room;
   }
 
   // people connected right now (every signed session, in a raid or browsing)
@@ -233,7 +249,7 @@ export class Lobby {
           s.name = cleanName(msg.name);
           this.social.touch(this.key(s), s.name);
         }
-        const room = this.rooms.get(`${MODE[msg.mode] ? msg.mode : 'raid'}:${Number(msg.stake)}`);
+        const room = this.roomFor(msg.mode, Number(msg.stake));
         if (!room) return;
         if (!this.key(s)) {
           this.send(cid, { t: 'err', msg: 'Connect a wallet first.' });
@@ -512,6 +528,25 @@ export class Lobby {
         if (r.error) return reply({ t: 'guildErr', why: r.error });
         return reply({ t: 'guildDone', id: r.guild.id });
       }
+      case 'guild_invite': {
+        // ask anyone who has ever played into your guild: a card if they are online, and a
+        // message in their inbox either way
+        const g = me.guild && S.guilds.get(me.guild);
+        if (!g) return err('Join or found a guild first.');
+        const k = S.keyOf(msg.id);
+        const them = k && S.get(k);
+        if (!them || k === key) return err('No such player.');
+        if (them.guild === g.id) return err('Already in your guild.');
+        if (them.guild) return err('That player is in another guild.');
+        const now = this.now();
+        s.ginv ??= new Map();
+        if (now - (s.ginv.get(k) ?? 0) < 30000) return err('Invite sent already. Give them a moment.');
+        s.ginv.set(k, now);
+        const guild = { id: g.id, name: g.name, tag: g.tag, n: g.members.length };
+        this.pushTo(k, { t: 'guildInvited', from: this.card(key, k), guild });
+        S.dm(key, them.id, `[${g.tag}] ${g.name}: guild invite → Guilds`); // waits in their inbox if they are away
+        return reply({ t: 'ginvSent', id: String(msg.id) });
+      }
       case 'guild_join': {
         const r = S.joinGuild(key, msg.id);
         if (r.error) return err(r.error);
@@ -567,7 +602,11 @@ export class Lobby {
   }
 
   tick() {
-    for (const r of this.rooms.values()) r.tick();
+    for (const [id, r] of this.rooms) {
+      r.tick();
+      // custom-stake tables go once nobody is at them and no raid runs
+      if (r.custom && !r.clients.size && r.state !== 'live') this.rooms.delete(id);
+    }
   }
 
   // periodic refresh for people browsing tables
