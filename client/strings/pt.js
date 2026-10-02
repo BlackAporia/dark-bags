@@ -978,4 +978,6 @@ export default {
   'res.practiceNoXp': "O treino é grátis: sem XP nem recompensas. Jogue online para subir de rank.",
   'online.only': "Só online. O treino é grátis, então não conta para o passe nem para o ranking. Mude para Online na página Jogar.",
   'err.online_only': "Isso só funciona online",
+  'tour.skip': "Pular tutorial",
+  'tour.skipped': "Tutorial pulado. Você pode chamar a Nyx de novo em Configurações.",
 };

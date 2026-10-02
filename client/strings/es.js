@@ -978,4 +978,6 @@ export default {
   'res.practiceNoXp': "La práctica es gratis: sin XP ni recompensas. Juega en línea para subir de rango.",
   'online.only': "Solo en línea. La práctica es gratis, así que no cuenta para el pase ni la clasificatoria. Cambia a En línea en la página Jugar.",
   'err.online_only': "Esto solo funciona en línea",
+  'tour.skip': "Saltar tutorial",
+  'tour.skipped': "Tutorial omitido. Puedes llamar a Nyx otra vez en Ajustes.",
 };
