@@ -34,16 +34,16 @@ export const NYX_LINES = {
   exit: "Ooh, that bag looks good on you! Find a green exit ring, and stand in it!",
   extracting: "Hold still! Three seconds! Don't get hit!",
   retry: "Aww, you went down! It happens, practice is free! Tap Play again. This time grab a little loot, then run for a green exit!",
-  resultWon: "You made it out! You won! I knew you could do it! The money is in your wallet now. Tap Tables, and let's go spend some of it!",
+  resultWon: "You made it out! You won! I knew you could do it! Practice money is just for fun. Tap Tables, and let me show you the shop!",
   shopGo: "Now tap the Shop!",
-  shopCase: "Welcome to the shop! Let's spend your winnings. Tap Open on this bag. It's paid straight from your wallet!",
-  shopEquip: "Ooh, look what you got! Tap the button, and it's yours!",
+  shopCase: "Welcome to the shop! In practice it's only a demo, nothing is charged. Tap Demo on this bag and watch it open!",
+  shopEquip: "Ooh, look what came out! Online, with your shop dollars, it would be yours. Tap Close!",
   social: "Friends, messages, guilds! Bring your squad. Everything's more fun together!",
   wallet: "Want real stakes? Sign in with a wallet, or just an email! Cash-outs only ever go back to your own address. Safe and sound!",
   bye: "That's everything! You can play, win, and shop. Go get 'em, runner! You can call me again anytime, in Settings.",
 };
 
-// the first unopened bag in the shop: the tutorial buys it with the money just won
+// the first bag in the shop: in practice the tutorial opens it as a demo (nothing is charged)
 const freshBox = () => [...document.querySelectorAll('#shop-root .box-card')].find((c) => !c.querySelector('.held-badge') && !c.querySelector('.box-go')?.disabled)?.querySelector('.box-go') ?? null;
 
 // The whole first session, in order. The player can only do what the step asks: everything

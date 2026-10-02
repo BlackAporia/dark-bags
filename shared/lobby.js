@@ -255,8 +255,8 @@ export class Lobby {
       case 'tequip':
       case 'pass_buy':
       case 'pass_claim':
-        // the battle pass is online only: practice is free and must not fill or pay it
-        if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'The battle pass works in online play only.' });
+        // practice is free play money: buying (bags, shop $) and the battle pass are online only
+        if (this.practice && ['box', 'topup', 'pass_buy', 'pass_claim'].includes(msg.t)) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
         this.lockerOp(cid, s, msg);
         return;
       case 'ref_info':
