@@ -1991,3 +1991,30 @@ body:has(#pause:not([hidden])) .now-playing { display: none; }
 .hero[data-tier="mystery"]::before { background: conic-gradient(from var(--spin, 0deg), #581c87, #c084fc, #00f5ff, #581c87); }
 @media (prefers-reduced-motion: reduce) { .ttl, .ttl::after, .hero::before { animation: none !important; } }
 .slot-tt { font-size: 8.5px; padding: 0 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+/* ------------------------------------------------ zombies and the gold rush */
+.mode-card.k-zombie { background: linear-gradient(160deg, rgba(90, 160, 70, 0.16), rgba(10, 14, 12, 0.6)); }
+.mode-card.k-zombie .mc-meta { color: #9be36b; }
+.mode-card.k-gold { background: linear-gradient(160deg, rgba(255, 196, 61, 0.16), rgba(18, 14, 6, 0.6)); }
+.mode-card.k-gold .mc-meta { color: #ffd166; }
+.mode-card.k-zombie[aria-checked="true"] { border-color: #9be36b; box-shadow: 0 0 0 1px #9be36b, 0 0 22px rgba(155, 227, 107, 0.25); }
+.mode-card.k-gold[aria-checked="true"] { border-color: #ffd166; box-shadow: 0 0 0 1px #ffd166, 0 0 22px rgba(255, 209, 102, 0.25); }
+.table-list.fixed .table-btn { grid-column: 1 / -1; }
+.zpick { width: 100%; }
+.zpick .eyebrow { margin: 0 0 8px; text-align: center; color: #9be36b; }
+.zp-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.zp { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 6px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04); color: var(--paper, #ebe5d6); cursor: pointer; font: inherit; transition: transform 0.12s, border-color 0.12s, background 0.12s; }
+.zp:hover { transform: translateY(-2px); border-color: rgba(155, 227, 107, 0.5); }
+.zp.on { border-color: #9be36b; background: rgba(155, 227, 107, 0.12); box-shadow: 0 0 16px rgba(155, 227, 107, 0.25); }
+.zp img { width: 84px; height: 40px; object-fit: contain; }
+.zp b { font-size: 12px; line-height: 1.1; text-align: center; }
+.zp small { font-size: 10px; color: var(--dust, #8d93a6); }
+.zp-bar { width: 80%; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.zp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #9be36b, #ffd166); }
+.slot-wp { font-size: 9px; color: #9be36b; letter-spacing: 0.04em; }
+body.z-on .hud-bag b, body.z-on #bag { color: #9be36b; }
+body.gold-on #bag { color: #ffd166; }
+@media (max-width: 560px) {
+  .zp-row { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+  .zp img { width: 66px; height: 32px; }
+}

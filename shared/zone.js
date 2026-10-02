@@ -97,7 +97,7 @@ export function staticZone(map, duration) {
     circles: ZONE_RADII.map(() => ({ ...c })),
     times: ZONE_STAGES.map(() => [duration + 1, duration + 2]),
     dps: ZONE_DPS.map(() => 0),
-    finalExit: map.extracts[0].id,
+    finalExit: map.extracts[0]?.id ?? -1,
     duration,
     none: true,
   };

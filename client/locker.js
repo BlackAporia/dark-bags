@@ -73,10 +73,11 @@ const TILT = -0.3;
 export function weaponStill(skinId, w = 150, h = 100) {
   const key = `${skinId}:${w}x${h}`;
   if (wstills.has(key)) return wstills.get(key);
-  const s = WSKIN[skinId];
+  // 'gun:<weapon id>' draws the plain weapon, with no skin on it
+  const s = WSKIN[skinId] ?? (String(skinId).startsWith('gun:') ? { weapon: skinId.slice(4), finish: null } : null);
   const wi = Math.max(0, WEAPONS.findIndex((x) => x.id === s?.weapon));
-  const art = weaponArt(wi, s ? { [s.weapon]: s.finish } : null);
-  const fin = s ? FINISH[s.finish] : null;
+  const art = weaponArt(wi, s?.finish ? { [s.weapon]: s.finish } : null);
+  const fin = s?.finish ? FINISH[s.finish] : null;
   // bounds of the tilted weapon, line widths included
   const c = Math.cos(TILT);
   const sn = Math.sin(TILT);
@@ -117,6 +118,8 @@ export function weaponStill(skinId, w = 150, h = 100) {
   wstills.set(key, url);
   return url;
 }
+
+export const gunStill = (weaponId, w, h) => weaponStill(`gun:${weaponId}`, w, h);
 
 // a turret skin as a small picture, for the locker grid
 const tstills = new Map();

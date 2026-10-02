@@ -160,3 +160,56 @@ export function randomLootPoint(map, rnd, chest, circle = null) {
   }
   return null;
 }
+
+// Arenas for the side modes: smaller, no vaults and no exits.
+//   graveyard (zombies): an open plaza in the middle to make a stand in, rows of
+//     headstones and a few crypts around it, and eight broken gates in the fence
+//     where the dead climb in.
+//   mine (gold rush): a quarry of rock piles, ore carts and timber sheds, with open
+//     ground between them for the gold to land on.
+export const ARENA = 2000;
+export function generateArena(seed, theme) {
+  const rnd = mulberry32(seed ^ 0xa11e);
+  const W = ARENA;
+  const H = ARENA;
+  const walls = [];
+  const cx = W / 2;
+  const cy = H / 2;
+  const clearOf = (r, pad) => !walls.some((o) => rectsOverlap(o, r, pad));
+  const add = (r, pad = 40, keepOut = 0) => {
+    if (keepOut && circleHitsRect(cx, cy, keepOut, r)) return false;
+    if (r.x < 90 || r.y < 90 || r.x + r.w > W - 90 || r.y + r.h > H - 90) return false;
+    if (!clearOf(r, pad)) return false;
+    walls.push(r);
+    return true;
+  };
+  const gates = [
+    [W / 2, 40], [W - 40, H / 2], [W / 2, H - 40], [40, H / 2],
+    [180, 180], [W - 180, 180], [W - 180, H - 180], [180, H - 180],
+  ].map(([x, y], id) => ({ id, x, y }));
+  if (theme === 'graveyard') {
+    // crypts: big blocks with room around them
+    for (let i = 0, t = 0; i < 6 && t < 200; t++) {
+      const w = 110 + Math.floor(rnd() * 70);
+      const h = 80 + Math.floor(rnd() * 50);
+      if (add({ x: Math.floor(160 + rnd() * (W - 320 - w)), y: Math.floor(160 + rnd() * (H - 320 - h)), w, h }, 120, 340)) i++;
+    }
+    // rows of headstones: thin and short, so the dead weave between them
+    for (let i = 0, t = 0; i < 46 && t < 900; t++) {
+      const w = 24 + Math.floor(rnd() * 12);
+      const h = 34 + Math.floor(rnd() * 12);
+      if (add({ x: Math.floor(140 + rnd() * (W - 280 - w)), y: Math.floor(140 + rnd() * (H - 280 - h)), w, h }, 70, 300)) i++;
+    }
+    // low cemetery walls around the plaza, broken in four places
+    for (const [x, y, w, h] of [[cx - 260, cy - 300, 170, 24], [cx + 90, cy - 300, 170, 24], [cx - 260, cy + 276, 170, 24], [cx + 90, cy + 276, 170, 24]]) add({ x, y, w, h }, 10);
+  } else {
+    // rock piles, ore carts and sheds of every size
+    for (let i = 0, t = 0; i < 34 && t < 900; t++) {
+      const k = rnd();
+      const w = k < 0.5 ? 60 + Math.floor(rnd() * 80) : k < 0.75 ? 150 + Math.floor(rnd() * 120) : 28 + Math.floor(rnd() * 10);
+      const h = k < 0.5 ? 60 + Math.floor(rnd() * 80) : k < 0.75 ? 28 + Math.floor(rnd() * 10) : 150 + Math.floor(rnd() * 120);
+      if (add({ x: Math.floor(120 + rnd() * (W - 240 - w)), y: Math.floor(120 + rnd() * (H - 240 - h)), w, h }, 90)) i++;
+    }
+  }
+  return { seed, w: W, h: H, walls, vaults: [], extracts: [], gates, theme };
+}

@@ -87,6 +87,22 @@ export const ACHIEVEMENTS = [
   { id: 'pass_holder', stat: 'passTier', goal: 25, xp: 500 },
   { id: 'pass_maxed', stat: 'passTier', goal: 50, xp: 1500 },
   { id: 'neon_bearer', stat: 'stitles', goal: 1, xp: 800 },
+  // zombies: survive the waves, clear the boss, top the squad
+  { id: 'graveyard_shift', stat: 'zRuns', goal: 1, xp: 80 },
+  { id: 'hold_the_line', stat: 'bestWave', goal: 5, xp: 300 },
+  { id: 'undertaker', stat: 'zKills', goal: 100, xp: 300 },
+  { id: 'exterminator', stat: 'zKills', goal: 1000, xp: 1500 },
+  { id: 'giant_slayer', stat: 'zBoss', goal: 1, xp: 1200 },
+  { id: 'zombie_slayer', stat: 'zClears', goal: 1, xp: 1500 },
+  { id: 'top_of_the_horde', stat: 'zMvp', goal: 1, xp: 3000 },
+  { id: 'nightmare_walker', stat: 'zClears', goal: 5, xp: 3500 },
+  { id: 'army_of_one', stat: 'zSolo', goal: 1, xp: 5000 },
+  // gold rush: grab the most bags, be the one who takes it all
+  { id: 'prospector', stat: 'goldRuns', goal: 1, xp: 60 },
+  { id: 'gold_fever', stat: 'goldWins', goal: 1, xp: 400 },
+  { id: 'mother_lode', stat: 'bestGold', goal: 25, xp: 600 },
+  { id: 'bag_hoarder', stat: 'goldBags', goal: 300, xp: 1200 },
+  { id: 'midas', stat: 'goldWins', goal: 10, xp: 3000 },
   // secret: hidden until you earn them
   { id: 'by_a_thread', stat: 'clutch', goal: 1, xp: 700, secret: true },
   { id: 'untouchable', stat: 'flawless', goal: 1, xp: 900, secret: true },
@@ -107,12 +123,16 @@ export function titleTier(id) {
 export const ACHIEVEMENT = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 
 // counters that keep the best value instead of adding up
-const MAX_STATS = new Set(['bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles']);
+const MAX_STATS = new Set(['bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles', 'bestWave', 'bestGold']);
 
 // What one finished raid adds to the career counters. p is the world's player record.
-export function raidStats(p, { golden = false, lastExit = false, mode = null } = {}) {
+// squad: runners in the match; mvp: topped the squad's zombie kills on a clear
+export function raidStats(p, { golden = false, lastExit = false, mode = null, squad = 1, mvp = false } = {}) {
   const out = p.status === 'extracted' || !!p.won;
   const won = !!p.won;
+  const zed = mode?.kind === 'zombie';
+  const gold = mode?.kind === 'gold';
+  const side = zed || gold; // the side modes have their own achievements, not the raid ones
   const wk = p.wk ?? {};
   const secs = Math.max(0, Math.round((p.endedAt ?? 0) - (p.joinedAt ?? 0)));
   return {
@@ -131,20 +151,31 @@ export function raidStats(p, { golden = false, lastExit = false, mode = null } =
     weaponWins: won && mode?.weapon ? 1 : 0,
     clutch: out && p.hp > 0 && p.hp <= (p.maxHp ?? 100) * 0.1 ? 1 : 0,
     flawless: out && !(p.dmgTaken > 0) && secs >= 120 ? 1 : 0,
-    ninjaWin: won && mode && mode.kind !== 'raid' && !p.kills ? 1 : 0,
+    ninjaWin: won && mode && mode.kind !== 'raid' && !side && !p.kills ? 1 : 0,
+    zRuns: zed ? 1 : 0,
+    bestWave: zed ? p.zWave ?? 0 : 0,
+    zKills: zed ? p.zk ?? 0 : 0,
+    zBoss: zed && p.bossKill ? 1 : 0,
+    zClears: zed && won ? 1 : 0,
+    zMvp: zed && won && mvp ? 1 : 0,
+    zSolo: zed && won && squad === 1 ? 1 : 0,
+    goldRuns: gold ? 1 : 0,
+    goldWins: gold && won ? 1 : 0,
+    goldBags: gold ? p.gb ?? 0 : 0,
+    bestGold: gold ? p.gb ?? 0 : 0,
     wins: p.won ? 1 : 0,
     raids: 1,
-    extracts: out ? 1 : 0,
+    extracts: out && !side ? 1 : 0,
     kills: p.kills ?? 0,
     bestKills: p.kills ?? 0,
     bestMulti: p.bestMulti ?? 0,
     prestige: p.prestige ?? 0,
     firstBloods: p.firstBlood ? 1 : 0,
     secs: Math.max(0, Math.round((p.endedAt ?? 0) - (p.joinedAt ?? 0))),
-    bestReturn: out && p.stake > 0 ? Math.floor((100 * p.payout) / p.stake) : 0,
+    bestReturn: out && !side && p.stake > 0 ? Math.floor((100 * p.payout) / p.stake) : 0,
     golden: out && golden ? 1 : 0,
     lastExit: out && lastExit ? 1 : 0,
-    pacifist: out && !p.kills ? 1 : 0,
+    pacifist: out && !side && !p.kills ? 1 : 0,
   };
 }
 

@@ -49,7 +49,8 @@ export class Lobby {
     // one table per mode and stake
     this.rooms = new Map();
     this.roomArgs = { wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
-    for (const m of MODES) for (const stake of tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
+    // every mode at every stake level; zombies and the gold rush at their one flat entry
+    for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
     this.roundSeconds = roundSeconds;
   }
@@ -61,6 +62,7 @@ export class Lobby {
   // A table at a stake of your own ($0.10 to $10,000 in whole cents): made when someone
   // sits down, removed again once it stands empty.
   roomFor(mode, stake) {
+    if (MODE[mode]?.fixed) stake = MODE[mode].fixed;
     const id = `${MODE[mode] ? mode : 'raid'}:${stake}`;
     if (this.rooms.has(id)) return this.rooms.get(id);
     if (!Number.isInteger(stake) || stake < CUSTOM_MIN || stake > CUSTOM_MAX || stake % 10) return null;
@@ -210,14 +212,14 @@ export class Lobby {
         if (!this.practice) return;
         for (const r of this.rooms.values()) {
           if (['easy', 'normal', 'hard'].includes(msg.difficulty)) r.difficulty = msg.difficulty;
-          if (MODE[r.mode].kind === 'team' || r.mode === 'duel') continue; // fixed line-ups
+          if (MODE[r.mode].kind === 'team' || r.mode === 'duel' || r.noBots) continue; // fixed line-ups
           const n = Math.round(Number(msg.runners));
           if (n >= 2 && n <= 20) {
             r.botFill = n;
             if (r.state === 'prep') r.openPrep(); // re-roll the lineup
           }
           const secs = Math.round(Number(msg.seconds));
-          if (secs >= 60 && secs <= 600) r.roundSeconds = secs;
+          if (secs >= 60 && secs <= 600 && !MODE[r.mode].fixed) r.roundSeconds = secs; // the side modes keep their clock
         }
         return;
       case 'faucet':

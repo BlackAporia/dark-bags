@@ -56,11 +56,29 @@ export function rankOf(xp) {
 }
 
 // What a raid is worth. p is the world's player record at the end of their raid.
-export function raidXp(p, { practice = false } = {}) {
+// kind: the mode's kind. Zombies pay by the wave (each one worth more than the last), the
+// gold rush by the bag.
+export function raidXp(p, { practice = false, kind = 'raid' } = {}) {
   const parts = [];
   const add = (label, xp) => xp > 0 && parts.push({ label, xp: Math.round(xp) });
   const secs = Math.max(0, (p.endedAt ?? 0) - (p.joinedAt ?? 0));
   add('Raid', 40);
+  if (kind === 'zombie') {
+    const waves = Math.min(9, p.zWave ?? 0);
+    let wx = 0;
+    for (let n = 1; n <= waves; n++) wx += 25 + 12 * n;
+    add('Waves survived', wx);
+    add('Zombies', Math.min(500, (p.zk ?? 0) * 2));
+    if (p.bossKill) add('Boss slain', 300);
+    if (p.won) add('Run cleared', 500);
+    return finish(parts, practice);
+  }
+  if (kind === 'gold') {
+    add(`${p.kills} ${p.kills === 1 ? 'kill' : 'kills'}`, p.kills * 40);
+    add('Gold bags', Math.min(400, (p.gb ?? 0) * 10));
+    if (p.won) add('Victory', 200);
+    return finish(parts, practice);
+  }
   add(`${p.kills} ${p.kills === 1 ? 'kill' : 'kills'}`, p.kills * 50);
   add('Damage', (p.dmgDealt ?? 0) * 0.5);
   add('Time alive', Math.min(90, secs / 2));
@@ -75,6 +93,10 @@ export function raidXp(p, { practice = false } = {}) {
     add('Extracted', 120);
     add('Profit', Math.min(200, (60 * Math.max(0, p.payout - p.stake)) / Math.max(1, p.stake)));
   }
+  return finish(parts, practice);
+}
+
+function finish(parts, practice) {
   let total = parts.reduce((s, x) => s + x.xp, 0);
   if (practice) {
     const cut = Math.floor(total / 2);

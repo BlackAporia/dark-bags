@@ -15,6 +15,16 @@
 // hardcore: one hit and you're down; shop: in-match credits buy medkits, sentry
 // turrets and laser tripmines (Guns + Lasers, after the CS 1.6 CSDM mod); ranked: the
 // finish moves your season rating and may earn a bonus spin.
+//
+//   zombie  co-op survival on the graveyard map: alone or with up to three friends, hold
+//           out against ten waves of the dead coming from every side, the last one a boss.
+//           The entry is a flat fee; it pays XP (more for every wave survived),
+//           achievements and titles, not money. You pick your weapon before you go in.
+//   gold    gold rush on the mine map: bags of gold drop all over, grab more than anyone
+//           before the clock runs out. Random weapons, quick respawns. The one runner with
+//           the most bags takes the whole pot (minus the rake) as shop credit.
+//
+// fixed: the only stake the mode takes (mills); solo: one ready player can start it.
 export const MODES = [
   { id: 'raid', kind: 'raid', size: 10 },
   { id: 'br', kind: 'br', size: 20 },
@@ -32,6 +42,11 @@ export const MODES = [
   { id: 'team8', kind: 'team', size: 16, teamSize: 8 },
   // ranked: a battle royale that also moves your season rating (ranked.js)
   { id: 'ranked', kind: 'br', size: 10, ranked: true },
+  { id: 'zombies', kind: 'zombie', size: 4, seconds: 480, fixed: 100, solo: true, pick: true },
+  { id: 'gold', kind: 'gold', size: 8, seconds: 150, fixed: 100 },
 ];
 export const MODE = Object.fromEntries(MODES.map((m) => [m.id, m]));
 export const isPotMode = (m) => !!m && m.kind !== 'raid';
+
+// weapons a zombie hunter may take in (everything with a magazine, and the knife for the brave)
+export const ZOMBIE_WEAPONS = ['knife', 'pistol', 'deagle', 'shotgun', 'autoshotgun', 'smg', 'pdw', 'rifle', 'carbine', 'scout', 'lmg', 'magnum', 'sniper'];
