@@ -986,4 +986,6 @@ export default {
   'res.practiceNoXp': "Practice is free: no XP or rewards. Play online to rank up.",
   'online.only': "Online only. Practice is free, so it doesn't count toward the battle pass or the ranked table. Switch to Online on the Play page.",
   'err.online_only': "This works in online play only",
+  'tour.skip': "Skip tutorial",
+  'tour.skipped': "Tutorial skipped. You can call Nyx again in Settings.",
 };

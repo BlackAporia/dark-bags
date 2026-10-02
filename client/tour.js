@@ -72,7 +72,7 @@ const FLOW = [
 
 const SEEN = 'darkbags.tour.seen'; // who has had the tour on this device: 'device', wallet addresses
 
-export function createTour({ app, go, practice, touch = () => false, sfx = null, game = null, pickRaid = () => {}, tune = () => {} }) {
+export function createTour({ app, go, practice, touch = () => false, sfx = null, game = null, pickRaid = () => {}, tune = () => {}, toast = null }) {
   let el = null;
   let nyx = null;
   let steps = [];
@@ -219,6 +219,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
           <p class="tour-move" id="tour-move" hidden>👆 ${t('tour.yourMove')}</p>
           <div class="tour-dots" id="tour-dots" aria-hidden="true"></div>
           <div class="tour-actions">
+            <button type="button" class="ghost tour-skip" id="tour-skip">${t('tour.skip')}</button>
             <span class="tour-grow"></span>
             <button type="button" class="cta" id="tour-next">${t('tour.next')}</button>
           </div>
@@ -234,6 +235,7 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     });
     $('tour-nyx').addEventListener('click', () => say(steps[i].key, { show: (k) => subtitle(el, k) }));
     $('tour-voice').addEventListener('click', toggleVoice);
+    $('tour-skip').addEventListener('click', skip);
     paintVoice();
     addEventListener('resize', place);
   }
@@ -472,6 +474,12 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     document.body.classList.remove('touring', 'tour-raid-only');
   }
 
+  // the player knows the game already: stop here, unlock everything (Settings can call her again)
+  function skip() {
+    end();
+    toast?.(t('tour.skipped'));
+  }
+
   // the end of the tour: everything unlocks
   function end() {
     active = false;
@@ -488,13 +496,14 @@ export function createTour({ app, go, practice, touch = () => false, sfx = null,
     if (dock) return;
     dock = document.createElement('div');
     dock.className = 'nyx-dock';
-    dock.innerHTML = `<div class="nyx-face" id="nyx-face"></div><div class="nyx-says"><p class="nyx-who"><b>NYX</b><button type="button" class="tour-voice" title="${t('tour.voice')}"></button></p><p class="nyx-en"></p><p class="nyx-tr" hidden></p></div>`;
+    dock.innerHTML = `<div class="nyx-face" id="nyx-face"></div><div class="nyx-says"><p class="nyx-who"><b>NYX</b><button type="button" class="tour-voice" title="${t('tour.voice')}"></button><button type="button" class="tour-skip dock-skip">${t('tour.skip')}</button></p><p class="nyx-en"></p><p class="nyx-tr" hidden></p></div>`;
     document.body.append(dock);
     document.body.classList.add('nyx-on');
     const face = createNyx(dock.querySelector('#nyx-face'));
     mouthOf = face;
     dock._face = face;
     dock.querySelector('.tour-voice').addEventListener('click', toggleVoice);
+    dock.querySelector('.tour-skip').addEventListener('click', skip);
     paintVoice();
     raid = { said: new Set(), t0: performance.now(), bag0: null, k0: null };
     preload(['hurt', 'storm', 'exit', 'extracting', 'retry', 'resultWon']);

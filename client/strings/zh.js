@@ -978,4 +978,6 @@ export default {
   'res.practiceNoXp': "练习免费：不获得经验和奖励。联网游戏才能升级。",
   'online.only': "仅限联网。练习免费，不计入通行证和排位。请在「开始」页面切换到联网。",
   'err.online_only': "仅在联网时可用",
+  'tour.skip': "跳过教程",
+  'tour.skipped': "已跳过教程。可在设置中再次召唤 Nyx。",
 };

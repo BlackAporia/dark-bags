@@ -179,6 +179,7 @@ const settingsUi = createSettingsUi();
 const tour = createTour({
   app,
   go: (p) => go(p),
+  toast: (m) => toast(m),
   touch: () => input.touchOn,
   sfx,
   game,

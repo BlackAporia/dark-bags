@@ -978,4 +978,6 @@ export default {
   'res.practiceNoXp': "L'entraînement est gratuit : ni XP ni récompenses. Joue en ligne pour monter en rang.",
   'online.only': "En ligne uniquement. L'entraînement est gratuit, il ne compte ni pour la passe ni pour le classement. Passe en ligne sur la page Jouer.",
   'err.online_only': "Ça ne marche qu'en ligne",
+  'tour.skip': "Passer le tutoriel",
+  'tour.skipped': "Tutoriel passé. Tu peux rappeler Nyx dans les Réglages.",
 };

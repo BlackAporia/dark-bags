@@ -1669,6 +1669,7 @@ body.touch-on .pause-keys { display: none; }
 .tour-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tour-actions .tour-grow { flex: 1; }
 .tour-actions .cta, .tour-actions .ghost { padding: 10px 18px; }
+.tour-actions .tour-skip { padding: 8px 12px; font-size: 13px; opacity: 0.85; }
 .tour-skip { color: var(--dust); }
 /* Nyx: breathing, blinking */
 .nyx-svg .nx-body { animation: nx-breathe 4.2s ease-in-out infinite; transform-origin: 120px 300px; }
