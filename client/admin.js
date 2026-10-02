@@ -376,6 +376,7 @@ function sys() {
     ${tile('Рефкодів', num(D.referrals.codes))}
     ${tile('Зависання сервера', `<span class="${(D.stalls ?? []).some((x) => x.ms > 500) ? 'bad' : (D.stalls ?? []).length ? 'warn' : 'ok'}">${num((D.stalls ?? []).length)}</span>`, 'паузи понад 150 мс з запуску')}
   </div></section>
+  ${D.regions ? `<section>${card('Регіони', table(['Регіон', 'Адреса', '>У грі зараз ($)'], D.regions.list.map((r) => `<tr><td>${esc(r.id.toUpperCase())}</td><td class="mono">${esc(r.url ?? 'головний сервер')}</td><td class="r">${r.url ? usd(D.regions.pots[r.id]?.mills ?? 0) : '—'}</td></tr>`)) + `<p class="note">Незакритих квитків на ставку: ${num(D.regions.pending)}</p>`)}</section>` : ''}
   <section>${card('Помилки в браузерах гравців', table(['Коли', 'Гравець', 'Де', 'Режим', 'Помилка'], (D.clientErrors ?? []).map((x) => `<tr><td>${dt(x.at)}</td><td>${esc(x.name)}</td><td>${esc(x.where)}</td><td>${esc(x.mode ?? 'лобі')}</td><td title="${esc(x.st + '\n' + x.ua)}" style="white-space:normal;max-width:520px">${esc(x.m)}</td></tr>`)))}</section>
   <section>${card('Зависання сервера (гра стоїть у всіх)', table(['Коли', '>Тривалість', 'Що працювало'], (D.stalls ?? []).map((x) => `<tr><td>${dt(x.at)}</td><td class="r ${x.ms > 500 ? 'bad' : 'warn'}">${num(x.ms)} мс</td><td>${esc(x.during.join(', ') || 'невідомо')}</td></tr>`)))}</section>`;
 }

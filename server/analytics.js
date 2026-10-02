@@ -22,7 +22,7 @@ export function adminSet(env = process.env) {
   return new Set((list.length ? list : DEFAULT_ADMINS).map(norm).filter(Boolean));
 }
 
-export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inventory, social, referrals, mail, fortune, guard, network = 'test', stalls = [], env = process.env, now = () => Date.now(), startedAt = Date.now() }) {
+export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inventory, social, referrals, mail, fortune, guard, network = 'test', stalls = [], regions = null, env = process.env, now = () => Date.now(), startedAt = Date.now() }) {
   const admins = adminSet(env);
   const isAdmin = (account) => !!account && admins.has(norm(account));
   const prices = lobby.prices;
@@ -210,6 +210,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       onchain,
       days: Object.values(series),
       stalls: stalls.slice(0, 30),
+      regions: regions ? { list: regions.list(), pots: Object.fromEntries(Object.entries(regions.pots()).map(([r, m]) => [r, basket(m)])), pending: regions.pending() } : null,
       clientErrors: lobby.clientErrors?.slice(0, 30) ?? [],
     };
   }

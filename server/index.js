@@ -21,6 +21,9 @@ import { FortuneBook } from '../shared/fortune.js';
 import { StatsBook } from '../shared/stats.js';
 import { createAnalytics, adminSet } from './analytics.js';
 import { track, note, stalls, watchStalls } from './stall.js';
+import { createRegionMain, createRegionEdge, parseRegions, journaled } from './regions.js';
+import { MODE } from '../shared/modes.js';
+import { CUSTOM_MIN, CUSTOM_MAX } from '../shared/lobby.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -30,7 +33,17 @@ const PREP_SECONDS = Number(process.env.PREP_SECONDS || CFG.PREP_SECONDS);
 const BOTS = false;
 // with a data volume (/data on Railway) everything is kept there by default; the locker (skins
 // and shop $ bought with real money) gets one file per network so test and real never mix
-const DATA = existsSync('/data') ? '/data' : '';
+// Regions (server/regions.js). ROLE=region: a match server near the players, for the main
+// server at MAIN_URL; it keeps no money and no records of its own. The main server lists its
+// match servers in REGIONS=us=https://…,asia=https://…; both share REGION_SECRET.
+const EDGE = process.env.ROLE === 'region';
+const REGION_SECRET = process.env.REGION_SECRET || '';
+if (EDGE && (REGION_SECRET.length < 32 || !process.env.MAIN_URL)) {
+  console.error('ROLE=region needs MAIN_URL and REGION_SECRET (32+ characters, the same as on the main server).');
+  process.exit(1);
+}
+const DATA = !EDGE && existsSync('/data') ? '/data' : '';
+const OUTBOX_FILE = EDGE && existsSync('/data') ? '/data/region-outbox.json' : '';
 const NET = process.env.CHAIN && process.env.CHAIN !== 'off' ? process.env.CHAIN : 'test';
 const WALLET_FILE = process.env.WALLET_FILE || '';
 const RANKS_FILE = process.env.RANKS_FILE || (DATA ? `${DATA}/${NET}-ranks.json` : '');
@@ -92,13 +105,18 @@ watchStalls();
 
 // ------------------------------------------------------------------ wallet
 // CHAIN=sepolia|mainnet: real tokens through the cashier (server/cashier). Otherwise test tokens.
-const real = await createCashier().catch((e) => {
-  console.error(`cashier failed to start: ${e?.message ?? e}`);
-  process.exit(1);
-});
+if (EDGE && process.env.CHAIN && process.env.CHAIN !== 'off') console.warn('ROLE=region: CHAIN is ignored, money stays on the main server');
+const real = EDGE
+  ? null
+  : await createCashier().catch((e) => {
+      console.error(`cashier failed to start: ${e?.message ?? e}`);
+      process.exit(1);
+    });
 let saveTimer = null;
 const initial = WALLET_FILE && existsSync(WALLET_FILE) ? JSON.parse(readFileSync(WALLET_FILE, 'utf8')) : {};
 const wallet = new MemoryWallet({
+  // a match server holds only the stakes the main server took (no test faucet)
+  ...(EDGE ? { faucet: [] } : {}),
   data: initial,
   onChange: (w) => {
     if (!WALLET_FILE || saveTimer) return;
@@ -248,19 +266,23 @@ const send = (cid, msg) => {
   if (msg.t === 'snap' && s.ws.bufferedAmount > 48 * 1024) return;
   s.ws.send(JSON.stringify(msg));
 };
+// a match server journals what its matches write to these books, for the main server to replay
+const journal = [];
+const J = (name, book) => (EDGE ? journaled(name, book, journal) : book);
 const lobby = new Lobby({
-  stats,
+  edge: EDGE,
+  stats: J('stats', stats),
   isAdmin: (account) => admins.has(norm64(account)),
   wallet,
   cashier: real?.cashier ?? null,
   // in-game swaps: always with test tokens and on Sepolia; on mainnet only when the house
   // rebalances on chain (SWAP_INTERNAL=1). SWAP_INTERNAL=0 turns them off anywhere.
   swap: process.env.SWAP_INTERNAL === '0' ? false : !real || real.cfg.network === 'sepolia' || process.env.SWAP_INTERNAL === '1',
-  ranks,
-  inventory,
+  ranks: J('ranks', ranks),
+  inventory: J('inventory', inventory),
   social,
-  referrals,
-  guard,
+  referrals: J('referrals', referrals),
+  guard: J('guard', guard),
   mail,
   fortune,
   coins: real ? { list: () => real.catalog.list(), import: (a) => real.importToken(a) } : null,
@@ -281,7 +303,35 @@ if (real) {
   const refresh = real.feed.refresh.bind(real.feed);
   real.feed.refresh = () => track('price feed', refresh);
 }
-const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls });
+// ----------------------------------------------------------------- regions
+const regionList = parseRegions(process.env.REGIONS);
+const regionMain = !EDGE && REGION_SECRET.length >= 32 && regionList.length ? createRegionMain({ lobby, secret: REGION_SECRET, regions: regionList, self: process.env.REGION || 'eu', file: DATA ? `${DATA}/${NET}-regions.json` : '' }) : null;
+if (!EDGE && regionList.length && !regionMain) console.warn('REGIONS is set but REGION_SECRET is missing or shorter than 32 characters: regional tables are off');
+if (regionMain) {
+  console.log(`regions: main (${regionMain.self}) with ${regionList.map((r) => `${r.id} ${r.url}`).join(', ')}`);
+  lobby.regionList = () => regionMain.list();
+  lobby.regionOp = (cid, s, msg) => {
+    const key = lobby.key(s);
+    const err = (m) => send(cid, { t: 'err', code: 'region', msg: m });
+    if (!key) return err('Sign in first.');
+    const region = String(msg.region ?? '');
+    const url = regionMain.url(region);
+    if (!url) return err('Unknown region.');
+    if (msg.t === 'edge_ticket') return send(cid, { t: 'edge_ticket', region, url, ticket: regionMain.entryTicket(key, region, s.name) });
+    const m = MODE[msg.mode];
+    if (!m) return err('Unknown mode.');
+    const mills = m.fixed ?? Number(msg.stake);
+    if (!Number.isInteger(mills) || mills < CUSTOM_MIN || mills > CUSTOM_MAX || mills % 10) return err('That stake is not available.');
+    if (s.busy) return err('One moment.');
+    const r = regionMain.stakeTicket(key, region, { asset: String(msg.asset ?? ''), mills });
+    if (r.error) return err(r.error);
+    send(cid, { t: 'stake_ticket', region, ticket: r.ticket, balances: lobby.balances(s) });
+  };
+}
+const regionEdge = EDGE ? createRegionEdge({ lobby, secret: REGION_SECRET, region: process.env.REGION || 'region', mainUrl: process.env.MAIN_URL.replace(/\/+$/, ''), journal, file: OUTBOX_FILE }) : null;
+if (regionEdge) console.log(`regions: match server ${process.env.REGION || 'region'} for ${process.env.MAIN_URL}`);
+
+const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain });
 
 // ------------------------------------------------------------------ static
 const MIME = {
@@ -383,6 +433,15 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  // a match server's report (regions)
+  if (pathOnly === '/api/region/report' && req.method === 'POST') {
+    if (!regionMain) return void res.writeHead(404).end();
+    regionMain.handle(req, res).catch((e) => {
+      console.error('region report failed', e);
+      if (!res.headersSent) res.writeHead(500).end();
+    });
+    return;
+  }
   // bridges in and out of Starknet (NEAR Intents 1Click), for signed-in players on a real chain
   if (pathOnly.startsWith('/api/bridge/')) {
     if (!bridge) return void res.writeHead(404, { 'content-type': 'application/json' }).end('{"error":"bridge off"}');
@@ -415,6 +474,17 @@ let nextCid = 1;
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 const ipOf = (req) => (TRUST_PROXY ? String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim() : '') || req.socket.remoteAddress || '';
 
+// a match server answers only what a raid needs; the rest lives on the main server
+const EDGE_MSGS = new Set(['join', 'unready', 'start', 'leave', 'in', 'watch', 'buy', 'upgrade', 'bluff', 'pick', 'probe', 'ping', 'cerr']);
+function edgeHandle(cid, msg) {
+  if (!msg || typeof msg.t !== 'string') return;
+  if (msg.t === 'hello') return regionEdge.admit(cid, msg);
+  if (msg.t === 'ready') return regionEdge.ready(cid, msg);
+  if (!EDGE_MSGS.has(msg.t)) return;
+  if (msg.t === 'join' && !lobby.sessions.get(cid)?.token) return;
+  lobby.handle(cid, msg);
+}
+
 wss.on('connection', (ws, req) => {
   const ip = ipOf(req);
   const net = guard.net(ip);
@@ -445,7 +515,7 @@ wss.on('connection', (ws, req) => {
       return;
     }
     const t0 = performance.now();
-    track(`msg ${String(msg?.t).slice(0, 20)}`, () => lobby.handle(cid, msg));
+    track(`msg ${String(msg?.t).slice(0, 20)}`, () => (EDGE ? edgeHandle(cid, msg) : lobby.handle(cid, msg)));
     const took = performance.now() - t0;
     if (took > 50) note(`msg ${String(msg?.t).slice(0, 20)}`, took);
   });
@@ -498,6 +568,8 @@ const shutdown = async () => {
   // stakes on the tables come back before anything is saved (the cashier journal is flushed below)
   const refunds = lobby.abortAll();
   if (refunds.length) console.warn(`shutdown: refunded ${refunds.length} stake(s) still on the tables`);
+  // a match server sends the refunds home before it goes
+  if (regionEdge) await regionEdge.flush().catch(() => {});
   await new Promise((r) => setTimeout(r, 300)); // let the notices reach the players
   if (RANKS_FILE) await saveJSON(RANKS_FILE, ranks.toJSON()).catch(() => {});
   if (LOCKER_FILE) await saveJSON(LOCKER_FILE, inventory.toJSON()).catch(() => {});

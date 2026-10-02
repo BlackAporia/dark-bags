@@ -8,6 +8,7 @@ import { Input } from './input.js';
 import { Sfx } from './sfx.js';
 import { GameClient, Attract, fmt, mmss, esc, reportError } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
+import { createRegions } from './region.js';
 import { store } from './store.js';
 import { PriceBook, formatUnits, usdText } from '../shared/assets.js';
 import { createCashierUi } from './cashier.js';
@@ -152,7 +153,12 @@ Object.defineProperty(app, 'stake', {
   },
   enumerable: true,
 });
-const send = (m) => app.transport?.send(m);
+// a table in another region plays on that region's match server (client/region.js)
+const send = (m) => {
+  if (regions.route(m)) return;
+  app.transport?.send(m);
+};
+const regions = createRegions({ app, mainSend: (m) => app.transport?.send(m), onMessage: (m) => onMessage(m), toast: (x) => toast(x), deviceId });
 globalThis.__darkbagsSend = send;
 addEventListener('error', (e) => reportError('script', e.error ?? e.message));
 addEventListener('unhandledrejection', (e) => reportError('promise', e.reason));
@@ -472,6 +478,7 @@ function renderStarter() {
 
 function renderLobby() {
   renderStarter();
+  regions.render();
   const onlineBtn = $('mode-online');
   onlineBtn.disabled = !SERVER;
   onlineBtn.title = SERVER ? '' : 'No game server configured for this build';
@@ -859,6 +866,7 @@ function renderZPick(show, current) {
 // ------------------------------------------------------------- transport
 function setMode(mode) {
   if (mode === 'online' && !SERVER) mode = 'practice';
+  regions.closeEdge();
   if (app.transport) app.transport.close();
   app.mode = mode;
   app.tables = [];
@@ -905,9 +913,10 @@ function onMessage(m) {
   // ping probe: echo the server's stamp straight back, before anything else
   if (m.t === 'probe') return send({ t: 'probe', s: m.s });
   if (m.t === 'ping') {
-    app.ping = m.ms;
+    if (!regions.inEdge()) app.ping = m.ms; // at a table abroad, the match server's ping counts
     return;
   }
+  if (regions.onMain(m)) return;
   if (m.t !== 'locker') handleMessage(m);
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);

@@ -22,7 +22,7 @@ import { FortuneBook, FORTUNE } from './fortune.js';
  *   auth_privy {token} → authed {account, privy: {walletId, publicKey}}
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
-const PAUSABLE = new Set(['ready', 'box', 'topup', 'swap']);
+const PAUSABLE = new Set(['ready', 'stake_ticket', 'box', 'topup', 'swap']);
 const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite', 'guild_invite']);
 
 export const CUSTOM_MIN = 100; // $0.10 (stakes are in thousandths of a dollar)
@@ -32,10 +32,13 @@ export const CUSTOM_MAX = 10_000_000; // $10,000
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
+    this.edge = edge; // a regional match server (server/regions.js)
+    this.regionOp = null; // main server: entry and stake tickets for regional tables
+    this.regionList = null; // main server: () => [{ id, url }]
     this.isAdmin = isAdmin; // (account) => may open the analytics page
     this.referrals = referrals; // invite codes, who brought whom, the inviters' earnings
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
@@ -63,7 +66,7 @@ export class Lobby {
     this.mail = mail;
     this.fortune = fortune;
     this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
-    this.roomArgs = { stats, wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    this.roomArgs = { edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
@@ -170,6 +173,7 @@ export class Lobby {
         social: this.socialSummary(s),
         mail: this.key(s) ? this.mail.unread(this.key(s)) : 0,
         account: s.account,
+        regions: this.regionList?.() ?? null,
         admin: !!s.account && this.isAdmin(s.account),
         privy: this.cashier?.privyFor(s.token) ?? null,
         cfg: {
@@ -201,6 +205,10 @@ export class Lobby {
         this.send(cid, { t: 'ping', ms: s.ping });
         break;
       }
+      case 'edge_ticket':
+      case 'stake_ticket':
+        if (this.regionOp) this.regionOp(cid, s, msg);
+        return;
       case 'cerr': {
         // a frame or script error on a player's device (see client reportError): kept for the team
         s.cerrs = (s.cerrs ?? 0) + 1;
@@ -830,6 +838,16 @@ export class Lobby {
   }
 
   // periodic refresh for people browsing tables
+  // after a regional match settled on this server: the player's new balance, career and locker
+  refreshPlayer(key) {
+    for (const cid of this.sessionsOf(key)) {
+      const s = this.sessions.get(cid);
+      this.send(cid, { t: 'balance', balances: this.balances(s) });
+      this.send(cid, { t: 'career', career: this.ranks.career(key) });
+      this.send(cid, { t: 'locker', op: 'sync', locker: this.inventory.view(key) });
+    }
+  }
+
   // A restart is coming: give back every stake still on a table and tell everyone.
   abortAll() {
     const refunds = [];
