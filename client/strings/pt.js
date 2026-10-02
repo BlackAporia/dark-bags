@@ -975,4 +975,7 @@ export default {
   'err.guard_seat': "Outra conta da sua rede ou dispositivo já está nesta mesa",
   'err.guard_new': "Contas novas demais da sua rede hoje. Volte amanhã",
   'err.guard_faucet': "Sua rede já recebeu os tokens de teste de hoje",
+  'res.practiceNoXp': "O treino é grátis: sem XP nem recompensas. Jogue online para subir de rank.",
+  'online.only': "Só online. O treino é grátis, então não conta para o passe nem para o ranking. Mude para Online na página Jogar.",
+  'err.online_only': "Isso só funciona online",
 };

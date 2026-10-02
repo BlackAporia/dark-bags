@@ -219,7 +219,7 @@ test('a rank-up pays only a 72h trial outfit, which expires', () => {
 test('the lobby sells in $ (play balance, or USDC/USDT), and rank-ups arrive with the result', () => {
   const out = [];
   const wallet = new MemoryWallet();
-  const lobby = new Lobby({ wallet, send: (cid, m) => out.push(m), newToken: () => 'tok00001', bots: false, prepSeconds: 1, practice: true });
+  const lobby = new Lobby({ wallet, send: (cid, m) => out.push(m), newToken: () => 'tok00001', bots: false, prepSeconds: 1 });
   const last = (t) => out.filter((m) => m.t === t).at(-1);
   lobby.connect(1);
   lobby.handle(1, { t: 'hello', name: 'me' });

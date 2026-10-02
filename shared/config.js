@@ -2,6 +2,9 @@
 // Everything gameplay-relevant lives here so balancing is one-file work.
 
 export const CFG = {
+  // the data epoch: bump it to start every player over (server archives its game files, browsers
+  // forget their local progress). Real-money deposits (the cashier journal) are never touched.
+  EPOCH: '2026-10-04',
   // simulation
   TICK_RATE: 30,          // server ticks per second
   SNAP_EVERY: 2,          // send a snapshot every N ticks (15 Hz)

@@ -204,7 +204,8 @@ export class Lobby {
         return;
       }
       case 'leaderboard': {
-        // the season's ranked table: top 100, and where you stand
+        // the season's ranked table: top 100, and where you stand (online only)
+        if (this.practice) return this.send(cid, { t: 'leaderboard', rows: [], me: null, total: 0, offline: true });
         const k = this.key(s);
         const all = this.ranks.leaderboard(Date.now(), 100000);
         const rows = all.slice(0, 100).map((r, i) => ({ pos: i + 1, n: this.social.get(r.key)?.name ?? 'runner', rk: this.ranks.get(r.key).rank, nt: this.ranks.neon(r.key), rp: r.rp, div: r.div, games: r.games, wins: r.wins, top3: r.top3, kills: r.kills, me: r.key === k }));
@@ -254,6 +255,8 @@ export class Lobby {
       case 'tequip':
       case 'pass_buy':
       case 'pass_claim':
+        // the battle pass is online only: practice is free and must not fill or pay it
+        if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'The battle pass works in online play only.' });
         this.lockerOp(cid, s, msg);
         return;
       case 'ref_info':
@@ -290,6 +293,8 @@ export class Lobby {
           s.name = cleanName(msg.name);
           this.social.touch(this.key(s), s.name);
         }
+        // ranked is online only
+        if (this.practice && MODE[msg.mode]?.ranked) return this.send(cid, { t: 'err', code: 'online_only', msg: 'Ranked works in online play only.' });
         const room = this.roomFor(msg.mode, Number(msg.stake));
         if (!room) return;
         if (!this.key(s)) {

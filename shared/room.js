@@ -479,7 +479,8 @@ export class RoomCore {
         if (bonus?.to && !this.guard?.flagged(c.token)) this.inventory.give(bonus.to, { k: 'box', id: 'vault' });
       }
       // career rank: every raid pays, win or lose
-      const earned = raidXp(p, { practice: this.practice, kind: MODE[this.mode].kind });
+      // practice pays nothing: no XP, ranks, achievements, pass or bags (it is free, so it must not farm)
+      const earned = this.practice ? { total: 0, parts: [] } : raidXp(p, { kind: MODE[this.mode].kind });
       // achievements: career counters, each completed one pays its XP once
       const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit, mode: MODE[this.mode], squad: w.players.size, mvp: w.zombie && p.won && [...w.players.values()].every((q) => q === p || (q.zk ?? 0) < (p.zk ?? 0)), goldWin: w.goldRush && !!p.won });
       // ranked: the finish moves the season rating, and may earn a bonus spin
@@ -494,22 +495,22 @@ export class RoomCore {
         stats.bestDiv = DIVISIONS.findIndex((d) => d.id === ranked.div);
       }
       const lv = this.inventory.view(c.token);
-      const done = this.ranks.progress(c.token, { ...stats, outfits: lv.owned.length, wskins: lv.wowned.length, opened: lv.opened, passTier: lv.pass?.tier ?? 0, stitles: this.ranks.seasonTitles(c.token).length });
+      const done = this.practice ? [] : this.ranks.progress(c.token, { ...stats, outfits: lv.owned.length, wskins: lv.wowned.length, opened: lv.opened, passTier: lv.pass?.tier ?? 0, stitles: this.ranks.seasonTitles(c.token).length });
       for (const a of done) if (a.xp) earned.parts.push({ label: 'Achievement', ach: a.id, xp: a.xp });
       earned.total += done.reduce((s, a) => s + a.xp, 0);
       // a season title in neon adds its bonus to everything earned, while its season lasts
-      const bonus = titleBonus(this.ranks.neon(c.token));
+      const bonus = this.practice ? 0 : titleBonus(this.ranks.neon(c.token));
       if (bonus > 0 && earned.total > 0) {
         const extra = Math.round(earned.total * bonus);
         earned.parts.push({ label: 'Season title', xp: extra });
         earned.total += extra;
       }
       const { before, after } = this.ranks.add(c.token, earned.total);
-      done.push(...this.ranks.progress(c.token, { rank: after.rank }));
+      if (!this.practice) done.push(...this.ranks.progress(c.token, { rank: after.rank }));
       // every rank gained pays a luck bag, $ credit and a 72h trial outfit
-      const rewards = this.inventory.rankUp(c.token, before.rank, after.rank);
+      const rewards = this.practice ? [] : this.inventory.rankUp(c.token, before.rank, after.rank);
       // the season's battle pass fills with the same XP
-      const pass = this.inventory.passXp(c.token, earned.total);
+      const pass = this.practice ? null : this.inventory.passXp(c.token, earned.total);
       this.send(c.cid, {
         t: 'result',
         rewards,

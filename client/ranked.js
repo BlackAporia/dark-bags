@@ -7,6 +7,9 @@ import { boxArt, weaponStill } from './locker.js';
 import { spinReel } from './reel.js';
 import { esc } from './game.js';
 import { t } from './i18n.js';
+
+// a page that only exists in online play
+const onlineOnly = (title) => `<div class="ref-card online-only"><h2 class="ref-title">${t(title)}</h2><p class="muted">${t('online.only')}</p></div>`;
 import { settings } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -32,6 +35,7 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {} }) 
   function render() {
     const root = $('ranked-root');
     if (!root) return;
+    if (app.mode === 'practice') return (root.innerHTML = onlineOnly('nav.ranked'));
     if (!board) send({ t: 'leaderboard' });
     const S = seasonInfo(seasonAt().id);
     const me = board?.me ?? app.career?.ranked ?? null;

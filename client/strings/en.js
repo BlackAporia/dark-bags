@@ -983,4 +983,7 @@ export default {
   'err.guard_seat': "Another account from your network or device is already at this table",
   'err.guard_new': "Too many new accounts from your network today. Come back tomorrow",
   'err.guard_faucet': "Your network had its test tokens for today",
+  'res.practiceNoXp': "Practice is free: no XP or rewards. Play online to rank up.",
+  'online.only': "Online only. Practice is free, so it doesn't count toward the battle pass or the ranked table. Switch to Online on the Play page.",
+  'err.online_only': "This works in online play only",
 };

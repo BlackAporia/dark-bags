@@ -118,7 +118,7 @@ test('practice is survivable: an idle human lasts longer than online', () => {
   assert.ok(easy > hard, `practice ${easy.toFixed(1)}s vs online ${hard.toFixed(1)}s`);
 });
 
-test('the room pays rank XP with the result and shows ranks in the lineup', () => {
+test('practice shows ranks in the lineup but pays no XP or rewards', () => {
   const out = [];
   const ranks = new RankBook();
   const wallet = new MemoryWallet();
@@ -134,10 +134,12 @@ test('the room pays rank XP with the result and shows ranks in the lineup', () =
   room.world.kill(me, null, 'storm');
   room.tick();
   const res = out.find((m) => m.t === 'result');
-  assert.ok(res.rank.gained > 0);
-  assert.equal(res.rank.after.xp, res.rank.gained);
-  assert.equal(ranks.get('tok').xp, res.rank.gained);
-  assert.ok(res.rank.parts.some((p) => p.label === 'Practice ×0.5'));
+  // practice is free, so it pays nothing: no XP, ranks, achievements, pass or bags
+  assert.equal(res.rank.gained, 0);
+  assert.equal(ranks.get('tok').xp, 0);
+  assert.deepEqual(res.rewards, []);
+  assert.deepEqual(res.achievements, []);
+  assert.equal(res.pass, null);
   room.handle(1, { t: 'watch', d: 0 }); // done watching
   room.tick();
   assert.equal(room.world.phase, 'ended');

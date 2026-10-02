@@ -105,7 +105,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         el.innerHTML = `${icon}<span class="opt-name">${esc(w.name)}</span><span class="opt-sub">${w.installed ? 'installed' : 'get it'}</span>`;
         if (w.installed) {
           el.type = 'button';
-          el.addEventListener('click', () => signInWith(`extension:${w.name}`, () => cs.vendor.connectExtension(w)));
+          el.addEventListener('click', () => signInWith(`extension:${w.name}`, () => cs.vendor.connectExtension(w, cs.chain)));
         } else if (w.download) {
           el.href = w.download;
           el.target = '_blank';
@@ -203,7 +203,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       const name = (cs.kind ?? '').replace(/^extension:/, '');
       const w = v.listWallets().find((x) => x.installed && x.name === name) ?? v.listWallets().find((x) => x.installed);
       if (!w) throw new Error('No wallet found. Sign in again.');
-      f = await v.connectExtension(w);
+      f = await v.connectExtension(w, cs.chain);
     }
     if (norm(f.address) !== cs.account) throw new Error(`The wallet is on ${short(f.address)}, not ${short(cs.account)}. Switch accounts or sign in again.`);
     cs.facade = f;
