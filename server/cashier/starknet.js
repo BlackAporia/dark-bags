@@ -126,6 +126,17 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       return { tx: tx.hash };
     },
 
+    // a coin from the AVNU / Ekubo lists joins the table tokens (deposits, prices, stakes, cash-outs)
+    addToken({ address, symbol, name, decimals }) {
+      const id = normAddr(address);
+      if (!id) return null;
+      if (byId.has(id)) return byId.get(id);
+      const t = { name: name || symbol, symbol, decimals, address: fromAddress(id), id, color: '#8d93a6', btc: /BTC/i.test(symbol), imported: true };
+      tokens.push(t);
+      byId.set(id, t);
+      return t;
+    },
+
     // a fortune jackpot straight from the fortune wallet to the winner's address
     ...(fortuneWallet
       ? {

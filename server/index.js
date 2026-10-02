@@ -220,6 +220,7 @@ const lobby = new Lobby({
   guard,
   mail,
   fortune,
+  coins: real ? { list: () => real.catalog.list(), import: (a) => real.importToken(a) } : null,
   send,
   bots: BOTS,
   minPlayers: 2,

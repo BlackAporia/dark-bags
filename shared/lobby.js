@@ -32,7 +32,7 @@ export const CUSTOM_MAX = 10_000_000; // $10,000
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ coins = null, fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.referrals = referrals; // invite codes, who brought whom, the inviters' earnings
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
@@ -59,6 +59,7 @@ export class Lobby {
     this.guard = guard;
     this.mail = mail;
     this.fortune = fortune;
+    this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
     this.roomArgs = { wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
@@ -271,6 +272,10 @@ export class Lobby {
       case 'spin':
         this.mailOp(cid, s, msg);
         return;
+      case 'coin_list':
+      case 'coin_import':
+        this.coinOp(cid, s, msg);
+        return;
       case 'fortune_info':
         return this.send(cid, { t: 'fortune', view: this.fortune.view() });
       case 'fortune_spin':
@@ -476,6 +481,29 @@ export class Lobby {
       }
     }
     this.send(cid, { t: 'fortune', spun: { slot, prize, paid: { asset, units: units.toString() }, ...(win ? { jackpot: win } : {}) }, view: this.fortune.view(), locker: this.inventory.view(key), balances: this.balances(s), mail: this.mail.unread(key) });
+  }
+
+  // Coins a player can bring to the table: the merged AVNU / Ekubo list, and importing one of them.
+  // An import is for everyone: the new coin shows up in every player's stake and cashier lists.
+  async coinOp(cid, s, msg) {
+    if (!this.coins || !this.cashier) return this.send(cid, { t: 'coins', off: true, list: [] });
+    try {
+      if (msg.t === 'coin_list') {
+        const have = new Set(this.cashier.chain.tokens.map((t) => t.id));
+        const list = (await this.coins.list()).map((t) => ({ ...t, added: have.has(t.address) }));
+        return this.send(cid, { t: 'coins', list });
+      }
+      if (!this.key(s)) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
+      if (!this.guard.allow('coin', this.key(s), 20)) return this.send(cid, { t: 'err', msg: 'Enough imports for today.' });
+      const r = await this.coins.import(String(msg.address ?? ''));
+      const info = { t: 'chain', chain: this.cashier.info(), assets: this.prices.list() };
+      if (r.fresh) {
+        for (const [c, x] of this.sessions) if (x.token) this.send(c, info);
+      } else this.send(cid, info);
+      this.send(cid, { t: 'coins', imported: { id: r.token.id, symbol: r.token.symbol, priced: this.prices.has(r.token.id) } });
+    } catch (e) {
+      this.send(cid, { t: 'err', msg: e?.user ? e.message : 'Could not import that coin. Try again in a minute.' });
+    }
   }
 
   // the bank in real coins: USDC if priced, else USDT, else STRK

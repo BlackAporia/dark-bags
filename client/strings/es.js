@@ -1078,4 +1078,12 @@ export default {
   'fw.title': "Ruleta de la fortuna",
   'fw.trial': "Aspecto de corredor 72 h",
   'fw.wtrial': "Aspecto de arma 72 h",
+  'coin.import': "Importar moneda",
+  'coin.search': "Buscar: símbolo, nombre o dirección",
+  'coin.added': "añadida",
+  'coin.add': "Añadir",
+  'coin.none': "No se encontró nada",
+  'coin.note': "Cualquier moneda de Starknet de la lista verificada de AVNU o de Ekubo. Una vez añadida, deposítala y apuesta como con cualquier otra; las ganancias vuelven en ella.",
+  'coin.done': "{s} añadida: deposítala y elígela para apostar.",
+  'coin.noPrice': "{s} añadida; su precio aparecerá en un minuto.",
 };

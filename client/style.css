@@ -2184,3 +2184,15 @@ body.gold-on #bag { color: #ffd166; }
 @media (max-width: 560px) {
   .fw-head { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------- import a coin */
+.asset.coin-add { border-style: dashed; opacity: 0.9; }
+.coin-pop { display: grid; gap: 8px; margin-top: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(10, 12, 18, 0.95); }
+.coin-pop[hidden] { display: none; }
+.coin-pop input { width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--paper); }
+.coin-rows { display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
+.coin-row { display: grid; grid-template-columns: 22px auto 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.coin-row img, .coin-dot { width: 22px; height: 22px; border-radius: 50%; background: #2a2f3d; }
+.coin-row .fine { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coin-row button { padding: 5px 10px; }
+.coin-ok { color: #4ade80; font-size: 12px; font-weight: 800; }

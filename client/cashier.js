@@ -524,6 +524,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         render();
         finishOAuth();
         return true;
+      case 'chain':
+        cs.chain = m.chain ?? cs.chain;
+        return false; // the app updates its prices too
       case 'auth_challenge':
         cs.waiter?.resolve(m.typedData);
         return true;

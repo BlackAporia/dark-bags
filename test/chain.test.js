@@ -145,3 +145,18 @@ test('the cashier takes the first Starknet node that answers on the right chain'
   const cfg = readConfig({ CHAIN: 'mainnet', RPC_FALLBACKS: 'https://a,https://b' });
   assert.deepEqual(cfg.rpcFallbacks, ['https://a', 'https://b', 'https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10']);
 });
+
+test('coin lists: AVNU and Ekubo shapes parse into one tidy list', async () => {
+  const { parseTokenList, createCatalog } = await import('../server/cashier/catalog.js');
+  const avnu = { content: [{ address: '0x4718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d', symbol: 'STRK', name: 'Starknet', decimals: 18, logoUri: 'https://x/strk.png', tags: ['Verified'] }, { address: 'bad', symbol: 'X', decimals: 18 }] };
+  const ekubo = [{ l2_token_address: '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d', symbol: 'STRK', name: 'Starknet Token', decimals: 18 }, { l2_token_address: '0x0123', symbol: 'MEME', name: 'Meme', decimals: 18, logo_url: null }];
+  assert.equal(parseTokenList(avnu).length, 1);
+  assert.equal(parseTokenList(ekubo).length, 2);
+  const fetchImpl = async (url) => ({ ok: true, json: async () => (url.includes('avnu') ? avnu : ekubo) });
+  const cat = createCatalog({ env: { AVNU_TOKENS_URL: 'https://avnu/x', EKUBO_TOKENS_URL: 'https://ekubo/x' }, fetchImpl, log: { warn() {} } });
+  const list = await cat.list();
+  assert.equal(list.length, 2);
+  assert.deepEqual(list[0].src, ['avnu', 'ekubo'], 'on both lists, first');
+  assert.equal((await cat.find('0x123')).symbol, 'MEME');
+  assert.equal(await cat.find('0x999'), null);
+});

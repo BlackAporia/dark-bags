@@ -1086,4 +1086,12 @@ export default {
   'fw.title': "Fortune wheel",
   'fw.trial': "72h runner skin",
   'fw.wtrial': "72h weapon skin",
+  'coin.import': "Import coin",
+  'coin.search': "Search: symbol, name or address",
+  'coin.added': "added",
+  'coin.add': "Add",
+  'coin.none': "Nothing found",
+  'coin.note': "Any Starknet coin on AVNU's verified list or Ekubo's list. Once added, deposit it and stake it like any other coin; winnings come back in it.",
+  'coin.done': "{s} added: deposit it and pick it for your stake.",
+  'coin.noPrice': "{s} added; its price shows up in a minute.",
 };

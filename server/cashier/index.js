@@ -9,6 +9,7 @@ import { readConfig } from './config.js';
 import { PriceFeed } from './prices.js';
 import { createStarknetChain } from './starknet.js';
 import { createPrivy, handlePrivySign } from './privy.js';
+import { createCatalog } from './catalog.js';
 
 const TRANSFER_SELECTOR = normAddr(hash.getSelectorFromName('transfer'));
 
@@ -22,11 +23,29 @@ export async function createCashier(env = process.env, log = console) {
   const chain = await createStarknetChain({ cfg, starkzap, log });
   const privy = await createPrivy({ cfg, starkzap, log });
   const prices = new PriceBook([]);
-  const usd = chain.tokens.find((t) => t.symbol.toUpperCase() === 'USDC') ?? null;
-  const feed = new PriceFeed({ tokens: chain.tokens, prices, quoter: chain.quote, usd, fixed: cfg.fixedPrices, log });
-
   // journal: debounced atomic writes, plus an immediate flush before any payout
   const data = cfg.file && existsSync(cfg.file) ? JSON.parse(readFileSync(cfg.file, 'utf8')) : {};
+  // coins players imported earlier come back before the price feed starts
+  for (const t of data.imported ?? []) chain.addToken(t);
+  const usd = chain.tokens.find((t) => t.symbol.toUpperCase() === 'USDC') ?? null;
+  const feed = new PriceFeed({ tokens: chain.tokens, prices, quoter: chain.quote, usd, fixed: cfg.fixedPrices, log });
+  const catalog = createCatalog({ network: cfg.network, env, log });
+  const MAX_TOKENS = Number(env.MAX_TOKENS || 80);
+
+  // bring a coin to the table: it must be on AVNU's verified list or Ekubo's list
+  async function importToken(address) {
+    const had = chain.tokens.find((t) => t.id === normAddr(address));
+    if (had) return { token: had, fresh: false };
+    if (chain.tokens.length >= MAX_TOKENS) throw Object.assign(new Error('The table takes no more coins for now.'), { user: true });
+    const entry = await catalog.find(address);
+    if (!entry) throw Object.assign(new Error('That coin is not on the AVNU or Ekubo lists.'), { user: true });
+    const t = chain.addToken(entry);
+    cashier.addToken(t);
+    feed.publish(t, 0);
+    const price = await feed.refreshOne(t);
+    log.log(`cashier: imported ${t.symbol} ${t.id}${price ? ` at $${price}` : ' (no price yet)'}`);
+    return { token: t, fresh: true, price };
+  }
   let timer = null;
   let writing = Promise.resolve();
   let cashier;
@@ -101,6 +120,8 @@ export async function createCashier(env = process.env, log = console) {
     chain,
     privy,
     feed,
+    catalog,
+    importToken,
     routes,
     start() {
       feed.start(cfg.priceSeconds);
