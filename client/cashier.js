@@ -340,16 +340,45 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     if (cs.kind === 'privy') {
       if (!cs.privyWallet) throw new Error('Sign in with Privy again.');
       f = await v.connectPrivy(cs.chain, app.token, cs.privyWallet, base);
-    } else if (cs.kind === 'cartridge') f = await v.connectCartridge(cs.chain, app.token, base);
+    } else if (cs.kind === 'cartridge' || v.isCartridgeEntry?.((cs.kind ?? '').replace(/^extension:/, ''))) f = await v.connectCartridge(cs.chain, app.token, base);
     else {
-      const name = (cs.kind ?? '').replace(/^extension:/, '');
-      const w = v.listWallets().find((x) => x.installed && x.name === name) ?? v.listWallets().find((x) => x.installed);
-      if (!w) throw new Error('No wallet found. Sign in again.');
+      // the very wallet you signed in with, never just any installed one: extensions (the
+      // MetaMask snap above all) can show up a moment after the page loads, so look for a while
+      const name = (cs.kind ?? '').replace(/^extension:/, '').toLowerCase();
+      if (!name) throw new Error('Sign in again to pick your wallet.');
+      let w = null;
+      for (let i = 0; i < 16 && !w; i++) {
+        w = v.listWallets().find((x) => x.installed && x.name.toLowerCase() === name) ?? null;
+        if (!w) await new Promise((r) => setTimeout(r, 250));
+      }
+      if (!w) throw new Error(`${(cs.kind ?? '').replace(/^extension:/, '')} is not open in this browser. Unlock it, or sign out and sign in with the wallet you have.`);
       f = await v.connectExtension(w, cs.chain);
     }
-    if (norm(f.address) !== cs.account) throw new Error(`The wallet is on ${short(f.address)}, not ${short(cs.account)}. Switch accounts or sign in again.`);
+    if (norm(f.address) !== cs.account) {
+      // the wallet has another account selected than the one you signed in with
+      const e = new Error(`${f.name ?? 'The wallet'} is on account ${short(f.address)}, but you are signed in as ${short(cs.account)}. Switch the account in the wallet, or sign in with ${short(f.address)}.`);
+      e.other = f;
+      throw e;
+    }
     cs.facade = f;
     return f;
+  }
+
+  // after a mismatch: a button under the message to sign in with the account the wallet is on
+  function offerSwitch(statusId, e) {
+    const el = $(statusId);
+    if (!e?.other || !el) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ghost';
+    b.style.marginTop = '8px';
+    b.textContent = `Sign in as ${short(e.other.address)}`;
+    b.addEventListener('click', () => {
+      for (const id of ['dlg-cashier']) if ($(id).open) $(id).close();
+      if (!$('dlg-connect').open) $('dlg-connect').showModal();
+      signInWith(cs.kind, async () => e.other);
+    });
+    el.append(document.createElement('br'), b);
   }
 
   // ---------------------------------------------------------------- cashier
@@ -482,6 +511,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       store.set('darkbags.lastDeposit', { tx, at: Date.now() });
     } catch (e) {
       setStatus('cash-status', friendly(e), true);
+      offerSwitch('cash-status', e);
     } finally {
       $('dep-go').disabled = false;
     }
