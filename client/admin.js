@@ -362,7 +362,10 @@ function sys() {
     ${tile('Пам’ять', `${num(g.memMb)} МБ`)}
     ${tile('Розсилок у пошті', num(D.mail.broadcasts), `${num(D.mail.boxes)} скриньок`)}
     ${tile('Рефкодів', num(D.referrals.codes))}
-  </div></section>`;
+    ${tile('Зависання сервера', `<span class="${(D.stalls ?? []).some((x) => x.ms > 500) ? 'bad' : (D.stalls ?? []).length ? 'warn' : 'ok'}">${num((D.stalls ?? []).length)}</span>`, 'паузи понад 150 мс з запуску')}
+  </div></section>
+  <section>${card('Помилки в браузерах гравців', table(['Коли', 'Гравець', 'Де', 'Режим', 'Помилка'], (D.clientErrors ?? []).map((x) => `<tr><td>${dt(x.at)}</td><td>${esc(x.name)}</td><td>${esc(x.where)}</td><td>${esc(x.mode ?? 'лобі')}</td><td title="${esc(x.st + '\n' + x.ua)}" style="white-space:normal;max-width:520px">${esc(x.m)}</td></tr>`)))}</section>
+  <section>${card('Зависання сервера (гра стоїть у всіх)', table(['Коли', '>Тривалість', 'Що працювало'], (D.stalls ?? []).map((x) => `<tr><td>${dt(x.at)}</td><td class="r ${x.ms > 500 ? 'bad' : 'warn'}">${num(x.ms)} мс</td><td>${esc(x.during.join(', ') || 'невідомо')}</td></tr>`)))}</section>`;
 }
 
 const VIEWS = { over: overview, players, matches, shop, chain, sys };
