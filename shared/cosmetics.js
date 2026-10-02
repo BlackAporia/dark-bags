@@ -729,6 +729,33 @@ export class Inventory {
     return true;
   }
 
+  // a prize from the shop's fortune wheel: a 72h trial, or a real skin of that rarity to keep
+  // (one you don't own yet; never limited or exotic). Falls back to a trial when there is none.
+  fortunePrize(key, slot) {
+    const r = this.rec(key);
+    const fresh = (list, owned, trying, rarities) => {
+      const pool = list.filter((o) => !o.basic && !o.limited && rarities.includes(o.rarity) && !owned.includes(o.id) && !((trying?.[o.id] ?? 0) > this.now()));
+      return pool.length ? pool[Math.floor(this.rnd() * pool.length)] : null;
+    };
+    let prize = null;
+    if (slot.k === 'outfit') {
+      const o = fresh(OUTFITS, r.owned, null, [slot.rarity]);
+      if (o) prize = { k: 'outfit', id: o.id };
+    } else if (slot.k === 'wskin') {
+      const o = fresh(WEAPON_SKINS, r.wowned, null, [slot.rarity]);
+      if (o) prize = { k: 'wskin', id: o.id };
+    }
+    if (!prize) {
+      const weapon = slot.k === 'wtrial' || slot.k === 'wskin';
+      const o = weapon ? fresh(WEAPON_SKINS, r.wowned, r.wtrials, ['rare', 'epic', 'legendary']) : fresh(OUTFITS, r.owned, r.trials, ['rare', 'epic', 'legendary']);
+      prize = o ? { k: weapon ? 'wtrial' : 'trial', id: o.id } : { k: 'credit', v: 5 };
+    }
+    this.give(key, prize);
+    if (prize.k === 'trial') prize.until = r.trials[prize.id];
+    if (prize.k === 'wtrial') prize.until = r.wtrials[prize.id];
+    return prize;
+  }
+
   // one turn of the fortune wheel: the slot it stops on and what it paid
   spin(key) {
     const r = this.rec(key);

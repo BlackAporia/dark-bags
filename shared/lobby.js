@@ -9,6 +9,7 @@ import { SocialBook, GUILD_RANK } from './social.js';
 import { ReferralBook, cleanCode } from './referrals.js';
 import { Guard, GUARD } from './guard.js';
 import { MailBook } from './mail.js';
+import { FortuneBook, FORTUNE } from './fortune.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -31,7 +32,7 @@ export const CUSTOM_MAX = 10_000_000; // $10,000
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.referrals = referrals; // invite codes, who brought whom, the inviters' earnings
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
@@ -57,6 +58,7 @@ export class Lobby {
     this.rooms = new Map();
     this.guard = guard;
     this.mail = mail;
+    this.fortune = fortune;
     this.roomArgs = { wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
@@ -172,6 +174,7 @@ export class Lobby {
           MODES,
         },
       });
+      this.catchUpWelcome(this.key(s));
       return;
     }
     if (!s.token) return;
@@ -267,6 +270,11 @@ export class Lobby {
       case 'mail_claim':
       case 'spin':
         this.mailOp(cid, s, msg);
+        return;
+      case 'fortune_info':
+        return this.send(cid, { t: 'fortune', view: this.fortune.view() });
+      case 'fortune_spin':
+        this.fortuneSpin(cid, s, msg);
         return;
       case 'ref_info':
         // with real tokens the code belongs to the signed-in address
@@ -418,6 +426,12 @@ export class Lobby {
     return true;
   }
 
+  // players who topped up before the welcome bonus existed get it on their next visit
+  catchUpWelcome(key) {
+    if (!key || this.practice) return;
+    if (this.cashier?.hasDeposited?.(key) || this.inventory.rec(key).bought > 0) this.welcome(key);
+  }
+
   mailOp(cid, s, msg) {
     const key = this.key(s);
     if (!key) return this.send(cid, { t: 'mailbox', signedOut: true, list: [], unread: 0 });
@@ -434,6 +448,54 @@ export class Lobby {
       if (!spin.ok) return this.send(cid, { t: 'err', msg: spin.error });
     }
     this.send(cid, { t: 'mailbox', list: this.mail.inbox(key), unread: this.mail.unread(key), ...(gift ? { claimed: gift } : {}), ...(spin ? { spin } : {}), locker: this.inventory.view(key) });
+  }
+
+  // A paid turn of the shop's fortune wheel ($0.05 in any coin the player holds). The prize lands
+  // at once; a jackpot is paid in real coins: sent on chain from the fortune wallet when the server
+  // has one, otherwise credited to the game balance (withdrawable like any winnings).
+  async fortuneSpin(cid, s, msg) {
+    const key = this.key(s);
+    if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
+    if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
+    if (s.busy) return this.send(cid, { t: 'err', msg: 'One moment.' });
+    const asset = String(msg.asset ?? '');
+    const units = this.prices.quote(asset, FORTUNE.price);
+    if (units === null) return this.send(cid, { t: 'err', msg: 'That coin has no price right now.' });
+    if (!this.wallet.debit(key, asset, units)) return this.send(cid, { t: 'err', code: 'fortune_funds', msg: `Not enough ${this.prices.get(asset)?.symbol ?? 'coins'} for a spin.` });
+    const { slot, jackpot } = this.fortune.spin();
+    const prize = this.inventory.fortunePrize(key, FORTUNE.slots[slot]);
+    let win = null;
+    if (jackpot) {
+      s.busy = true;
+      try {
+        win = await this.payJackpot(key, jackpot);
+        this.fortune.won(s.name, jackpot, win?.symbol ?? '');
+        this.mail.send({ key, kind: 'gift', title: 'Fortune jackpot', body: `${(jackpot / 1000).toFixed(2)} $`, i18n: 'jackpot' });
+      } finally {
+        s.busy = false;
+      }
+    }
+    this.send(cid, { t: 'fortune', spun: { slot, prize, paid: { asset, units: units.toString() }, ...(win ? { jackpot: win } : {}) }, view: this.fortune.view(), locker: this.inventory.view(key), balances: this.balances(s), mail: this.mail.unread(key) });
+  }
+
+  // the bank in real coins: USDC if priced, else USDT, else STRK
+  async payJackpot(key, mills) {
+    const list = this.prices.list();
+    const pick = ['USDC', 'USDT', 'STRK'].map((sym) => list.find((a) => a.symbol?.toUpperCase() === sym && this.prices.has(a.id))).find(Boolean) ?? list.find((a) => this.prices.has(a.id));
+    if (!pick) return null;
+    const units = this.prices.unitsFor(pick.id, mills);
+    const out = { mills, asset: pick.id, symbol: pick.symbol, units: units.toString(), onchain: false, tx: null };
+    const chain = this.cashier?.chain;
+    if (chain?.payFortune && this.cashier) {
+      try {
+        const r = await chain.payFortune({ token: pick.id, to: key, amount: units });
+        return { ...out, onchain: true, tx: r.tx };
+      } catch (e) {
+        console.error('fortune payout on chain failed, crediting the game balance instead', e?.message ?? e);
+      }
+    }
+    this.wallet.credit(key, pick.id, units);
+    return out;
   }
 
   // Shop $ is bought 1:1 with USDC or USDT (play-money test tokens without a cashier)
@@ -477,6 +539,7 @@ export class Lobby {
         this.social.touch(account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
         reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
+        this.catchUpWelcome(account);
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
@@ -486,6 +549,7 @@ export class Lobby {
         this.social.touch(r.account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
         reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
+        this.catchUpWelcome(r.account);
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
         let r;

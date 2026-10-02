@@ -31,6 +31,7 @@ import { createTour } from './tour.js';
 import { createIntro } from './intro.js';
 import { createInvite, captureRef, deviceId } from './invite.js';
 import { createMail } from './mail.js';
+import { createFortune } from './fortune.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
@@ -171,7 +172,8 @@ const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: (
 // the menu pages
 const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
 const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
-const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }) });
+const fortune = createFortune({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
+const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }), onRender: (root) => fortune.mount(root) });
 const inventory = createInventory({ app, send, openBox: (id) => shop.open(id), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
 const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
 const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
@@ -909,6 +911,8 @@ function onMessage(m) {
   if (m.t === 'leaderboard' || m.t === 'career' || m.t === 'result') ranked.onMessage(m);
   if (m.t === 'ref' || m.t === 'welcome' || m.t === 'authed') invite.onMessage(m);
   if (m.t === 'mailbox' || m.t === 'welcome' || m.t === 'authed' || m.t === 'locker') mail.onMessage(m);
+  if (m.t === 'fortune' || m.t === 'err') fortune.onMessage(m);
+  if (m.t === 'balance' && app.page === 'shop') fortune.paint();
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();

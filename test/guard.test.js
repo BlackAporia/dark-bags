@@ -122,3 +122,15 @@ test('guard: the sim counts human shots, hits, headshots and flicks', () => {
   assert.equal(A.ac.hits, 1);
   assert.equal(A.ac.snap, 1);
 });
+
+test('guard: trusted test accounts may share a network and a table', () => {
+  const a = '0x03b318c215e22262cd9a5accf8a97bfefa0805dfe03ddfd370ed4db2f5f50e82';
+  const b = '0x04c5a81396849724434ca58bdccdc68177ac6db5ef219823361795fa877c043a';
+  const g = new Guard({ trusted: [a, b] });
+  g.see(a, 'net1', 'dev1');
+  g.see(b, 'net1', 'dev2');
+  assert.equal(g.linked(a, b), false);
+  assert.ok(g.seatOk({ key: b, net: 'net1', dev: 'dev2' }, [{ key: a, net: 'net1', dev: 'dev1' }]));
+  // strangers are still split
+  assert.ok(!new Guard().seatOk({ key: 'x', net: 'n' }, [{ key: 'y', net: 'n' }]));
+});

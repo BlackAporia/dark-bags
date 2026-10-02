@@ -32,7 +32,7 @@ export function digest(s, salt = '') {
 }
 
 export class Guard {
-  constructor({ data = {}, onChange = null, now = () => Date.now(), salt = '', sharedIp = false, log = () => {} } = {}) {
+  constructor({ data = {}, onChange = null, now = () => Date.now(), salt = '', sharedIp = false, trusted = [], log = () => {} } = {}) {
     this.seen = new Map(Object.entries(data.seen ?? {})); // key -> { n: [nets], d: [devices] }
     this.aims = new Map(Object.entries(data.aims ?? {})); // key -> { shots, hits, hs, snap }
     this.flags = new Map(Object.entries(data.flags ?? {})); // key -> { why, at }
@@ -40,6 +40,7 @@ export class Guard {
     this.now = now;
     this.salt = salt;
     this.sharedIp = sharedIp; // a LAN cafe may run with this on: tables then only split by device
+    this.trusted = new Set(trusted.map((k) => String(k).toLowerCase())); // the team's own test accounts: never split or linked
     this.log = log;
     this.counts = new Map(); // daily counters, in memory only
     this.conns = new Map(); // net -> open sockets
@@ -110,6 +111,7 @@ export class Guard {
   // two accounts that have shared a network or a device: one person, as far as rewards go
   linked(a, b) {
     if (!a || !b || a === b) return a === b && !!a;
+    if (this.isTrusted(a) && this.isTrusted(b)) return false;
     const x = this.seen.get(a);
     const y = this.seen.get(b);
     if (!x || !y) return false;
@@ -117,9 +119,14 @@ export class Guard {
   }
 
   // may this session sit at a staked table with these others? (no feeding your own alt)
+  isTrusted(key) {
+    return !!key && this.trusted.has(String(key).toLowerCase());
+  }
+
   seatOk(me, others) {
+    if (this.isTrusted(me.key)) return true;
     for (const o of others) {
-      if (o.key === me.key) continue;
+      if (o.key === me.key || this.isTrusted(o.key)) continue;
       if (me.dev && me.dev === o.dev) return false;
       if (!this.sharedIp && me.net && me.net === o.net) return false;
       if (this.linked(me.key, o.key)) return false;

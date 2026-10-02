@@ -2158,3 +2158,29 @@ body.gold-on #bag { color: #ffd166; }
 @media (max-width: 640px) {
   .mail { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------- shop fortune wheel */
+.fortune { display: grid; gap: 10px; margin-bottom: 14px; padding: 16px; border-radius: 18px; border: 1px solid rgba(255, 211, 77, 0.45); background: radial-gradient(80% 140% at 100% 0%, rgba(255, 211, 77, 0.16), transparent 60%), linear-gradient(135deg, #171326, #0b0d14); }
+.fw-head { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+.fw-title { margin: 2px 0 4px; font: 900 clamp(22px, 3vw, 32px)/1 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; background: linear-gradient(90deg, #ffd34d, #ff6bd5); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.fw-bank { display: grid; gap: 4px; justify-items: center; min-width: 170px; padding: 10px 14px; border-radius: 14px; border: 1px dashed rgba(255, 211, 77, 0.6); background: rgba(0, 0, 0, 0.35); }
+.fw-bank small { color: #9aa3b5; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.fw-bank b { font: 900 30px/1 var(--f-display); color: #ffd34d; text-shadow: 0 0 18px rgba(255, 211, 77, 0.5); }
+.fw-bar { width: 100%; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.fw-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffd34d, #ff6bd5); }
+.fw-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.fw-row select { flex: 1 1 160px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--paper); }
+.fw-go { flex: 1 1 200px; }
+.fw-odds ul { margin: 6px 0; padding-inline-start: 18px; display: grid; gap: 2px; font-size: 13px; }
+.fw-wins { margin: 0; font-size: 13px; color: #d9deea; }
+.fw-box { width: min(560px, 100%); }
+.fw-reel { position: relative; width: 100%; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255, 211, 77, 0.5); background: #07080d; padding: 10px 0; }
+.fw-marker { position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; transform: translateX(-50%); z-index: 2; background: #ffd34d; box-shadow: 0 0 12px #ffd34d; }
+.fw-strip { display: flex; gap: 6px; will-change: transform; }
+.fw-cell { flex: 0 0 120px; display: grid; place-items: center; height: 74px; border-radius: 10px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 22%, #0b0d14); font-size: 12px; font-weight: 800; text-align: center; padding: 4px; }
+.fw-jackpot { display: grid; justify-items: center; gap: 2px; margin-bottom: 8px; padding: 12px 18px; border-radius: 14px; background: linear-gradient(135deg, #b8860b, #ffd76a, #b8860b); color: #1a1205; animation: prize-pop 0.6s ease-out; box-shadow: 0 0 40px rgba(255, 211, 77, 0.7); }
+.fw-jackpot b { font: 900 42px/1 var(--f-display); }
+.fw-jackpot small { font-weight: 900; letter-spacing: 0.1em; }
+@media (max-width: 560px) {
+  .fw-head { grid-template-columns: 1fr; }
+}

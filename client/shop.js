@@ -17,7 +17,7 @@ const rn = (k) => t(`r.${k}`);
 const rankOf = (r) => RARITY_ORDER.indexOf(r);
 const QTY = [1, 5, 10, 25, 100];
 
-export function createShop({ app, send, sfx, toast, share, equip }) {
+export function createShop({ app, send, sfx, toast, share, equip, onRender = () => {} }) {
   const st = { family: 'outfit', qty: {}, busy: false, last: null };
   const L = () => app.locker;
   // USDC/USDT the player can top shop $ up from, in cents
@@ -81,6 +81,7 @@ export function createShop({ app, send, sfx, toast, share, equip }) {
         render();
       });
     for (const el of root.querySelectorAll('.box-card')) wireBox(el);
+    onRender(root); // the fortune wheel puts itself at the top
   }
 
   function qty(id) {

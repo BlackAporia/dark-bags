@@ -409,6 +409,11 @@ export class Cashier {
     return p;
   }
 
+  // has this address ever had a deposit credited? (the welcome bonus, also for the early ones)
+  hasDeposited(account) {
+    return !!account && this.deposits.some((d) => d.account === account && !d.unsupported && !d.held);
+  }
+
   history(account, n = 20) {
     const pick = (l) => l.filter((x) => x.account === account).slice(-n).reverse();
     return {
