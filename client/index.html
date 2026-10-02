@@ -45,6 +45,7 @@
   <div id="spect" class="spect" hidden><button type="button" id="sp-prev" class="sp-btn" aria-label="Previous runner">◀</button><span id="sp-text"></span><button type="button" id="sp-next" class="sp-btn" aria-label="Next runner">▶</button><button type="button" id="sp-done" class="sp-done" data-i18n="spect.results">Results</button></div>
   <div id="coach" class="coach" hidden aria-live="polite"></div>
   <!-- guns + lasers: credits and the buy bar -->
+  <p id="up-hint" class="up-hint" hidden></p>
   <div id="gl-shop" class="gl-shop" hidden>
     <span class="gl-cr" aria-label="Credits"><i>CR</i><b id="gl-cr">0</b></span>
     <button type="button" class="gl-btn" data-buy="medkit"><span class="gl-ico" aria-hidden="true">✚</span><b data-i18n="gl.medkit">Medkit</b><em>150</em><kbd>1</kbd></button>
@@ -106,6 +107,8 @@
   <button id="t-fire" class="tbtn fire" type="button" aria-label="Fire"><span data-i18n="touch.fire">Fire</span></button>
   <button id="t-dash" class="tbtn dash" type="button" data-i18n="hud.dash">Dash</button>
   <button id="t-bag" class="tbtn bagbtn" type="button" data-i18n="touch.bag">Bag</button>
+  <button id="t-reload" class="tbtn reloadbtn" type="button" aria-label="Reload">↻</button>
+  <button id="t-up" class="tbtn upbtn" type="button" hidden aria-label="Upgrade">⬆<em></em></button>
   <button class="tbtn tbuy b1" type="button" data-buy="medkit" aria-label="Medkit"><span>✚</span><em>150</em></button>
   <button class="tbtn tbuy b2" type="button" data-buy="turret" aria-label="Turret"><span>◈</span><em>600</em></button>
   <button class="tbtn tbuy b3" type="button" data-buy="mine" aria-label="Laser mine"><span>⌁</span><em>350</em></button>

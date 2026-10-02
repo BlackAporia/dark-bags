@@ -87,6 +87,7 @@ const el = {
   ping: $('ping'),
   glShop: $('gl-shop'),
   glCr: $('gl-cr'),
+  upHint: $('up-hint'),
   spText: $('sp-text'),
   coach: $('coach'),
   hpBar: $('hp-bar'),
@@ -1275,6 +1276,7 @@ musicChip.addEventListener('click', toggleMusic);
 syncAudio();
 input.onBluff = () => game.cycleBluff();
 input.onBuy = (item) => game.buy(item);
+input.onSpace = () => game.tryUpgrade();
 for (const b of $('gl-shop').querySelectorAll('[data-buy]')) b.addEventListener('click', () => game.buy(b.dataset.buy));
 for (const b of document.querySelectorAll('#touch [data-buy]'))
   b.addEventListener('pointerdown', (e) => {

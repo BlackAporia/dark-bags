@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "DALGA 10 · ÇİTİN ÜSTÜNDEN BİR BOSS GELİYOR",
   'hud.midBossDown': "Boss düştü! On dalga daha",
   'ach.last_stand': "Son Direniş",
+  'gl.upTurret': "Taret yükseltildi: seviye {lv}",
+  'gl.upMine': "Lazer mayın yükseltildi: {lv} ışın",
+  'gl.upHint': "Boşluk: {what} → seviye {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → seviye {lv} · {c} CR",
+  'gl.no.max': "Zaten en üst seviyede",
+  'gl.no.near': "Taretinin ya da mayının yanına git",
 };

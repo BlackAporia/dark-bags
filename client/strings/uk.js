@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "ХВИЛЯ 10 · ЧЕРЕЗ ПАРКАН ЛІЗЕ БОС",
   'hud.midBossDown': "Боса вбито! Ще десять хвиль",
   'ach.last_stand': "Останній рубіж",
+  'gl.upTurret': "Турель покращено: рівень {lv}",
+  'gl.upMine': "Лазерну міну покращено: {lv} промені",
+  'gl.upHint': "Пробіл: {what} → рівень {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → рівень {lv} · {c} CR",
+  'gl.no.max': "Уже найвищий рівень",
+  'gl.no.near': "Підійдіть до своєї турелі чи міни",
 };

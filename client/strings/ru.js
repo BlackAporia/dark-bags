@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "ВОЛНА 10 · ЧЕРЕЗ ЗАБОР ЛЕЗЕТ БОСС",
   'hud.midBossDown': "Босс убит! Ещё десять волн",
   'ach.last_stand': "Последний рубеж",
+  'gl.upTurret': "Турель улучшена: уровень {lv}",
+  'gl.upMine': "Лазерная мина улучшена: {lv} луча",
+  'gl.upHint': "Пробел: {what} → уровень {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → уровень {lv} · {c} CR",
+  'gl.no.max': "Уже максимальный уровень",
+  'gl.no.near': "Подойдите к своей турели или мине",
 };

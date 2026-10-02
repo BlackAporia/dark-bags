@@ -936,4 +936,10 @@ export default {
   'hud.midBossWave': "ONDA 10 · UM CHEFE PULA A CERCA",
   'hud.midBossDown': "Chefe abatido! Faltam dez ondas",
   'ach.last_stand': "Última resistência",
+  'gl.upTurret': "Torreta melhorada: nível {lv}",
+  'gl.upMine': "Mina laser melhorada: {lv} feixes",
+  'gl.upHint': "Espaço: {what} → nível {lv} · {c} CR",
+  'gl.upHintTouch': "⬆ {what} → nível {lv} · {c} CR",
+  'gl.no.max': "Já está no nível máximo",
+  'gl.no.near': "Fique perto da sua torreta ou mina",
 };
