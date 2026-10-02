@@ -4,6 +4,7 @@
 import { store } from './store.js';
 import { formatUnits, parseUnits } from '../shared/assets.js';
 import { esc, fmt } from './game.js';
+import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '');
@@ -56,6 +57,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   function render() {
     const on = !!cs.chain && app.mode === 'online';
     $('cashier').hidden = !on;
+    renderChip();
     if (!on) return;
     $('acct-label').innerHTML = cs.account
       ? `<b>${esc(short(cs.account))}</b> <span class="unit">${esc(kindLabel())} · ${esc(cs.chain.network)}</span>`
@@ -65,6 +67,102 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     $('logout').hidden = !cs.account;
     $('fine').textContent = `Real tokens on Starknet ${cs.chain.network}. The house holds deposits until you cash out; cash-outs go only to the address you signed in with.${cs.chain.maxBalanceUsd ? ` Beta: up to $${cs.chain.maxBalanceUsd} per player.` : ''}`;
   }
+
+  // ------------------------------------------------- the account chip (top right)
+  // Who you are signed in as, at a glance; a click opens the wallet panel: full address to copy,
+  // the explorer, what the wallet holds on chain and in the game, deposit / cash out, Cartridge's
+  // own wallet window, and sign out.
+  const acctName = () => store.get('darkbags.walletName', null);
+  function renderChip() {
+    const b = $('tb-acct');
+    const on = !!cs.chain && app.mode === 'online';
+    b.hidden = !on;
+    if (!on) return closePop();
+    b.classList.toggle('in', !!cs.account);
+    b.querySelector('.tb-acct-ico').textContent = cs.account ? (cs.kind === 'cartridge' ? '🎮' : cs.kind === 'privy' ? '✉️' : '👛') : '🔑';
+    b.querySelector('.tb-acct-txt').textContent = cs.account ? (cs.kind === 'cartridge' && acctName()) || short(cs.account) : t('acct.signin');
+    if (!cs.account) closePop();
+    else if (!$('acct-pop').hidden) fillPop();
+  }
+  function closePop() {
+    $('acct-pop').hidden = true;
+    $('tb-acct').setAttribute('aria-expanded', 'false');
+  }
+  async function fillPop() {
+    const pop = $('acct-pop');
+    const net = cs.chain.network === 'mainnet' ? 'Mainnet' : 'Sepolia';
+    const name = cs.kind === 'cartridge' ? acctName() : null;
+    const rows = cs.chain.tokens
+      .map((tk) => `<li data-tk="${esc(tk.id)}"><span class="ap-sym" style="--c:${esc(tk.color ?? '#888')}">${esc(tk.symbol)}</span><b class="ap-chain num">…</b><b class="ap-game num">${formatUnits(ledger(tk.id), tk.decimals, 4)}</b></li>`)
+      .join('');
+    pop.innerHTML = `
+      <div class="ap-head"><span class="ap-kind">${esc(kindLabel())}</span><span class="ap-net">Starknet ${net}</span></div>
+      ${name ? `<p class="ap-name">${esc(name)}</p>` : ''}
+      <p class="ap-addr num" title="${esc(cs.account)}">${esc(cs.account)}</p>
+      <div class="ap-row">
+        <button type="button" class="ghost" data-ap="copy">${t('acct.copy')}</button>
+        <a class="ghost" href="${esc(cs.chain.explorer)}/contract/${esc(cs.account)}" target="_blank" rel="noopener">${t('acct.explorer')} ↗</a>
+      </div>
+      <ul class="ap-bal"><li class="ap-th"><span></span><span>${t('acct.inWallet')}</span><span>${t('acct.inGame')}</span></li>${rows}</ul>
+      <div class="ap-row">
+        <button type="button" class="cta" data-ap="dep">${t('acct.deposit')}</button>
+        <button type="button" class="ghost" data-ap="wd">${t('acct.withdraw')}</button>
+      </div>
+      ${cs.kind === 'cartridge' ? `<button type="button" class="ghost ap-wide" data-ap="profile">🎮 ${t('acct.cartridge')}</button>` : ''}
+      <button type="button" class="link ap-out" data-ap="out">${t('acct.signout')}</button>`;
+    const on = (k, f) => pop.querySelector(`[data-ap="${k}"]`)?.addEventListener('click', f);
+    on('copy', async () => {
+      try {
+        await navigator.clipboard.writeText(cs.account);
+      } catch {
+        const r = document.createRange();
+        r.selectNodeContents(pop.querySelector('.ap-addr'));
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+        document.execCommand?.('copy');
+      }
+      toast(t('acct.copied'));
+    });
+    on('dep', () => (closePop(), openCashier('deposit')));
+    on('wd', () => (closePop(), openCashier('withdraw')));
+    on('profile', async () => {
+      closePop();
+      try {
+        const f = await ensureFacade();
+        await f.profile?.();
+      } catch (e) {
+        toast(friendly(e));
+      }
+    });
+    on('out', () => {
+      closePop();
+      $('logout').click();
+    });
+    // what the wallet itself holds, read from the chain
+    try {
+      const v = await vendor();
+      await Promise.all(
+        cs.chain.tokens.map(async (tk) => {
+          const bal = await v.walletBalance(cs.chain, tk, cs.account).catch(() => null);
+          const el = pop.querySelector(`[data-tk="${CSS.escape(tk.id)}"] .ap-chain`);
+          if (el) el.textContent = bal == null ? '—' : formatUnits(bal, tk.decimals, 4);
+        }),
+      );
+    } catch {}
+  }
+  $('tb-acct').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!cs.account) return openConnect();
+    const pop = $('acct-pop');
+    if (!pop.hidden) return closePop();
+    pop.hidden = false;
+    $('tb-acct').setAttribute('aria-expanded', 'true');
+    fillPop();
+  });
+  document.addEventListener('click', (e) => {
+    if (!$('acct-pop').hidden && !e.target.closest('#acct-pop, #tb-acct')) closePop();
+  });
+  addEventListener('keydown', (e) => e.key === 'Escape' && closePop());
 
   function kindLabel() {
     if (!cs.kind) return 'wallet';
@@ -157,6 +255,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       say('Signed. Checking the signature on Starknet…');
       cs.facade = f;
       cs.kind = kind;
+      store.set('darkbags.walletName', kind === 'cartridge' ? f.name : null);
       const parts = Array.isArray(sig) ? sig : Array.isArray(sig?.signature) ? sig.signature : sig?.r != null ? [sig.r, sig.s] : [];
       if (!parts.length) throw new Error('The wallet returned no signature.');
       cs.authPending = true; // the server's answer may come while the dialog is out of the way

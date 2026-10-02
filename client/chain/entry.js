@@ -174,6 +174,8 @@ function starkzapFacade(kind, name, wallet, chain) {
       return tx.hash;
     },
     disconnect: async () => wallet.disconnect?.(),
+    // Cartridge's own wallet window (tokens, activity, send); other kinds have none
+    profile: kind === 'cartridge' ? () => wallet.getController?.()?.openProfile?.() : null,
   };
 }
 
