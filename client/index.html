@@ -392,6 +392,7 @@
     <div class="mode" role="tablist" aria-label="Cashier">
       <button type="button" class="seg" role="tab" data-tab="deposit">Deposit</button>
       <button type="button" class="seg" role="tab" data-tab="withdraw">Cash out</button>
+      <button type="button" class="seg" role="tab" data-tab="bridge" data-i18n="br.tab">Bridge</button>
       <button type="button" class="seg" role="tab" data-tab="history">History</button>
     </div>
     <section data-pane="deposit" class="pane">
@@ -408,6 +409,7 @@
       <p id="wd-hint" class="fine"></p>
       <button type="button" id="wd-go" class="cta">Cash out</button>
     </section>
+    <section data-pane="bridge" class="pane" hidden><div id="bridge-root" class="bridge"></div></section>
     <section data-pane="history" class="pane" hidden>
       <ul id="hist" class="hist"></ul>
     </section>
