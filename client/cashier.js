@@ -500,6 +500,11 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       setStatus('cash-status', 'Confirm the deposit in your wallet…');
       const tx = await aside(cs.kind, async () => {
         const f = await ensureFacade();
+        // no reading from the chain yet: ask the wallet itself before it builds a transfer that fails
+        if (cs.depRoute !== 'private' && bal == null && f.balance) {
+          const have = await f.balance(t).catch(() => null);
+          if (have != null && units > have) throw new Error(`${f.name ?? 'Your wallet'} (${short(f.address)}) holds ${formatUnits(have, t.decimals, 6)} ${t.symbol}. Send ${t.symbol} to this address first.`);
+        }
         if (cs.depRoute === 'private') {
           if (!f.depositPrivate) throw new Error('This sign-in cannot make private transfers. Use a public deposit.');
           return f.depositPrivate(t, units, cs.chain.house);
@@ -710,8 +715,20 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   };
 }
 
+// the reason a wallet gives can sit deep in the error (Cartridge: { code, message, data: { … } })
+function reasonOf(e) {
+  const parts = [e?.message, e?.data?.execution_error, e?.data?.revert_reason, e?.data?.message, typeof e?.data === 'string' ? e.data : null, e?.error?.message, e?.cause?.message];
+  let m = parts.filter((x) => typeof x === 'string' && x.trim()).join(' · ');
+  if (!m && e && typeof e === 'object') {
+    try {
+      m = JSON.stringify(e).slice(0, 400);
+    } catch {}
+  }
+  return m || String(e ?? 'Something went wrong.');
+}
+
 function friendly(e) {
-  const m = String(e?.message ?? e ?? 'Something went wrong.');
+  const m = reasonOf(e);
   if (/user (rejected|refused|abort)|USER_REFUSED|denied/i.test(m) || e?.code === 113) return 'Cancelled in the wallet.';
   if (/multicall failed|u256_sub Overflow|insufficient|exceeds balance|transfer amount exceeds|not enough balance/i.test(m)) return 'Your wallet could not send this: usually not enough of that token, or no STRK left for the network fee. Try a smaller amount (Max leaves room for the fee).';
   if (/not deployed|Contract not found|account.*deploy/i.test(m)) return 'Your wallet account is not deployed on this network yet. Make any transaction in the wallet first (for example, send yourself a little STRK), then try again.';

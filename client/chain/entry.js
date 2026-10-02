@@ -201,6 +201,10 @@ function starkzapFacade(kind, name, wallet, chain) {
 // failed to initialize"). So the page keeps the one connected wallet, and before a fresh attempt
 // (after a cancel or a failure) the old container goes, so the new iframe can mount.
 let cartridge = null; // { key, wallet, name }
+const CARTRIDGE_RPC = {
+  mainnet: 'https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_9',
+  sepolia: 'https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9',
+};
 function clearCartridgeFrames() {
   if (typeof document === 'undefined') return;
   document.getElementById('controller')?.remove();
@@ -211,7 +215,12 @@ export async function connectCartridge(chain, session, base) {
   if (cartridge?.key === key) return cartridgeFacade(chain);
   clearCartridgeFrames();
   cartridge = null;
-  const sdk = sdkFor(chain, session, base);
+  // The Cartridge keychain simulates and sends with the node it is given: it needs a versioned
+  // Cartridge endpoint (rpc/v0_9, its own default). The bare preset URL signs fine but every
+  // transaction then fails in the review ("No balance changes detected", "Transaction failed").
+  // Cartridge pays or asks for fees itself, so our paymaster is left out.
+  const cchain = { ...chain, rpcUrl: CARTRIDGE_RPC[chain.network] ?? chain.rpcUrl, paymaster: false };
+  const sdk = sdkFor(cchain, session, base);
   // pre-approve deposits so they go through without a popup each time
   const policies = chain.tokens.map((t) => ({ target: t.id, method: 'transfer' }));
   try {
@@ -226,7 +235,7 @@ export async function connectCartridge(chain, session, base) {
   return cartridgeFacade(chain);
 }
 function cartridgeFacade(chain) {
-  const f = starkzapFacade('cartridge', cartridge.name, cartridge.wallet, chain);
+  const f = starkzapFacade('cartridge', cartridge.name, cartridge.wallet, { ...chain, paymaster: false });
   const off = f.disconnect;
   f.disconnect = async () => {
     cartridge = null;
