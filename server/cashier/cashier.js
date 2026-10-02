@@ -210,7 +210,7 @@ export class Cashier {
     if (!account) throw new CashierError('That is not a Starknet address.');
     // plain Stark keys sign with 2-5 felts; passkey (WebAuthn) and multisig accounts with hundreds
     if (!Array.isArray(signature) || !signature.length) throw new CashierError('The wallet returned no signature.');
-    if (signature.length > 2048 || signature.some((x) => String(x).length > 80)) throw new CashierError('That signature is not one this game can check.');
+    if (signature.length > 2048) throw new CashierError('That signature is not one this game can check.');
     const td = loginTypedData({ chainId: this.chain.info().chainId, nonce: l.nonce, issued: l.issued });
     let ok = false;
     console.log(`login: checking ${account} (${signature.length} felts)`);
