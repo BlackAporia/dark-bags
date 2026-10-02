@@ -66,6 +66,7 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
     sdk,
     wallet,
     strk20,
+    fortuneAddress: cfg.fortune ? normAddr(cfg.fortune.address) : null,
 
     info: () => ({
       network: cfg.network,
@@ -168,6 +169,14 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       if (!wallet) return {};
       const out = {};
       for (const t of tokens) out[t.id] = (await wallet.balanceOf(t)).toBase().toString();
+      return out;
+    },
+
+    // what the fortune wallet holds (the analytics page); {} without one
+    async fortuneBalances() {
+      if (!fortuneWallet) return {};
+      const out = {};
+      for (const t of tokens) out[t.id] = (await fortuneWallet.balanceOf(t)).toBase().toString();
       return out;
     },
   };

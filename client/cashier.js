@@ -111,6 +111,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       </div>
       <button type="button" class="ghost ap-wide" data-ap="bridge">🌉 ${t('br.tab')}</button>
       ${cs.kind === 'cartridge' ? `<button type="button" class="ghost ap-wide" data-ap="profile">🎮 ${t('acct.cartridge')}</button>` : ''}
+      ${cs.admin ? `<a class="ghost ap-wide" href="admin.html" target="_blank" rel="noopener">📊 Analytics</a>` : ''}
       <button type="button" class="link ap-out" data-ap="out">${t('acct.signout')}</button>`;
     const on = (k, f) => pop.querySelector(`[data-ap="${k}"]`)?.addEventListener('click', f);
     on('copy', async () => {
@@ -519,6 +520,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       case 'welcome':
         cs.chain = m.chain ?? null;
         cs.account = m.account ?? null;
+        cs.admin = !!m.admin;
         cs.privyWallet = m.privy ?? null;
         if (cs.account && m.privy) cs.kind = 'privy';
         render();
@@ -534,6 +536,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         cs.authPending = false;
         clearTimeout(cs.authTimer);
         cs.account = m.account;
+        cs.admin = !!m.admin;
         if (m.privy) cs.privyWallet = m.privy;
         if (!m.account) {
           cs.facade = null;

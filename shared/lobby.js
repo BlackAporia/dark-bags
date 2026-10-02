@@ -32,8 +32,10 @@ export const CUSTOM_MAX = 10_000_000; // $10,000
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ coins = null, fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
+    this.stats = stats; // the team's analytics (server only)
+    this.isAdmin = isAdmin; // (account) => may open the analytics page
     this.referrals = referrals; // invite codes, who brought whom, the inviters' earnings
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
     // tokens this only runs when the operator turns it on (the house must rebalance on chain).
@@ -60,7 +62,7 @@ export class Lobby {
     this.mail = mail;
     this.fortune = fortune;
     this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
-    this.roomArgs = { wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    this.roomArgs = { stats, wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
@@ -148,6 +150,7 @@ export class Lobby {
       if (this.cashier) s.account = this.cashier.accountFor(s.token);
       else this.wallet.ensure(s.token);
       this.social.touch(this.key(s), s.name);
+      this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account });
       this.send(cid, {
         t: 'welcome',
         token: s.token,
@@ -166,6 +169,7 @@ export class Lobby {
         social: this.socialSummary(s),
         mail: this.key(s) ? this.mail.unread(this.key(s)) : 0,
         account: s.account,
+        admin: !!s.account && this.isAdmin(s.account),
         privy: this.cashier?.privyFor(s.token) ?? null,
         cfg: {
           ROUND_SECONDS: this.roundSeconds,
@@ -401,6 +405,8 @@ export class Lobby {
       if (ok) this.social.markPurchase(key);
       return ok;
     };
+    const rec = inv.rec(key);
+    const was = { spent: rec.spent ?? 0, bought: rec.bought ?? 0 };
     const r =
       msg.t === 'equip' ? inv.equip(key, id)
       : msg.t === 'body' ? inv.setBody(key, id)
@@ -411,6 +417,11 @@ export class Lobby {
       : msg.t === 'pass_claim' ? inv.passClaim(key, msg.track, msg.tier)
       : inv.open(key, id, pay, msg.n);
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
+    if (!this.practice && this.stats) {
+      const now = inv.rec(key);
+      if ((now.bought ?? 0) > was.bought) this.stats.buy('topup', now.bought - was.bought, id);
+      if ((now.spent ?? 0) > was.spent) this.stats.buy(msg.t === 'pass_buy' ? 'pass' : 'box', now.spent - was.spent, msg.t === 'pass_buy' ? 'pass' : id);
+    }
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (msg.t === 'topup' && !this.practice) this.welcome(key); // the first top-up earns the welcome bonus (its toast comes last)
     if (s.room && (msg.t === 'equip' || msg.t === 'body' || msg.t === 'wequip' || msg.t === 'tequip')) s.room.broadcastPrep();
@@ -434,7 +445,14 @@ export class Lobby {
   // players who topped up before the welcome bonus existed get it on their next visit
   catchUpWelcome(key) {
     if (!key || this.practice) return;
-    if (this.cashier?.hasDeposited?.(key) || this.inventory.rec(key).bought > 0) this.welcome(key);
+    if (!(this.cashier?.hasDeposited?.(key) || this.inventory.rec(key).bought > 0)) return;
+    if (this.welcome(key)) return;
+    // welcomed before, but the rank book is new (ranks are kept per network now): the Founder title stays theirs
+    if (!this.ranks.rec(key).done?.founder) {
+      const done = this.ranks.progress(key, { deposits: 1 });
+      if (done.some((a) => a.id === 'founder') && !this.ranks.title(key)) this.ranks.setTitle(key, 'founder');
+      if (done.length) this.ranks.add(key, done.reduce((n, a) => n + (a.xp ?? 0), 0));
+    }
   }
 
   mailOp(cid, s, msg) {
@@ -468,6 +486,7 @@ export class Lobby {
     if (units === null) return this.send(cid, { t: 'err', msg: 'That coin has no price right now.' });
     if (!this.wallet.debit(key, asset, units)) return this.send(cid, { t: 'err', code: 'fortune_funds', msg: `Not enough ${this.prices.get(asset)?.symbol ?? 'coins'} for a spin.` });
     const { slot, jackpot } = this.fortune.spin();
+    this.stats?.buy('fortune', FORTUNE.price / 10);
     const prize = this.inventory.fortunePrize(key, FORTUNE.slots[slot]);
     let win = null;
     if (jackpot) {
@@ -566,7 +585,8 @@ export class Lobby {
         this.guard.see(account, s.net, s.dev);
         this.social.touch(account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
-        reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
+        this.stats?.seen(account, { wallet: true });
+        reply({ t: 'authed', account, admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
         this.catchUpWelcome(account);
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
@@ -576,7 +596,8 @@ export class Lobby {
         this.guard.see(r.account, s.net, s.dev);
         this.social.touch(r.account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
-        reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
+        this.stats?.seen(r.account, { wallet: true });
+        reply({ t: 'authed', account: r.account, admin: this.isAdmin(r.account), privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
         this.catchUpWelcome(r.account);
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
