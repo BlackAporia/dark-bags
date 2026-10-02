@@ -64,7 +64,7 @@ export function raidXp(p, { practice = false, kind = 'raid' } = {}) {
   const secs = Math.max(0, (p.endedAt ?? 0) - (p.joinedAt ?? 0));
   add('Raid', 40);
   if (kind === 'zombie') {
-    const waves = Math.min(9, p.zWave ?? 0);
+    const waves = Math.min(19, p.zWave ?? 0);
     let wx = 0;
     for (let n = 1; n <= waves; n++) wx += 25 + 12 * n;
     add('Waves survived', wx);

@@ -6,6 +6,7 @@ import { PriceBook, unitsAtEntryRate } from './assets.js';
 import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
 import { MODE, ZOMBIE_WEAPONS } from './modes.js';
+import { WAVES } from './horde.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, seasonAt } from './cosmetics.js';
 import { spinChance, rollLottery, titleBonus, DIVISIONS } from './ranked.js';
 
@@ -508,7 +509,7 @@ export class RoomCore {
         stake: p.stake,
         kills: p.kills,
         ...(w.dm ? { deaths: p.deaths, place: w.standings().indexOf(p) + 1, top: w.standings()[0]?.kills ?? 0 } : {}),
-        ...(w.zombie ? { zWave: p.zWave ?? 0, zk: p.zk ?? 0, waves: 10, squad: w.players.size } : {}),
+        ...(w.zombie ? { zWave: p.zWave ?? 0, zk: p.zk ?? 0, waves: WAVES, squad: w.players.size } : {}),
         ...(w.goldRush ? { gb: p.gb, place: w.goldOrder().indexOf(p) + 1, top: w.goldOrder()[0]?.gb ?? 0, deaths: p.deaths, credit: this.accounts.get(p.id)?.credit ?? 0 } : {}),
         secs: Math.round((p.endedAt ?? w.time) - p.joinedAt),
         killer: p.killerName,

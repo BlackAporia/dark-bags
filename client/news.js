@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-03a',
+    at: '2026-10-03T12:00:00+03:00',
+    items: {
+      en: ["Teams and ranked: pick your weapon before the match; best of three rounds on a clock", "Shots: tracers fly exactly to where the damage lands; ranges by class, the pistol shortest, the snipers furthest", "Melee: the swing is drawn exactly where it hits; katanas, machetes, axes, scythes and energy swords reach further than a knife", "Zombies: 20 waves (bosses on 10 and 20), no clock, every wave harder; kills pay credits for turrets, laser mines and medkits", "The game server moves to Europe for a lower ping"],
+      uk: ["Командні та рейтингові: вибір зброї перед матчем; бій до двох перемог у раундах за таймером", "Постріли: трасер летить рівно туди, де зараховується шкода; дальність за класом, пістолет найближче, снайперки найдалі", "Ближній бій: замах малюється там, де б'є; катани, мачете, сокири, коси й енергомечі дістають далі за ніж", "Зомбі: 20 хвиль (боси на 10-й і 20-й), без таймера, кожна хвиля складніша; за вбивства кредити на турелі, лазерні міни й аптечки", "Ігровий сервер переїжджає в Європу заради нижчого пінгу"],
+      ru: ["Командные и рейтинговые: выбор оружия перед матчем; бой до двух побед в раундах по таймеру", "Выстрелы: трассер летит ровно туда, где засчитывается урон; дальность по классу, пистолет ближе всех, снайперки дальше всех", "Ближний бой: замах рисуется там, где бьёт; катаны, мачете, топоры, косы и энергомечи достают дальше ножа", "Зомби: 20 волн (боссы на 10-й и 20-й), без таймера, каждая волна сложнее; за убийства кредиты на турели, лазерные мины и аптечки", "Игровой сервер переезжает в Европу ради меньшего пинга"],
+      es: ["Equipos y clasificatoria: elige arma antes de la partida; al mejor de tres rondas con reloj", "Disparos: el trazador llega justo donde cae el daño; alcance por clase", "Cuerpo a cuerpo: el tajo se dibuja donde golpea; katanas y machetes llegan más lejos", "Zombis: 20 oleadas, sin reloj, créditos por bajas para torretas, minas láser y botiquines", "El servidor se muda a Europa para menos ping"],
+      fr: ["Équipes et classé : choix de l'arme avant le match ; deux manches gagnantes sur trois, chronométrées", "Tirs : le traceur va exactement là où tombent les dégâts ; portée selon la classe", "Corps à corps : le coup est dessiné là où il frappe ; katanas et machettes portent plus loin", "Zombies : 20 vagues, sans chrono, crédits par élimination pour tourelles, mines laser et trousses", "Le serveur passe en Europe pour un meilleur ping"],
+      pt: ["Equipes e ranqueada: escolha a arma antes da partida; melhor de três rodadas com relógio", "Tiros: o traçante vai exatamente onde o dano acontece; alcance por classe", "Corpo a corpo: o golpe é desenhado onde acerta; katanas e facões alcançam mais", "Zumbis: 20 ondas, sem relógio, créditos por abate para torretas, minas laser e kits", "O servidor vai para a Europa para menos ping"],
+      tr: ["Takım ve dereceli: maçtan önce silah seçimi; süreli üç rauntta iki galibiyet", "Atışlar: iz mermisi hasarın olduğu yere gider; menzil sınıfa göre", "Yakın dövüş: savuruş vurduğu yerde çizilir; katana ve palalar daha uzağa erişir", "Zombiler: 20 dalga, süre yok, öldürme başına taret, lazer mayın ve ilk yardım kredisi", "Sunucu daha düşük ping için Avrupa'ya taşınıyor"],
+      zh: ["团队与排位：赛前选武器；限时三局两胜", "射击：弹道正好飞到造成伤害的位置；射程按类别", "近战：挥砍画在命中范围上；武士刀、砍刀攻击距离更远", "僵尸：20 波，不限时，击杀获得点数购买炮塔、激光地雷、医疗包", "游戏服务器迁至欧洲以降低延迟"],
+      hi: ["टीम और रैंक्ड: मैच से पहले हथियार चुनें; घड़ी पर तीन में से दो राउंड", "गोलियाँ: ट्रेसर ठीक वहीं जाता है जहाँ नुकसान होता है; रेंज क्लास के हिसाब से", "हाथापाई: वार वहीं दिखता है जहाँ लगता है; कटाना और छुरे ज़्यादा दूर तक", "ज़ॉम्बी: 20 लहरें, कोई घड़ी नहीं, किल पर टरेट, लेज़र माइन, मेडकिट के क्रेडिट", "कम पिंग के लिए सर्वर यूरोप में"],
+      ar: ["الفرق والتصنيف: اختيار السلاح قبل المباراة؛ أفضل جولتين من ثلاث بمؤقت", "الطلقات: يصل الأثر تمامًا إلى حيث يقع الضرر؛ المدى حسب الفئة", "الاشتباك: تُرسم الضربة حيث تصيب؛ الكاتانا والمناجل تصل أبعد", "الزومبي: 20 موجة بلا مؤقت، والقتل يمنح رصيدًا للأبراج والألغام وحقائب الإسعاف", "الخادم ينتقل إلى أوروبا لتقليل التأخير"],
+    },
+  },
+  {
     id: '2026-10-02d',
     at: '2026-10-02T18:30:00+03:00',
     items: {

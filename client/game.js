@@ -1,7 +1,8 @@
 import { CFG, GL } from '../shared/config.js';
 import { titleTier } from '../shared/achievements.js';
-import { OUTFIT, FINISH, RARITY_ORDER, modelFor } from '../shared/cosmetics.js';
+import { OUTFIT, FINISH, RARITY_ORDER, modelFor, meleeOf } from '../shared/cosmetics.js';
 import { MODE } from '../shared/modes.js';
+import { WAVES } from '../shared/horde.js';
 import { usdText } from '../shared/assets.js';
 import { t, getLang } from './i18n.js';
 import { settings } from './settings.js';
@@ -291,7 +292,10 @@ export class GameClient {
     const tint = fin && RARITY_ORDER.indexOf(fin.rarity) >= 1 ? (fin.fx === 'rainbow' ? `hsl(${(now / 3) % 360}, 100%, 65%)` : fin.color) : null;
     if (wp.melee) {
       const big = ['axe', 'katana', 'scythe', 'hammer', 'esword', 'dual'].includes(fin ? modelFor(wp.id, fin.id) : '');
-      this.fx.slash(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.aim, a.facing, tint, big);
+      // drawn where the hit lands: around the runner, at gun height, out to the blade's reach
+      // (a target counts when its body is inside it)
+      const m = meleeOf(fin?.id);
+      this.fx.slash(a.x, a.y, 18, a.aim, a.facing, tint, big, m.reach + CFG.PLAYER_R, m.arc);
       return;
     }
     this.fx.muzzle(p.muzzle.x, a.y + FEET, a.y + FEET - p.muzzle.y, p.aim, !!wp.heavy, now, tint);
@@ -554,7 +558,7 @@ export class GameClient {
           if (this.pred && Math.hypot(ev.x - this.pred.x, ev.y - this.pred.y) < 400) this.shake = Math.max(this.shake, 14);
           break;
         case 'wave':
-          this.banner(ev.boss ? t('hud.bossWave') : t('hud.wave', { n: ev.n, of: ev.of }), ev.boss ? 'warn' : 'gold', 2600);
+          this.banner(ev.boss ? t(ev.n >= ev.of ? 'hud.bossWave' : 'hud.midBossWave') : t('hud.wave', { n: ev.n, of: ev.of }), ev.boss ? 'warn' : 'gold', 2600);
           this.sfx.play('storm');
           if (ev.boss) {
             this.sfx.say?.('final', getLang());
@@ -593,8 +597,11 @@ export class GameClient {
           this.banner(t('hud.summon'), 'warn', 1400);
           break;
         case 'bossDown':
-          this.banner(t('hud.bossDown'), 'gold', 3000);
+          this.banner(t(ev.mid ? 'hud.midBossDown' : 'hud.bossDown'), 'gold', 3000);
           this.sfx.music?.sting(true);
+          break;
+        case 'zcr':
+          this.fx.floater(ev.x, ev.y - 46, `+${ev.v} CR`, '#3ddc97', 13, 0.8);
           break;
         case 'medkit':
           this.fx.floater(ev.x, ev.y - 20, '+HP', '#3ddc97', 16, 1);
@@ -730,7 +737,7 @@ export class GameClient {
   // nearest enemy we can see within the current weapon's reach (allies never)
   autoTarget() {
     const wp = WEAPONS[this.you?.w ?? 0];
-    const reach = wp.melee ? wp.reach + CFG.PLAYER_R * 2 + 40 : wp.range * 0.95;
+    const reach = wp.melee ? meleeOf(this.outfit?.ws?.[wp.id]).reach + CFG.PLAYER_R * 2 + 20 : wp.range * 0.95;
     let best = null;
     let bd = reach;
     for (const f of [...(this.lastFigures ?? []), ...(this.lastZombies ?? [])]) {
@@ -953,7 +960,7 @@ export class GameClient {
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
     if (this.zombieMode) {
-      el.bag.textContent = t('hud.waveN', { n: you.zw ?? 0, of: 10 });
+      el.bag.textContent = t('hud.waveN', { n: you.zw ?? 0, of: WAVES });
       el.pnl.textContent = you.zbr ? t('hud.nextWave', { s: you.zbr }) : t('hud.zLeft', { n: you.zl ?? 0, k: you.zk ?? 0 });
       el.pnl.className = 'pnl';
     } else if (this.goldMode) {
@@ -990,6 +997,7 @@ export class GameClient {
   updateRest(now, view, you, alive, tl) {
     const el = this.el;
     el.timer.textContent = mmss(tl);
+    el.timer.hidden = this.zombieMode; // zombies: no clock, hold out as long as you can
     el.timer.classList.toggle('hot', tl <= 30);
     if (alive && tl <= 10 && tl > 0 && Math.floor(tl) !== this.lastTick) {
       this.lastTick = Math.floor(tl);

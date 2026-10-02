@@ -91,8 +91,9 @@ export class Fx {
     this.lights.push({ x, y, r: big ? 150 : 100, t0: now, life: 70 });
   }
 
-  slash(x, y, z, aim, f, color = null, big = false) {
-    this.add({ kind: 'slash', x, y, z, aim, f, life: big ? 0.24 : 0.16, float: true, color, big });
+  // a swing: an arc around the runner exactly as wide and as far as the blade hits (r, arc)
+  slash(x, y, z, aim, f, color = null, big = false, r = 26, arc = 2) {
+    this.add({ kind: 'slash', x, y, z, aim, f, life: big ? 0.28 : 0.22, float: true, color, big, r, arc });
   }
 
   // a tripmine going off: a fireball, a shock ring, a flash that lights the dark
@@ -321,9 +322,10 @@ export class Fx {
         }
         case 'slash': {
           const k = p.age / p.life;
-          const r = p.big ? 34 : 26;
-          const start = p.aim - 1.0;
-          const end = start + 2.0 * Math.min(1, k * 2.2);
+          const r = p.r;
+          // the sweep runs across the arc the blade covers, from one side to the other
+          const start = p.aim - p.arc / 2;
+          const end = start + p.arc * Math.min(1, k * 3);
           if (p.color) {
             // a skinned blade leaves a neon arc: glow, colour, white edge
             ctx.save();
@@ -339,10 +341,23 @@ export class Fx {
             ctx.restore();
             break;
           }
-          ctx.strokeStyle = `rgba(235, 240, 255, ${0.85 * (1 - k)})`;
-          ctx.lineWidth = 3;
+          ctx.globalAlpha = 1; // (the particle before may have left it faded)
+          // the reach of the swing, faint, and the blade's trail sweeping across it
+          ctx.fillStyle = `rgba(235, 240, 255, ${0.08 * (1 - k)})`;
           ctx.beginPath();
-          ctx.arc(p.x, sy, r, start, end);
+          ctx.moveTo(p.x, sy);
+          ctx.arc(p.x, sy, r, start, start + p.arc);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = `rgba(235, 240, 255, ${0.95 * (1 - k)})`;
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.arc(p.x, sy, r, Math.max(start, end - 0.9), end);
+          ctx.stroke();
+          ctx.strokeStyle = `rgba(235, 240, 255, ${0.35 * (1 - k)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(p.x, sy, r * 0.82, start, end);
           ctx.stroke();
           break;
         }

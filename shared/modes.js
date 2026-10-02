@@ -48,7 +48,8 @@ export const MODES = [
   { id: 'team8', kind: 'team', size: 16, teamSize: 8, pick: true, rounds: 2, round: 90 },
   // ranked: a battle royale that also moves your season rating (ranked.js)
   { id: 'ranked', kind: 'br', size: 10, ranked: true, pick: true, rounds: 2, round: 90 },
-  { id: 'zombies', kind: 'zombie', size: 4, seconds: 480, fixed: 100, solo: true, pick: true },
+  // zombies: no clock (two hours is only a safety net) and the Guns + Lasers buy menu
+  { id: 'zombies', kind: 'zombie', size: 4, seconds: 7200, fixed: 100, solo: true, pick: true, shop: true },
   { id: 'gold', kind: 'gold', size: 8, seconds: 150, fixed: 100 },
 ];
 export const MODE = Object.fromEntries(MODES.map((m) => [m.id, m]));
