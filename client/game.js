@@ -41,6 +41,18 @@ function lerpAngle(a, b, t) {
 // ------------------------------------------------------------ animation book
 
 /** Keeps a walk cycle, facing and wound state per runner from their positions. */
+// What breaks on a player's device is invisible to us: a frame or script error goes to the server
+// (a few per page, each message once) so it shows on the team's analytics page.
+const reported = new Set();
+export function reportError(where, e) {
+  try {
+    const m = String(e?.message ?? e).slice(0, 300);
+    if (reported.has(m) || reported.size >= 8) return;
+    reported.add(m);
+    globalThis.__darkbagsSend?.({ t: 'cerr', where, m, st: String(e?.stack ?? '').slice(0, 900), ua: navigator.userAgent.slice(0, 160) });
+  } catch {}
+}
+
 export class AnimBook {
   constructor() {
     this.map = new Map();
@@ -199,6 +211,7 @@ export class GameClient {
 
   onSnap(s) {
     const now = performance.now();
+    this.snapAt = now;
     const off = s.time - now;
     if (this.offset === null || off > this.offset) this.offset = off;
     else this.offset += (off - this.offset) * 0.02;
@@ -811,8 +824,13 @@ export class GameClient {
     try {
       if (view) this.renderer.draw(view);
     } catch (e) {
-      if (!this.drawErr) console.error('frame draw failed', e);
-      this.drawErr = true;
+      const key = String(e?.message ?? e);
+      this.drawErrs ??= new Set();
+      if (!this.drawErrs.has(key) && this.drawErrs.size < 5) {
+        this.drawErrs.add(key);
+        console.error('frame draw failed', e);
+        reportError('draw', e);
+      }
       this.fx.clear();
     }
     this.renderer.measure(dt * 1000);
@@ -999,6 +1017,9 @@ export class GameClient {
   updateHud(now, view) {
     const you = this.you;
     const el = this.el;
+    // no picture from the server for a while: say so, instead of a silent freeze
+    const lagEl = document.getElementById('lagwarn');
+    if (lagEl) lagEl.hidden = !(this.snapAt && now - this.snapAt > 1200);
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
     if (this.zombieMode) {

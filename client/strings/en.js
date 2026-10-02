@@ -19,7 +19,7 @@ export default {
   'how.keys': "<kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd> attack · <kbd>Space</kbd> dash · <kbd>Q</kbd> fake your bag size · <kbd>M</kbd> sound · <kbd>N</kbd> music",
   'how.fine': 'Every raid and every achievement pays rank XP. Every rank-up lends you a new skin for 3 days.',
   'net.practice': 'Just you and the bots, offline.',
-  'net.open': 'Connected. Humans and bots share each raid.',
+  'net.open': 'Connected. Online raids are real players only.',
   'net.connecting': 'Connecting to the raid server…',
   'net.down': 'Server unreachable. Retrying… Practice mode works offline.',
   'net.lost': 'Lost the connection. Back at the tables.',
@@ -82,6 +82,7 @@ export default {
   'prep.back': 'Back to tables',
   // raid HUD
   'hud.bagPrivate': 'Your bag · private',
+  'hud.lag': 'Server not responding · reconnecting…',
   'hud.golden': 'Golden raid',
   'hud.goldenStart': 'Golden raid · jackpot loot inside',
   'hud.start': 'Knife up · grab the orange · find an exit',

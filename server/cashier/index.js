@@ -10,6 +10,7 @@ import { PriceFeed } from './prices.js';
 import { createStarknetChain } from './starknet.js';
 import { createPrivy, handlePrivySign } from './privy.js';
 import { createCatalog } from './catalog.js';
+import { track } from '../stall.js';
 
 const TRANSFER_SELECTOR = normAddr(hash.getSelectorFromName('transfer'));
 
@@ -51,7 +52,7 @@ export async function createCashier(env = process.env, log = console) {
   let cashier;
   const write = () => {
     if (!cfg.file) return Promise.resolve();
-    const body = JSON.stringify(cashier.toJSON());
+    const body = track('save cashier journal', () => JSON.stringify(cashier.toJSON()));
     writing = writing.then(async () => {
       const tmp = `${cfg.file}.tmp`;
       await writeFile(tmp, body, { mode: 0o600 });

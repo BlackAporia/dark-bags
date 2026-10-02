@@ -6,7 +6,7 @@ import { WEAPONS } from '../shared/weapons.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
 import { Sfx } from './sfx.js';
-import { GameClient, Attract, fmt, mmss, esc } from './game.js';
+import { GameClient, Attract, fmt, mmss, esc, reportError } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { store } from './store.js';
 import { PriceBook, formatUnits, usdText } from '../shared/assets.js';
@@ -153,6 +153,9 @@ Object.defineProperty(app, 'stake', {
   enumerable: true,
 });
 const send = (m) => app.transport?.send(m);
+globalThis.__darkbagsSend = send;
+addEventListener('error', (e) => reportError('script', e.error ?? e.message));
+addEventListener('unhandledrejection', (e) => reportError('promise', e.reason));
 const game = new GameClient({ renderer, input, sfx, send, el });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
 // share cards: everything that happens can be posted
@@ -1385,7 +1388,10 @@ function loop(now) {
       if (!input.touchOn || attractSkip) attract.frame(now, input.touchOn ? dt * 2 : dt);
     }
   } catch (e) {
-    if (!loopErr) console.error('frame failed', e);
+    if (!loopErr) {
+      console.error('frame failed', e);
+      reportError('frame', e);
+    }
     loopErr = true;
   }
 }

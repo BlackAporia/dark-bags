@@ -37,6 +37,8 @@ const PENDING_TTL_MS = 15 * 60 * 1000;
 const PENDING_PER_ACCOUNT = 5;
 const PENDING_TOTAL = 1000;
 const SCAN_EVERY_MS = 10 * 1000;
+const BG_SCAN_IDLE_MS = 60 * 1000;
+const BG_SCAN_LIVE_MS = 5 * 60 * 1000;
 
 export function normAddr(x) {
   let v;
@@ -128,6 +130,7 @@ export class Cashier {
     this.pending = new Map(); // public deposit tx → { account, at }
     this.queue = Promise.resolve(); // withdrawals go out one at a time (house nonce)
     this.onCredit = null; // (account) => void, set by the lobby to push balances
+    this.liveGame = null; // () => is a raid running? (set by the server: background scans wait)
     // a payout that was in flight when the process died needs a human, not a retry
     for (const w of this.withdrawals) if (w.status === 'sending') w.status = 'review';
   }
@@ -371,8 +374,14 @@ export class Cashier {
       }
       await this.depositPublic(p.account, tx).catch(() => {});
     }
-    if (this.chain.info().routes.includes('private')) return this.scanPrivate().catch((e) => console.error('pool scan failed', e?.message ?? e));
-    return [];
+    if (!this.chain.info().routes.includes('private')) return [];
+    // A pool scan opens every note with the viewing key: seconds of CPU on one thread, and every
+    // raid on the server stalls meanwhile. In the background it runs once a minute when nobody is
+    // in a raid, at most every 5 minutes while one is live. A player asking for a private deposit
+    // still gets a scan at once (scanPrivate from the lobby).
+    const since = this.now() - (this.lastScan ?? -Infinity);
+    if (since < BG_SCAN_IDLE_MS || (this.liveGame?.() && since < BG_SCAN_LIVE_MS)) return [];
+    return this.scanPrivate().catch((e) => console.error('pool scan failed', e?.message ?? e));
   }
 
   // ------------------------------------------------------------ withdrawals

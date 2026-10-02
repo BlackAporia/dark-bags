@@ -20,6 +20,7 @@ import { MailBook, cleanGift } from '../shared/mail.js';
 import { FortuneBook } from '../shared/fortune.js';
 import { StatsBook } from '../shared/stats.js';
 import { createAnalytics, adminSet } from './analytics.js';
+import { track, note, stalls, watchStalls } from './stall.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -82,9 +83,11 @@ if (EPOCH_FILE) {
 // a save never leaves a half-written file behind: write a temp file, then swap it in
 async function saveJSON(file, obj) {
   const tmp = `${file}.tmp`;
-  await writeFile(tmp, JSON.stringify(obj));
+  const body = track(`save ${path.basename(file)}`, () => JSON.stringify(obj));
+  await writeFile(tmp, body);
   await rename(tmp, file);
 }
+watchStalls();
 // players, friends, messages, guilds: on the data volume when there is one
 
 // ------------------------------------------------------------------ wallet
@@ -271,7 +274,14 @@ const lobby = new Lobby({
   newToken: () => crypto.randomBytes(16).toString('hex'),
 });
 
-const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET });
+if (real) {
+  real.cashier.liveGame = () => [...lobby.rooms.values()].some((r) => r.state === 'live');
+  const poll = real.cashier.poll.bind(real.cashier);
+  real.cashier.poll = () => track('cashier poll (deposits, STRK20 scan)', poll);
+  const refresh = real.feed.refresh.bind(real.feed);
+  real.feed.refresh = () => track('price feed', refresh);
+}
+const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls });
 
 // ------------------------------------------------------------------ static
 const MIME = {
@@ -434,7 +444,10 @@ wss.on('connection', (ws, req) => {
     } catch {
       return;
     }
-    lobby.handle(cid, msg);
+    const t0 = performance.now();
+    track(`msg ${String(msg?.t).slice(0, 20)}`, () => lobby.handle(cid, msg));
+    const took = performance.now() - t0;
+    if (took > 50) note(`msg ${String(msg?.t).slice(0, 20)}`, took);
   });
   ws.on('close', () => {
     guard.close(net);
@@ -455,7 +468,10 @@ function loop() {
   let n = 0;
   while (acc >= STEP && n < 5) {
     try {
-      lobby.tick();
+      const t0 = performance.now();
+      track('game tick', () => lobby.tick());
+      const took = performance.now() - t0;
+      if (took > 50) note('game tick', took);
     } catch (e) {
       console.error('tick failed', e);
     }

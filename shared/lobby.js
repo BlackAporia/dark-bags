@@ -35,6 +35,7 @@ export class Lobby {
   constructor({ stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.stats = stats; // the team's analytics (server only)
+    this.clientErrors = []; // errors players' devices reported, newest first
     this.isAdmin = isAdmin; // (account) => may open the analytics page
     this.referrals = referrals; // invite codes, who brought whom, the inviters' earnings
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
@@ -198,6 +199,16 @@ export class Lobby {
         s.ping = s.ping == null ? Math.round(rtt) : Math.round(s.ping * 0.6 + rtt * 0.4);
         s.room?.setPing?.(cid, s.ping);
         this.send(cid, { t: 'ping', ms: s.ping });
+        break;
+      }
+      case 'cerr': {
+        // a frame or script error on a player's device (see client reportError): kept for the team
+        s.cerrs = (s.cerrs ?? 0) + 1;
+        if (s.cerrs > 10) break;
+        const e = { at: this.now(), key: this.key(s) ?? null, name: s.name, where: String(msg.where ?? '').slice(0, 20), m: String(msg.m ?? '').slice(0, 300), st: String(msg.st ?? '').slice(0, 900), ua: String(msg.ua ?? '').slice(0, 160), mode: s.room?.mode ?? null };
+        this.clientErrors.unshift(e);
+        if (this.clientErrors.length > 40) this.clientErrors.length = 40;
+        if (!this.practice) console.warn(`client ${e.where} error (${e.name}, ${e.mode ?? 'lobby'}): ${e.m}`);
         break;
       }
       case 'ping':
