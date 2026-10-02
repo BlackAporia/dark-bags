@@ -8,6 +8,7 @@ import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } 
 import { SocialBook, GUILD_RANK } from './social.js';
 import { ReferralBook, cleanCode } from './referrals.js';
 import { Guard, GUARD } from './guard.js';
+import { MailBook } from './mail.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -30,7 +31,7 @@ export const CUSTOM_MAX = 10_000_000; // $10,000
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.referrals = referrals; // invite codes, who brought whom, the inviters' earnings
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
@@ -55,6 +56,7 @@ export class Lobby {
     // one table per mode and stake
     this.rooms = new Map();
     this.guard = guard;
+    this.mail = mail;
     this.roomArgs = { wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
@@ -159,6 +161,7 @@ export class Lobby {
         chat: this.chat,
         chain: this.cashier ? this.cashier.info() : null,
         social: this.socialSummary(s),
+        mail: this.key(s) ? this.mail.unread(this.key(s)) : 0,
         account: s.account,
         privy: this.cashier?.privyFor(s.token) ?? null,
         cfg: {
@@ -258,6 +261,12 @@ export class Lobby {
         // practice is free play money: buying (bags, shop $) and the battle pass are online only
         if (this.practice && ['box', 'topup', 'pass_buy', 'pass_claim'].includes(msg.t)) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
         this.lockerOp(cid, s, msg);
+        return;
+      case 'mail_list':
+      case 'mail_read':
+      case 'mail_claim':
+      case 'spin':
+        this.mailOp(cid, s, msg);
         return;
       case 'ref_info':
         // with real tokens the code belongs to the signed-in address
@@ -390,7 +399,41 @@ export class Lobby {
       : inv.open(key, id, pay, msg.n);
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
+    if (msg.t === 'topup' && !this.practice) this.welcome(key); // the first top-up earns the welcome bonus (its toast comes last)
     if (s.room && (msg.t === 'equip' || msg.t === 'body' || msg.t === 'wequip' || msg.t === 'tequip')) s.room.broadcastPrep();
+  }
+
+  // The welcome bonus, once per account: the premium Founder title (worn at once if no other title
+  // is on) and a letter in the mailbox with a spin of the fortune wheel.
+  welcome(key) {
+    if (!key || !this.inventory.welcome(key)) return false;
+    const done = this.ranks.progress(key, { deposits: 1 });
+    if (done.some((a) => a.id === 'founder') && !this.ranks.title(key)) this.ranks.setTitle(key, 'founder');
+    if (done.length) this.ranks.add(key, done.reduce((n, a) => n + (a.xp ?? 0), 0));
+    this.mail.send({ key, kind: 'gift', title: 'Welcome bonus', body: 'Thanks for your first top-up!', i18n: 'welcome', gift: { k: 'spin', n: 1 } });
+    for (const cid of this.sessionsOf(key)) {
+      this.send(cid, { t: 'mailbox', unread: this.mail.unread(key), news: { k: 'welcome' } });
+      this.send(cid, { t: 'career', career: this.ranks.career(key) });
+    }
+    return true;
+  }
+
+  mailOp(cid, s, msg) {
+    const key = this.key(s);
+    if (!key) return this.send(cid, { t: 'mailbox', signedOut: true, list: [], unread: 0 });
+    let gift = null;
+    let spin = null;
+    if (msg.t === 'mail_read') this.mail.read(key, String(msg.id ?? ''));
+    if (msg.t === 'mail_claim') {
+      gift = this.mail.claim(key, String(msg.id ?? ''));
+      if (gift) this.inventory.give(key, gift);
+    }
+    if (msg.t === 'spin') {
+      if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
+      spin = this.inventory.spin(key);
+      if (!spin.ok) return this.send(cid, { t: 'err', msg: spin.error });
+    }
+    this.send(cid, { t: 'mailbox', list: this.mail.inbox(key), unread: this.mail.unread(key), ...(gift ? { claimed: gift } : {}), ...(spin ? { spin } : {}), locker: this.inventory.view(key) });
   }
 
   // Shop $ is bought 1:1 with USDC or USDT (play-money test tokens without a cashier)
@@ -448,6 +491,7 @@ export class Lobby {
         let r;
         if (msg.route === 'private') r = { status: 'ok', credited: (await c.scanPrivate()).filter((x) => x.account === s.account) };
         else r = await c.depositPublic(s.account, msg.tx);
+        if (r.credited.some((x) => !x.held && !x.unsupported)) this.welcome(s.account); // the first deposit earns the welcome bonus
         reply({ t: 'cashier', op: 'deposit', route: msg.route, status: r.status, credited: r.credited.map((x) => ({ asset: x.token, units: x.amount.toString(), unsupported: !!x.unsupported, held: x.held ?? null })) });
         reply({ t: 'balance', balances: this.balances(s) });
       } else if (msg.t === 'withdraw') {

@@ -30,6 +30,7 @@ import { createSettingsUi } from './settingsui.js';
 import { createTour } from './tour.js';
 import { createIntro } from './intro.js';
 import { createInvite, captureRef, deviceId } from './invite.js';
+import { createMail } from './mail.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
@@ -157,7 +158,7 @@ game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null);
 const myLook = () => {
   const L = app.locker;
   const ws = {};
-  for (const [w, f] of Object.entries(L?.wequip ?? {})) if (!L.wowned || L.wowned.includes(`${w}.${f}`)) ws[w] = f;
+  for (const [w, f] of Object.entries(L?.wequip ?? {})) if (!L.wowned || L.wowned.includes(`${w}.${f}`) || (L.wtrials?.[`${w}.${f}`] ?? 0) > Date.now()) ws[w] = f;
   return { outfit: L?.outfit ?? 'basic-0', body: L?.body ?? 'm', ws };
 };
 function shareMoment(kind, data = {}) {
@@ -230,7 +231,20 @@ document.addEventListener('darkbags:news', () => news.open());
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m), openBox: (id) => shop.open(id) });
 const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id) });
 const invite = createInvite({ app, send, sfx, toast: (m) => toast(m) });
-const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite };
+const mail = createMail({
+  app,
+  send,
+  sfx,
+  toast: (m) => toast(m),
+  onUnread: (n) => {
+    const b = document.querySelector('.nav-btn[data-page="mail"] .nav-badge');
+    if (b) {
+      b.hidden = !n;
+      b.textContent = n > 9 ? '9+' : String(n);
+    }
+  },
+});
+const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite, mail };
 document.addEventListener('darkbags:mode', () => {
   store.set('darkbags.gmode', app.gameMode);
   renderLobby();
@@ -894,6 +908,7 @@ function onMessage(m) {
   if (m.t === 'locker') pass.onMessage(m);
   if (m.t === 'leaderboard' || m.t === 'career' || m.t === 'result') ranked.onMessage(m);
   if (m.t === 'ref' || m.t === 'welcome' || m.t === 'authed') invite.onMessage(m);
+  if (m.t === 'mailbox' || m.t === 'welcome' || m.t === 'authed' || m.t === 'locker') mail.onMessage(m);
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();

@@ -2121,3 +2121,40 @@ body.gold-on #bag { color: #ffd166; }
 @media (max-width: 520px) {
   .br-grid { grid-template-columns: 1fr; }
 }
+.ttl.t-premium { color: #1a1205; border: 0; background: linear-gradient(110deg, #b8860b 0%, #ffd76a 22%, #fff4c2 32%, #ffd76a 42%, #c9971c 60%, #ffe08a 80%, #b8860b 100%); background-size: 220% 100%; animation: ttl-gold 3.2s linear infinite; box-shadow: 0 0 16px -2px rgba(255, 200, 60, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.45); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5); font-weight: 900; }
+@keyframes ttl-gold { to { background-position: -220% 0; } }
+
+/* ---------------------------------------------------------------- mail + fortune wheel */
+.mail-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.mail { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 10px; min-height: 320px; }
+.mail-list { display: grid; align-content: start; gap: 6px; }
+.mail-row { display: flex; gap: 10px; align-items: center; text-align: start; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(14, 17, 25, 0.9); color: var(--paper); cursor: pointer; }
+.mail-row.on { border-color: var(--loot); }
+.mail-row.unread b::after { content: ''; display: inline-block; width: 8px; height: 8px; margin-inline-start: 6px; border-radius: 50%; background: #ff4d6d; vertical-align: middle; }
+.mail-ico { font-size: 20px; }
+.mail-head { display: grid; gap: 2px; min-width: 0; }
+.mail-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail-head small { color: #9aa3b5; font-size: 11px; }
+.mail-view { padding: 16px; border-radius: 16px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(20, 24, 34, 0.92), rgba(10, 12, 18, 0.92)); display: grid; align-content: start; gap: 8px; }
+.mail-view h3 { margin: 0; font-size: 20px; }
+.mail-body { line-height: 1.5; color: #d9deea; white-space: normal; }
+.mail-gift { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; border: 1px dashed rgba(255, 211, 77, 0.6); background: rgba(255, 211, 77, 0.06); }
+.mail-gift .ok { color: #4ade80; }
+.mail-spin { animation: spin-glow 1.6s ease-in-out infinite; }
+@keyframes spin-glow { 50% { box-shadow: 0 0 26px rgba(255, 211, 77, 0.8); } }
+.wheel-ov { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(3, 4, 8, 0.82); backdrop-filter: blur(6px); }
+.wheel-ov[hidden] { display: none; }
+.wheel-box { width: min(440px, 100%); display: grid; gap: 10px; justify-items: center; text-align: center; padding: 18px; border-radius: 20px; border: 1px solid rgba(255, 211, 77, 0.4); background: radial-gradient(90% 70% at 50% 30%, rgba(255, 211, 77, 0.14), transparent 70%), #0c0e14; }
+.wheel-wrap { position: relative; width: min(320px, 78vw); aspect-ratio: 1; }
+.wheel-rot { width: 100%; height: 100%; will-change: transform; }
+.wheel-svg { width: 100%; height: 100%; filter: drop-shadow(0 0 22px rgba(255, 211, 77, 0.35)); }
+.wheel-pin { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); z-index: 2; color: #ffd34d; font-size: 30px; text-shadow: 0 2px 6px #000; }
+.wheel-out { min-height: 20px; }
+.wheel-prize { display: grid; justify-items: center; gap: 4px; padding: 10px 16px; border-radius: 14px; border: 1px solid var(--r); box-shadow: 0 0 24px -4px var(--r); animation: prize-pop 0.5s ease-out; }
+.wheel-prize p { margin: 0; }
+.wheel-prize img { max-height: 126px; }
+.wheel-cash { font: 900 40px/1 var(--f-display); color: #4ade80; }
+@keyframes prize-pop { from { transform: scale(0.6); opacity: 0; } }
+@media (max-width: 640px) {
+  .mail { grid-template-columns: 1fr; }
+}
