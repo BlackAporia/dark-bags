@@ -116,8 +116,27 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     );
   }
 
+  // Cartridge Controller draws its window inside the page; our dialogs are modal (the browser's
+  // top layer), so nothing in the page can show above them. Step aside while it is up.
+  const inPage = (kind) => /cartridge|controller/i.test(kind ?? '');
+  async function aside(kind, fn) {
+    if (!inPage(kind)) return fn();
+    const open = ['dlg-connect', 'dlg-cashier'].filter((id) => $(id).open);
+    for (const id of open) $(id).close();
+    toast('Continue in the Cartridge window…');
+    try {
+      return await fn();
+    } finally {
+      for (const id of open) if (!$(id).open) $(id).showModal(); // back where the player was
+    }
+  }
+
   // wallet facade → server challenge → signature → session bound to the address
   async function signInWith(kind, connect) {
+    if (inPage(kind)) {
+      $('dlg-connect').close();
+      toast('Continue in the Cartridge window…');
+    }
     try {
       setStatus('connect-status', 'Waiting for the wallet…');
       const f = await connect();
@@ -132,6 +151,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       cs.kind = kind;
       send({ t: 'auth', address: f.address, signature: (Array.isArray(sig) ? sig : sig?.signature ?? []).map(String) });
     } catch (e) {
+      if (inPage(kind) && !$('dlg-connect').open) $('dlg-connect').showModal();
       setStatus('connect-status', friendly(e), true);
     } finally {
       cs.waiter = null;
@@ -325,13 +345,15 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     }
     $('dep-go').disabled = true;
     try {
-      const f = await ensureFacade();
       setStatus('cash-status', 'Confirm the deposit in your wallet…');
-      let tx;
-      if (cs.depRoute === 'private') {
-        if (!f.depositPrivate) throw new Error('This sign-in cannot make private transfers. Use a public deposit.');
-        tx = await f.depositPrivate(t, units, cs.chain.house);
-      } else tx = await f.depositPublic(t, units, cs.chain.house);
+      const tx = await aside(cs.kind, async () => {
+        const f = await ensureFacade();
+        if (cs.depRoute === 'private') {
+          if (!f.depositPrivate) throw new Error('This sign-in cannot make private transfers. Use a public deposit.');
+          return f.depositPrivate(t, units, cs.chain.house);
+        }
+        return f.depositPublic(t, units, cs.chain.house);
+      });
       setStatus('cash-status', `Sent (${short(tx)}). Waiting for Starknet…`);
       send({ t: 'deposit', route: cs.depRoute, tx });
       store.set('darkbags.lastDeposit', { tx, at: Date.now() });
