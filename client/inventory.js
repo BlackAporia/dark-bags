@@ -10,7 +10,7 @@ import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createInventory({ app, go, openLocker, openCashier, send }) {
+export function createInventory({ app, go, openLocker, openCashier, send, openBox = () => {} }) {
   function render() {
     const root = $('inv-root');
     if (!root) return;
@@ -47,7 +47,7 @@ export function createInventory({ app, go, openLocker, openCashier, send }) {
         <p class="fine">${t('inv.shopNote')}</p>
         <div class="inv-actions"><button type="button" class="cta" data-go="shop">${t('shop.topup')}</button></div>
       </section>
-      ${held.length ? `<section class="inv-card"><header><p class="eyebrow">${t('inv.unopened')}</p></header><div class="inv-boxes">${held.map(([id, n]) => `<button type="button" class="inv-box" data-go="shop" data-fam="${BOX[id]?.family}">${boxArt(BOX[id], 72)}<b>${esc(t(`box.${id}`))}</b><span>×${n}</span></button>`).join('')}</div></section>` : ''}
+      ${held.length ? `<section class="inv-card"><header><p class="eyebrow">${t('inv.unopened')}</p></header><div class="inv-boxes">${held.map(([id, n]) => `<div class="inv-box">${boxArt(BOX[id], 72)}<b>${esc(t(`box.${id}`))}</b><span>×${n}</span><button type="button" class="cta inv-open" data-open="${id}">${t('inv.open')}</button></div>`).join('')}</div></section>` : ''}
       <section class="inv-card">
         <header><p class="eyebrow">${t('inv.collection')}</p></header>
         <div class="inv-stats">
@@ -69,6 +69,12 @@ export function createInventory({ app, go, openLocker, openCashier, send }) {
           ${stat('inv.time', s.secs ? (s.secs >= 3600 ? `${(s.secs / 3600).toFixed(1)} h` : mmss(s.secs)) : '0:00')}
         </div>
       </section>`;
+    // open a held bag right here: the same show as in the shop, and it is free
+    for (const b of root.querySelectorAll('[data-open]'))
+      b.addEventListener('click', () => {
+        b.disabled = true;
+        openBox(b.dataset.open);
+      });
     for (const b of root.querySelectorAll('[data-go]'))
       b.addEventListener('click', () => {
         const k = b.dataset.go;

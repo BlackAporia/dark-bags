@@ -571,7 +571,8 @@ export class World {
       }
       if (zed) {
         this.bullets.delete(b.id);
-        this.horde.hit(zed, this.players.get(b.owner), b.dmg);
+        const hs = this.headshot(b, zed, zed.r / CFG.PLAYER_R);
+        this.horde.hit(zed, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, hs);
         if (this.phase !== 'live') return;
         continue;
       }
@@ -596,7 +597,8 @@ export class World {
       }
       if (victim) {
         this.bullets.delete(b.id);
-        this.damage(victim, this.players.get(b.owner), b.dmg, b.cause);
+        const hs = this.headshot(b, victim);
+        this.damage(victim, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, b.cause, hs);
         continue;
       }
       if (tWall >= 0) {
@@ -610,7 +612,15 @@ export class World {
     }
   }
 
-  damage(v, shooter, amount, cause = 'shot') {
+  // A gun round that passes close to the middle of the body is a headshot: a clean, centred
+  // hit, whatever the direction it came from (turret rounds never count)
+  headshot(b, v, scale = 1) {
+    if (b.cause !== 'shot') return false;
+    const d = Math.abs((v.x - b.x) * b.vy - (v.y - b.y) * b.vx) / (b.speed || 1);
+    return d < CFG.HEAD_R * scale;
+  }
+
+  damage(v, shooter, amount, cause = 'shot', hs = false) {
     if (v.shield > 0) return;
     if (shooter && shooter !== v && this.teamSize && shooter.team === v.team) return; // no friendly fire
     if (shooter && this.zombie) return; // zombies: the squad never hurts itself
@@ -628,11 +638,12 @@ export class World {
     if (full && v.hp <= 0 && shooter && shooter !== v && !this.hardcore) shooter.oneShots = (shooter.oneShots ?? 0) + 1; // full health to nothing in one hit
     v.lastHit = this.time;
     v.ext = 0;
-    this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y) });
-    if (v.hp <= 0) this.kill(v, shooter, cause);
+    if (hs && shooter && shooter !== v) shooter.headshots = (shooter.headshots ?? 0) + 1;
+    this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y), ...(hs ? { hs: 1 } : {}) });
+    if (v.hp <= 0) this.kill(v, shooter, cause, hs);
   }
 
-  kill(v, killer, cause = 'shot') {
+  kill(v, killer, cause = 'shot', hs = false) {
     // kills by weapon class (achievements), and turret kills (Guns + Lasers)
     if (killer && killer !== v) {
       if (cause === 'turret') killer.turretKills = (killer.turretKills ?? 0) + 1;
@@ -671,7 +682,7 @@ export class World {
       this.streak(killer);
     }
     // public feed: names only, never amounts
-    this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id, cause });
+    this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id, cause, ...(hs ? { hs: 1 } : {}) });
     if (this.dm && killer && killer !== v) this.checkLead();
   }
 

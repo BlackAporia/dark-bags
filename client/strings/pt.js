@@ -916,4 +916,10 @@ export default {
   'nyx.shopCase': "Bem-vindo à loja! Vamos gastar seus ganhos. Toque em Abrir nesta bolsa. É pago direto da sua carteira!",
   'nyx.shopEquip': "Uau, olha o que você ganhou! Toque no botão e é seu!",
   'nyx.bye': "É isso! Você já sabe jogar, vencer e comprar. Vai lá, corredor! Pode me chamar quando quiser nas Configurações.",
+  'hud.headshot': "TIRO NA CABEÇA",
+  'inv.open': "Abrir",
+  'bp.later': "Depois",
+  'ach.sharpshooter': "Atirador certeiro",
+  'ach.headhunter': "Caçador de cabeças",
+  'achd.headshots': "Acerte {n} tiros na cabeça",
 };

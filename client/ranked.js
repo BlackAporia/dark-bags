@@ -26,7 +26,7 @@ const titleImg = (id) => {
   return svgUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" width="120" height="70"><defs><filter id="g"><feGaussianBlur stdDeviation="2.4"/></filter></defs><g font-family="system-ui,sans-serif" font-weight="900" text-anchor="middle"><text x="60" y="30" font-size="13" fill="${c}" filter="url(#g)">${esc(t(`st.${seasonTitle(id).key}`).toUpperCase())}</text><text x="60" y="30" font-size="13" fill="#fff">${esc(t(`st.${seasonTitle(id).key}`).toUpperCase())}</text><text x="60" y="50" font-size="10" fill="${c}">+${Math.round(seasonTitle(id).bonus * 100)}% XP</text></g><rect x="6" y="8" width="108" height="54" rx="10" fill="none" stroke="${c}" stroke-width="2"/></svg>`);
 };
 
-export function createRanked({ app, send, sfx, toast, go }) {
+export function createRanked({ app, send, sfx, toast, go, openBox = () => {} }) {
   let board = null;
 
   function render() {
@@ -125,7 +125,13 @@ export function createRanked({ app, send, sfx, toast, go }) {
         else sfx.play('bag');
         const name = sp.k === 'title' ? neonText(sp.id) : win.name;
         const col = sp.k === 'title' ? neonColor(sp.id) : RARITIES[win.rarity].color;
-        $('lt-actions').innerHTML = `<p class="ru-won" style="--q:${col}">${t('rd.won')} <b>${esc(name)}</b>${big ? ` · ${t('rd.bonus', { p: Math.round(seasonTitle(sp.id).bonus * 100) })}` : ''}</p><div class="ru-btns"><button type="button" class="cta" data-lt="ok">${t('rw.continue')}</button></div>`;
+        $('lt-actions').innerHTML = `<p class="ru-won" style="--q:${col}">${t('rd.won')} <b>${esc(name)}</b>${big ? ` · ${t('rd.bonus', { p: Math.round(seasonTitle(sp.id).bonus * 100) })}` : ''}</p><div class="ru-btns">${sp.k === 'box' ? `<button type="button" class="cta" data-lt="open">${t('inv.open')}</button>` : ''}<button type="button" class="${sp.k === 'box' ? 'ghost' : 'cta'}" data-lt="ok">${t('rw.continue')}</button></div>`;
+        $('lt-actions').querySelector('[data-lt="open"]')?.addEventListener('click', () => {
+          overlay.hidden = true;
+          overlay.className = 'rankup';
+          done?.();
+          openBox(sp.id);
+        });
         $('lt-actions').querySelector('[data-lt="ok"]').addEventListener('click', () => {
           overlay.hidden = true;
           overlay.className = 'rankup';

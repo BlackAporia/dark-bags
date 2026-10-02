@@ -916,4 +916,10 @@ export default {
   'nyx.shopCase': "Mağazaya hoş geldin! Kazancını harcayalım. Bu çantada Aç'a dokun. Ödeme doğrudan cüzdanından!",
   'nyx.shopEquip': "Vay, bak ne çıktı! Düğmeye dokun, artık senin!",
   'nyx.bye': "Hepsi bu! Oynamayı, kazanmayı ve alışverişi biliyorsun. Hadi koşucu! Beni istediğin zaman Ayarlar'dan çağırabilirsin.",
+  'hud.headshot': "KAFADAN",
+  'inv.open': "Aç",
+  'bp.later': "Sonra",
+  'ach.sharpshooter': "Keskin Nişancı",
+  'ach.headhunter': "Kafa Avcısı",
+  'achd.headshots': "{n} kafadan vuruş yap",
 };

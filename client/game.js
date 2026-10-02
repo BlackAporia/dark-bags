@@ -318,6 +318,21 @@ export class GameClient {
     }
   }
 
+  // your round found the head: a big HEADSHOT over them, a ping, and the announcer (not on
+  // every pellet of a shotgun: once in a while)
+  headshotFx(x, y, now) {
+    this.fx.floater(x, y - 34, t('hud.headshot'), '#ff3b5c', 20, 0.9);
+    this.fx.sparks(x, y, 44, 8, '#ffd166');
+    if (now - (this.hsPing ?? 0) > 120) {
+      this.hsPing = now;
+      this.sfx.play('headshot');
+    }
+    if (now - (this.hsSay ?? 0) > 2500) {
+      this.hsSay = now;
+      this.sfx.say?.('headshot', getLang(), 0.05);
+    }
+  }
+
   // a round in a zombie: dark ichor (or sparks without gore) and a wet thud
   zHitFx(a, now) {
     a.hitT = now;
@@ -391,9 +406,13 @@ export class GameClient {
             this.sfx.play('hurt');
             if (this.meAnim) this.hitFx(this.meAnim, now, 20);
           } else if (ev.sid === this.pid) {
-            this.fx.floater(ev.x, ev.y, '✕', '#ebe5d6', 14, 0.25);
-            this.sfx.play('hitmark');
+            if (ev.hs) this.headshotFx(ev.x, ev.y, now);
+            else {
+              this.fx.floater(ev.x, ev.y, '✕', '#ebe5d6', 14, 0.25);
+              this.sfx.play('hitmark');
+            }
           }
+          if (ev.hs && ev.vid === this.pid) this.shake = Math.max(this.shake, 16);
           break;
         case 'kill': {
           if (ev.vid === this.pid && this.meAnim && !this.dead) {
@@ -410,11 +429,11 @@ export class GameClient {
           const how = ev.cause === 'storm';
           if (ev.kid === this.pid && this.shopMode) this.fx.floater(this.pred?.x ?? 0, (this.pred?.y ?? 0) - 40, `+${GL.KILL} CR`, '#3ddc97', 18, 1.2);
           const b = (n) => `<b>${esc(n)}</b>`;
-          if (ev.kid === this.pid) this.feed(t('feed.youDropped', { name: b(ev.victim) }), 'me');
+          if (ev.kid === this.pid) this.feed(`${t('feed.youDropped', { name: b(ev.victim) })}${ev.hs ? ` · ${t('hud.headshot')}` : ''}`, 'me');
           else if (ev.cause === 'zombie' || ev.cause === 'boss') this.feed(t(ev.vid === this.pid ? 'feed.zYou' : 'feed.zDown', { name: b(ev.victim) }), ev.vid === this.pid ? 'me' : 'warnline');
           else if (ev.vid === this.pid) this.feed(how ? t('feed.storm') : t('feed.droppedYou', { name: `<b>${esc(ev.killer ?? 'The dark')}</b>` }), 'me');
           else if (how) this.feed(t('feed.stormTook', { name: b(ev.victim) }));
-          else if (ev.killer) this.feed(`${t('feed.dropped', { a: b(ev.killer), b: b(ev.victim) })}${ev.cause === 'turret' ? ' ◈' : ev.cause === 'mine' ? ' ⌁' : ''}`);
+          else if (ev.killer) this.feed(`${t('feed.dropped', { a: b(ev.killer), b: b(ev.victim) })}${ev.cause === 'turret' ? ' ◈' : ev.cause === 'mine' ? ' ⌁' : ev.hs ? ' ⌖' : ''}`);
           else this.feed(t('feed.down', { name: b(ev.victim) }));
           break;
         }
@@ -509,7 +528,8 @@ export class GameClient {
           break;
         }
         case 'zhit':
-          if (now - (this.zMark ?? 0) > 90) {
+          if (ev.hs) this.headshotFx(ev.x, ev.y, now);
+          else if (now - (this.zMark ?? 0) > 90) {
             this.zMark = now;
             this.sfx.play('hitmark');
           }

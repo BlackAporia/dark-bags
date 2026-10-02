@@ -244,6 +244,14 @@ export class Sfx {
       case 'hitmark':
         this.osc(this.voice({}, 0.6, 0), { type: 'square', f: 1500, dur: 0.035, vol: 0.12 });
         break;
+      case 'headshot': {
+        // a bright metal ping over a short crack: you know it was the head
+        const v = this.voice({}, 0.8, 0.1);
+        this.noise(v, { dur: 0.03, vol: 0.5, type: 'highpass', f: 3000 });
+        this.osc(v, { type: 'sine', f: 2400, to: 2300, dur: 0.35, vol: 0.18 });
+        this.osc(v, { type: 'sine', f: 3600, dur: 0.22, vol: 0.08, at: 0.01 });
+        break;
+      }
       case 'bone': {
         const v = this.voice(o, 1, 0.15);
         for (const at of [0, 0.022, 0.05]) this.noise(v, { dur: 0.012, vol: 0.55, type: 'highpass', f: 2200, at });
@@ -420,7 +428,7 @@ export class Sfx {
   // Announcer: recorded lines (voice-data.js) in the player's language, English where a
   // language has no recording. Played through the effects bus with a little extra punch
   // and a hall tail, so it follows the sound volume and mute. Keys: s1..s5 (kill streaks),
-  // victory, extracted, final, lead, lostLead.
+  // victory, extracted, final, lead, lostLead, headshot.
   say(key, lang = 'en', delay = 0.15) {
     if (this.muted || this.voiceOff || !this.ctx) return;
     const src = VOICE[lang]?.[key] ? VOICE[lang][key] : VOICE.en[key];

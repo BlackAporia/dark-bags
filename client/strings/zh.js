@@ -916,4 +916,10 @@ export default {
   'nyx.shopCase': "欢迎来到商店！花掉你的奖金吧。点这个袋子上的「打开」，直接从钱包付款！",
   'nyx.shopEquip': "哇，看看你抽到了什么！点按钮，它就是你的了！",
   'nyx.bye': "就这些！你已经会玩、会赢、会买了。冲吧，跑者！随时可以在「设置」里再叫我。",
+  'hud.headshot': "爆头",
+  'inv.open': "打开",
+  'bp.later': "稍后",
+  'ach.sharpshooter': "神枪手",
+  'ach.headhunter': "猎头者",
+  'achd.headshots': "命中 {n} 次爆头",
 };

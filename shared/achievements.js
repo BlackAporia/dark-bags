@@ -103,6 +103,9 @@ export const ACHIEVEMENTS = [
   { id: 'mother_lode', stat: 'bestGold', goal: 25, xp: 600 },
   { id: 'bag_hoarder', stat: 'goldBags', goal: 300, xp: 1200 },
   { id: 'midas', stat: 'goldWins', goal: 10, xp: 3000 },
+  // headshots: clean, centred hits (double damage)
+  { id: 'sharpshooter', stat: 'headshots', goal: 25, xp: 300 },
+  { id: 'headhunter', stat: 'headshots', goal: 250, xp: 1500 },
   // secret: hidden until you earn them
   { id: 'by_a_thread', stat: 'clutch', goal: 1, xp: 700, secret: true },
   { id: 'untouchable', stat: 'flawless', goal: 1, xp: 900, secret: true },
@@ -143,6 +146,7 @@ export function raidStats(p, { golden = false, lastExit = false, mode = null, sq
     kSniper: wk.sniper ?? 0,
     kKnife: wk.knife ?? 0,
     turretKills: p.turretKills ?? 0,
+    headshots: p.headshots ?? 0,
     oneShots: p.oneShots ?? 0,
     dmWins: won && mode?.kind === 'dm' ? 1 : 0,
     duelWins: won && mode?.id === 'duel' ? 1 : 0,

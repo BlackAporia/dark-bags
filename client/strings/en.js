@@ -924,4 +924,10 @@ export default {
   'nyx.shopCase': "Welcome to the shop! Let's spend your winnings. Tap Open on this bag. It's paid straight from your wallet!",
   'nyx.shopEquip': "Ooh, look what you got! Tap the button, and it's yours!",
   'nyx.bye': "That's everything! You can play, win, and shop. Go get 'em, runner! You can call me again anytime, in Settings.",
+  'hud.headshot': "HEADSHOT",
+  'inv.open': "Open",
+  'bp.later': "Later",
+  'ach.sharpshooter': "Sharpshooter",
+  'ach.headhunter': "Headhunter",
+  'achd.headshots': "Land {n} headshots",
 };
