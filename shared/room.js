@@ -25,7 +25,7 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ stats = null, guard = null, referrals = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
+  constructor({ edge = false, stats = null, guard = null, referrals = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
@@ -40,6 +40,7 @@ export class RoomCore {
     this.referrals = referrals;
     this.guard = guard;
     this.stats = stats; // the team's analytics (online only)
+    this.edge = edge; // a regional match server: stakes arrive already taken by the main server
     this.practice = practice;
     this.wallet = wallet;
     this.prices = prices;
@@ -120,7 +121,7 @@ export class RoomCore {
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
         if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
-        this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'USDC');
+        this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'USDC', this.edge ? msg._units : null);
         break;
       case 'unready':
         this.unready(c);
@@ -156,15 +157,21 @@ export class RoomCore {
   // ------------------------------------------------------------ ready room
 
   // Ready: quote the $ stake in the chosen token and escrow it at that rate.
-  ready(c, asset) {
+  // pre: units already quoted and taken by the main server (regional match servers only)
+  ready(c, asset, pre = null) {
     if (c.ready || this.inRaid(c)) return;
-    const units = this.prices.quote(asset, this.stake);
+    let units = null;
+    try {
+      units = pre != null ? BigInt(pre) : this.prices.quote(asset, this.stake);
+    } catch {
+      units = null;
+    }
     if (units === null) {
       this.send(c.cid, { t: 'err', msg: 'That token has no price right now, so it cannot be staked.' });
       return;
     }
     if (!this.wallet.debit(c.token, asset, units)) {
-      const sym = this.prices.get(asset)?.symbol ?? asset;
+      const sym = this.prices.get(asset)?.symbol ?? 'coins';
       this.send(c.cid, { t: 'err', msg: `Not enough ${sym} for this table.` });
       return;
     }
