@@ -318,6 +318,16 @@ export class GameClient {
     }
   }
 
+  // the damage a hit did, popping off the target: white for yours, gold for a head hit,
+  // red over yourself when you take it; numbers in quick succession fan out a little
+  dmgNumber(x, y, d, kind) {
+    this.dmgFan = ((this.dmgFan ?? 0) + 1) % 5;
+    const dx = (this.dmgFan - 2) * 9;
+    const color = kind === 'crit' ? '#ffd166' : kind === 'me' ? '#ff4d5e' : '#ffffff';
+    const size = kind === 'crit' ? 19 : Math.min(18, 12 + d / 12);
+    this.fx.floater(x + dx, y - 10 - Math.abs(dx) * 0.3, `-${d}`, color, size, kind === 'crit' ? 0.9 : 0.75, true);
+  }
+
   // a round in the head that does not kill: CRIT (and the ping)
   critFx(x, y, now) {
     this.fx.floater(x, y - 30, t('hud.crit'), '#ffd166', 16, 0.7);
@@ -434,12 +444,11 @@ export class GameClient {
             this.shake = Math.max(this.shake, 12);
             this.sfx.play('hurt');
             if (this.meAnim) this.hitFx(this.meAnim, now, 20);
+            if (ev.d) this.dmgNumber(this.meAnim?.x ?? ev.x, this.meAnim?.y ?? ev.y, ev.d, 'me');
           } else if (ev.sid === this.pid) {
             if (ev.hs && !ev.fatal) this.critFx(ev.x, ev.y, now);
-            else if (!ev.hs) {
-              this.fx.floater(ev.x, ev.y, '✕', '#ebe5d6', 14, 0.25);
-              this.sfx.play('hitmark');
-            }
+            else if (!ev.hs) this.sfx.play('hitmark');
+            if (ev.d) this.dmgNumber(ev.x, ev.y, ev.d, ev.hs ? 'crit' : 'hit');
           }
           if (ev.hs && ev.vid === this.pid) this.shake = Math.max(this.shake, 16);
           break;
@@ -579,6 +588,7 @@ export class GameClient {
           break;
         }
         case 'zhit':
+          if (ev.d) this.dmgNumber(ev.x, ev.y, ev.d, ev.hs ? 'crit' : 'hit');
           if (ev.hs && !ev.fatal) this.critFx(ev.x, ev.y, now);
           else if (ev.hs) break;
           else if (now - (this.zMark ?? 0) > 90) {

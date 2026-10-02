@@ -108,8 +108,9 @@ export class Fx {
     this.add({ kind: 'ring', x, y, z: 4, life: 0.5, color, float: true });
   }
 
-  floater(x, y, text, color, size, life = 1) {
-    this.floaters.push({ x, y, text, color, size, age: 0, life });
+  // pop: a damage number, that punches in big and settles (and drifts sideways a touch)
+  floater(x, y, text, color, size, life = 1, pop = false) {
+    this.floaters.push({ x, y, text, color, size, age: 0, life, pop, drift: pop ? (Math.random() - 0.5) * 30 : 0 });
   }
 
   // a detached leg: pts are relative to piece origin, in upright figure space
@@ -386,12 +387,14 @@ export class Fx {
       const k = f.age / f.life;
       ctx.globalAlpha = 1 - k * k;
       ctx.fillStyle = f.color;
-      ctx.font = `600 ${f.size}px "IBM Plex Mono", ui-monospace, monospace`;
+      const size = f.pop ? f.size * (k < 0.18 ? 1.6 - (k / 0.18) * 0.6 : 1) : f.size;
+      ctx.font = `${f.pop ? 800 : 600} ${size}px "IBM Plex Mono", ui-monospace, monospace`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = 'rgba(4,6,10,0.8)';
-      ctx.lineWidth = 3;
-      ctx.strokeText(f.text, f.x, f.y - 46 - k * 40);
-      ctx.fillText(f.text, f.x, f.y - 46 - k * 40);
+      ctx.lineWidth = f.pop ? 4 : 3;
+      const x = f.x + f.drift * k;
+      ctx.strokeText(f.text, x, f.y - 46 - k * 40);
+      ctx.fillText(f.text, x, f.y - 46 - k * 40);
     }
     ctx.globalAlpha = 1;
   }

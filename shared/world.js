@@ -661,13 +661,14 @@ export class World {
       v.lastAttacker = shooter.id;
     }
     const full = v.hp >= this.maxHp;
+    const dealt = Math.max(1, Math.round(Math.min(amount, Math.max(0, v.hp)) * (CFG.HP / this.maxHp))); // shown over the target
     v.hp -= amount;
     v.dmgTaken = (v.dmgTaken ?? 0) + amount; // for "untouchable"
     if (full && v.hp <= 0 && shooter && shooter !== v && !this.hardcore) shooter.oneShots = (shooter.oneShots ?? 0) + 1; // full health to nothing in one hit
     v.lastHit = this.time;
     v.ext = 0;
     if (hs && shooter && shooter !== v) shooter.headshots = (shooter.headshots ?? 0) + 1;
-    this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y), ...(hs ? { hs: 1 } : {}), ...(v.hp <= 0 ? { fatal: 1 } : {}) });
+    this.emit({ k: 'hit', to: shooter ? [v.id, shooter.id] : [v.id], vid: v.id, sid: shooter?.id ?? 0, x: r1(v.x), y: r1(v.y), d: dealt, ...(hs ? { hs: 1 } : {}), ...(v.hp <= 0 ? { fatal: 1 } : {}) });
     if (v.hp <= 0) this.kill(v, shooter, cause, hs);
   }
 

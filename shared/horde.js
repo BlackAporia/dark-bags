@@ -258,11 +258,12 @@ export class Horde {
   hit(z, by, dmg, hs = false) {
     const w = this.w;
     if (!this.zombies.has(z.id)) return;
+    const dealt = Math.max(1, Math.round(Math.min(dmg, Math.max(0, z.hp))));
     z.hp -= dmg;
     if (hs && by) by.headshots = (by.headshots ?? 0) + 1;
     if (by) by.zDmg = (by.zDmg ?? 0) + Math.min(dmg, Math.max(0, z.hp + dmg));
     if (z.type === 'boss' && by) by.bossDmg = (by.bossDmg ?? 0) + dmg;
-    w.emit({ k: 'zhit', to: by ? [by.id] : undefined, zid: z.id, x: Math.round(z.x), y: Math.round(z.y), ...(hs ? { hs: 1 } : {}), ...(z.hp <= 0 ? { fatal: 1 } : {}) });
+    w.emit({ k: 'zhit', to: by ? [by.id] : undefined, zid: z.id, x: Math.round(z.x), y: Math.round(z.y), d: dealt, ...(hs ? { hs: 1 } : {}), ...(z.hp <= 0 ? { fatal: 1 } : {}) });
     if (z.hp > 0) return;
     this.zombies.delete(z.id);
     if (by) {
