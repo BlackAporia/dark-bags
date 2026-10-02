@@ -860,15 +860,15 @@ export class GameClient {
       }
     }
     const span = b.time - a.time;
-    const t = span > 0 ? Math.min(1, Math.max(0, (rt - a.time) / span)) : 1;
+    const k = span > 0 ? Math.min(1, Math.max(0, (rt - a.time) / span)) : 1;
     const pa = new Map(a.players.map((p) => [p.i, p]));
     const figures = [];
     const zombies = [];
     for (const p of b.players) {
       const q = pa.get(p.i);
-      const x = q ? lerp(q.x, p.x, t) : p.x;
-      const y = q ? lerp(q.y, p.y, t) : p.y;
-      const aim = q ? lerpAngle(q.a, p.a, t) : p.a;
+      const x = q ? lerp(q.x, p.x, k) : p.x;
+      const y = q ? lerp(q.y, p.y, k) : p.y;
+      const aim = q ? lerpAngle(q.a, p.a, k) : p.a;
       if (p.zb) {
         const an = this.anims.update(p.i, x, y, aim, dt, now, { w: 0, color: '#7fae5a' });
         zombies.push({ a: an, type: p.zb, hp: p.h, flash: now - an.hitT < 90 });
@@ -962,8 +962,8 @@ export class GameClient {
     for (const x of b.bullets) {
       const q = a === b ? null : a.bullets.find((y) => y.i === x.i);
       if (q) {
-        const t = Math.min(1, Math.max(0, (rt - a.time) / Math.max(1, b.time - a.time)));
-        out.push({ ...x, x: lerp(q.x, x.x, t), y: lerp(q.y, x.y, t), tr: lerp(q.d ?? 999, x.d ?? 999, t) });
+        const k = Math.min(1, Math.max(0, (rt - a.time) / Math.max(1, b.time - a.time)));
+        out.push({ ...x, x: lerp(q.x, x.x, k), y: lerp(q.y, x.y, k), tr: lerp(q.d ?? 999, x.d ?? 999, k) });
         continue;
       }
       const sp = Math.hypot(x.vx, x.vy) || 1;
