@@ -28,6 +28,8 @@ import { createChat } from './chat.js';
 import { createSettingsUi } from './settingsui.js';
 import { createTour } from './tour.js';
 import { createIntro } from './intro.js';
+import { createInvite, captureRef, deviceId } from './invite.js';
+captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS } from './i18n.js';
@@ -225,7 +227,8 @@ const news = createNews();
 document.addEventListener('darkbags:news', () => news.open());
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m), openBox: (id) => shop.open(id) });
 const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id) });
-const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked };
+const invite = createInvite({ app, send, sfx, toast: (m) => toast(m) });
+const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite };
 document.addEventListener('darkbags:mode', () => {
   store.set('darkbags.gmode', app.gameMode);
   renderLobby();
@@ -851,7 +854,7 @@ function onStatus(st) {
   if (st === 'open') {
     app.everOpen = true;
     const token = app.mode === 'online' ? store.get('darkbags.token', null) : 'practice';
-    send({ t: 'hello', token, name: app.name });
+    send({ t: 'hello', token, name: app.name, dev: deviceId() });
     sendPracticeCfg();
     intro.mark('connect');
   } else if (wasOpen && app.screen !== 'lobby') {
@@ -879,6 +882,7 @@ function onMessage(m) {
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
   if (m.t === 'locker') pass.onMessage(m);
   if (m.t === 'leaderboard' || m.t === 'career' || m.t === 'result') ranked.onMessage(m);
+  if (m.t === 'ref' || m.t === 'welcome' || m.t === 'authed') invite.onMessage(m);
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
@@ -964,7 +968,8 @@ function handleMessage(m) {
       showResult(m);
       break;
     case 'err':
-      toast(m.msg);
+      // fair-play refusals carry a code, and read in the player's language
+      toast(m.code && t(`err.${m.code}`) !== `err.${m.code}` ? t(`err.${m.code}`) : m.msg);
       break;
     default:
   }

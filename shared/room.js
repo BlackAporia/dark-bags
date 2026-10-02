@@ -25,7 +25,7 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
+  constructor({ guard = null, referrals = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
@@ -37,6 +37,8 @@ export class RoomCore {
     if (m.seconds) roundSeconds = m.seconds;
     this.ranks = ranks;
     this.inventory = inventory;
+    this.referrals = referrals;
+    this.guard = guard;
     this.practice = practice;
     this.wallet = wallet;
     this.prices = prices;
@@ -273,6 +275,12 @@ export class RoomCore {
       c.escrow = null; // the stake is in the raid's ledger now
       c.reported = false;
       this.totals.stakesIn += this.stake;
+      // the inviter's share of the house cut on this stake, as shop $ (real matches only)
+      if (!this.practice && !this.guard?.flagged(c.token)) {
+        const rake = MODE[this.mode].kind === 'zombie' ? this.stake : Math.floor(this.stake * CFG.RAKE);
+        const paid = this.referrals?.onStake(c.token, rake);
+        if (paid) this.inventory.give(paid.to, { k: 'credit', v: paid.cents });
+      }
       this.jackpot += Math.floor(this.stake * CFG.RAKE * CFG.JACKPOT_SHARE);
       this.send(c.cid, {
         t: 'start',
@@ -462,6 +470,14 @@ export class RoomCore {
       // pot modes: the fallen learn the outcome when the raid is settled (they watch meanwhile)
       if (w.potMode && p.status === 'dead' && w.phase !== 'ended') continue;
       c.reported = true;
+      // a finished match counts towards the inviter's bonus bag
+      if (!this.practice) {
+        // fair play: the aim numbers of this match go on the account's record
+        this.guard?.aim(c.token, p.ac);
+        const bonus = this.referrals?.onMatch(c.token);
+        if (bonus?.welcome) this.inventory.give(bonus.welcome, { k: 'box', id: 'vault' });
+        if (bonus?.to && !this.guard?.flagged(c.token)) this.inventory.give(bonus.to, { k: 'box', id: 'vault' });
+      }
       // career rank: every raid pays, win or lose
       const earned = raidXp(p, { practice: this.practice, kind: MODE[this.mode].kind });
       // achievements: career counters, each completed one pays its XP once

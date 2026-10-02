@@ -6,6 +6,8 @@ import { RankBook } from './ranks.js';
 import { MODES, MODE } from './modes.js';
 import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
 import { SocialBook, GUILD_RANK } from './social.js';
+import { ReferralBook, cleanCode } from './referrals.js';
+import { Guard, GUARD } from './guard.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -24,9 +26,13 @@ const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', '
 export const CUSTOM_MIN = 100; // $0.10 (stakes are in thousandths of a dollar)
 export const CUSTOM_MAX = 10_000_000; // $10,000
 
+// the welcome bag for a player who came through an invite, and the inviter's bonus bag
+export const REF_GIFT = 'vault';
+
 export class Lobby {
-  constructor({ wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
+    this.referrals = referrals; // invite codes, who brought whom, the inviters' earnings
     // in-game swaps between the coins you hold, at the feed price minus SWAP_FEE. With real
     // tokens this only runs when the operator turns it on (the house must rebalance on chain).
     this.swapOn = swap;
@@ -48,7 +54,8 @@ export class Lobby {
     this.sessions = new Map();
     // one table per mode and stake
     this.rooms = new Map();
-    this.roomArgs = { wallet, send, prices, ranks, inventory, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    this.guard = guard;
+    this.roomArgs = { wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
@@ -91,8 +98,15 @@ export class Lobby {
     }
   }
 
-  connect(cid) {
-    this.sessions.set(cid, { token: null, account: null, name: 'runner', room: null, busy: false });
+  // ip: where the socket comes from (the server knows, a local practice lobby doesn't)
+  connect(cid, { ip = null } = {}) {
+    this.sessions.set(cid, { token: null, account: null, name: 'runner', room: null, busy: false, net: this.guard.net(ip), dev: null });
+  }
+
+  seatOk(s, room) {
+    const others = [];
+    for (const x of this.sessions.values()) if (x !== s && x.room === room) others.push({ key: this.key(x), net: x.net, dev: x.dev });
+    return this.guard.seatOk({ key: this.key(s), net: s.net, dev: s.dev }, others);
   }
 
   // whose balance this session plays with: the session itself (play money) or a signed-in address
@@ -120,8 +134,12 @@ export class Lobby {
     if (!s || !msg || typeof msg.t !== 'string') return;
 
     if (msg.t === 'hello') {
-      s.token = typeof msg.token === 'string' && /^[a-z0-9]{8,64}$/.test(msg.token) ? msg.token : this.newToken();
+      s.dev = this.guard.dev(msg.dev);
+      if (typeof msg.token === 'string' && /^[a-z0-9]{8,64}$/.test(msg.token)) s.token = msg.token;
+      else if (this.cashier || this.guard.allow('new', s.net, GUARD.newPerIpDay)) s.token = this.newToken();
+      else return this.send(cid, { t: 'err', code: 'guard_new', msg: 'Too many new accounts from your network today. Come back tomorrow.' });
       s.name = cleanName(msg.name);
+      this.guard.see(this.key(s), s.net, s.dev);
       if (this.cashier) s.account = this.cashier.accountFor(s.token);
       else this.wallet.ensure(s.token);
       this.social.touch(this.key(s), s.name);
@@ -224,6 +242,7 @@ export class Lobby {
         return;
       case 'faucet':
         if (this.cashier) return;
+        if (!this.guard.allow('faucet', s.net, GUARD.faucetPerIpDay)) return this.send(cid, { t: 'err', code: 'guard_faucet', msg: 'Your network had its test tokens for today.' });
         this.wallet.faucet(s.token);
         this.send(cid, { t: 'balance', balances: this.balances(s) });
         return;
@@ -237,6 +256,26 @@ export class Lobby {
       case 'pass_claim':
         this.lockerOp(cid, s, msg);
         return;
+      case 'ref_info':
+        // with real tokens the code belongs to the signed-in address
+        if (!this.key(s)) return this.send(cid, { t: 'ref', signedOut: true });
+        this.send(cid, { t: 'ref', ...this.referrals.view(this.key(s)) });
+        return;
+      case 'ref_claim': {
+        // only before your first match; a welcome bag for coming in through an invite
+        const key = this.key(s);
+        if (!key) return this.send(cid, { t: 'ref', signedOut: true });
+        const fresh = !(this.ranks.rec?.(key)?.stats?.raids > 0);
+        // fair play: not from a network or device the inviter uses, and only so many a day each
+        const by = this.referrals.codes.get(cleanCode(msg.code));
+        let r;
+        if (by && by !== key && this.guard.linked(key, by)) r = { ok: false, error: 'linked' };
+        else if (by && this.referrals.view(key).canClaim && fresh && !this.guard.allow('ref', by, GUARD.refPerDay)) r = { ok: false, error: 'busy' };
+        else r = this.referrals.claim(key, msg.code, { fresh });
+        // the welcome bag comes after the first staked match (see RoomCore.reportEnds)
+        this.send(cid, { t: 'ref', claimed: r.ok, error: r.error ?? null, gift: r.ok ? REF_GIFT : null, ...this.referrals.view(key) });
+        return;
+      }
       case 'auth_start':
       case 'auth':
       case 'auth_privy':
@@ -262,6 +301,8 @@ export class Lobby {
           s.room = null;
         }
         if (!s.room) {
+          // fair play: one person, one seat at a staked table (no feeding a second account)
+          if (!room.practice && !this.seatOk(s, room)) return this.send(cid, { t: 'err', code: 'guard_seat', msg: 'Another account from your network or device is already at this table.' });
           room.addClient(cid, { token: this.key(s), name: msg.name || s.name, skin: msg.skin });
           s.room = room;
         } else room.handle(cid, msg);
@@ -384,6 +425,7 @@ export class Lobby {
         const account = await c.login(s.token, msg.address, msg.signature);
         if (!alive()) return;
         s.account = account;
+        this.guard.see(account, s.net, s.dev);
         this.social.touch(account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
         reply({ t: 'authed', account, balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
@@ -392,6 +434,7 @@ export class Lobby {
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
         if (!alive()) return;
         s.account = r.account;
+        this.guard.see(r.account, s.net, s.dev);
         this.social.touch(r.account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
         reply({ t: 'authed', account: r.account, privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
@@ -403,6 +446,8 @@ export class Lobby {
         reply({ t: 'cashier', op: 'deposit', route: msg.route, status: r.status, credited: r.credited.map((x) => ({ asset: x.token, units: x.amount.toString(), unsupported: !!x.unsupported, held: x.held ?? null })) });
         reply({ t: 'balance', balances: this.balances(s) });
       } else if (msg.t === 'withdraw') {
+        // fair play: an account under aim review keeps its balance but cannot cash out until cleared
+        if (this.guard.flagged(s.account)) throw Object.assign(new Error('Your account is under a fair-play review. Withdrawals open again once it is cleared; write to support.'), { user: true });
         const route = msg.route === 'private' ? 'private' : 'public';
         reply({ t: 'cashier', op: 'withdraw', status: 'sending' });
         reply({ t: 'balance', balances: this.balances(s) });

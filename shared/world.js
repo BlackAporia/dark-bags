@@ -33,6 +33,7 @@ const BOT_DAMAGE = 0.75;
 const PRACTICE_BOT_DAMAGE = { easy: 0.5, normal: 0.75, hard: 1 };
 const PRACTICE_SPAWN_SHIELD = 5; // seconds; firing still drops it early
 const ROUND_BREAK = 4; // seconds between rounds
+const SNAP = 1.15; // rad of aim turned within one tick (~35 rad/s): a flick at the very edge of a hand
 // gold rush: bags on the ground at once (plus some per runner), how often a new one lands,
 // and the share of big bags (worth three)
 const GOLD = { base: 6, perRunner: 2, every: 0.8, big: 0.1, r: CFG.PLAYER_R + 14 };
@@ -247,6 +248,7 @@ export class World {
       status: 'alive',
       kills: 0,
       deaths: 0,
+      ac: { shots: 0, hits: 0, hs: 0, snap: 0 }, // fair-play aim numbers (guns, humans)
       cr: this.shop ? GL.START : 0, // guns + lasers credits
       respawnAt: null,
       dmgDealt: 0,
@@ -381,6 +383,12 @@ export class World {
       stepMovement(p, inp, DT, this.map);
       p.vx = (p.x - ox) / DT;
       p.vy = (p.y - oy) / DT;
+      // fair play: a flick no hand makes in one tick, remembered for the next shot
+      if (!p.isBot) {
+        let da = Math.abs(inp.a - p.aim) % (Math.PI * 2);
+        if (da > Math.PI) da = Math.PI * 2 - da;
+        if (da > SNAP) p.snapT = this.time;
+      }
       p.aim = inp.a;
 
       if (p.shield > 0) p.shield = Math.max(0, p.shield - DT);
@@ -493,6 +501,10 @@ export class World {
     const sx = p.x + Math.cos(p.aim) * muzzle;
     const sy = p.y + Math.sin(p.aim) * muzzle;
     if (segWalls(p.x, p.y, sx, sy, this.map.walls) >= 0) return;
+    // fair play numbers: single rounds from human hands (pellets would blur them)
+    const tally = !p.isBot && wp.pellets === 1;
+    const snap = tally && this.time - (p.snapT ?? -9) <= DT * 1.5;
+    if (tally) p.ac.shots++;
     for (let i = 0; i < wp.pellets; i++) {
       const a = p.aim + (this.rnd() - 0.5) * wp.spread * (wp.pellets > 1 ? 1 : 2);
       const b = {
@@ -508,6 +520,7 @@ export class World {
         dist: 0,
         skin: p.ws?.[wp.id] ?? null, // the shooter's weapon skin: clients draw its tracer
         cause: 'shot',
+        ...(tally ? { ac: snap ? 2 : 1 } : {}),
       };
       this.bullets.set(b.id, b);
     }
@@ -637,6 +650,14 @@ export class World {
       if (victim) {
         if (this.endBullet(b, tMin, nx, ny, 'p')) continue;
         const hs = this.headshot(b, victim);
+        if (b.ac && victim.id !== b.owner) {
+          const ac = this.players.get(b.owner)?.ac;
+          if (ac) {
+            ac.hits++;
+            if (hs) ac.hs++;
+            if (b.ac === 2) ac.snap++;
+          }
+        }
         this.damage(victim, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, b.cause, hs);
         continue;
       }
