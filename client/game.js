@@ -1103,7 +1103,7 @@ export class GameClient {
     if (this.shopMode) {
       const cr = you.cr ?? 0;
       el.glCr.textContent = fmt(cr);
-      for (const b of document.querySelectorAll('[data-buy]')) b.classList.toggle('poor', cr < GL.ITEMS[b.dataset.buy].cost);
+      for (const b of document.querySelectorAll('#gl-shop [data-buy], #touch [data-buy]')) b.classList.toggle('poor', cr < (GL.ITEMS[b.dataset.buy]?.cost ?? 0));
     }
     const cd = this.pred ? this.pred.dashCd : 0;
     el.dashChip.classList.toggle('cooling', cd > 0);

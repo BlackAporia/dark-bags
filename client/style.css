@@ -1427,6 +1427,10 @@ body.ready #lobby { animation: menu-in 0.6s ease both; }
 .tbuy.b2 { left: calc(80px + var(--safe-l)); bottom: calc(64% + 6px); }
 .tbuy.b3 { left: calc(144px + var(--safe-l)); bottom: calc(64% + 6px); }
 body.gl-on .tbuy { display: flex; }
+.tbuy.b4 { left: calc(208px + var(--safe-l)); bottom: calc(64% + 6px); }
+.tbuy.b4 span { color: #ffd166; }
+body.gl-on .tbuy.b4 { display: none; }
+body.gl-on.z-on .tbuy.b4 { display: flex; }
 body.touch-on .gl-shop .gl-btn { display: none; }
 body.touch-on .gl-shop { top: calc(14px + var(--safe-t)); bottom: auto; right: calc(176px + var(--safe-r)); }
 body.touch-on .gl-cr { padding: 4px 10px; }
