@@ -516,6 +516,7 @@ export default {
   'stake.own': "自定义赌注",
   'stake.range': "赌注 $0.10 至 $10,000",
   'nav.settings': "设置",
+  'nav.more': "更多",
   'modes.title': "游戏模式",
   'kind.raid': "撤离",
   'kind.br': "赢家通吃奖池",

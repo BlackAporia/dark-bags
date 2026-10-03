@@ -516,6 +516,7 @@ export default {
   'stake.own': "رهانك",
   'stake.range': "الرهان من 0.10$ إلى 10,000$",
   'nav.settings': "الإعدادات",
+  'nav.more': "المزيد",
   'modes.title': "نمط اللعب",
   'kind.raid': "إجلاء",
   'kind.br': "الفائز يأخذ الوعاء",

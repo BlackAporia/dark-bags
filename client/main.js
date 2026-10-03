@@ -287,10 +287,57 @@ function go(page, extra) {
     if (b) b.hidden = true;
   }
   PAGES[page]?.render();
+  closeMore();
+  syncMore();
   document.querySelector('.pages').scrollTo?.({ top: 0 });
   sfx.play('beep', { f: 990, dur: 0.02 });
 }
-for (const b of document.querySelectorAll('.nav-btn')) b.addEventListener('click', () => go(b.dataset.page));
+for (const b of document.querySelectorAll('.nav-btn[data-page]')) b.addEventListener('click', () => go(b.dataset.page));
+
+// phones: four tabs at the bottom (Play, Shop, Tasks, Inventory) and More for the rest, in a
+// sheet of big tiles with their full names, so nothing gets squeezed into "P… S… R…"
+function closeMore() {
+  $('more-sheet').hidden = true;
+  $('nav-more').setAttribute('aria-expanded', 'false');
+}
+function openMore() {
+  const grid = $('more-grid');
+  grid.replaceChildren(
+    ...[...document.querySelectorAll('.menu-nav .nav-btn[data-page]')]
+      .filter((b) => !isPrimary(b.dataset.page))
+      .map((b) => {
+        const tile = b.cloneNode(true);
+        tile.className = `more-tile${b.getAttribute('aria-current') === 'true' ? ' on' : ''}`;
+        tile.removeAttribute('aria-current');
+        tile.setAttribute('role', 'menuitem');
+        tile.addEventListener('click', () => {
+          closeMore();
+          go(b.dataset.page);
+        });
+        return tile;
+      }),
+  );
+  $('more-sheet').hidden = false;
+  $('nav-more').setAttribute('aria-expanded', 'true');
+}
+$('nav-more').addEventListener('click', () => ($('more-sheet').hidden ? openMore() : closeMore()));
+$('more-sheet').addEventListener('click', (e) => e.target === e.currentTarget && closeMore());
+// More lights up when you are on one of its pages, and shows the badges hidden inside it
+function syncMore() {
+  const more = $('nav-more');
+  more.setAttribute('aria-current', String(!isPrimary(app.page)));
+  let n = 0;
+  for (const b of document.querySelectorAll('.menu-nav .nav-btn[data-page] .nav-badge'))
+    if (!isPrimary(b.parentElement.dataset.page) && !b.hidden) n += Number(b.textContent) || 1;
+  const badge = more.querySelector('.nav-badge');
+  badge.hidden = !n;
+  badge.textContent = n ? String(n) : '';
+}
+setInterval(syncMore, 1000);
+matchMedia('(max-width: 760px)').addEventListener?.('change', closeMore);
+function isPrimary(page) {
+  return page === 'play' || page === 'shop' || page === 'achievements' || page === 'inventory';
+}
 app.go = go;
 $('tb-wallet').addEventListener('click', () => go('inventory'));
 $('tb-credit').addEventListener('click', () => go('shop'));

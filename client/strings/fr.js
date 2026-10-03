@@ -516,6 +516,7 @@ export default {
   'stake.own': "Ta mise",
   'stake.range': "Mise de 0,10 $ à 10 000 $",
   'nav.settings': "Réglages",
+  'nav.more': "Plus",
   'modes.title': "Mode de jeu",
   'kind.raid': "extraction",
   'kind.br': "le gagnant rafle le pot",

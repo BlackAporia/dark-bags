@@ -516,6 +516,7 @@ export default {
   'stake.own': "Своя ставка",
   'stake.range': "Ставка від $0.10 до $10 000",
   'nav.settings': "Налаштування",
+  'nav.more': "Ще",
   'modes.title': "Режим гри",
   'kind.raid': "евакуація",
   'kind.br': "переможець забирає банк",

@@ -524,6 +524,7 @@ export default {
   'stake.own': "Your stake",
   'stake.range': "Stake from $0.10 to $10,000",
   'nav.settings': "Settings",
+  'nav.more': "More",
   'modes.title': "Game mode",
   'kind.raid': "extraction",
   'kind.br': "winner takes the pot",
