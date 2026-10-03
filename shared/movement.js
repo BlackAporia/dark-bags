@@ -1,5 +1,6 @@
 import { CFG } from './config.js';
 import { moveCircle } from './geom.js';
+import { solids } from './map.js';
 
 const num = (v) => (Number.isFinite(v) ? v : 0);
 
@@ -47,5 +48,5 @@ export function stepMovement(s, input, dt, map) {
     vx = mx * CFG.SPEED;
     vy = my * CFG.SPEED;
   }
-  moveCircle(s, vx * dt, vy * dt, CFG.PLAYER_R, map.walls, map.w, map.h);
+  moveCircle(s, vx * dt, vy * dt, CFG.PLAYER_R, solids(map), map.w, map.h);
 }

@@ -3,6 +3,10 @@
 // the visible chunks, which is what keeps the textured map cheap.
 import { mulberry32, rectsOverlap } from '../shared/geom.js';
 import { textures, pattern, shade, canvas, TEX_SCALE } from './textures.js';
+import { THEME, floorTex, drawThemeWall, drawPit, drawUnder, drawGroundBits } from './themes.js';
+
+const ARENA_THEMES = new Set(['graveyard', 'mine']);
+const ROUND = new Set(['tree', 'pine', 'cactus', 'shroom', 'tyres', 'oak', 'log', 'candy', 'gift', 'mesa', 'ice', 'car', 'hay', 'brick', 'link']);
 
 export const CHUNK = 400;
 const PAD = 2; // chunks overlap slightly so no seams show between them
@@ -43,6 +47,7 @@ function classifyWalls(map) {
       return long ? { kind: rnd() < 0.5 ? 'timber' : 'crate' } : { kind: 'rock', c: Math.floor(rnd() * 3) };
     });
   return map.walls.map((w) => {
+    if (w.k) return { kind: w.k, themed: true };
     const inVault = map.vaults.some((v) => rectsOverlap(v, w, 1) && (w.w <= 24 || w.h <= 24));
     if (inVault) return { kind: 'steel' };
     const long = Math.max(w.w, w.h) / Math.min(w.w, w.h) > 2.5;
@@ -53,7 +58,7 @@ function classifyWalls(map) {
 
 // A few painted "roads" crossing the map, fixed per map.
 function planRoads(map) {
-  if (map.theme) return []; // arenas have paths of their own
+  if (map.theme && map.theme !== 'docks') return []; // the other maps have streets (or none) of their own
   const rnd = mulberry32(map.seed ^ 0x70ad);
   const roads = [];
   for (let i = 0; i < 2; i++) roads.push({ vertical: true, at: 300 + rnd() * (map.w - 600), w: 110 });
@@ -152,8 +157,10 @@ export class MapLayer {
     x.fillRect(x0, y0, view.w, view.h);
 
     // floor
-    x.fillStyle = pattern(x, tex.concrete);
+    const th = THEME[map.theme];
+    x.fillStyle = pattern(x, floorTex(map.theme) ?? tex.concrete);
     x.fillRect(0, 0, map.w, map.h);
+    if (th) drawUnder(map.theme, x, map, near);
 
     // roads: darker asphalt with worn dashed centre lines
     for (const r of this.roads) {
@@ -182,8 +189,15 @@ export class MapLayer {
     // decals, seeded per chunk (flat paint and dirt only: nothing here looks solid)
     const rnd = mulberry32((map.seed * 131 + cx * 7919 + cy * 104729) >>> 0);
     const inMap = (px, py) => px > 20 && py > 20 && px < map.w - 20 && py < map.h - 20;
-    if (map.theme) this.arenaGround(x, map, cx, cy, rnd, inMap, near);
-    else this.cityDecals(x, map, cx, cy, rnd, inMap);
+    if (ARENA_THEMES.has(map.theme)) this.arenaGround(x, map, cx, cy, rnd, inMap, near);
+    else if (th) {
+      const at = () => {
+        const px = cx * CHUNK + rnd() * CHUNK;
+        const py = cy * CHUNK + rnd() * CHUNK;
+        return inMap(px, py) ? [px, py] : [null, null];
+      };
+      drawGroundBits(map.theme, x, 3 + Math.floor(rnd() * 4), at, rnd);
+    } else this.cityDecals(x, map, cx, cy, rnd, inMap);
     // vault floors, exits, the fence and the walls
     this.buildRest(x, map, near, view, tex);
     return c;
@@ -392,6 +406,10 @@ export class MapLayer {
       g.addColorStop(1, 'rgba(0,0,0,0.35)');
       x.fillStyle = g;
       x.fillRect(v.x, v.y, v.w, v.h);
+      if (THEME[map.theme]?.vault) {
+        x.fillStyle = THEME[map.theme].vault;
+        x.fillRect(v.x, v.y, v.w, v.h);
+      }
       x.strokeStyle = hazardPattern(x);
       x.lineWidth = 22;
       x.strokeRect(v.x + 11, v.y + 11, v.w - 22, v.h - 22);
@@ -424,6 +442,19 @@ export class MapLayer {
           x.lineTo(ox - dir[0] * 7 - dir[1] * 12, oy - dir[1] * 7 - dir[0] * 12);
           x.stroke();
         }
+      }
+    }
+
+    // pits: lava, water, mud… (under the walls, over the floor)
+    for (const r of map.pits ?? []) {
+      if (!near(r, 20)) continue;
+      x.save();
+      const edge = drawPit(x, r, map.seed);
+      x.restore();
+      if (edge) {
+        x.strokeStyle = edge;
+        x.lineWidth = 2;
+        x.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
       }
     }
 
@@ -463,7 +494,9 @@ export class MapLayer {
     this.drawFence(x, view);
 
     // walls: drop shadow first, then textured bodies with bevels
-    const walls = map.walls.map((w, i) => [w, this.kinds[i]]).filter(([w]) => near(w, 30));
+    const all = map.walls.map((w, i) => [w, this.kinds[i]]).filter(([w]) => near(w, 30));
+    // round things (trees, mushrooms, tyres…) cast their own soft shadow: a square one would show
+    const walls = all.filter(([, k]) => !(k.themed && ROUND.has(k.kind.replace(/\d+$/, ''))));
     if (this.hq) {
       x.save();
       x.shadowColor = 'rgba(0, 0, 0, 0.65)';
@@ -477,7 +510,15 @@ export class MapLayer {
       x.fillStyle = 'rgba(0,0,0,0.45)';
       for (const [w] of walls) x.fillRect(w.x + 7, w.y + 9, w.w, w.h);
     }
-    for (const [w, k] of walls) this.drawWall(x, w, k, tex);
+    for (const [w, k] of all) {
+      if (k.themed) {
+        x.save();
+        const ok = drawThemeWall(x, w, k, map.seed);
+        x.restore();
+        if (ok) continue;
+      }
+      this.drawWall(x, w, k, tex);
+    }
   }
 
   drawFence(x, view) {
@@ -491,7 +532,7 @@ export class MapLayer {
     ];
     for (const s of sides) {
       if (!rectsOverlap(s, view, 4)) continue;
-      x.fillStyle = '#10141c';
+      x.fillStyle = THEME[map.theme]?.fence ?? '#10141c';
       x.fillRect(s.x, s.y, s.w, s.h);
       x.save();
       x.beginPath();

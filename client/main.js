@@ -26,6 +26,8 @@ import { titleTier } from '../shared/achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
 import { createSwap } from './swap.js';
+import { renderMapPick } from './mappick.js';
+import { MAP_THEMES } from '../shared/map.js';
 import { createChat } from './chat.js';
 import { createSettingsUi } from './settingsui.js';
 import { createTour } from './tour.js';
@@ -132,6 +134,7 @@ const app = {
   asset: store.get('darkbags.asset', 'USDC'),
   tables: [],
   _stake: validStake(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
+  mapVote: MAP_THEMES.includes(store.get('darkbags.mapVote', null)) ? store.get('darkbags.mapVote', null) : null,
   zweapon: ZOMBIE_WEAPONS.includes(store.get('darkbags.zweapon', 'rifle')) ? store.get('darkbags.zweapon', 'rifle') : 'rifle',
   name: store.get('darkbags.name', ''),
   skin: SKINS.includes(store.get('darkbags.skin', '')) ? store.get('darkbags.skin') : SKINS[Math.floor(Math.random() * SKINS.length)],
@@ -823,6 +826,19 @@ function renderPrep() {
   $('pot').textContent = zed ? t('prep.zFee', { v: money(p.stake) }) : money(p.pot);
   $('pot-k').textContent = t(zed ? 'prep.zSquad' : MODE[app.gameMode]?.kind === 'gold' ? 'prep.goldPot' : 'prep.pot');
   renderZPick(MODE[app.gameMode]?.pick && p.state !== 'live', p.me?.weapon);
+  // the map vote: every mode but the ones with arenas of their own (zombies, gold rush)
+  const kind = MODE[app.gameMode]?.kind;
+  renderMapPick($('mappick'), {
+    show: p.state !== 'live' && kind !== 'zombie' && kind !== 'gold',
+    votes: p.votes,
+    mine: p.me?.vote !== undefined ? p.me.vote : app.mapVote,
+    onVote: (id) => {
+      app.mapVote = id;
+      store.set('darkbags.mapVote', id);
+      send({ t: 'vote', map: id });
+      sfx.play('beep', { f: 880, dur: 0.06 });
+    },
+  });
   $('prep-start').hidden = !(p.waiting && p.me?.ready);
   $('prep-start').disabled = p.slots.length < (p.min ?? 1); // online needs two players or more
   $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
@@ -991,6 +1007,8 @@ function handleMessage(m) {
       game.myTitleTier = app.career?.title ? titleTier(app.career.title) : null;
       game.myNeon = app.career?.neon ?? null;
       game.begin(m, app.skin, app.gore, app.locker);
+      sfx.music?.forMap?.(m.map.theme);
+      if (m.map.theme && MAP_THEMES.includes(m.map.theme)) toast(t('map.now', { m: t(`map.${m.map.theme}`) }));
       renderer.prewarm(m.map.w / 2, m.map.h / 2);
       showScreen('game');
       break;
@@ -1237,7 +1255,7 @@ function goToTable() {
 function toggleReady() {
   sfx.unlock();
   if (app.prep?.me?.ready) send({ t: 'unready' });
-  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon });
+  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote });
 }
 
 $('name').value = app.name;
@@ -1289,7 +1307,7 @@ $('res-share').addEventListener('click', () => {
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
-  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon });
+  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote });
   showScreen('prep');
 });
 $('res-tables').addEventListener('click', () => {

@@ -1,5 +1,6 @@
 import { CFG } from './config.js';
 import { circleHitsRect, hasLOS } from './geom.js';
+import { solids } from './map.js';
 
 // Coarse grid A* for bots. Built once per map.
 export class NavGrid {
@@ -16,12 +17,12 @@ export class NavGrid {
         const x = (col + 0.5) * cell;
         const y = (row + 0.5) * cell;
         let b = x < r || y < r || x > map.w - r || y > map.h - r;
-        if (!b) for (const w of map.walls) if (circleHitsRect(x, y, r, w)) { b = true; break; }
+        if (!b) for (const w of solids(map)) if (circleHitsRect(x, y, r, w)) { b = true; break; }
         this.blocked[row * this.cols + col] = b ? 1 : 0;
       }
     }
     // walls inflated by the runner radius, for path smoothing
-    this.fat = map.walls.map((w) => ({ x: w.x - r, y: w.y - r, w: w.w + 2 * r, h: w.h + 2 * r }));
+    this.fat = solids(map).map((w) => ({ x: w.x - r, y: w.y - r, w: w.w + 2 * r, h: w.h + 2 * r }));
     this.g = new Float32Array(n);
     this.f = new Float32Array(n);
     this.from = new Int32Array(n);
