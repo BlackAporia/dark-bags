@@ -54,6 +54,7 @@ export class World {
     difficulty = null, // practice: 'easy' | 'normal' | 'hard'
     botFill = CFG.BOT_FILL,
     mode = 'raid',
+    theme = 'docks', // the raid map's look and layout (shared/map.js MAP_THEMES)
   }) {
     // the mode's rules (modes.js): raid = extraction; br/team = one prize pot, last side standing
     this.mode = MODE[mode] ? mode : 'raid';
@@ -101,7 +102,7 @@ export class World {
     this.stake = stake;
     this.seed = seed;
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
-    this.map = this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed);
+    this.map = this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed, theme);
     this.nav = null; // built lazily by the first bot
     this.roundNo = roundNo;
     this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot

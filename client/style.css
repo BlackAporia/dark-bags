@@ -2279,3 +2279,17 @@ body.z-on .gl-btn.gl-revive { display: flex; }
 .tk-row .tk-logo { width: 30px; height: 30px; }
 .tk-name { display: grid; min-width: 0; } .tk-name small { color: var(--dust, #9aa); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tk-bal { color: var(--dust, #9aa); font-size: 13px; }
+
+/* the map vote in the ready room */
+.mappick { width: 100%; }
+.mappick .eyebrow { margin: 0 0 8px; text-align: center; }
+.mappick .eyebrow .fine { text-transform: none; letter-spacing: 0; }
+.mp-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.mp { position: relative; flex: 0 0 auto; width: 132px; scroll-snap-align: center; display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 5px 5px 7px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04); color: var(--paper, #ebe5d6); cursor: pointer; font: inherit; transition: transform 0.12s, border-color 0.12s, background 0.12s; }
+.mp img, .mp .mp-any { width: 100%; aspect-ratio: 176 / 112; border-radius: 8px; object-fit: cover; display: block; background: #0d1018; }
+.mp .mp-any { display: grid; place-items: center; font: 900 34px/1 var(--f-display, Impact, sans-serif); color: rgba(255, 255, 255, 0.35); background: repeating-linear-gradient(45deg, #141824 0 10px, #10131c 10px 20px); }
+.mp b { font-size: 12px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.25); }
+.mp.on { border-color: #f7931a; background: rgba(247, 147, 26, 0.12); box-shadow: 0 0 0 1px #f7931a inset, 0 6px 22px rgba(247, 147, 26, 0.25); }
+.mp-n { position: absolute; top: 9px; right: 9px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: #f7931a; color: #111; font: 800 12px/22px var(--f-num, monospace); font-style: normal; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+@media (max-width: 560px) { .mp { width: 108px; } }

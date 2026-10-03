@@ -303,4 +303,4 @@ export function textures() {
   return cache;
 }
 
-export { pattern, TEX_SCALE, canvas };
+export { pattern, TEX_SCALE, canvas, noiseLayer, speckle, crack };

@@ -8,6 +8,7 @@ import { textures, canvas } from './textures.js';
 import { FINISH, RARITY_ORDER, TURRET_SKIN } from '../shared/cosmetics.js';
 import { neonText, neonColor } from './ranked.js';
 import { drawZombie, drawZombieTag, drawGoldBag, drawMedkit } from './zombie.js';
+import { THEME, glowPoints, Weather } from './themes.js';
 
 const C = {
   void: '#07090f',
@@ -127,6 +128,10 @@ export class Renderer {
     this.map = map;
     this.layer.setMap(map);
     this.miniBase = null;
+    const th = THEME[map.theme];
+    this.darkCol = th?.dark ?? C.dark;
+    this.glows = th ? glowPoints(map) : [];
+    this.weather = new Weather(th?.weather);
   }
 
   prewarm(x, y) {
@@ -218,9 +223,14 @@ export class Renderer {
     // 6. darkness with wall shadows and muzzle-flash light
     this.drawDarkness(v.eye, shx, shy, v.fx.lights, t);
 
-    // 7. the storm glows through the dark
+    // 7. the storm glows through the dark, the weather drifts over it
     worldTf();
     if (v.zone) this.drawStorm(v.zone, t, vb);
+    if (this.weather?.kind) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.weather.draw(ctx, this.w, this.h, this.cam, t, this.reduced, this.quality);
+      worldTf();
+    }
 
     // 8. crisp overlays: exit labels, names and health, floaters
     for (const e of this.noExits ? [] : map.extracts) {
@@ -887,7 +897,7 @@ export class Renderer {
     d.setTransform(1, 0, 0, 1, 0, 0);
     d.globalCompositeOperation = 'source-over';
     d.clearRect(0, 0, this.dark.width, this.dark.height);
-    d.fillStyle = C.dark;
+    d.fillStyle = this.darkCol ?? C.dark;
     d.fillRect(0, 0, this.dark.width, this.dark.height);
     const toS = (x, y) => [((x - this.cam.x) * s + this.w / 2 + shx) * dpr, ((y - this.cam.y) * s + this.h / 2 + shy) * dpr];
     const [ex, ey] = toS(eye.x, eye.y - 10);
@@ -901,6 +911,19 @@ export class Renderer {
     d.beginPath();
     d.arc(ex, ey, R, 0, TAU);
     d.fill();
+    // the map's own lights: lava, street lamps, neon (only the ones on screen)
+    for (const l of this.glows ?? []) {
+      const [lx, ly] = toS(l.x, l.y);
+      const lr = l.r * s * dpr;
+      if (lx < -lr || ly < -lr || lx > this.dark.width + lr || ly > this.dark.height + lr) continue;
+      const lg = d.createRadialGradient(lx, ly, 0, lx, ly, lr);
+      lg.addColorStop(0, `rgba(0,0,0,${l.a})`);
+      lg.addColorStop(1, 'rgba(0,0,0,0)');
+      d.fillStyle = lg;
+      d.beginPath();
+      d.arc(lx, ly, lr, 0, TAU);
+      d.fill();
+    }
     for (const l of lights) {
       const k = 1 - (now - l.t0) / l.life;
       if (k <= 0) continue;
@@ -916,7 +939,7 @@ export class Renderer {
     }
     d.globalCompositeOperation = 'source-over';
     d.setTransform(dpr * s, 0, 0, dpr * s, dpr * (this.w / 2 - this.cam.x * s + shx), dpr * (this.h / 2 - this.cam.y * s + shy));
-    d.fillStyle = C.dark;
+    d.fillStyle = this.darkCol ?? C.dark;
     d.beginPath();
     const V = CFG.VISION + 60;
     for (const w of map.walls) {
@@ -1056,11 +1079,20 @@ export class Renderer {
     const base = canvas(px, px);
     const b = base.getContext('2d');
     const k = px / this.map.w;
+    const mc = THEME[this.map.theme]?.mini;
     b.fillStyle = 'rgba(14, 18, 27, 0.92)';
     b.fillRect(0, 0, px, px);
+    if (mc) {
+      b.globalAlpha = 0.45;
+      b.fillStyle = mc[0];
+      b.fillRect(0, 0, px, px);
+      b.globalAlpha = 1;
+      b.fillStyle = mc[2];
+      for (const r of this.map.pits ?? []) b.fillRect(r.x * k, r.y * k, Math.max(1, r.w * k), Math.max(1, r.h * k));
+    }
     b.fillStyle = '#2a2116';
     for (const v of this.map.vaults) b.fillRect(v.x * k, v.y * k, v.w * k, v.h * k);
-    b.fillStyle = '#3a4358';
+    b.fillStyle = mc?.[1] ?? '#3a4358';
     for (const w of this.map.walls) b.fillRect(w.x * k, w.y * k, Math.max(1, w.w * k), Math.max(1, w.h * k));
     this.miniBase = base;
     this.miniK = k;

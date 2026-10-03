@@ -1,5 +1,6 @@
 import { CFG, SKINS } from './config.js';
 import { World } from './world.js';
+import { MAP_THEMES, pickTheme } from './map.js';
 import { cleanName } from './wallet.js';
 import { botName } from './bot.js';
 import { PriceBook, unitsAtEntryRate } from './assets.js';
@@ -67,7 +68,7 @@ export class RoomCore {
   // --------------------------------------------------------------- clients
 
   addClient(cid, { token, name, skin }) {
-    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle' });
+    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle', vote: null });
     if (this.state === 'idle') this.openPrep();
     this.broadcastPrep();
   }
@@ -117,7 +118,13 @@ export class RoomCore {
         if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
         this.broadcastPrep();
         break;
+      case 'vote':
+        // the map you'd like to play next (null: any); the most votes wins, ties by lot
+        c.vote = MAP_THEMES.includes(msg.map) ? msg.map : null;
+        this.broadcastPrep();
+        break;
       case 'ready':
+        if (typeof msg.map === 'string' || msg.map === null) c.vote = MAP_THEMES.includes(msg.map) ? msg.map : null;
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
         if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
@@ -290,6 +297,7 @@ export class RoomCore {
       difficulty: this.difficulty,
       botFill: this.botFill,
       mode: this.mode,
+      theme: pickTheme(ready.map((c) => c.vote)),
     });
     this.world = w;
     this.rollover = 0;
@@ -399,6 +407,13 @@ export class RoomCore {
     };
   }
 
+  // the map votes in the ready room: { theme: count } over everyone at the table
+  mapVotes() {
+    const out = {};
+    for (const c of this.clients.values()) if (c.vote) out[c.vote] = (out[c.vote] ?? 0) + 1;
+    return out;
+  }
+
   // The ready room view. onlyIdle: skip clients who are busy inside the raid.
   broadcastPrep(onlyIdle = false) {
     const ready = this.readyList();
@@ -417,6 +432,7 @@ export class RoomCore {
       min: this.minPlayers,
       waiting: this.waitForStart && this.state === 'prep' && this.countT === null, // no timer: start when you like
       bots,
+      votes: this.mapVotes(),
       pot: this.noBots ? 0 : (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,
     };
     for (const c of this.clients.values()) {
@@ -428,7 +444,7 @@ export class RoomCore {
           const tt = this.ranks.title(r.token);
           return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(tt ? { tt } : {}), ...(this.noBots ? { wp: r.weapon } : {}), me: r === c ? 1 : 0 };
         }),
-        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
+        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, vote: c.vote, escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
         balances: this.wallet.balances(c.token),
       });
     }
