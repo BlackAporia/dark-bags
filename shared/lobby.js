@@ -238,9 +238,15 @@ export class Lobby {
         if (this.practice) return this.send(cid, { t: 'leaderboard', rows: [], me: null, total: 0, offline: true });
         const k = this.key(s);
         const all = this.ranks.leaderboard(Date.now(), 100000);
-        const rows = all.slice(0, 100).map((r, i) => ({ pos: i + 1, n: this.social.get(r.key)?.name ?? 'runner', rk: this.ranks.get(r.key).rank, nt: this.ranks.neon(r.key), rp: r.rp, div: r.div, games: r.games, wins: r.wins, top3: r.top3, kills: r.kills, me: r.key === k }));
+        const pid = (key) => this.social.get(key)?.id ?? null;
+        const rows = all.slice(0, 100).map((r, i) => ({ pos: i + 1, id: pid(r.key), n: this.social.get(r.key)?.name ?? 'runner', rk: this.ranks.get(r.key).rank, nt: this.ranks.neon(r.key), rp: r.rp, div: r.div, games: r.games, wins: r.wins, top3: r.top3, kills: r.kills, deaths: r.deaths, kd: r.kd, me: r.key === k }));
         const pos = k ? all.findIndex((r) => r.key === k) + 1 : 0;
-        this.send(cid, { t: 'leaderboard', rows, me: k ? { pos, ...this.ranks.rankedView(k) } : null, total: all.length });
+        // everyone who played PvP online, by K/D (or kills, or XP)
+        const sort = ['kd', 'kills', 'xp'].includes(msg.sort) ? msg.sort : 'kd';
+        const every = this.ranks.board(sort, Infinity);
+        const allRows = every.slice(0, 100).map((r, i) => ({ pos: i + 1, id: pid(r.key), n: this.social.get(r.key)?.name ?? 'runner', rk: r.rank, nt: this.ranks.neon(r.key), kills: r.kills, deaths: r.deaths, kd: r.kd, games: r.games, wins: r.wins, xp: r.xp, me: r.key === k }));
+        const mePos = k ? every.findIndex((r) => r.key === k) + 1 : 0;
+        this.send(cid, { t: 'leaderboard', rows, me: k ? { pos, ...this.ranks.rankedView(k) } : null, total: all.length, all: { sort, rows: allRows, total: every.length, me: mePos ? { pos: mePos, ...every[mePos - 1], key: undefined } : null } });
         return;
       }
       case 'title': {

@@ -400,6 +400,31 @@ export class MapLayer {
       x.textAlign = 'center';
       x.textBaseline = 'middle';
       x.fillText('VAULT', v.x + v.w / 2, v.y + v.h / 2);
+      // the way out: a lit threshold and chevrons pointing outside in every doorway
+      for (const d of v.doors ?? []) {
+        const horiz = d.out === 'n' || d.out === 's';
+        const cx = d.x + d.w / 2;
+        const cy = d.y + d.h / 2;
+        const lg = horiz ? x.createLinearGradient(d.x, cy, d.x + d.w, cy) : x.createLinearGradient(cx, d.y, cx, d.y + d.h);
+        lg.addColorStop(0, 'rgba(61,220,151,0)');
+        lg.addColorStop(0.5, 'rgba(61,220,151,0.35)');
+        lg.addColorStop(1, 'rgba(61,220,151,0)');
+        x.fillStyle = lg;
+        x.fillRect(d.x - (horiz ? 0 : 6), d.y - (horiz ? 6 : 0), d.w + (horiz ? 0 : 12), d.h + (horiz ? 12 : 0));
+        const dir = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] }[d.out];
+        x.strokeStyle = 'rgba(61,220,151,0.75)';
+        x.lineWidth = 4;
+        x.lineCap = 'round';
+        for (let k = 0; k < 2; k++) {
+          const ox = cx - dir[0] * (26 - k * 14);
+          const oy = cy - dir[1] * (26 - k * 14);
+          x.beginPath();
+          x.moveTo(ox - dir[0] * 7 + dir[1] * 12, oy - dir[1] * 7 + dir[0] * 12);
+          x.lineTo(ox + dir[0] * 5, oy + dir[1] * 5);
+          x.lineTo(ox - dir[0] * 7 - dir[1] * 12, oy - dir[1] * 7 - dir[0] * 12);
+          x.stroke();
+        }
+      }
     }
 
     // exit pads (static paint; state colours are drawn live on top)

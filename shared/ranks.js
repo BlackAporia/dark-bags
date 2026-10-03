@@ -113,6 +113,10 @@ export function botRank(rnd) {
 
 // Career per player key (session token, Starknet address, or 'practice' in the browser):
 // rank XP, the achievement counters and the title the player wears.
+// kills per death; no deaths yet counts as one (10 kills, 0 deaths = 10.00)
+export const kd = (kills, deaths) => Math.round(((kills ?? 0) / Math.max(1, deaths ?? 0)) * 100) / 100;
+export const KD_MIN = 3; // PvP matches before a player ranks on K/D
+
 export class RankBook {
   constructor({ data = {}, onChange = null } = {}) {
     // old save files hold a bare XP number per key
@@ -155,7 +159,7 @@ export class RankBook {
   ranked(key, now = Date.now()) {
     const r = this.rec(key);
     const sid = seasonAt(now).id;
-    if (r.ranked?.sid !== sid) r.ranked = { sid, rp: START_RP, games: 0, wins: 0, kills: 0, top3: 0, best: START_RP };
+    if (r.ranked?.sid !== sid) r.ranked = { sid, rp: START_RP, games: 0, wins: 0, kills: 0, deaths: 0, top3: 0, best: START_RP };
     return r.ranked;
   }
 
@@ -164,7 +168,7 @@ export class RankBook {
     return { ...q, div: divisionOf(q.rp).id };
   }
 
-  rankedResult(key, { place, size, kills = 0, won = false }, now = Date.now()) {
+  rankedResult(key, { place, size, kills = 0, deaths = 0, won = false }, now = Date.now()) {
     const q = this.ranked(key, now);
     const before = q.rp;
     const delta = rpDelta({ place, size, kills });
@@ -172,6 +176,7 @@ export class RankBook {
     q.best = Math.max(q.best, q.rp);
     q.games++;
     q.kills += kills;
+    q.deaths = (q.deaths ?? 0) + Math.max(0, deaths | 0);
     if (won || place === 1) q.wins++;
     if (place <= 3) q.top3++;
     this.onChange?.(this);
@@ -182,9 +187,27 @@ export class RankBook {
   leaderboard(now = Date.now(), n = 100) {
     const sid = seasonAt(now).id;
     const rows = [];
-    for (const [key, r] of this.recs) if (r.ranked?.sid === sid && r.ranked.games > 0) rows.push({ key, ...r.ranked, div: divisionOf(r.ranked.rp).id });
+    for (const [key, r] of this.recs) if (r.ranked?.sid === sid && r.ranked.games > 0) rows.push({ key, ...r.ranked, deaths: r.ranked.deaths ?? 0, kd: kd(r.ranked.kills, r.ranked.deaths ?? 0), div: divisionOf(r.ranked.rp).id });
     rows.sort((a, b) => b.rp - a.rp || b.wins - a.wins || b.kills - a.kills);
     return rows.slice(0, n);
+  }
+
+  // Everyone who played PvP online: kills, deaths, K/D, matches, wins, rank. sort: 'kd' (players
+  // with at least KD_MIN matches first, so one lucky game does not top the table), 'kills' or 'xp'.
+  board(sort = 'kd', n = 100) {
+    const rows = [];
+    for (const [key, r] of this.recs) {
+      const st = r.stats ?? {};
+      if (!(st.pvpGames > 0)) continue;
+      rows.push({ key, kills: st.pvpKills ?? 0, deaths: st.pvpDeaths ?? 0, kd: kd(st.pvpKills ?? 0, st.pvpDeaths ?? 0), games: st.pvpGames, wins: st.wins ?? 0, xp: r.xp ?? 0, rank: rankOf(r.xp ?? 0).rank });
+    }
+    const by = {
+      kd: (a, b) => (b.games >= KD_MIN) - (a.games >= KD_MIN) || b.kd - a.kd || b.kills - a.kills,
+      kills: (a, b) => b.kills - a.kills || b.kd - a.kd,
+      xp: (a, b) => b.xp - a.xp || b.kd - a.kd,
+    }[sort] ?? ((a, b) => b.kd - a.kd);
+    rows.sort(by);
+    return rows.slice(0, n === Infinity ? rows.length : n);
   }
 
   // season titles: won from the ranked spin, worn in neon, a bonus on XP while their season lasts

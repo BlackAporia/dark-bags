@@ -523,7 +523,7 @@ export class RoomCore {
       let ranked = null;
       if (MODE[this.mode]?.ranked && !this.practice && (w.phase === 'ended' || p.status === 'dead')) {
         const place = p.won ? 1 : p.place ?? w.players.size;
-        ranked = this.ranks.rankedResult(c.token, { place, size: w.players.size, kills: p.kills, won: !!p.won });
+        ranked = this.ranks.rankedResult(c.token, { place, size: w.players.size, kills: p.kills, deaths: p.deaths ?? 0, won: !!p.won });
         if (Math.random() < spinChance(place)) ranked.spin = this.lottery(c.token);
         ranked.view = this.ranks.rankedView(c.token);
         stats.rankedGames = 1;
