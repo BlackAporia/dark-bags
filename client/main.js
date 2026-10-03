@@ -22,6 +22,7 @@ import { createPass } from './pass.js';
 import { createNews } from './news.js';
 import { createRanked, neonText, neonColor } from './ranked.js';
 import { createAchievements, achName, titleHtml } from './achievements.js';
+import { createDaily } from './daily.js';
 import { titleTier } from '../shared/achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
@@ -185,6 +186,9 @@ const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: (
 // the menu pages
 const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
 const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
+const daily = createDaily({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p) });
+app.renderAch = () => ach.renderList();
+app.claimAch = (id) => daily.claimAch(id);
 const coinImport = createCoinImport({ app, send, toast: (m) => toast(m) });
 const fortune = createFortune({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
 const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }), onRender: (root) => fortune.mount(root) });
@@ -271,7 +275,11 @@ function go(page, extra) {
   store.set('darkbags.page', page);
   for (const p of document.querySelectorAll('.page')) p.hidden = p.dataset.page !== page;
   for (const b of document.querySelectorAll('.nav-btn')) b.setAttribute('aria-current', String(b.dataset.page === page));
-  if (page === 'achievements') ach.renderList();
+  if (page === 'achievements') {
+    daily.render();
+    daily.refresh();
+    ach.renderList();
+  }
   if (page === 'shop' && extra) shop.family?.(extra);
   if (page === 'shop') locker.bagsSeen();
   if (page === 'pass') {
@@ -940,6 +948,8 @@ function onMessage(m) {
   if (m.t !== 'locker') handleMessage(m);
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
+  if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'daily') daily.onMessage(m);
+  if (m.t === 'daily' && m.career) ach.renderProfile();
   if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
   if (m.t === 'locker') pass.onMessage(m);

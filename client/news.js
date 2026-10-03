@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-06a',
+    at: '2026-10-06T12:00:00+03:00',
+    items: {
+      en: ["Daily rewards: 30 days in a row, gifts grow every day, a big one every 7th day", "Tasks: three every day and three every week, rewards for each, a bonus for all three", "Achievements now pay a reward too: claim it on the Tasks page", "XP boosts and the first win of the day: +300 XP"],
+      uk: ["Щоденні нагороди: 30 днів поспіль, подарунки ростуть щодня, щосьомого дня великий", "Завдання: три щодня й три щотижня, нагорода за кожне, бонус за всі три", "Досягнення тепер теж дають нагороду: забери її на сторінці «Завдання»", "Бустери XP і перша перемога дня: +300 XP"],
+      ru: ["Ежедневные награды: 30 дней подряд, подарки растут каждый день, каждый 7-й день большой", "Задания: три каждый день и три каждую неделю, награда за каждое, бонус за все три", "Достижения теперь тоже дают награду: забери её на странице «Задания»", "Бустеры XP и первая победа дня: +300 XP"],
+      es: ["Recompensas diarias: 30 días seguidos, regalos que crecen, uno grande cada 7 días", "Tareas: tres al día y tres a la semana, con recompensa y bonus por las tres", "Los logros ahora también dan recompensa: reclámala en Tareas", "Potenciadores de XP y primera victoria del día: +300 XP"],
+      fr: ["Récompenses quotidiennes : 30 jours d’affilée, des cadeaux qui grandissent, un gros tous les 7 jours", "Tâches : trois par jour et trois par semaine, une récompense chacune, un bonus pour les trois", "Les succès donnent aussi une récompense : récupère-la dans Tâches", "Boosts d’XP et première victoire du jour : +300 XP"],
+      pt: ["Recompensas diárias: 30 dias seguidos, presentes que crescem, um grande a cada 7 dias", "Tarefas: três por dia e três por semana, recompensa em cada, bônus pelas três", "Conquistas agora também dão recompensa: resgate em Tarefas", "Bônus de XP e primeira vitória do dia: +300 XP"],
+      tr: ["Günlük ödüller: 30 gün üst üste, her gün büyüyen hediyeler, her 7. gün büyük", "Görevler: her gün üç, her hafta üç; her birine ödül, üçüne bonus", "Başarımlar artık ödül de veriyor: Görevler sayfasından al", "XP takviyeleri ve günün ilk galibiyeti: +300 XP"],
+      zh: ["每日奖励：连续 30 天，礼物逐日升级，每第 7 天有大礼", "任务：每天三项、每周三项，每项都有奖励，全部完成另有奖励", "成就现在也有奖励：在任务页领取", "经验加成和每日首胜：+300 经验"],
+      hi: ["डेली रिवॉर्ड: लगातार 30 दिन, हर दिन बढ़ते तोहफ़े, हर 7वें दिन बड़ा", "टास्क: रोज़ तीन और हर हफ़्ते तीन, हर एक पर इनाम, तीनों पर बोनस", "उपलब्धियाँ अब इनाम भी देती हैं: टास्क पेज पर लो", "XP बूस्ट और दिन की पहली जीत: +300 XP"],
+      ar: ["المكافآت اليومية: 30 يومًا متتالية، هدايا تكبر كل يوم وهدية كبيرة كل يوم سابع", "المهام: ثلاث يوميًا وثلاث أسبوعيًا، مكافأة لكل مهمة ومكافأة إضافية للثلاث", "الإنجازات تمنح مكافأة الآن أيضًا: استلمها من صفحة المهام", "معززات XP وأول فوز في اليوم: +300 XP"],
+    },
+  },
+  {
     id: '2026-10-05a',
     at: '2026-10-05T12:00:00+03:00',
     items: {

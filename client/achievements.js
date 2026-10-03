@@ -4,6 +4,8 @@ import { ACHIEVEMENT, titleTier } from '../shared/achievements.js';
 import { DIVISIONS } from '../shared/ranked.js';
 import { t } from './i18n.js';
 import { esc, fmt } from './game.js';
+import { achGifts } from '../shared/daily.js';
+import { giftHtml } from './daily.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -46,8 +48,9 @@ export function createAchievements({ app, send, toast, sfx, open: openPage }) {
     const xp = c.achievements.filter((a) => a.done).reduce((s, a) => s + a.xp, 0);
     $('ach-sum').innerHTML = `<b>${done}</b> / ${c.achievements.length} · <b>+${fmt(xp)}</b> XP${c.title ? ` · ${esc(t('ach.wearing'))} ${titleHtml(c.title)} <button type="button" class="link" data-off>${esc(t('ach.takeOff'))}</button>` : ''}`;
     $('ach-sum').querySelector('[data-off]')?.addEventListener('click', () => send({ t: 'title', id: null }));
-    // done first (newest goals last), then the closest to done
-    const list = [...c.achievements].sort((a, b) => b.done - a.done || b.have / b.goal - a.have / a.goal);
+    // a reward to take first, then done, then the closest to done
+    const claimable = (id) => !!app.daily?.achClaim?.includes(id);
+    const list = [...c.achievements].sort((a, b) => claimable(b.id) - claimable(a.id) || b.done - a.done || b.have / b.goal - a.have / a.goal);
     $('ach-list').replaceChildren(
       ...list.map((a) => {
         const li = document.createElement('li');
@@ -60,8 +63,10 @@ export function createAchievements({ app, send, toast, sfx, open: openPage }) {
           <div class="ach-body"><p class="ach-name">${hidden ? `<b>${esc(t('ach.secret'))}</b>` : a.done ? titleHtml(a.id) : `<b>${esc(achName(a.id))}</b>`}<span class="ach-tier t-${tier}">${esc(t(`r.${tier}`))}</span>${a.xp ? `<span class="ach-xp">+${fmt(a.xp)} XP</span>` : ''}</p>
           <p class="ach-desc">${esc(hidden ? t('ach.secretDesc') : achDesc(a))}</p>
           ${a.done ? '' : `<div class="ach-bar"><i style="width:${pct}%"></i></div><p class="ach-have">${have}</p>`}</div>
-          ${a.done ? (c.title === a.id ? `<span class="ach-tag">${esc(t('ach.worn'))}</span>` : `<button type="button" class="ghost" data-wear="${a.id}">${esc(t('ach.wear'))}</button>`) : ''}`;
+          <div class="ach-acts">${claimable(a.id) ? `<button type="button" class="cta" data-take="${a.id}">${esc(t('dl.claim'))}</button>` : ''}${a.done ? (c.title === a.id ? `<span class="ach-tag">${esc(t('ach.worn'))}</span>` : `<button type="button" class="ghost" data-wear="${a.id}">${esc(t('ach.wear'))}</button>`) : ''}</div>`;
+        if (!hidden) li.querySelector('.ach-body').insertAdjacentHTML('beforeend', `<p class="task-gifts">${achGifts(a.id).map((g) => giftHtml(g)).join('')}${a.done && !claimable(a.id) && app.daily ? `<span class="fine">✓ ${esc(t('dl.done'))}</span>` : ''}</p>`);
         li.querySelector('[data-wear]')?.addEventListener('click', () => send({ t: 'title', id: a.id }));
+        li.querySelector('[data-take]')?.addEventListener('click', () => app.claimAch?.(a.id));
         return li;
       }),
     );

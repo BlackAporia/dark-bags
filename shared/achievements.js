@@ -107,6 +107,14 @@ export const ACHIEVEMENTS = [
   // headshots: clean, centred hits (double damage)
   { id: 'sharpshooter', stat: 'headshots', goal: 25, xp: 300 },
   { id: 'headhunter', stat: 'headshots', goal: 250, xp: 1500 },
+  // coming back: days in a row on the calendar, days claimed in all, tasks done
+  { id: 'habit', stat: 'streak', goal: 7, xp: 400 },
+  { id: 'devoted', stat: 'streak', goal: 14, xp: 1200 },
+  { id: 'loyal', stat: 'streak', goal: 30, xp: 3000 },
+  { id: 'regular_face', stat: 'calDays', goal: 60, xp: 1500 },
+  { id: 'dutiful', stat: 'tasksDone', goal: 10, xp: 300 },
+  { id: 'workhorse', stat: 'tasksDone', goal: 100, xp: 1500 },
+  { id: 'taskmaster', stat: 'tasksDone', goal: 500, xp: 5000 },
   // premium: the welcome bonus of a first top-up or deposit, worn in animated gold
   { id: 'founder', stat: 'deposits', goal: 1, xp: 500, premium: true },
   // secret: hidden until you earn them
@@ -130,7 +138,7 @@ export function titleTier(id) {
 export const ACHIEVEMENT = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 
 // counters that keep the best value instead of adding up
-const MAX_STATS = new Set(['bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles', 'bestWave', 'bestGold']);
+const MAX_STATS = new Set(['streak', 'bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles', 'bestWave', 'bestGold']);
 
 // What one finished raid adds to the career counters. p is the world's player record.
 // squad: runners in the match; mvp: topped the squad's zombie kills on a clear

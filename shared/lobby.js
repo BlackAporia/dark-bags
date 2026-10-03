@@ -10,6 +10,7 @@ import { ReferralBook, cleanCode } from './referrals.js';
 import { Guard, GUARD } from './guard.js';
 import { MailBook } from './mail.js';
 import { FortuneBook, FORTUNE } from './fortune.js';
+import { DailyBook } from './daily.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -32,7 +33,7 @@ export const CUSTOM_MAX = 10_000_000; // $10,000
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
@@ -65,8 +66,9 @@ export class Lobby {
     this.guard = guard;
     this.mail = mail;
     this.fortune = fortune;
+    this.daily = daily; // the login calendar, the daily and weekly tasks, achievement rewards
     this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
-    this.roomArgs = { edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    this.roomArgs = { edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
@@ -310,6 +312,10 @@ export class Lobby {
       case 'fortune_spin':
         this.fortuneSpin(cid, s, msg);
         return;
+      case 'daily':
+      case 'daily_claim':
+        this.dailyMsg(cid, s, msg);
+        return;
       case 'ref_info':
         // with real tokens the code belongs to the signed-in address
         if (!this.key(s)) return this.send(cid, { t: 'ref', signedOut: true });
@@ -450,6 +456,62 @@ export class Lobby {
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (msg.t === 'topup' && !this.practice) this.welcome(key); // the first top-up earns the welcome bonus (its toast comes last)
     if (s.room && (msg.t === 'equip' || msg.t === 'body' || msg.t === 'wequip' || msg.t === 'tequip')) s.room.broadcastPrep();
+  }
+
+  // ------------------------------------------------------------ coming back every day
+  // The calendar, the tasks and the achievement rewards. Online only (practice is free, so it
+  // must not farm), signed in, and not while the account is under a fair-play review.
+  dailyView(key) {
+    return this.daily.view(key, this.ranks.recs.get(key)?.done ?? {});
+  }
+
+  dailyMsg(cid, s, msg) {
+    if (this.practice) return this.send(cid, { t: 'daily', offline: true });
+    const key = this.key(s);
+    if (!key) return this.send(cid, { t: 'daily', signedOut: true });
+    if (msg.t === 'daily') return this.send(cid, { t: 'daily', view: this.dailyView(key) });
+    if (this.guard?.flagged(key)) return this.send(cid, { t: 'err', msg: 'Rewards are on hold while the account is under a fair-play review.' });
+    let r;
+    let add = null; // career counters this claim moves (for the achievements about coming back)
+    if (msg.what === 'day') {
+      r = this.daily.claimDay(key);
+      if (r.ok) add = { streak: r.streak, calDays: 1 };
+    } else if (msg.what === 'task') {
+      r = this.daily.claimTask(key, String(msg.id ?? ''));
+      if (r.ok) add = { tasksDone: 1 };
+    } else if (msg.what === 'ach') r = this.daily.claimAch(key, String(msg.id ?? ''), this.ranks.recs.get(key)?.done ?? {});
+    else return;
+    if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
+    const got = this.grant(key, r.gifts);
+    // coming back unlocks achievements of its own (their XP is paid at once, their reward waits)
+    const fresh = add ? this.ranks.progress(key, add) : [];
+    const xp = fresh.reduce((n, a) => n + (a.xp ?? 0), 0);
+    if (xp) this.grant(key, [{ k: 'xp', v: xp }]);
+    this.stats?.daily?.(msg.what);
+    for (const c of this.sessionsOf(key)) {
+      this.send(c, { t: 'daily', view: this.dailyView(key), career: this.ranks.career(key), ...(c === cid ? { claimed: { what: msg.what, id: r.id ?? null, day: r.day ?? null, gifts: r.gifts, sweep: !!r.sweep, rewards: got.rewards, achievements: fresh.map((a) => a.id) } } : {}) });
+      this.send(c, { t: 'locker', op: 'sync', locker: this.inventory.view(key) });
+    }
+  }
+
+  // hand out daily gifts: shop $, bags, spins (the inventory), pass XP, rank XP (with its
+  // rank-up rewards), XP boosts. Returns the rank-up rewards it paid.
+  grant(key, gifts) {
+    const rewards = [];
+    for (const g of gifts ?? []) {
+      if (g.k === 'credit' || g.k === 'box' || g.k === 'spin') this.inventory.give(key, g);
+      else if (g.k === 'pass') this.inventory.passXp(key, g.v);
+      else if (g.k === 'boost') this.daily.addBoost(key, g.n);
+      else if (g.k === 'xp') {
+        const { before, after } = this.ranks.add(key, g.v);
+        this.inventory.passXp(key, g.v);
+        if (after.rank > before.rank) {
+          rewards.push(...this.inventory.rankUp(key, before.rank, after.rank));
+          this.ranks.progress(key, { rank: after.rank });
+        }
+      }
+    }
+    return { rewards };
   }
 
   // The welcome bonus, once per account: the premium Founder title (worn at once if no other title

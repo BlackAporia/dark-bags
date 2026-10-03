@@ -14,6 +14,7 @@ import { RankBook } from '../shared/ranks.js';
 import { Inventory } from '../shared/cosmetics.js';
 import { SocialBook } from '../shared/social.js';
 import { ReferralBook } from '../shared/referrals.js';
+import { DailyBook } from '../shared/daily.js';
 import { Guard } from '../shared/guard.js';
 import { createBridge } from './bridge.js';
 import { MailBook, cleanGift } from '../shared/mail.js';
@@ -51,6 +52,7 @@ const LOCKER_FILE = process.env.LOCKER_FILE || (DATA ? `${DATA}/${NET}-locker.js
 const REFERRAL_FILE = process.env.REFERRAL_FILE || (DATA ? `${DATA}/${NET}-referrals.json` : '');
 const GUARD_FILE = process.env.GUARD_FILE || (DATA ? `${DATA}/${NET}-guard.json` : '');
 const MAIL_FILE = process.env.MAIL_FILE || (DATA ? `${DATA}/${NET}-mail.json` : '');
+const DAILY_FILE = process.env.DAILY_FILE || (DATA ? `${DATA}/${NET}-daily.json` : '');
 const FORTUNE_FILE = process.env.FORTUNE_FILE || (DATA ? `${DATA}/${NET}-fortune.json` : '');
 const SOCIAL_FILE = process.env.SOCIAL_FILE || (DATA ? `${DATA}/${NET}-social.json` : '');
 const STATS_FILE = process.env.STATS_FILE || (DATA ? `${DATA}/${NET}-stats.json` : '');
@@ -80,7 +82,7 @@ const EPOCH_FILE = process.env.EPOCH_FILE || (DATA ? `${DATA}/epoch.json` : '');
 if (EPOCH_FILE) {
   const was = existsSync(EPOCH_FILE) ? JSON.parse(readFileSync(EPOCH_FILE, 'utf8')).epoch ?? null : null;
   if (was !== CFG.EPOCH) {
-    const files = [WALLET_FILE, RANKS_FILE, LOCKER_FILE, REFERRAL_FILE, GUARD_FILE, SOCIAL_FILE, MAIL_FILE].filter((f) => f && existsSync(f));
+    const files = [WALLET_FILE, RANKS_FILE, LOCKER_FILE, REFERRAL_FILE, GUARD_FILE, SOCIAL_FILE, MAIL_FILE, DAILY_FILE].filter((f) => f && existsSync(f));
     if (NET === 'mainnet' && files.length && process.env.EPOCH_RESET_MAINNET !== '1') {
       console.warn(`data epoch ${was} → ${CFG.EPOCH}: mainnet keeps its files (set EPOCH_RESET_MAINNET=1 to start over)`);
     } else if (files.length) {
@@ -220,6 +222,20 @@ const mail = new MailBook({
   },
 });
 
+// ------------------------------------------------------------------- daily
+// the login calendar, the day's and the week's tasks, the achievement rewards, XP boosts
+let dailyTimer = null;
+const daily = new DailyBook({
+  data: DAILY_FILE && existsSync(DAILY_FILE) ? JSON.parse(readFileSync(DAILY_FILE, 'utf8')) : {},
+  onChange: (db) => {
+    if (!DAILY_FILE || dailyTimer) return;
+    dailyTimer = setTimeout(async () => {
+      dailyTimer = null;
+      await saveJSON(DAILY_FILE, db.toJSON()).catch((e) => console.error('daily save failed', e));
+    }, 1500);
+  },
+});
+
 // ----------------------------------------------------------------- fortune
 // the wheel's bank survives restarts and data epochs (it is money players have put in)
 let fortuneTimer = null;
@@ -285,6 +301,7 @@ const lobby = new Lobby({
   guard: J('guard', guard),
   mail,
   fortune,
+  daily: J('daily', daily),
   coins: real ? { list: () => real.catalog.list(), import: (a) => real.importToken(a) } : null,
   send,
   bots: BOTS,
@@ -574,6 +591,7 @@ const shutdown = async () => {
   if (RANKS_FILE) await saveJSON(RANKS_FILE, ranks.toJSON()).catch(() => {});
   if (LOCKER_FILE) await saveJSON(LOCKER_FILE, inventory.toJSON()).catch(() => {});
   if (REFERRAL_FILE) await saveJSON(REFERRAL_FILE, referrals.toJSON()).catch(() => {});
+  if (DAILY_FILE) await saveJSON(DAILY_FILE, daily.toJSON()).catch(() => {});
   if (GUARD_FILE) await saveGuard(guard).catch(() => {});
   if (MAIL_FILE) await saveJSON(MAIL_FILE, mail.toJSON()).catch(() => {});
   if (FORTUNE_FILE) await saveJSON(FORTUNE_FILE, fortune.toJSON()).catch(() => {});
