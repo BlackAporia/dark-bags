@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-07a',
+    at: '2026-10-07T12:00:00+03:00',
+    items: {
+      en: ["Style: 44 animated items: profile frames, banners, kill effects and name colours", "Three Style cases in the shop; style also drops from the daily calendar, weekly tasks and achievement rewards", "Wear them in Inventory → Style: your frame and banner show on your card and in your profile, your name colour over your head, your kill effect where your enemies fall"],
+      uk: ["Стиль: 44 анімовані предмети: рамки й банери профілю, ефекти вбивства й кольори ніків", "Три стильові кейси в магазині; стиль також випадає з щоденного календаря, тижневих завдань і нагород за досягнення", "Одягай в Інвентар → Стиль: рамка й банер видно на картці та в профілі, колір ніку над головою, ефект вбивства там, де падає ворог"],
+      ru: ["Стиль: 44 анимированных предмета: рамки и баннеры профиля, эффекты убийства и цвета ников", "Три стильных кейса в магазине; стиль также выпадает из ежедневного календаря, недельных заданий и наград за достижения", "Надевай в Инвентарь → Стиль: рамку и баннер видно на карточке и в профиле, цвет ника над головой, эффект убийства там, где падает враг"],
+      es: ["Estilo: 44 objetos animados: marcos y banners de perfil, efectos de baja y colores de nombre", "Tres cajas de estilo en la tienda; también salen del calendario diario, tareas semanales y logros", "Equípalos en Inventario → Estilo"],
+      fr: ["Style : 44 objets animés : cadres et bannières de profil, effets d’élimination et couleurs de pseudo", "Trois caisses de style en boutique ; le style tombe aussi du calendrier, des tâches hebdo et des succès", "Équipe-les dans Inventaire → Style"],
+      pt: ["Estilo: 44 itens animados: molduras e banners de perfil, efeitos de abate e cores de nome", "Três caixas de estilo na loja; também vêm do calendário diário, tarefas semanais e conquistas", "Equipe em Inventário → Estilo"],
+      tr: ["Stil: 44 animasyonlu öğe: profil çerçeveleri, afişler, öldürme efektleri ve isim renkleri", "Mağazada üç stil kasası; stil ayrıca günlük takvimden, haftalık görevlerden ve başarımlardan düşer", "Envanter → Stil bölümünden tak"],
+      zh: ["风格：44 件动态物品：头像框、横幅、击杀特效和名字颜色", "商店新增三种风格箱；每日签到、每周任务和成就奖励也会掉落", "在 库存 → 风格 中装备"],
+      hi: ["स्टाइल: 44 एनिमेटेड चीज़ें: प्रोफ़ाइल फ़्रेम, बैनर, किल इफ़ेक्ट और नाम के रंग", "दुकान में तीन स्टाइल केस; डेली कैलेंडर, साप्ताहिक टास्क और उपलब्धियों से भी मिलते हैं", "इन्वेंटरी → स्टाइल में पहनो"],
+      ar: ["الأسلوب: 44 عنصرًا متحركًا: إطارات ولافتات الملف وتأثيرات القتل وألوان الأسماء", "ثلاثة صناديق أسلوب في المتجر؛ ويأتي الأسلوب أيضًا من التقويم اليومي والمهام الأسبوعية والإنجازات", "ارتدِها من المخزون ← الأسلوب"],
+    },
+  },
+  {
     id: '2026-10-06a',
     at: '2026-10-06T12:00:00+03:00',
     items: {

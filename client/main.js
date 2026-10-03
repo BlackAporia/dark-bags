@@ -28,6 +28,7 @@ import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
 import { createSwap } from './swap.js';
 import { renderMapPick } from './mappick.js';
+import { nameHtml, frameAttrs, bannerHtml } from './flair.js';
 import { MAP_THEMES } from '../shared/map.js';
 import { createChat } from './chat.js';
 import { createSettingsUi } from './settingsui.js';
@@ -334,6 +335,27 @@ function syncMore() {
   badge.textContent = n ? String(n) : '';
 }
 setInterval(syncMore, 1000);
+
+// your style on the menu card: the frame around your runner, the banner behind the card
+let heroStyleKey = '';
+function heroStyle() {
+  const L = app.locker;
+  const fr = L?.sequip?.frame && L.sowned?.includes(L.sequip.frame) ? L.sequip.frame : null;
+  const bn = L?.sequip?.banner && L.sowned?.includes(L.sequip.banner) ? L.sequip.banner : null;
+  const key = `${fr}|${bn}`;
+  if (key === heroStyleKey) return;
+  heroStyleKey = key;
+  const tile = $('locker-tile');
+  const hero = document.querySelector('.page-play .hero');
+  if (!tile || !hero) return;
+  const f = frameAttrs(fr);
+  tile.classList.remove(...[...tile.classList].filter((c) => c === 'frm' || c.startsWith('frm-')));
+  if (f.cls) tile.classList.add(...f.cls.split(' '));
+  tile.setAttribute('style', f.style);
+  hero.querySelector(':scope > .bnr')?.remove();
+  if (bn) hero.insertAdjacentHTML('afterbegin', bannerHtml(bn));
+}
+setInterval(heroStyle, 800);
 matchMedia('(max-width: 760px)').addEventListener?.('change', closeMore);
 function isPrimary(page) {
   return page === 'play' || page === 'shop' || page === 'achievements' || page === 'inventory';
@@ -857,7 +879,7 @@ function renderPrep() {
   const lineup = $('lineup');
   const want = [...p.slots.map((s) => ({ ...s, kind: s.me ? 'me' : 'human' })), ...p.bots.map((b) => ({ ...b, kind: 'bot' }))];
   const total = Math.max(p.slotsTotal, want.length);
-  const keys = want.map((s) => `${s.kind}:${s.n}:${s.wp ?? ''}`);
+  const keys = want.map((s) => `${s.kind}:${s.n}:${s.wp ?? ''}:${s.fr ?? ''}:${s.nf ?? ''}`);
   const cur = [...lineup.children].map((c) => c.dataset.key || '');
   if (cur.join('|') !== [...keys, ...Array(total - keys.length).fill('')].join('|')) {
     lineup.replaceChildren(
@@ -871,8 +893,9 @@ function renderPrep() {
         }
         d.className = `slot lit ${s.kind === 'me' ? 'me' : ''} ${s.kind === 'bot' ? 'bot' : ''}`;
         d.style.color = s.c;
-        d.dataset.key = `${s.kind}:${s.n}:${s.wp ?? ''}`;
-        d.innerHTML = `<img class="fig" alt="" src="${figureStill({ outfit: s.o, body: s.g }, 60, 84)}"><span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${esc(s.n)}</span>${s.tt ? titleHtml(s.tt, 'slot-tt') : ''}${s.wp ? `<span class="slot-wp">${esc(t(`w.${WEAPONS.find((w) => w.id === s.wp)?.name}`))}</span>` : ''}`;
+        d.dataset.key = `${s.kind}:${s.n}:${s.wp ?? ''}:${s.fr ?? ''}:${s.nf ?? ''}`;
+        const fa = frameAttrs(s.fr);
+        d.innerHTML = `<span class="fig-w ${fa.cls}" style="${fa.style}"><img class="fig" alt="" src="${figureStill({ outfit: s.o, body: s.g }, 60, 84)}"></span><span class="sn">${s.rk ? rankBadgeSvg(s.rk, 16) : ''}${nameHtml(s.n, s.nf)}</span>${s.tt ? titleHtml(s.tt, 'slot-tt') : ''}${s.wp ? `<span class="slot-wp">${esc(t(`w.${WEAPONS.find((w) => w.id === s.wp)?.name}`))}</span>` : ''}`;
         return d;
       }),
     );

@@ -13,7 +13,8 @@ export const DAY_MS = 86400000;
 export const dayOf = (t) => Math.floor(t / DAY_MS);
 export const weekOf = (t) => Math.floor((dayOf(t) + 3) / 7); // weeks start on Monday (UTC)
 
-// gift kinds: credit (shop cents), box, spin, pass (pass XP), xp (rank XP), boost (raids at ×2 XP)
+// gift kinds: credit (shop cents), box, spin, pass (pass XP), xp (rank XP), boost (raids at ×2 XP),
+// style (a frame, banner, kill effect or name effect)
 const G = {
   c: (v) => ({ k: 'credit', v }),
   box: (id, n = 1) => ({ k: 'box', id, n }),
@@ -21,40 +22,41 @@ const G = {
   pass: (v) => ({ k: 'pass', v }),
   xp: (v) => ({ k: 'xp', v }),
   boost: (n) => ({ k: 'boost', n }),
+  style: (id) => ({ k: 'style', id }),
 };
 
 // the calendar: something every day, a big one every week, the biggest on day 30
 export const CALENDAR = [
   [G.c(5), G.pass(50)], // 1
   [G.spin(1)],
-  [G.c(10), G.xp(150)],
+  [G.c(10), G.style('n-mint')],
   [G.boost(2)],
   [G.box('street')],
   [G.c(15), G.pass(80)],
   [G.box('vault'), G.spin(2)], // 7: the first big one
   [G.c(10), G.xp(250)],
   [G.spin(1), G.boost(2)],
-  [G.box('w-scrap')],
+  [G.box('w-scrap'), G.style('f-neon')],
   [G.c(15), G.pass(100)],
   [G.spin(2)],
   [G.c(20), G.boost(3)],
-  [G.box('golden'), G.box('w-armory')], // 14
+  [G.box('golden'), G.style('b-sunset')], // 14
   [G.c(15), G.xp(400)],
   [G.spin(2), G.pass(120)],
-  [G.box('street', 2)],
+  [G.box('s-street'), G.style('k-confetti')],
   [G.c(20), G.boost(3)],
   [G.box('w-armory')],
   [G.spin(3)],
-  [G.box('elite'), G.c(50)], // 21
+  [G.box('elite'), G.box('s-neon')], // 21
   [G.c(25), G.xp(600)],
   [G.spin(3), G.pass(150)],
-  [G.box('b-crypto')],
+  [G.box('b-crypto'), G.style('n-gold')],
   [G.c(30), G.boost(5)],
   [G.box('c-pistol')],
   [G.spin(3), G.xp(800)],
-  [G.box('golden'), G.pass(200)],
+  [G.box('golden'), G.style('k-coins')],
   [G.c(50), G.boost(5)],
-  [G.box('diamond'), G.box('w-diamond'), G.spin(5), G.xp(2000)], // 30: the grand prize
+  [G.box('diamond'), G.style('f-gold'), G.style('n-rainbow'), G.spin(5), G.xp(2000)], // 30: the grand prize
 ];
 export const BIG_DAYS = [7, 14, 21, 30];
 
@@ -83,13 +85,13 @@ export const DAILY_SWEEP = [G.spin(1), G.pass(100)];
 
 export const WEEKLY_TASKS = [
   { id: 'w_play25', stat: 'raids', goal: 25, gifts: [G.box('vault'), G.pass(300)] },
-  { id: 'w_kill75', stat: 'kills', goal: 75, gifts: [G.spin(3), G.boost(3)] },
+  { id: 'w_kill75', stat: 'kills', goal: 75, gifts: [G.box('s-street'), G.boost(3)] },
   { id: 'w_win5', stat: 'wins', goal: 5, gifts: [G.box('w-armory'), G.c(30)] },
   { id: 'w_extract10', stat: 'extracts', goal: 10, gifts: [G.box('vault'), G.c(20)] },
   { id: 'w_alive2h', stat: 'secs', goal: 7200, gifts: [G.spin(2), G.xp(1500)] },
   { id: 'w_ranked5', stat: 'rankedGames', goal: 5, gifts: [G.box('c-rifle')] },
   { id: 'w_zclear2', stat: 'zClears', goal: 2, gifts: [G.box('golden')] },
-  { id: 'w_head25', stat: 'headshots', goal: 25, gifts: [G.spin(3), G.c(20)] },
+  { id: 'w_head25', stat: 'headshots', goal: 25, gifts: [G.box('s-street'), G.c(20)] },
 ];
 
 export const FIRST_WIN_XP = 300; // the first win (or extraction) of the day
@@ -107,9 +109,9 @@ export function achGifts(id) {
     case 'epic':
       return [G.c(20), G.spin(1)];
     case 'legendary':
-      return [G.box('vault'), G.boost(2)];
+      return [G.box('vault'), G.box('s-street')];
     case 'mythic':
-      return [G.box('golden'), G.spin(3)];
+      return [G.box('golden'), G.box('s-neon')];
     default: // mystery, premium
       return [G.box('vault'), G.spin(1)];
   }

@@ -291,6 +291,7 @@ export class Lobby {
       case 'box':
       case 'topup':
       case 'tequip':
+      case 'sequip':
       case 'pass_buy':
       case 'pass_claim':
         // practice is free play money: buying (bags, shop $) and the battle pass are online only
@@ -444,6 +445,7 @@ export class Lobby {
       : msg.t === 'wequip' ? inv.equipWeapon(key, id)
       : msg.t === 'topup' ? inv.topUp(key, id, pay)
       : msg.t === 'tequip' ? inv.equipTurret(key, msg.id ? id : null)
+      : msg.t === 'sequip' ? inv.equipStyle(key, String(msg.kind ?? ''), msg.id ? id : null)
       : msg.t === 'pass_buy' ? inv.passBuy(key, pay)
       : msg.t === 'pass_claim' ? inv.passClaim(key, msg.track, msg.tier)
       : inv.open(key, id, pay, msg.n);
@@ -455,7 +457,7 @@ export class Lobby {
     }
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (msg.t === 'topup' && !this.practice) this.welcome(key); // the first top-up earns the welcome bonus (its toast comes last)
-    if (s.room && (msg.t === 'equip' || msg.t === 'body' || msg.t === 'wequip' || msg.t === 'tequip')) s.room.broadcastPrep();
+    if (s.room && (msg.t === 'equip' || msg.t === 'body' || msg.t === 'wequip' || msg.t === 'tequip' || msg.t === 'sequip')) s.room.broadcastPrep();
   }
 
   // ------------------------------------------------------------ coming back every day
@@ -499,7 +501,7 @@ export class Lobby {
   grant(key, gifts) {
     const rewards = [];
     for (const g of gifts ?? []) {
-      if (g.k === 'credit' || g.k === 'box' || g.k === 'spin') this.inventory.give(key, g);
+      if (g.k === 'credit' || g.k === 'box' || g.k === 'spin' || g.k === 'style') this.inventory.give(key, g);
       else if (g.k === 'pass') this.inventory.passXp(key, g.v);
       else if (g.k === 'boost') this.daily.addBoost(key, g.n);
       else if (g.k === 'xp') {
