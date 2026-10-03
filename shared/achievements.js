@@ -176,6 +176,10 @@ export function raidStats(p, { golden = false, lastExit = false, mode = null, sq
     extracts: out && !side ? 1 : 0,
     kills: p.kills ?? 0,
     bestKills: p.kills ?? 0,
+    // PvP only (zombies are not players): kills, deaths and matches for the K/D ratio
+    pvpKills: zed ? 0 : p.kills ?? 0,
+    pvpDeaths: zed ? 0 : p.deaths ?? (p.status === 'dead' ? 1 : 0),
+    pvpGames: zed ? 0 : 1,
     bestMulti: p.bestMulti ?? 0,
     prestige: p.prestige ?? 0,
     firstBloods: p.firstBlood ? 1 : 0,

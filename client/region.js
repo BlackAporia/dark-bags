@@ -211,6 +211,18 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     return false;
   }
 
+  // the ready room: where this table is played, and a closer server if there is one
+  function prepLine() {
+    if (!st.list || app.mode !== 'online') return null;
+    const id = st.edge?.region ?? current();
+    const name = (r) => `${FLAG[r] ?? '🌐'} ${t(`reg.${r}`)}`;
+    const ms = st.ping[id];
+    let best = null;
+    for (const r of st.list) if (st.ping[r.id] != null && (best === null || st.ping[r.id] < st.ping[best])) best = r.id;
+    const hint = best && best !== id && ms != null && ms - st.ping[best] > 60 ? t('reg.closer', { r: name(best), ms: st.ping[best] }) : '';
+    return `${t('reg.table', { r: name(id) })}${ms != null ? ` · <b class="${ms < 90 ? 'good' : ms < 180 ? 'ok' : 'bad'}">${ms} ms</b>` : ''}${hint ? `<br><span class="fine">${hint}</span>` : ''}`;
+  }
+
   setInterval(() => app.mode === 'online' && !app.inRoom && !document.hidden && probe(), 30_000);
-  return { route, onMain, render, remote, current, closeEdge, probe, inEdge: () => !!st.edge };
+  return { route, onMain, render, remote, current, closeEdge, probe, prepLine, inEdge: () => !!st.edge };
 }

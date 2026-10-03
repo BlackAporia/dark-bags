@@ -242,7 +242,7 @@ const social = createSocial({
 const news = createNews();
 document.addEventListener('darkbags:news', () => news.open());
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m), openBox: (id) => shop.open(id) });
-const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id) });
+const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id), profile: (id) => social.profile(id) });
 const invite = createInvite({ app, send, sfx, toast: (m) => toast(m) });
 const mail = createMail({
   app,
@@ -270,6 +270,7 @@ function go(page, extra) {
   for (const b of document.querySelectorAll('.nav-btn')) b.setAttribute('aria-current', String(b.dataset.page === page));
   if (page === 'achievements') ach.renderList();
   if (page === 'shop' && extra) shop.family?.(extra);
+  if (page === 'shop') locker.bagsSeen();
   if (page === 'pass') {
     const b = document.querySelector('.nav-btn[data-page="pass"] .nav-badge');
     if (b) b.hidden = true;
@@ -758,6 +759,9 @@ const figureSvg = (color) =>
 function renderPrep() {
   const p = app.prep;
   if (!p) return;
+  const srv = regions.prepLine();
+  $('prep-server').hidden = !srv;
+  if (srv) $('prep-server').innerHTML = srv;
   const fixedMode = MODE[app.gameMode]?.fixed;
   $('prep-kicker').textContent = fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: money(p.stake) })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
   const count = $('prep-count');
@@ -929,7 +933,7 @@ function onMessage(m) {
   if (m.t === 'fortune' || m.t === 'err') fortune.onMessage(m);
   if (m.t === 'coins' || m.t === 'err') coinImport.onMessage(m);
   if (m.t === 'balance' && app.page === 'shop') fortune.paint();
-  if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables') swap.onMessage(m);
+  if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables' || m.t === 'coins' || m.t === 'authed') swap.onMessage(m);
   if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
   if (app.page === 'shop' && (m.t === 'balance' || m.t === 'welcome')) shop.render();

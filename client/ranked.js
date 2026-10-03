@@ -11,6 +11,8 @@ import { t } from './i18n.js';
 // a page that only exists in online play
 const onlineOnly = (title) => `<div class="ref-card online-only"><h2 class="ref-title">${t(title)}</h2><p class="muted">${t('online.only')}</p></div>`;
 import { settings } from './settings.js';
+import { store } from './store.js';
+import { rankBadgeSvg } from './rankbadge.js';
 
 const $ = (id) => document.getElementById(id);
 const DIV = Object.fromEntries(DIVISIONS.map((d) => [d.id, d]));
@@ -29,14 +31,61 @@ const titleImg = (id) => {
   return svgUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" width="120" height="70"><defs><filter id="g"><feGaussianBlur stdDeviation="2.4"/></filter></defs><g font-family="system-ui,sans-serif" font-weight="900" text-anchor="middle"><text x="60" y="30" font-size="13" fill="${c}" filter="url(#g)">${esc(t(`st.${seasonTitle(id).key}`).toUpperCase())}</text><text x="60" y="30" font-size="13" fill="#fff">${esc(t(`st.${seasonTitle(id).key}`).toUpperCase())}</text><text x="60" y="50" font-size="10" fill="${c}">+${Math.round(seasonTitle(id).bonus * 100)}% XP</text></g><rect x="6" y="8" width="108" height="54" rx="10" fill="none" stroke="${c}" stroke-width="2"/></svg>`);
 };
 
-export function createRanked({ app, send, sfx, toast, go, openBox = () => {} }) {
+export function createRanked({ app, send, sfx, toast, go, openBox = () => {}, profile = () => {} }) {
   let board = null;
+  let tab = store.get('darkbags.boardTab', 'all'); // 'all': every PvP player by K/D · 'season': ranked
+  let sort = 'kd';
+  const kdText = (v) => (v ?? 0).toFixed(2);
+  const kdCls = (v) => (v >= 2 ? 'kd-hi' : v >= 1 ? 'kd-ok' : 'kd-lo');
+
+  function tabs() {
+    return `<nav class="rd-tabs" role="tablist">${['all', 'season'].map((x) => `<button type="button" role="tab" data-tab="${x}" aria-selected="${tab === x}">${t(x === 'all' ? 'rd.tabAll' : 'rd.tabSeason')}</button>`).join('')}</nav>`;
+  }
+
+  // every PvP player online: K/D, kills, deaths, matches, wins
+  function renderAll(root) {
+    const a = board?.all;
+    const me = a?.me;
+    const stat = (k, v, cls = '') => `<div class="rd-stat"><b class="num ${cls}">${v}</b><span>${t(k)}</span></div>`;
+    root.innerHTML = `${tabs()}
+      <header class="rd-hero kd-hero">
+        <p class="eyebrow">${t('rd.myPvp')}</p>
+        ${me ? `<div class="rd-me"><div class="kd-big ${kdCls(me.kd)}"><b class="num">${kdText(me.kd)}</b><span>${t('rd.kd')}</span></div>
+          <p class="rd-pos">${t('rd.pos', { n: me.pos, m: a.total })}</p>
+          <div class="rd-stats">${stat('rd.kills', me.kills)}${stat('rd.deaths', me.deaths)}${stat('rd.games', me.games)}${stat('rd.wins', me.wins)}</div></div>` : `<p class="rd-none">${t('rd.noPvp')}</p>`}
+        <p class="fine">${t('rd.kdNote')}</p>
+      </header>
+      <section class="rd-board"><div class="rd-sort"><span class="eyebrow">${t('rd.sortBy')}</span>${['kd', 'kills', 'xp'].map((x) => `<button type="button" data-sort="${x}" aria-pressed="${sort === x}">${t(`rd.by.${x}`)}</button>`).join('')}</div>
+        ${a ? (a.rows.length ? `<table class="rd-table"><thead><tr><th>#</th><th>${t('rd.player')}</th><th>${t('rd.kd')}</th><th>${t('rd.kills')}</th><th>${t('rd.deaths')}</th><th>${t('rd.games')}</th><th>${t('rd.wins')}</th></tr></thead><tbody>${a.rows
+          .map((r) => `<tr class="${r.me ? 'me' : ''}${r.pos <= 3 ? ` p${r.pos}` : ''}"${r.id ? ` data-pid="${esc(r.id)}"` : ''}><td>${r.pos <= 3 ? ['🥇', '🥈', '🥉'][r.pos - 1] : r.pos}</td><td class="rd-who">${rankBadgeSvg(r.rk ?? 1, 18)}<b>${esc(r.n)}</b>${r.nt ? `<span class="rd-nt" style="--n:${neonColor(r.nt)}">${esc(neonText(r.nt))}</span>` : ''}</td><td class="num ${kdCls(r.kd)}"><b>${kdText(r.kd)}</b></td><td class="num">${r.kills}</td><td class="num">${r.deaths}</td><td class="num">${r.games}</td><td class="num">${r.wins}</td></tr>`)
+          .join('')}</tbody></table>` : `<p class="fine">${t('rd.emptyAll')}</p>`) : `<p class="fine">…</p>`}
+      </section>`;
+    wireCommon(root);
+    for (const b of root.querySelectorAll('[data-sort]'))
+      b.addEventListener('click', () => {
+        sort = b.dataset.sort;
+        board = null;
+        send({ t: 'leaderboard', sort });
+        render();
+      });
+  }
+
+  function wireCommon(root) {
+    for (const b of root.querySelectorAll('[data-tab]'))
+      b.addEventListener('click', () => {
+        tab = b.dataset.tab;
+        store.set('darkbags.boardTab', tab);
+        render();
+      });
+    for (const tr of root.querySelectorAll('tr[data-pid]')) tr.addEventListener('click', () => profile(tr.dataset.pid));
+  }
 
   function render() {
     const root = $('ranked-root');
     if (!root) return;
     if (app.mode === 'practice') return (root.innerHTML = onlineOnly('nav.ranked'));
-    if (!board) send({ t: 'leaderboard' });
+    if (!board) send({ t: 'leaderboard', sort });
+    if (tab === 'all') return renderAll(root);
     const S = seasonInfo(seasonAt().id);
     const me = board?.me ?? app.career?.ranked ?? null;
     const left = Math.max(0, S.end - Date.now());
@@ -45,14 +94,14 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {} }) 
     const div = me ? DIV[me.div ?? divisionOf(me.rp).id] : null;
     const stat = (k, v) => `<div class="rd-stat"><b class="num">${v}</b><span>${t(k)}</span></div>`;
     const owned = app.career?.stitles ?? [];
-    root.innerHTML = `
+    root.innerHTML = `${tabs()}
       <header class="rd-hero" style="--c1:${S.theme.c1};--c2:${S.theme.c2}">
         <p class="eyebrow">${t('rd.title', { n: S.n })} · ${t('bp.ends', { d, h })}</p>
         <h2 class="rd-h">${esc(S.theme.name)}</h2>
         ${me && me.games ? `<div class="rd-me" style="--d:${div.color}">
           <div class="rd-div"><span class="rd-gem"></span><b>${t(`rd.div.${div.id}`)}</b><span class="num">${me.rp} RP</span></div>
           ${board?.me?.pos ? `<p class="rd-pos">${t('rd.pos', { n: board.me.pos, m: board.total })}</p>` : ''}
-          <div class="rd-stats">${stat('rd.games', me.games)}${stat('rd.wins', me.wins)}${stat('rd.top3', me.top3)}${stat('rd.kills', me.kills)}${stat('rd.winrate', `${me.games ? Math.round((me.wins / me.games) * 100) : 0}%`)}</div>
+          <div class="rd-stats">${stat('rd.games', me.games)}${stat('rd.wins', me.wins)}${stat('rd.top3', me.top3)}${stat('rd.kills', me.kills)}${stat('rd.deaths', me.deaths ?? 0)}${stat('rd.kd', kdText((me.kills ?? 0) / Math.max(1, me.deaths ?? 0)))}${stat('rd.winrate', `${me.games ? Math.round((me.wins / me.games) * 100) : 0}%`)}</div>
         </div>` : `<p class="rd-none">${t('rd.unranked')}</p>`}
         <button type="button" class="cta" data-play>${t('rd.play')}</button>
         <div class="rd-ladder">${DIVISIONS.map((x) => `<span style="--d:${x.color}" class="${div?.id === x.id ? 'on' : ''}"><i></i>${t(`rd.div.${x.id}`)}<small>${x.min}+</small></span>`).join('')}</div>
@@ -66,8 +115,8 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {} }) 
         <div class="rd-tiers">${TITLE_TIERS.map((x) => `<span style="--n:${x.color}">${t(`st.${x.key}`)} · +${Math.round(x.bonus * 100)}% XP · ${x.odds}%</span>`).join('')}</div>
       </section>
       <section class="rd-board"><p class="eyebrow">${t('rd.board')}</p>
-        ${board ? (board.rows.length ? `<table class="rd-table"><thead><tr><th>#</th><th>${t('rd.player')}</th><th>${t('rd.div')}</th><th>RP</th><th>${t('rd.games')}</th><th>${t('rd.wins')}</th><th>${t('rd.top3')}</th><th>${t('rd.kills')}</th></tr></thead><tbody>${board.rows
-          .map((r) => `<tr class="${r.me ? 'me' : ''}${r.pos <= 3 ? ` p${r.pos}` : ''}"><td>${r.pos <= 3 ? ['🥇', '🥈', '🥉'][r.pos - 1] : r.pos}</td><td><b>${esc(r.n)}</b>${r.nt ? `<span class="rd-nt" style="--n:${neonColor(r.nt)}">${esc(neonText(r.nt))}</span>` : ''}</td><td><span class="rd-chip" style="--d:${DIV[r.div].color}">${t(`rd.div.${r.div}`)}</span></td><td class="num">${r.rp}</td><td class="num">${r.games}</td><td class="num">${r.wins}</td><td class="num">${r.top3}</td><td class="num">${r.kills}</td></tr>`)
+        ${board ? (board.rows.length ? `<table class="rd-table"><thead><tr><th>#</th><th>${t('rd.player')}</th><th>${t('rd.div')}</th><th>RP</th><th>${t('rd.games')}</th><th>${t('rd.wins')}</th><th>${t('rd.top3')}</th><th>${t('rd.kd')}</th><th>${t('rd.kills')}</th><th>${t('rd.deaths')}</th></tr></thead><tbody>${board.rows
+          .map((r) => `<tr class="${r.me ? 'me' : ''}${r.pos <= 3 ? ` p${r.pos}` : ''}"${r.id ? ` data-pid="${esc(r.id)}"` : ''}><td>${r.pos <= 3 ? ['🥇', '🥈', '🥉'][r.pos - 1] : r.pos}</td><td><b>${esc(r.n)}</b>${r.nt ? `<span class="rd-nt" style="--n:${neonColor(r.nt)}">${esc(neonText(r.nt))}</span>` : ''}</td><td><span class="rd-chip" style="--d:${DIV[r.div].color}">${t(`rd.div.${r.div}`)}</span></td><td class="num">${r.rp}</td><td class="num">${r.games}</td><td class="num">${r.wins}</td><td class="num">${r.top3}</td><td class="num ${kdCls(r.kd ?? 0)}"><b>${kdText(r.kd ?? 0)}</b></td><td class="num">${r.kills}</td><td class="num">${r.deaths ?? 0}</td></tr>`)
           .join('')}</tbody></table>` : `<p class="fine">${t('rd.empty')}</p>`) : `<p class="fine">…</p>`}
       </section>`;
     root.querySelector('[data-play]').addEventListener('click', () => {
@@ -76,6 +125,7 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {} }) 
       document.dispatchEvent(new CustomEvent('darkbags:mode'));
     });
     for (const b of root.querySelectorAll('[data-neon]')) b.addEventListener('click', () => send({ t: 'neon', id: b.dataset.neon || null }));
+    wireCommon(root);
   }
 
   function onMessage(m) {

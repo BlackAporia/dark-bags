@@ -679,12 +679,26 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   });
 
   // AVNU swaps inside the player's own wallet (tokens that never touched the house)
-  const tokenById = (id) => cs.chain?.tokens?.find((x) => x.id === id);
+  // the game's coins first, then any coin from the AVNU / Ekubo lists the swap page brought in
+  const extra = new Map();
+  const tokenById = (id) => cs.chain?.tokens?.find((x) => x.id === id) ?? extra.get(id);
   const avnu = {
     get ready() {
       return !!cs.chain && !!cs.account && app.mode === 'online';
     },
     tokens: () => cs.chain?.tokens ?? [],
+    // coins from the verified lists: { address, symbol, name, decimals, logo }
+    register(list) {
+      for (const c of list ?? []) if (c?.address && !extra.has(c.address)) extra.set(c.address, { id: c.address, symbol: c.symbol, name: c.name, decimals: c.decimals, logo: c.logo });
+    },
+    token: (id) => tokenById(id),
+    // what the signed-in wallet holds of a coin, read from the chain
+    async balance(id) {
+      const tk = tokenById(id);
+      if (!tk || !cs.account) return null;
+      const v = await vendor();
+      return v.walletBalance(cs.chain, tk, cs.account);
+    },
     async quote(from, to, units) {
       const v = await vendor();
       return v.avnuQuote(cs.chain, await ensureFacade(), tokenById(from), tokenById(to), units);
@@ -706,6 +720,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     },
     get signedIn() {
       return !!cs.account;
+    },
+    get account() {
+      return cs.account;
     },
     reset() {
       cs.chain = null;

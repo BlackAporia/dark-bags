@@ -301,6 +301,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     const c = m.card;
     const s = m.stats ?? {};
     const secs = s.secs ?? 0;
+    const kdv = Math.round(((s.pvpKills ?? 0) / Math.max(1, s.pvpDeaths ?? 0)) * 100) / 100; // PvP kills per death
     const stat = (k, v) => `<div><b class="num">${v}</b><span>${t(k)}</span></div>`;
     $('pf-body').innerHTML = `
       <div class="pf-top">
@@ -313,6 +314,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
         </div>
       </div>
       <div class="pf-stats">
+        <div class="pf-kd ${kdv >= 2 ? 'kd-hi' : kdv >= 1 ? 'kd-ok' : 'kd-lo'}"><b class="num">${kdv.toFixed(2)}</b><span>${t('rd.kd')} · ${s.pvpKills ?? 0} / ${s.pvpDeaths ?? 0}</span></div>
         ${stat('pf.raids', s.raids ?? 0)}${stat('pf.wins', s.wins ?? 0)}${stat('pf.kills', s.kills ?? 0)}
         ${stat('pf.extracts', s.extracts ?? 0)}${stat('pf.best', s.bestKills ?? 0)}${stat('pf.time', `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`)}
         ${stat('pf.ach', m.done ?? 0)}${stat('pf.multi', s.bestMulti ?? 0)}${stat('pf.since', new Date(m.created).toLocaleDateString())}

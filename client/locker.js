@@ -5,6 +5,7 @@ import { WEAPONS } from '../shared/weapons.js';
 import { drawPreview, figureStill, weaponArt, drawWeapon } from './stickman.js';
 import { esc } from './game.js';
 import { t } from './i18n.js';
+import { store } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 const rn = (k) => t(`r.${k}`);
@@ -164,8 +165,13 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
     const bags = bagsHeld();
     $('lt-marks').textContent = bags ? t('lk.toOpen', { n: bags }) : '';
     $('tb-credit-v').textContent = usdCents(L().credit);
-    document.querySelector('.nav-btn[data-page="shop"] .nav-badge').hidden = !bags;
-    document.querySelector('.nav-btn[data-page="shop"] .nav-badge').textContent = bags ? String(bags) : '';
+    // the shop's badge counts the bags you have not seen yet: opening the shop reads them
+    let seen = store.get('darkbags.bagsSeen', 0);
+    if (bags < seen) store.set('darkbags.bagsSeen', (seen = bags));
+    if (app.page === 'shop' && bags > seen) store.set('darkbags.bagsSeen', (seen = bags));
+    const badge = document.querySelector('.nav-btn[data-page="shop"] .nav-badge');
+    badge.hidden = bags <= seen;
+    badge.textContent = bags > seen ? String(bags - seen) : '';
     tile.style.setProperty('--r', r.color);
   }
   const usdCents = (c) => `$${(c / 100).toLocaleString('en-US', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
@@ -419,5 +425,12 @@ export function createLocker({ app, send, sfx, toast, openShop }) {
   });
   st.raf = requestAnimationFrame(loop);
 
-  return { onMessage, renderTile, open, lookOf, serial };
+  // the shop was opened: every bag held now counts as seen
+  function bagsSeen() {
+    if (!L()) return;
+    store.set('darkbags.bagsSeen', bagsHeld());
+    renderTile();
+  }
+
+  return { onMessage, renderTile, open, lookOf, serial, bagsSeen };
 }

@@ -192,3 +192,26 @@ test('achievements count a career, pay XP once and unlock titles', () => {
   assert.deepEqual(saved.career('me'), book.career('me'));
   assert.equal(new RankBook({ data: { old: 500 } }).get('old').xp, 500, 'old saves: bare XP numbers');
 });
+
+test('K/D: PvP kills over deaths (zombies apart), a board of every PvP player, and the ranked season keeps deaths', async () => {
+  const { RankBook, kd, KD_MIN } = await import('../shared/ranks.js');
+  const { raidStats } = await import('../shared/achievements.js');
+  const { MODE } = await import('../shared/modes.js');
+  assert.equal(kd(10, 0), 10);
+  assert.equal(kd(3, 2), 1.5);
+  const pvp = raidStats({ kills: 4, deaths: 2, status: 'dead' }, { mode: MODE.dm });
+  assert.deepEqual([pvp.pvpKills, pvp.pvpDeaths, pvp.pvpGames], [4, 2, 1]);
+  const z = raidStats({ kills: 0, zk: 40, deaths: 1, status: 'dead' }, { mode: MODE.zombies });
+  assert.deepEqual([z.pvpKills, z.pvpDeaths, z.pvpGames], [0, 0, 0], 'zombies do not count');
+  const rb = new RankBook();
+  for (let i = 0; i < KD_MIN; i++) rb.progress('steady', { pvpKills: 3, pvpDeaths: 2, pvpGames: 1 });
+  rb.progress('lucky', { pvpKills: 9, pvpDeaths: 0, pvpGames: 1 }); // one game: ranks after the steady ones
+  rb.progress('zed', { zKills: 50 });
+  const b = rb.board('kd');
+  assert.deepEqual(b.map((r) => r.key), ['steady', 'lucky']);
+  assert.equal(b[0].kd, 1.5);
+  assert.equal(rb.board('kills')[0].key, 'lucky');
+  rb.rankedResult('steady', { place: 2, size: 10, kills: 3, deaths: 1 });
+  assert.equal(rb.leaderboard()[0].deaths, 1);
+  assert.equal(rb.leaderboard()[0].kd, 3);
+});

@@ -2,14 +2,16 @@ import { CFG, EXTRACT_NAMES } from './config.js';
 import { mulberry32, shuffle, rectsOverlap, circleHitsRect } from './geom.js';
 
 const WALL_T = 22;
-const DOOR = 100;
+const DOOR = 140; // vault doorways: wide enough to find and to run through, even on a phone
 
 function vaultWalls(v, rnd) {
   const sides = shuffle(['n', 's', 'e', 'w'], rnd).slice(0, 2);
   const out = [];
+  v.doors = [];
   const hWall = (y, door) => {
     if (!door) return out.push({ x: v.x, y, w: v.w, h: WALL_T });
     const gx = v.x + 60 + Math.floor(rnd() * (v.w - 120 - DOOR));
+    v.doors.push({ x: gx, y, w: DOOR, h: WALL_T, out: y === v.y ? 'n' : 's' });
     out.push({ x: v.x, y, w: gx - v.x, h: WALL_T });
     out.push({ x: gx + DOOR, y, w: v.x + v.w - gx - DOOR, h: WALL_T });
   };
@@ -18,6 +20,7 @@ function vaultWalls(v, rnd) {
     const h = v.h - 2 * WALL_T;
     if (!door) return out.push({ x, y: y0, w: WALL_T, h });
     const gy = y0 + 40 + Math.floor(rnd() * (h - 80 - DOOR));
+    v.doors.push({ x, y: gy, w: WALL_T, h: DOOR, out: x === v.x ? 'w' : 'e' });
     out.push({ x, y: y0, w: WALL_T, h: gy - y0 });
     out.push({ x, y: gy + DOOR, w: WALL_T, h: y0 + h - gy - DOOR });
   };
