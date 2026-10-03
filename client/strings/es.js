@@ -516,6 +516,7 @@ export default {
   'stake.own': "Tu apuesta",
   'stake.range': "Apuesta de $0.10 a $10.000",
   'nav.settings': "Ajustes",
+  'nav.more': "Más",
   'modes.title': "Modo de juego",
   'kind.raid': "extracción",
   'kind.br': "el ganador se lleva el bote",

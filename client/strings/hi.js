@@ -516,6 +516,7 @@ export default {
   'stake.own': "अपना दांव",
   'stake.range': "दांव $0.10 से $10,000 तक",
   'nav.settings': "सेटिंग्स",
+  'nav.more': "और",
   'modes.title': "गेम मोड",
   'kind.raid': "निकासी",
   'kind.br': "विजेता पॉट ले जाता है",

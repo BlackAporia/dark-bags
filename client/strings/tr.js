@@ -516,6 +516,7 @@ export default {
   'stake.own': "Kendi bahsin",
   'stake.range': "Bahis $0.10 ile $10.000 arası",
   'nav.settings': "Ayarlar",
+  'nav.more': "Daha",
   'modes.title': "Oyun modu",
   'kind.raid': "tahliye",
   'kind.br': "kazanan potu alır",
