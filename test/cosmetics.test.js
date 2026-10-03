@@ -50,6 +50,7 @@ test('pity guarantees Epic within 15 and Legendary within 60 opens, even on bad 
   const unlucky = () => 0; // always the worst roll (commons first)
   const inv = new Inventory({ rnd: unlucky });
   inv.rec('p').credit = 1e9;
+  inv.rec('p').gboxes = {}; // no welcome gift: every open here is paid
   const got = [];
   for (let i = 0; i < PITY.legendary; i++) got.push(inv.open('p', 'street'));
   assert.equal(got[PITY.epic - 1].rarity, 'epic', 'the 15th open is the pity epic');
@@ -300,4 +301,20 @@ test('collection cases: every rarity they list can drop, and only from their col
     assert.ok(r.ok, id);
     for (const x of r.results) assert.ok(ids.has(x.item), `${id} dropped ${x.item}`);
   }
+});
+
+test('gift boxes (free rewards) roll no higher than Epic and leave the pity alone', () => {
+  const lucky = () => 0.999999; // the best roll there is
+  const inv = new Inventory({ rnd: lucky });
+  inv.give('g', { k: 'box', id: 'apex', n: 5, cap: 1 });
+  assert.equal(inv.view('g').boxes.apex, 5);
+  const r = inv.open('g', 'apex', () => false, 5);
+  assert.ok(r.ok);
+  assert.equal(r.gifts, 5);
+  for (const x of r.results) assert.ok(['common', 'rare', 'epic'].includes(x.rarity), x.rarity);
+  assert.equal(inv.view('g').pity.apex?.sinceEpic ?? 0, 0);
+  // a bought one rolls as usual
+  inv.rec('g').credit = 1e9;
+  const paid = inv.open('g', 'apex', () => false, 1);
+  assert.ok(!paid.results[0].gift);
 });

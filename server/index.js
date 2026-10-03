@@ -492,7 +492,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 const ipOf = (req) => (TRUST_PROXY ? String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim() : '') || req.socket.remoteAddress || '';
 
 // a match server answers only what a raid needs; the rest lives on the main server
-const EDGE_MSGS = new Set(['join', 'unready', 'start', 'leave', 'in', 'watch', 'buy', 'upgrade', 'bluff', 'pick', 'vote', 'probe', 'ping', 'cerr']);
+const EDGE_MSGS = new Set(['join', 'unready', 'start', 'leave', 'in', 'watch', 'buy', 'upgrade', 'bluff', 'pick', 'vote', 'vc', 'probe', 'ping', 'cerr']);
 function edgeHandle(cid, msg) {
   if (!msg || typeof msg.t !== 'string') return;
   if (msg.t === 'hello') return regionEdge.admit(cid, msg);

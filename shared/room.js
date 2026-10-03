@@ -9,7 +9,8 @@ import { raidStats } from './achievements.js';
 import { MODE, ZOMBIE_WEAPONS } from './modes.js';
 import { WAVES } from './horde.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, seasonAt } from './cosmetics.js';
-import { spinChance, rollLottery, titleBonus, DIVISIONS } from './ranked.js';
+import { spinChance, rollLottery, titleBonus, DIVISIONS, DIV_PRIZES } from './ranked.js';
+import { pickStyle } from './style.js';
 
 /**
  * A table at one stake level.
@@ -157,6 +158,9 @@ export class RoomCore {
         break;
       case 'bluff':
         if (c.pid && this.world && this.state === 'live') this.world.setBluff(c.pid, msg.v);
+        break;
+      case 'vc':
+        this.voice(c, msg);
         break;
       default:
     }
@@ -494,6 +498,50 @@ export class RoomCore {
     for (const [cid, l] of per) this.send(cid, { t: 'ev', l });
   }
 
+  // Voice chat: the server only passes the WebRTC handshake between players of the live match
+  // (team modes: your team only). The audio itself goes player to player.
+  voice(c, msg) {
+    const w = this.world;
+    if (!c.pid || !w || this.state !== 'live') return;
+    const me = w.players.get(c.pid);
+    if (!me) return;
+    const ok = (o) => {
+      if (!o.pid || o === c) return false;
+      const q = w.players.get(o.pid);
+      return !!q && !q.isBot && (!w.teamSize || q.team === me.team);
+    };
+    if (msg.op === 'hello' || msg.op === 'bye') {
+      // to everyone it may talk to, or (an answer to a hello) to one player
+      for (const o of this.clients.values()) if (ok(o) && (msg.to == null || o.pid === msg.to)) this.send(o.cid, { t: 'vc', op: msg.op, from: c.pid, ack: msg.to != null ? 1 : 0, n: me.name });
+    } else if (msg.op === 'sig' && msg.data && typeof msg.data === 'object' && JSON.stringify(msg.data).length < 12000) {
+      for (const o of this.clients.values()) if (ok(o) && o.pid === msg.to) this.send(o.cid, { t: 'vc', op: 'sig', from: c.pid, data: msg.data });
+    }
+  }
+
+  // the prizes of the divisions newly reached: style items picked here (so a match server's journal
+  // carries the exact item), cases given whole (they roll in full: rated play earns Legendary+)
+  divisionPrizes(token) {
+    const out = [];
+    for (const div of this.ranks.divisionPrizes(token)) {
+      for (const p of DIV_PRIZES[div] ?? []) {
+        if (p.k === 'style') {
+          const id = pickStyle(p.rarity, this.inventory.view(token).sowned, Math.random);
+          if (id) {
+            this.inventory.give(token, { k: 'style', id });
+            out.push({ div, k: 'style', id });
+          } else {
+            this.inventory.give(token, { k: 'box', id: 's-neon' });
+            out.push({ div, k: 'box', id: 's-neon' });
+          }
+        } else {
+          this.inventory.give(token, { k: 'box', id: p.id });
+          out.push({ div, k: 'box', id: p.id });
+        }
+      }
+    }
+    return out;
+  }
+
   // the ranked bonus spin: a season title (rare), a weapon skin, or a collection case
   lottery(token) {
     const won = rollLottery(Math.random);
@@ -503,7 +551,15 @@ export class RoomCore {
       return { k: 'title', id: r.id, fresh: r.fresh };
     }
     if (won.k === 'wskin') {
-      const pool = WEAPON_SKINS.filter((x) => !x.limited && ['rare', 'epic', 'legendary'].includes(x.rarity));
+      // ranked is where the rare things are earned: a Legendary or Mythic weapon skin, or style
+      if (Math.random() < 0.4) {
+        const id = pickStyle(Math.random() < 0.75 ? 'legendary' : 'mythic', this.inventory.view(token).sowned, Math.random);
+        if (id) {
+          this.inventory.give(token, { k: 'style', id });
+          return { k: 'style', id };
+        }
+      }
+      const pool = WEAPON_SKINS.filter((x) => !x.limited && ['legendary', 'mythic'].includes(x.rarity));
       const it = pool[Math.floor(Math.random() * pool.length)];
       this.inventory.give(token, { k: 'wskin', id: it.id });
       return { k: 'wskin', id: it.id };
@@ -528,8 +584,8 @@ export class RoomCore {
         // fair play: the aim numbers of this match go on the account's record
         this.guard?.aim(c.token, p.ac);
         const bonus = this.referrals?.onMatch(c.token);
-        if (bonus?.welcome) this.inventory.give(bonus.welcome, { k: 'box', id: 'vault' });
-        if (bonus?.to && !this.guard?.flagged(c.token)) this.inventory.give(bonus.to, { k: 'box', id: 'vault' });
+        if (bonus?.welcome) this.inventory.give(bonus.welcome, { k: 'box', id: 'vault', cap: 1 });
+        if (bonus?.to && !this.guard?.flagged(c.token)) this.inventory.give(bonus.to, { k: 'box', id: 'vault', cap: 1 });
       }
       // career rank: every raid pays, win or lose
       // practice pays nothing: no XP, ranks, achievements, pass or bags (it is free, so it must not farm)
@@ -542,6 +598,9 @@ export class RoomCore {
         const place = p.won ? 1 : p.place ?? w.players.size;
         ranked = this.ranks.rankedResult(c.token, { place, size: w.players.size, kills: p.kills, deaths: p.deaths ?? 0, won: !!p.won });
         if (Math.random() < spinChance(place)) ranked.spin = this.lottery(c.token);
+        // a division reached for the first time this season pays its prize
+        const prizes = this.divisionPrizes(c.token);
+        if (prizes.length) ranked.prizes = prizes;
         ranked.view = this.ranks.rankedView(c.token);
         stats.rankedGames = 1;
         stats.rankedWins = place === 1 ? 1 : 0;
@@ -569,7 +628,7 @@ export class RoomCore {
       }
       const { before, after } = this.ranks.add(c.token, earned.total);
       if (!this.practice) done.push(...this.ranks.progress(c.token, { rank: after.rank }));
-      // every rank gained pays a luck bag, $ credit and a 72h trial outfit
+      // every rank gained pays a luck bag, $ credit and a 1-hour trial outfit
       const rewards = this.practice ? [] : this.inventory.rankUp(c.token, before.rank, after.rank);
       // the season's battle pass fills with the same XP
       const pass = this.practice ? null : this.inventory.passXp(c.token, earned.total);

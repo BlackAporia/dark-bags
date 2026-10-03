@@ -41,3 +41,24 @@ test('style gifts: given once, a duplicate refunds shop $', () => {
   inv.give('a', { k: 'style', id: 'nope' });
   assert.deepEqual(inv.view('a').sowned, ['f-gold']);
 });
+
+test('free rewards top out at Epic: calendar and task style items, and every box they give is a gift', async () => {
+  const { CALENDAR, DAILY_TASKS, WEEKLY_TASKS, achGifts } = await import('../shared/daily.js');
+  const { ACHIEVEMENTS } = await import('../shared/achievements.js');
+  const gifts = [...CALENDAR.flat(), ...DAILY_TASKS.flatMap((x) => x.gifts), ...WEEKLY_TASKS.flatMap((x) => x.gifts), ...ACHIEVEMENTS.flatMap((a) => achGifts(a.id))];
+  for (const g of gifts) if (g.k === 'style') assert.ok(['common', 'rare', 'epic'].includes(STYLE[g.id].rarity), g.id);
+});
+
+test('ranked: each division pays its prize once a season; Legendary+ style lives there', async () => {
+  const { RankBook } = await import('../shared/ranks.js');
+  const { DIV_PRIZES } = await import('../shared/ranked.js');
+  const rb = new RankBook();
+  rb.rankedResult('a', { place: 1, size: 10, kills: 5 });
+  rb.ranked('a').best = 1500; // up to platinum
+  assert.deepEqual(rb.divisionPrizes('a'), ['silver', 'gold', 'platinum']);
+  assert.deepEqual(rb.divisionPrizes('a'), []);
+  rb.ranked('a').best = 2500;
+  assert.deepEqual(rb.divisionPrizes('a'), ['diamond', 'master', 'legend']);
+  const top = Object.values(DIV_PRIZES).flat().filter((p) => p.k === 'style').map((p) => p.rarity);
+  assert.ok(top.includes('legendary') && top.includes('mythic'));
+});

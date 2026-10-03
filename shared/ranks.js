@@ -1,5 +1,5 @@
 import { applyStats, achievementView } from './achievements.js';
-import { START_RP, rpDelta, divisionOf, seasonTitle, seasonTitleId } from './ranked.js';
+import { START_RP, rpDelta, divisionOf, seasonTitle, seasonTitleId, DIVISIONS } from './ranked.js';
 import { seasonAt } from './season.js';
 // Career ranks: 1 (Lance Corporal) to 90 (Legend). Every raid pays rank XP, win or lose.
 // The first ranks come after a raid or two; the last ones take hundreds of hours.
@@ -181,6 +181,19 @@ export class RankBook {
     if (place <= 3) q.top3++;
     this.onChange?.(this);
     return { before, after: q.rp, delta, place, divBefore: divisionOf(before).id, div: divisionOf(q.rp).id };
+  }
+
+  // the divisions reached this season that have not paid their prize yet (marks them paid)
+  divisionPrizes(key, now = Date.now()) {
+    const q = this.ranked(key, now);
+    q.prized ??= [];
+    const reached = DIVISIONS.filter((d) => d.min <= q.best && d.id !== 'bronze').map((d) => d.id);
+    const fresh = reached.filter((id) => !q.prized.includes(id));
+    if (fresh.length) {
+      q.prized.push(...fresh);
+      this.onChange?.(this);
+    }
+    return fresh;
   }
 
   // the season's top players by RP (only those who played this season)

@@ -68,3 +68,9 @@ export const STYLE_CASES = [
   { id: 's-neon', name: 'Neon Style Case', price: 299, odds: { rare: 50, epic: 36.5, legendary: 11, mythic: 2.2, exotic: 0.3 }, jackpot: 'mythic', art: { c1: '#ff3cc8', c2: '#160420', icon: '◆' } },
   { id: 's-icon', name: 'Icon Style Case', price: 999, odds: { epic: 45, legendary: 38, mythic: 14.5, exotic: 2.5 }, jackpot: 'exotic', exoticPity: 40, art: { c1: '#ffd166', c2: '#1a1204', icon: '♛' } },
 ];
+
+// one item of that rarity (and kind, if given) you don't own yet; null when you have them all
+export function pickStyle(rarity, owned = [], rnd = Math.random, kind = null) {
+  const pool = STYLE_ITEMS.filter((x) => x.rarity === rarity && (!kind || x.kind === kind) && !owned.includes(x.id));
+  return pool.length ? pool[Math.floor(rnd() * pool.length)].id : null;
+}
