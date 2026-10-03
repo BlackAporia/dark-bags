@@ -59,6 +59,7 @@ export const REPLAY = {
   referrals: ['onStake', 'onMatch'],
   guard: ['aim'],
   stats: ['raid'],
+  daily: ['raid', 'bonusXp'],
 };
 
 // ------------------------------------------------------------------ main side
@@ -90,6 +91,7 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
       ranks: lobby.ranks.recs.get(key) ?? null,
       inventory: lobby.inventory.data.get(key) ?? null,
       referrals: lobby.referrals.users.get(key) ?? null,
+      daily: lobby.daily?.users.get(key) ?? null,
       name: lobby.social.get?.(key)?.name ?? null,
     };
   }
@@ -164,7 +166,7 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
       lobby.wallet.credit(c.key, c.asset, units);
       touched.add(c.key);
     }
-    const books = { ranks: lobby.ranks, inventory: lobby.inventory, referrals: lobby.referrals, guard: lobby.guard, stats: lobby.stats };
+    const books = { ranks: lobby.ranks, inventory: lobby.inventory, referrals: lobby.referrals, guard: lobby.guard, stats: lobby.stats, daily: lobby.daily };
     for (const j of report.journal ?? []) {
       const [book, method, args] = j;
       if (!REPLAY[book]?.includes(method) || !books[book] || !Array.isArray(args)) continue;
@@ -264,6 +266,7 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
     else lobby.ranks.recs.delete(key);
     if (s.inventory) lobby.inventory.data.set(key, structuredClone(s.inventory));
     if (s.referrals) lobby.referrals.users.set(key, structuredClone(s.referrals));
+    if (s.daily && lobby.daily) lobby.daily.users.set(key, structuredClone(s.daily));
   }
 
   // hello with an entry ticket: the session plays as that account

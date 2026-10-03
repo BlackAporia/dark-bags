@@ -26,7 +26,7 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ edge = false, stats = null, guard = null, referrals = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
+  constructor({ edge = false, stats = null, guard = null, referrals = null, daily = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
@@ -39,6 +39,7 @@ export class RoomCore {
     this.ranks = ranks;
     this.inventory = inventory;
     this.referrals = referrals;
+    this.daily = daily; // tasks, the XP boost, the first win of the day
     this.guard = guard;
     this.stats = stats; // the team's analytics (online only)
     this.edge = edge; // a regional match server: stakes arrive already taken by the main server
@@ -557,6 +558,15 @@ export class RoomCore {
         earned.parts.push({ label: 'Season title', xp: extra });
         earned.total += extra;
       }
+      // the day's bonuses (the first win or extraction, the XP boost) and the tasks it moves
+      let tasks = [];
+      if (!this.practice && this.daily) {
+        for (const x of this.daily.bonusXp(c.token, { won: !!p.won || p.status === 'extracted', xp: earned.total })) {
+          earned.parts.push(x);
+          earned.total += x.xp;
+        }
+        tasks = this.daily.raid(c.token, stats);
+      }
       const { before, after } = this.ranks.add(c.token, earned.total);
       if (!this.practice) done.push(...this.ranks.progress(c.token, { rank: after.rank }));
       // every rank gained pays a luck bag, $ credit and a 72h trial outfit
@@ -572,6 +582,7 @@ export class RoomCore {
         ...(ranked ? { ranked } : {}),
         size: w.players.size,
         achievements: done.map((a) => a.id),
+        tasks,
         career: this.ranks.career(c.token),
         status: p.status,
         mode: this.mode,
