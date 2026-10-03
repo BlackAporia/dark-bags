@@ -6,6 +6,8 @@ import { seasonInfo, seasonAt } from '../shared/season.js';
 import { boxArt, weaponStill } from './locker.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { esc } from './game.js';
+import { STYLE } from '../shared/style.js';
+import { styleStill } from './flair.js';
 import { t } from './i18n.js';
 
 // a page that only exists in online play
@@ -25,6 +27,7 @@ export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
     if (rw.k === 'box') return boxArt(BOX[rw.id], 58);
     if (rw.k === 'outfit') return `<img src="${figureStill({ outfit: rw.id, body: L()?.body ?? 'm' }, 48, 66)}" alt="">`;
     if (rw.k === 'wskin') return `<img class="wimg" src="${weaponStill(rw.id, 96, 56)}" alt="">`;
+    if (rw.k === 'style') return `<img class="wimg" src="${styleStill(rw.id, 96, 56)}" alt="">`;
     return turretSvg(TURRET_SKIN[rw.id]);
   }
   function rewardName(rw) {
@@ -32,9 +35,10 @@ export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
     if (rw.k === 'box') return t(`box.${rw.id}`);
     if (rw.k === 'outfit') return OUTFIT[rw.id].name;
     if (rw.k === 'wskin') return WSKIN[rw.id].name;
+    if (rw.k === 'style') return `${STYLE[rw.id].name} · ${t(`sty.${STYLE[rw.id].kind}`)}`;
     return TURRET_SKIN[rw.id].name;
   }
-  const rarityOf = (rw) => (rw.k === 'outfit' ? OUTFIT[rw.id].rarity : rw.k === 'wskin' ? WSKIN[rw.id].rarity : rw.k === 'turret' ? TURRET_SKIN[rw.id].rarity : null);
+  const rarityOf = (rw) => (rw.k === 'style' ? STYLE[rw.id].rarity : rw.k === 'outfit' ? OUTFIT[rw.id].rarity : rw.k === 'wskin' ? WSKIN[rw.id].rarity : rw.k === 'turret' ? TURRET_SKIN[rw.id].rarity : null);
 
   function cell(rw, track, tier, ps) {
     if (!rw) return `<div class="bp-cell empty"></div>`;
@@ -44,7 +48,7 @@ export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
     const can = reached && !claimed && !locked;
     const r = rarityOf(rw);
     const col = r ? RARITIES[r].color : '#8a93a6';
-    const seasonal = rw.k === 'outfit' || rw.k === 'wskin' || rw.k === 'turret';
+    const seasonal = rw.k === 'outfit' || rw.k === 'wskin' || rw.k === 'turret' || rw.k === 'style';
     return `<div class="bp-cell ${track}${can ? ' can' : ''}${claimed ? ' got' : ''}${!reached ? ' far' : ''}${locked ? ' locked' : ''}" style="--q:${col}" title="${esc(rewardName(rw))}">
       <div class="bp-art">${rewardArt(rw)}</div>
       <p class="bp-name">${esc(rewardName(rw))}</p>

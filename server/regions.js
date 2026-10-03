@@ -54,7 +54,7 @@ export function parseRegions(s = '') {
 
 // What the match server's books record and the main server replays. Only these, nothing else.
 export const REPLAY = {
-  ranks: ['add', 'progress', 'setTitle', 'rankedResult', 'addSeasonTitle'],
+  ranks: ['add', 'progress', 'setTitle', 'rankedResult', 'addSeasonTitle', 'divisionPrizes'],
   inventory: ['give', 'passXp'],
   referrals: ['onStake', 'onMatch'],
   guard: ['aim'],

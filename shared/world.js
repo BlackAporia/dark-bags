@@ -1561,6 +1561,30 @@ export class World {
     return out;
   }
 
+  // Every runner in the match for the Tab table: name, kills, deaths, status, ping. Never what
+  // anyone carries. Sorted by side, then kills, then fewer deaths.
+  scoreboard(me) {
+    const rows = [];
+    for (const p of this.players.values()) {
+      const dead = p.status === 'dead';
+      rows.push([
+        p.id,
+        p.name,
+        p.kills ?? 0,
+        p.deaths ?? (dead ? 1 : 0),
+        p.status === 'alive' ? 0 : p.status === 'extracted' ? 2 : 1,
+        p.rank ?? 1,
+        this.teamSize ? p.team : -1,
+        p.isBot ? 1 : 0,
+        p.ping ?? -1,
+        p.nf ?? 0,
+        p.zk ?? p.gb ?? 0, // zombies killed, gold bags held: the mode's own score
+      ]);
+    }
+    rows.sort((a, b) => (a[6] === b[6] ? 0 : a[6] === (this.teamSize ? me.team : -1) ? -1 : 1) || b[2] - a[2] || a[3] - b[3]);
+    return rows;
+  }
+
   snapshotFor(id) {
     const me = this.players.get(id);
     if (!me) return null;
@@ -1667,6 +1691,8 @@ export class World {
       players,
       // the minimap radar: every runner still standing, coarse, a few times a second
       ...(this.tick % 3 === 0 ? { radar: this.radarFor(me) } : {}),
+      // the scoreboard (Tab): everyone in the match, once a second
+      ...(this.tick - (me.sbAt ?? -99) >= 20 ? { sb: ((me.sbAt = this.tick), this.scoreboard(me)) } : {}),
       ...(this.shop ? this.gadgetsNear(me, near) : {}),
       orbs,
       drops,

@@ -501,7 +501,9 @@ export class Lobby {
   grant(key, gifts) {
     const rewards = [];
     for (const g of gifts ?? []) {
-      if (g.k === 'credit' || g.k === 'box' || g.k === 'spin' || g.k === 'style') this.inventory.give(key, g);
+      // boxes from free rewards are gifts: they roll up to Epic (Legendary+ is for paid boxes, ranked and the pass)
+      if (g.k === 'box') this.inventory.give(key, { ...g, cap: 1 });
+      else if (g.k === 'credit' || g.k === 'spin' || g.k === 'style') this.inventory.give(key, g);
       else if (g.k === 'pass') this.inventory.passXp(key, g.v);
       else if (g.k === 'boost') this.daily.addBoost(key, g.n);
       else if (g.k === 'xp') {

@@ -43,6 +43,7 @@ export function createSettingsUi() {
         ${row('set.music', slider('music', 0, 1, 0.05))}
         ${row('set.track', tracks(), 'set.trackNote')}
         ${row('set.voice', toggle('voice'), 'set.voiceNote')}
+        ${row('set.vchat', toggle('vchat'), 'set.vchatNote')}
       </section>
       <section class="set-card"><p class="eyebrow">${t('news.title')}</p>
         <div class="set-row"><div><p>${t('news.note')}</p></div><button type="button" class="ghost" data-news>${t('news.open')}</button></div>

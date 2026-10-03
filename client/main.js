@@ -28,6 +28,8 @@ import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
 import { createSwap } from './swap.js';
 import { renderMapPick } from './mappick.js';
+import { createScoreboard } from './scoreboard.js';
+import { createVoice } from './voice.js';
 import { nameHtml, frameAttrs, bannerHtml } from './flair.js';
 import { MAP_THEMES } from '../shared/map.js';
 import { createChat } from './chat.js';
@@ -168,6 +170,8 @@ globalThis.__darkbagsSend = send;
 addEventListener('error', (e) => reportError('script', e.error ?? e.message));
 addEventListener('unhandledrejection', (e) => reportError('promise', e.reason));
 const game = new GameClient({ renderer, input, sfx, send, el });
+const scoreboard = createScoreboard({ game, app });
+const voice = createVoice({ send, app, game, toast: (m) => toast(m) });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
 // share cards: everything that happens can be posted
 // the runner as others see them: outfit, body and every weapon skin they have equipped
@@ -370,6 +374,10 @@ function showScreen(name) {
   app.screen = name;
   tour.onScreen(name);
   if (name !== 'game' && !$('pause').hidden) closePause();
+  if (name !== 'game') {
+    scoreboard.hide();
+    voice.end();
+  }
   $('lobby').hidden = name !== 'lobby';
   $('prep').hidden = name !== 'prep';
   $('result').hidden = name !== 'result';
@@ -1019,6 +1027,7 @@ function onMessage(m) {
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'daily') daily.onMessage(m);
+  if (m.t === 'vc') voice.onMessage(m);
   if (m.t === 'daily' && m.career) ach.renderProfile();
   if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
@@ -1088,6 +1097,7 @@ function handleMessage(m) {
       game.myNeon = app.career?.neon ?? null;
       game.begin(m, app.skin, app.gore, app.locker);
       sfx.music?.forMap?.(m.map.theme);
+      voice.begin(m.pid);
       if (m.map.theme && MAP_THEMES.includes(m.map.theme)) toast(t('map.now', { m: t(`map.${m.map.theme}`) }));
       renderer.prewarm(m.map.w / 2, m.map.h / 2);
       showScreen('game');

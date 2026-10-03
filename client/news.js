@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-08a',
+    at: '2026-10-08T12:00:00+03:00',
+    items: {
+      en: ["Hold Tab in a match (☰ on phones) for the full scoreboard: kills, deaths, K/D and ping of every player", "Voice chat in online matches: K (or 🎙) turns your microphone on and off; team modes talk to their team", "Free rewards (calendar, tasks, achievements, invites) now give boxes that roll up to Epic; Legendary and Mythic come from paid cases, ranked and the battle pass", "Ranked division prizes: reach Silver and up for style items, Master and Legend give Mythic and Exotic", "Battle pass: new style rewards on both tracks; premium has Mythic frames, names and kill effects", "Trial skins from the Fortune Wheel last 1 hour"],
+      uk: ["Затисни Tab у матчі (☰ на телефоні), щоб побачити повну статистику: вбивства, смерті, K/D і пінг кожного гравця", "Голосовий чат в онлайн-матчах: K (або 🎙) вмикає й вимикає мікрофон; у командних режимах — зі своєю командою", "Безкоштовні нагороди (календар, завдання, досягнення, запрошення) тепер дають кейси до Епічної рідкості; Легендарні й Міфічні — з платних кейсів, рейтингу та батл-пасу", "Призи за дивізіони рейтингу: від Срібла — предмети стилю, Майстер і Легенда дають Міфічні та Екзотичні", "Батл-пас: нові стильові нагороди на обох доріжках; преміум має Міфічні рамки, ніки й ефекти вбивства", "Пробні скіни з Колеса Фортуни діють 1 годину"],
+      ru: ["Зажми Tab в матче (☰ на телефоне), чтобы увидеть полную статистику: убийства, смерти, K/D и пинг каждого игрока", "Голосовой чат в онлайн-матчах: K (или 🎙) включает и выключает микрофон; в командных режимах — со своей командой", "Бесплатные награды теперь дают кейсы до Эпической редкости; Легендарные и Мифические — из платных кейсов, рейтинга и батл-пасса", "Призы за дивизионы рейтинга: от Серебра — предметы стиля, Мастер и Легенда дают Мифические и Экзотические", "Батл-пасс: новые стильные награды на обеих дорожках", "Пробные скины с Колеса Фортуны действуют 1 час"],
+      es: ["Mantén Tab en la partida (☰ en móvil) para ver el marcador completo", "Chat de voz en partidas online: K (o 🎙) activa tu micrófono", "Las recompensas gratis dan cajas hasta Épico; Legendario y Mítico salen de cajas de pago, ranked y el pase", "Premios por división en ranked y estilo nuevo en el pase", "Las skins de prueba de la Rueda duran 1 hora"],
+      fr: ["Maintiens Tab en match (☰ sur mobile) pour le tableau des scores complet", "Chat vocal en ligne : K (ou 🎙) active ton micro", "Les récompenses gratuites donnent des caisses jusqu’à Épique ; Légendaire et Mythique viennent des caisses payantes, du classé et du pass", "Prix de division en classé et nouveau style dans le pass", "Les skins d’essai de la Roue durent 1 heure"],
+      pt: ["Segure Tab na partida (☰ no celular) para o placar completo", "Chat de voz online: K (ou 🎙) liga seu microfone", "Recompensas grátis dão caixas até Épico; Lendário e Mítico vêm de caixas pagas, ranqueada e passe", "Prêmios por divisão na ranqueada e estilo novo no passe", "Skins de teste da Roda duram 1 hora"],
+      tr: ["Maçta Tab'a basılı tut (telefonda ☰): tam skor tablosu", "Çevrimiçi maçlarda sesli sohbet: K (veya 🎙) mikrofonu açar", "Ücretsiz ödüller Epik'e kadar kasa verir; Efsanevi ve Mitik ücretli kasalardan, dereceliden ve pass'ten gelir", "Derecelide lig ödülleri ve pass'te yeni stil", "Çarktaki deneme skinleri 1 saat sürer"],
+      zh: ["比赛中按住 Tab（手机点 ☰）查看完整计分板", "在线比赛语音聊天：K（或 🎙）开关麦克风", "免费奖励的箱子最高史诗；传说和神话来自付费箱、排位和通行证", "排位段位奖励，通行证新增风格奖励", "幸运轮试用皮肤持续 1 小时"],
+      hi: ["मैच में Tab दबाए रखो (फ़ोन पर ☰): पूरा स्कोरबोर्ड", "ऑनलाइन मैच में वॉइस चैट: K (या 🎙) से माइक", "मुफ़्त इनाम अब एपिक तक के बॉक्स देते हैं; लेजेंडरी और मिथिक पेड केस, रैंक्ड और पास से", "रैंक्ड डिवीज़न इनाम और पास में नया स्टाइल", "व्हील की ट्रायल स्किन 1 घंटा चलती है"],
+      ar: ["اضغط مطولًا على Tab في المباراة (☰ على الهاتف) لعرض لوحة النتائج كاملة", "دردشة صوتية في المباريات: K (أو 🎙) يشغّل الميكروفون", "المكافآت المجانية تعطي صناديق حتى ملحمي؛ الأسطوري والخرافي من الصناديق المدفوعة والمصنّف والتذكرة", "جوائز الأقسام في المصنّف وأسلوب جديد في التذكرة", "سكنات التجربة من العجلة تدوم ساعة واحدة"],
+    },
+  },
+  {
     id: '2026-10-07a',
     at: '2026-10-07T12:00:00+03:00',
     items: {

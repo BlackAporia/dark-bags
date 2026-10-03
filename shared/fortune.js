@@ -1,5 +1,5 @@
 // The shop's fortune wheel: $0.05 a spin, paid in any coin you hold (STRK, USDT, USDS, strkBTC,
-// WBTC, ETH, …). Every spin pays something temporary (a 72h runner skin or weapon skin), now and then
+// WBTC, ETH, …). Every spin pays something temporary (a 1-hour runner skin or weapon skin), now and then
 // a real skin to keep, and a share of every spin builds the fortune bank. When the bank reaches its
 // next mark ($0.50, then $1, $1.50, $2 … up to $5, then back to $0.50) the spin that gets it there
 // wins the whole bank in real coins (USDC, else USDT, else STRK).
@@ -12,7 +12,7 @@ export const FORTUNE = {
   price: 50, // mills: $0.05
   bank: 0.3, // share of each spin into the fortune bank
   marks: [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000], // mills: the bank pays out at the next mark
-  // the reel: w = weight; a real skin is rare, everything else is a 72h trial
+  // the reel: w = weight; a real skin is rare, everything else is a 1-hour trial
   slots: [
     { k: 'trial', w: 470 },
     { k: 'wtrial', w: 460 },

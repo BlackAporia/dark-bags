@@ -1,11 +1,14 @@
 // Ranked on the client: the season table page, the RP line on the result card, the bonus
 // spin (a reel of cases, skins and neon season titles), and the neon title text.
-import { DIVISIONS, divisionOf, seasonTitle, titleBonus, TITLE_TIERS } from '../shared/ranked.js';
+import { DIVISIONS, DIV_PRIZES, divisionOf, seasonTitle, titleBonus, TITLE_TIERS } from '../shared/ranked.js';
 import { seasonInfo, seasonAt } from '../shared/season.js';
 import { BOX, BOXES, WSKIN, WEAPON_SKINS, RARITIES } from '../shared/cosmetics.js';
 import { boxArt, weaponStill } from './locker.js';
 import { spinReel } from './reel.js';
 import { esc } from './game.js';
+import { STYLE, STYLE_ITEMS } from '../shared/style.js';
+import { styleStill } from './flair.js';
+import { giftHtml } from './daily.js';
 import { t } from './i18n.js';
 
 // a page that only exists in online play
@@ -106,6 +109,9 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {}, pr
         <button type="button" class="cta" data-play>${t('rd.play')}</button>
         <div class="rd-ladder">${DIVISIONS.map((x) => `<span style="--d:${x.color}" class="${div?.id === x.id ? 'on' : ''}"><i></i>${t(`rd.div.${x.id}`)}<small>${x.min}+</small></span>`).join('')}</div>
       </header>
+      <section class="rd-prizes"><p class="eyebrow">${t('rd.divPrizes')}</p><p class="fine">${t('rd.divPrizesNote')}</p>
+        <div class="rd-prow">${DIVISIONS.filter((x) => DIV_PRIZES[x.id]).map((x) => `<div class="rd-pz${div && x.min <= (me?.best ?? 0) ? ' got' : ''}" style="--d:${x.color}"><b>${t(`rd.div.${x.id}`)}</b>${DIV_PRIZES[x.id].map((p) => (p.k === 'box' ? giftHtml({ k: 'box', id: p.id }) : `<span class="gift g-style" style="--gc:${RARITIES[p.rarity].color}"><i>✦</i>${esc(t('rd.styleOf', { r: RARITIES[p.rarity].name }))}</span>`)).join('')}</div>`).join('')}</div>
+      </section>
       <section class="rd-titles"><p class="eyebrow">${t('rd.titles')}</p><p class="fine">${t('rd.titlesNote')}</p>
         <div class="rd-trow">${owned.length ? owned.map((id) => {
           const on = app.career?.neon === id;
@@ -150,7 +156,7 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {}, pr
     board = null; // the table changed
     const d = DIV[r.div];
     const up = r.div !== r.divBefore;
-    el.innerHTML = `<div class="rr-ranked" style="--d:${d.color}"><span class="rd-gem"></span><div><p class="eyebrow">${t('rd.place', { p: r.place, n: m.size ?? '' })}</p><b class="${r.delta >= 0 ? 'plus' : 'minus'}">${r.delta >= 0 ? '+' : '−'}${Math.abs(r.delta)} RP</b> <span>${t(`rd.div.${r.div}`)} · ${r.after} RP${up ? ` · ${t(r.after > r.before ? 'rd.promoted' : 'rd.demoted')}` : ''}</span></div></div>`;
+    el.innerHTML = `<div class="rr-ranked" style="--d:${d.color}"><span class="rd-gem"></span><div><p class="eyebrow">${t('rd.place', { p: r.place, n: m.size ?? '' })}</p><b class="${r.delta >= 0 ? 'plus' : 'minus'}">${r.delta >= 0 ? '+' : '−'}${Math.abs(r.delta)} RP</b> <span>${t(`rd.div.${r.div}`)} · ${r.after} RP${up ? ` · ${t(r.after > r.before ? 'rd.promoted' : 'rd.demoted')}` : ''}</span></div></div>${r.prizes?.length ? `<div class="rr-prizes"><p class="eyebrow">${t('rd.divPrize')}</p>${r.prizes.map((x) => giftHtml({ k: x.k, id: x.id }, true)).join('')}</div>` : ''}`;
   }
 
   // the bonus spin: a reel of what it could have paid, landing on what it did
@@ -164,10 +170,12 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {}, pr
     };
     const cases = BOXES.filter((b) => b.group !== 'tier' && b.id !== 'c-knife');
     const caseTile = (b) => ({ id: b.id, name: t(`box.${b.id}`), rarity: 'rare', img: svgUri(boxArt(b, 90).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')) });
-    const skins = WEAPON_SKINS.filter((x) => !x.limited && ['epic', 'legendary'].includes(x.rarity));
+    const skins = WEAPON_SKINS.filter((x) => !x.limited && ['legendary', 'mythic'].includes(x.rarity));
+    const styleTile = (id) => ({ id, name: STYLE[id].name, rarity: STYLE[id].rarity, img: styleStill(id, 120, 70) });
+    const styles = STYLE_ITEMS.filter((x) => ['legendary', 'mythic'].includes(x.rarity));
     const skinTile = (s) => ({ id: s.id, name: s.name, rarity: s.rarity, img: weaponStill(s.id, 120, 70) });
-    const pool = [...TITLE_TIERS.map((x) => titleTile(x.key)), ...cases.slice(0, 8).map(caseTile), ...Array.from({ length: 8 }, () => skinTile(skins[Math.floor(Math.random() * skins.length)]))];
-    const win = sp.k === 'title' ? titleTile(seasonTitle(sp.id).key) : sp.k === 'wskin' ? skinTile(WSKIN[sp.id]) : caseTile(BOX[sp.id]);
+    const pool = [...TITLE_TIERS.map((x) => titleTile(x.key)), ...cases.slice(0, 8).map(caseTile), ...Array.from({ length: 8 }, () => skinTile(skins[Math.floor(Math.random() * skins.length)])), ...Array.from({ length: 6 }, () => styleTile(styles[Math.floor(Math.random() * styles.length)].id))];
+    const win = sp.k === 'title' ? titleTile(seasonTitle(sp.id).key) : sp.k === 'style' ? styleTile(sp.id) : sp.k === 'wskin' ? skinTile(WSKIN[sp.id]) : caseTile(BOX[sp.id]);
     overlay.hidden = false;
     overlay.className = 'rankup in lottery';
     overlay.innerHTML = `<div class="ru-rays"></div><div class="ru-stage"><div class="ru-head"><p class="ru-kicker">${t('rd.spin')}</p><p class="ru-name">${t('rd.spinWhy', { p: m.ranked.place })}</p></div><div class="ru-reel" id="lt-reel"></div><div class="ru-actions" id="lt-actions"></div></div>`;

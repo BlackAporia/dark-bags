@@ -357,7 +357,7 @@ export const BULK_FREE_EVERY = 10;
 export const boxCost = (box, n) => (n - Math.floor(n / BULK_FREE_EVERY)) * box.price;
 
 export const usd = (cents) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export const TRIAL_MS = 72 * 3600 * 1000;
+export const TRIAL_MS = 3600 * 1000; // trial skins last an hour: long enough to enjoy, short enough to want the real one
 
 // ------------------------------------------------------------ battle pass
 export const PASS_TIERS = 50;
@@ -382,14 +382,23 @@ export function passRewards(sid) {
     30: { k: 'turret', id: s.overwatch }, 35: { k: 'wskin', id: `magnum.${s.relic}` }, 40: { k: 'box', id: 'c-knife' },
     45: { k: 'wskin', id: `knife.${s.relic}` }, 50: { k: 'outfit', id: s.apex },
   };
-  const cases = ['c-samurai', 'c-neon', 'c-arctic', 'c-inferno', 'c-crypto', 'c-toxic', 'c-toon', 'b-cyber', 'b-heroes', 'b-monsters'];
+  // style on the pass: Epic on the free track, Legendary and Mythic on the premium one
+  Object.assign(f, { 12: { k: 'style', id: 'k-ghost' }, 22: { k: 'style', id: 'b-aurora' }, 42: { k: 'style', id: 'n-neon' } });
+  Object.assign(special, {
+    7: { k: 'style', id: 'f-gold' }, 13: { k: 'style', id: 'n-rainbow' }, 18: { k: 'style', id: 'k-lightning' }, 22: { k: 'style', id: 'b-galaxy' },
+    27: { k: 'style', id: 'f-inferno' }, 33: { k: 'style', id: 'k-firework' }, 38: { k: 'style', id: 'n-glitch' }, 42: { k: 'style', id: 'b-bull' }, 48: { k: 'style', id: 'f-void' },
+  });
+  const cases = ['c-samurai', 'c-neon', 'c-arctic', 'c-inferno', 'c-crypto', 'c-toxic', 'c-toon', 'b-cyber', 'b-heroes', 'b-monsters', 's-neon'];
   const p = {};
   for (let t = 1; t <= PASS_TIERS; t++) p[t] = special[t] ?? (t % 2 ? { k: 'credit', v: 15 } : { k: 'box', id: cases[(t / 2) % cases.length] });
   const out = { f, p };
   passCache.set(sid, out);
   return out;
 }
-export const START_BOXES = { street: 1, 'w-scrap': 1 }; // a welcome bag and crate for every new runner
+export const START_BOXES = { street: 1, 'w-scrap': 1 }; // a welcome bag and crate for every new runner (gifts)
+// Free rewards (the calendar, tasks, achievements, invites, the welcome boxes) come as gift boxes
+// that roll no higher than Epic. Legendary and better: bought boxes, ranked play and the battle pass.
+export const GIFT_CAP = 'epic';
 
 // Shop $ packs: paid in USDC/USDT, credited as shop $ with a bonus on the bigger ones.
 export const PACKS = [
@@ -407,7 +416,7 @@ export const PACK = Object.fromEntries(PACKS.map((p) => [p.id, p]));
 export const FIRST_TOPUP_MAX = 10000;
 export const firstBonus = (price) => Math.min(price, FIRST_TOPUP_MAX);
 
-// The rarity of the 72h trial outfit one rank-up pays (the only rank-up reward).
+// The rarity of the 1-hour trial outfit one rank-up pays (the only rank-up reward).
 export function rankReward(rank, rnd) {
   const tr = rnd() + Math.min(0.1, rank / 900); // a little better as you climb
   const rarity = tr < 0.55 ? 'rare' : tr < 0.85 ? 'epic' : tr < 0.97 ? 'legendary' : 'mythic';
@@ -491,11 +500,11 @@ function migrate(r) {
 }
 
 function fresh() {
-  return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, wtrials: {}, spins: 0, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0, sowned: [], sequip: {} };
+  return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, wtrials: {}, spins: 0, boxes: {}, gboxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0, sowned: [], sequip: {} };
 }
 
-// The fortune wheel (one spin with the welcome bonus, more from mail gifts): a 72h trial outfit,
-// a 72h trial weapon skin, or a little shop $ (never withdrawn or sold). w: chance of the slot.
+// The fortune wheel (one spin with the welcome bonus, more from mail gifts): a 1-hour trial outfit,
+// a 1-hour trial weapon skin, or a little shop $ (never withdrawn or sold). w: chance of the slot.
 export const WHEEL = [
   { k: 'trial', w: 18 },
   { k: 'credit', v: 25, w: 14 },
@@ -527,7 +536,7 @@ export class Inventory {
     return this.data.get(key);
   }
 
-  // a weapon skin you own, or are trying for 72h
+  // a weapon skin you own, or are trying for an hour
   ownsW(key, id) {
     const r = this.rec(key);
     return r.wowned.includes(id) || (r.wtrials[id] ?? 0) > this.now();
@@ -573,7 +582,8 @@ export class Inventory {
       trials: r.trials,
       wtrials: r.wtrials,
       spins: r.spins,
-      boxes: r.boxes,
+      boxes: Object.fromEntries([...new Set([...Object.keys(r.boxes), ...Object.keys(r.gboxes ?? {})])].map((id) => [id, (r.boxes[id] ?? 0) + (r.gboxes?.[id] ?? 0)])),
+      gboxes: r.gboxes ?? {},
       outfit: r.outfit,
       body: r.body,
       opened: r.opened,
@@ -620,7 +630,7 @@ export class Inventory {
     return { ok: true, pack: p.id, added: p.price + p.bonus + first, first };
   }
 
-  // rank-ups: one 72h trial outfit per rank gained, nothing else
+  // rank-ups: one 1-hour trial outfit per rank gained, nothing else
   rankUp(key, fromRank, toRank) {
     const r = this.rec(key);
     const out = [];
@@ -735,6 +745,7 @@ export class Inventory {
   give(key, rw) {
     const r = this.rec(key);
     if (rw.k === 'credit') r.credit += rw.v;
+    else if (rw.k === 'box' && rw.cap) (r.gboxes ??= {})[rw.id] = (r.gboxes[rw.id] ?? 0) + (rw.n ?? 1); // a gift: rolls up to Epic
     else if (rw.k === 'box') r.boxes[rw.id] = (r.boxes[rw.id] ?? 0) + (rw.n ?? 1);
     else if (rw.k === 'outfit') {
       if (!r.owned.includes(rw.id)) r.owned.push(rw.id);
@@ -761,7 +772,7 @@ export class Inventory {
     return true;
   }
 
-  // a prize from the shop's fortune wheel: a 72h trial, or a real skin of that rarity to keep
+  // a prize from the shop's fortune wheel: a 1-hour trial, or a real skin of that rarity to keep
   // (one you don't own yet; never limited or exotic). Falls back to a trial when there is none.
   fortunePrize(key, slot) {
     const r = this.rec(key);
@@ -837,20 +848,30 @@ export class Inventory {
     if (!box) return { ok: false, error: 'Unknown box.' };
     count = Math.max(1, Math.min(MAX_OPEN, Math.floor(Number(count) || 1)));
     const held = r.boxes[boxId] ?? 0;
-    const free = Math.min(held, count);
+    const gheld = r.gboxes?.[boxId] ?? 0;
+    // held boxes first (bought or earned in rated play), then gifts (up to Epic), then paid ones
+    const fromHeld = Math.min(held, count);
+    const fromGift = Math.min(gheld, count - fromHeld);
+    const free = fromHeld + fromGift;
     const paid = count - free;
     if (paid > 0 && !this.charge(key, boxCost(box, paid), external)) return { ok: false, error: `Not enough $ (${usd(boxCost(box, paid))} needed).` };
-    r.boxes[boxId] = held - free;
+    r.boxes[boxId] = held - fromHeld;
+    if (fromGift) r.gboxes[boxId] = gheld - fromGift;
     const results = [];
-    for (let i = 0; i < count; i++) results.push({ ...this.roll(r, box), free: i < free });
+    for (let i = 0; i < count; i++) {
+      const gift = i >= fromHeld && i < free;
+      results.push({ ...this.roll(r, box, gift ? GIFT_CAP : null), free: i < free, ...(gift ? { gift: 1 } : {}) });
+    }
     this.changed();
-    return { ...results[0], ok: true, box: boxId, count, held: free, bought: paid, results };
+    return { ...results[0], ok: true, box: boxId, count, held: free, gifts: fromGift, bought: paid, results };
   }
 
-  roll(r, box) {
-    const p = (r.pity[box.id] ??= { sinceEpic: 0, sinceLegendary: 0 });
+  // cap: a gift box rolls no higher than this, and does not move the pity counters
+  roll(r, box, cap = null) {
+    const p = cap ? { sinceEpic: 0, sinceLegendary: 0, sinceExotic: 0 } : (r.pity[box.id] ??= { sinceEpic: 0, sinceLegendary: 0 });
     p.sinceExotic ??= 0;
-    const roll = rollRarity(box, p, this.rnd);
+    const roll = rollRarity(box, cap ? null : p, this.rnd);
+    if (cap && rank(roll.rarity) > rank(cap)) roll.rarity = cap;
     const weapon = box.family === 'weapon';
     const style = box.family === 'style';
     const mine = style ? (r.sowned ??= []) : weapon ? r.wowned : r.owned;

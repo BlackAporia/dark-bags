@@ -6,6 +6,9 @@
 // day starts it again at day 1, and after day 30 a new round starts. Tasks are the same for
 // everyone on a day (and in a week), so friends can chase them together.
 //
+// Everything free here tops out at Epic: style items given are Common to Epic, and boxes come as
+// gift boxes that roll no higher than Epic (Legendary and better: bought boxes, ranked, the pass).
+//
 // Pure bookkeeping, no I/O: the lobby hands out the gifts, the server persists toJSON().
 import { ACHIEVEMENT, titleTier } from './achievements.js';
 
@@ -40,23 +43,23 @@ export const CALENDAR = [
   [G.c(15), G.pass(100)],
   [G.spin(2)],
   [G.c(20), G.boost(3)],
-  [G.box('golden'), G.style('b-sunset')], // 14
+  [G.box('vault'), G.style('b-sunset')], // 14
   [G.c(15), G.xp(400)],
   [G.spin(2), G.pass(120)],
   [G.box('s-street'), G.style('k-confetti')],
   [G.c(20), G.boost(3)],
   [G.box('w-armory')],
   [G.spin(3)],
-  [G.box('elite'), G.box('s-neon')], // 21
+  [G.box('golden'), G.style('k-pixel')], // 21
   [G.c(25), G.xp(600)],
   [G.spin(3), G.pass(150)],
   [G.box('b-crypto'), G.style('n-gold')],
   [G.c(30), G.boost(5)],
   [G.box('c-pistol')],
   [G.spin(3), G.xp(800)],
-  [G.box('golden'), G.style('k-coins')],
+  [G.box('vault'), G.style('k-coins')],
   [G.c(50), G.boost(5)],
-  [G.box('diamond'), G.style('f-gold'), G.style('n-rainbow'), G.spin(5), G.xp(2000)], // 30: the grand prize
+  [G.box('golden', 2), G.style('f-circuit'), G.style('n-fire'), G.spin(5), G.xp(2000)], // 30: the grand prize
 ];
 export const BIG_DAYS = [7, 14, 21, 30];
 
@@ -90,7 +93,7 @@ export const WEEKLY_TASKS = [
   { id: 'w_extract10', stat: 'extracts', goal: 10, gifts: [G.box('vault'), G.c(20)] },
   { id: 'w_alive2h', stat: 'secs', goal: 7200, gifts: [G.spin(2), G.xp(1500)] },
   { id: 'w_ranked5', stat: 'rankedGames', goal: 5, gifts: [G.box('c-rifle')] },
-  { id: 'w_zclear2', stat: 'zClears', goal: 2, gifts: [G.box('golden')] },
+  { id: 'w_zclear2', stat: 'zClears', goal: 2, gifts: [G.box('vault'), G.spin(2)] },
   { id: 'w_head25', stat: 'headshots', goal: 25, gifts: [G.box('s-street'), G.c(20)] },
 ];
 
@@ -109,9 +112,9 @@ export function achGifts(id) {
     case 'epic':
       return [G.c(20), G.spin(1)];
     case 'legendary':
-      return [G.box('vault'), G.box('s-street')];
+      return [G.box('vault'), G.box('s-street'), G.boost(2)];
     case 'mythic':
-      return [G.box('golden'), G.box('s-neon')];
+      return [G.box('golden'), G.box('s-street', 2), G.spin(3)];
     default: // mystery, premium
       return [G.box('vault'), G.spin(1)];
   }

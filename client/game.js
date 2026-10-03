@@ -211,6 +211,7 @@ export class GameClient {
   // ------------------------------------------------------------ network in
 
   onSnap(s) {
+    if (s.sb) this.board = s.sb; // the Tab table
     const now = performance.now();
     this.snapAt = now;
     const off = s.time - now;

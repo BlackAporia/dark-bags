@@ -20,6 +20,18 @@ export const DIVISIONS = [
   { id: 'master', min: 2000, color: '#c084fc' },
   { id: 'legend', min: 2400, color: '#ff2dd4' },
 ];
+// What reaching a division pays, once a season: the best style and cases in the game are earned
+// here (and in the battle pass), never from free daily rewards.
+//   style: a style item of that rarity you don't own yet; box: a case to open (rolls in full)
+export const DIV_PRIZES = {
+  silver: [{ k: 'style', rarity: 'epic' }],
+  gold: [{ k: 'style', rarity: 'legendary' }],
+  platinum: [{ k: 'box', id: 's-neon' }, { k: 'style', rarity: 'legendary' }],
+  diamond: [{ k: 'style', rarity: 'legendary' }, { k: 'box', id: 'golden' }],
+  master: [{ k: 'style', rarity: 'mythic' }, { k: 'box', id: 's-icon' }],
+  legend: [{ k: 'style', rarity: 'mythic' }, { k: 'style', rarity: 'exotic' }, { k: 'box', id: 'apex' }],
+};
+
 export function divisionOf(rp) {
   let d = DIVISIONS[0];
   for (const x of DIVISIONS) if (rp >= x.min) d = x;

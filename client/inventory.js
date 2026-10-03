@@ -82,7 +82,7 @@ export function createInventory({ app, go, openLocker, openCashier, send, openBo
         <p class="fine">${t('inv.shopNote')}</p>
         <div class="inv-actions"><button type="button" class="cta" data-go="shop">${t('shop.topup')}</button></div>
       </section>
-      ${held.length ? `<section class="inv-card"><header><p class="eyebrow">${t('inv.unopened')}</p></header><div class="inv-boxes">${held.map(([id, n]) => `<div class="inv-box">${boxArt(BOX[id], 72)}<b>${esc(t(`box.${id}`))}</b><span>×${n}</span><button type="button" class="cta inv-open" data-open="${id}">${t('inv.open')}</button></div>`).join('')}</div></section>` : ''}
+      ${held.length ? `<section class="inv-card"><header><p class="eyebrow">${t('inv.unopened')}</p></header><div class="inv-boxes">${held.map(([id, n]) => `<div class="inv-box">${boxArt(BOX[id], 72)}<b>${esc(t(`box.${id}`))}</b><span>×${n}</span>${L.gboxes?.[id] ? `<small class="fine">${t('inv.giftCap', { n: L.gboxes[id] })}</small>` : ''}<button type="button" class="cta inv-open" data-open="${id}">${t('inv.open')}</button></div>`).join('')}</div></section>` : ''}
       ${styleCard(L)}
       <section class="inv-card">
         <header><p class="eyebrow">${t('inv.collection')}</p></header>
