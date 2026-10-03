@@ -2,7 +2,8 @@
 // and the week's tasks, and the rewards waiting on achievements, all on the Tasks page with the
 // achievements under them. A badge on the menu counts what is ready to claim, and the first
 // visit of a day opens the calendar by itself.
-import { BOX } from '../shared/cosmetics.js';
+import { BOX, RARITIES } from '../shared/cosmetics.js';
+import { STYLE } from '../shared/style.js';
 import { BIG_DAYS } from '../shared/daily.js';
 import { t } from './i18n.js';
 import { esc, fmt } from './game.js';
@@ -13,7 +14,7 @@ const usd = (c) => `$${(c / 100).toFixed(2)}`;
 
 // one gift as a chip: icon + words
 export function giftHtml(g, big = false) {
-  const ico = { credit: '$', box: '🎁', spin: '🎡', pass: '★', xp: '⬆', boost: '×2' }[g.k] ?? '•';
+  const ico = { credit: '$', box: '🎁', spin: '🎡', pass: '★', xp: '⬆', boost: '×2', style: '✦' }[g.k] ?? '•';
   let label;
   if (g.k === 'credit') label = t('dl.g.credit', { v: usd(g.v) });
   else if (g.k === 'box') label = `${BOX[g.id]?.name ?? g.id}${(g.n ?? 1) > 1 ? ` ×${g.n}` : ''}`;
@@ -21,8 +22,10 @@ export function giftHtml(g, big = false) {
   else if (g.k === 'pass') label = t('dl.g.pass', { n: fmt(g.v) });
   else if (g.k === 'xp') label = t('dl.g.xp', { n: fmt(g.v) });
   else if (g.k === 'boost') label = t('dl.g.boost', { n: g.n });
+  else if (g.k === 'style') label = `${STYLE[g.id]?.name ?? g.id} · ${t(`sty.${STYLE[g.id]?.kind ?? 'frame'}`)}`;
   else label = g.k;
-  return `<span class="gift g-${g.k}${big ? ' big' : ''}"><i>${ico}</i>${esc(label)}</span>`;
+  const col = g.k === 'style' ? ` style="--gc:${RARITIES[STYLE[g.id]?.rarity]?.color ?? '#fff'}"` : '';
+  return `<span class="gift g-${g.k}${big ? ' big' : ''}"${col}><i>${ico}</i>${esc(label)}</span>`;
 }
 
 const hms = (ms) => {
@@ -77,7 +80,7 @@ export function createDaily({ app, send, toast, sfx, go }) {
       <ol class="cal-grid">${cells}</ol></section>`;
   }
 
-  const giftIcon = (g) => ({ credit: '$', box: '🎁', spin: '🎡', pass: '★', xp: '⬆', boost: '×2' })[g?.k] ?? '•';
+  const giftIcon = (g) => ({ credit: '$', box: '🎁', spin: '🎡', pass: '★', xp: '⬆', boost: '×2', style: '✦' })[g?.k] ?? '•';
 
   function taskHtml(x, weekly) {
     const ready = !x.claimed && x.have >= x.goal;

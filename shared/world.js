@@ -183,7 +183,7 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null, nf = null, kf = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
     const stake = this.stake;
     const rake = this.feeOnly ? stake : Math.floor(stake * CFG.RAKE);
@@ -221,6 +221,8 @@ export class World {
       ws: ws && Object.keys(ws).length ? ws : null, // weapon skins: { weaponId: finishId }
       ts: ts || null, // turret skin (guns + lasers)
       neon: neon || null, // a season title, worn in neon over the name
+      nf: nf || null, // a name effect (style)
+      kf: kf || null, // a kill effect (style): what bursts where its victims fall
       x: pos.x,
       y: pos.y,
       vx: 0,
@@ -744,7 +746,7 @@ export class World {
       this.streak(killer);
     }
     // public feed: names only, never amounts
-    this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id, cause, ...(hs ? { hs: 1 } : {}) });
+    this.emit({ k: 'kill', killer: killer?.name ?? null, victim: v.name, kid: killer?.id ?? 0, vid: v.id, cause, ...(hs ? { hs: 1 } : {}), ...(killer && killer !== v && killer.kf ? { kf: killer.kf } : {}) });
     if (this.dm && killer && killer !== v) this.checkLead();
   }
 
@@ -1324,7 +1326,7 @@ export class World {
     const pre = this.botRoster?.find((b) => !taken.has(b.name));
     if (pre) {
       this.botRoster.splice(this.botRoster.indexOf(pre), 1);
-      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true, rank: pre.rank ?? botRank(this.rnd), outfit: pre.outfit ?? null, body: pre.body ?? 'm', ws: pre.ws ?? null });
+      return this.addPlayer({ name: pre.name, skin: pre.skin, isBot: true, rank: pre.rank ?? botRank(this.rnd), outfit: pre.outfit ?? null, body: pre.body ?? 'm', ws: pre.ws ?? null, nf: pre.nf ?? null, kf: pre.kf ?? null });
     }
     const look = botLook(this.rnd);
     return this.addPlayer({ name: botName(this.rnd, taken), skin: OUTFIT[look.outfit].color, isBot: true, rank: botRank(this.rnd), ...look });
@@ -1591,6 +1593,7 @@ export class World {
         rk: p.rank,
         ...(p.title ? { tt: p.title } : {}),
         ...(p.neon ? { nt: p.neon } : {}),
+        ...(p.nf ? { nf: p.nf } : {}),
         ...(this.teamSize ? { tm: p.team } : {}),
         ...(p.ws ? { ws: p.ws } : {}),
         ...(p.ping != null ? { pg: p.ping } : {}),

@@ -419,7 +419,7 @@ export class RoomCore {
   broadcastPrep(onlyIdle = false) {
     const ready = this.readyList();
     const shown = this.botsShown();
-    const bots = this.roster.slice(0, shown).map((b) => ({ n: b.name, c: b.skin, rk: b.rank, o: b.outfit, g: b.body, bot: 1 }));
+    const bots = this.roster.slice(0, shown).map((b) => ({ n: b.name, c: b.skin, rk: b.rank, o: b.outfit, g: b.body, bot: 1, ...(b.nf ? { nf: b.nf } : {}) }));
     const base = {
       t: 'prep',
       state: this.state,
@@ -443,7 +443,7 @@ export class RoomCore {
         slots: ready.map((r) => {
           const look = this.inventory.look(r.token);
           const tt = this.ranks.title(r.token);
-          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(tt ? { tt } : {}), ...(this.noBots ? { wp: r.weapon } : {}), me: r === c ? 1 : 0 };
+          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(look.fr ? { fr: look.fr } : {}), ...(look.nf ? { nf: look.nf } : {}), ...(tt ? { tt } : {}), ...(this.noBots ? { wp: r.weapon } : {}), me: r === c ? 1 : 0 };
         }),
         me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, vote: c.vote, escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
         balances: this.wallet.balances(c.token),

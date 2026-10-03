@@ -10,6 +10,8 @@ import { boxArt, weaponStill } from './locker.js';
 import { esc } from './game.js';
 import { spinReel } from './reel.js';
 import { t } from './i18n.js';
+import { STYLE } from '../shared/style.js';
+import { styleStill } from './flair.js';
 import { settings } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -40,8 +42,8 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     const s = WSKIN[res.item];
     return { look: { ...base, ws: { ...ws, [s.weapon]: s.finish } }, weapon: Math.max(0, WEAPONS.findIndex((x) => x.id === s.weapon)), skin: res.item };
   };
-  const itemOf = (res) => (res.kind === 'weapon' ? WSKIN[res.item] : OUTFIT[res.item]);
-  const imgOf = (res, w = 84, h = 112) => (res.kind === 'weapon' ? weaponStill(res.item, Math.max(150, w), Math.round(Math.max(150, w) * 0.66)) : figureStill({ outfit: res.item, body: L()?.body ?? 'm' }, w, h));
+  const itemOf = (res) => (res.kind === 'style' ? STYLE[res.item] : res.kind === 'weapon' ? WSKIN[res.item] : OUTFIT[res.item]);
+  const imgOf = (res, w = 84, h = 112) => (res.kind === 'style' ? styleStill(res.item, Math.max(150, w), Math.round(Math.max(150, w) * 0.66)) : res.kind === 'weapon' ? weaponStill(res.item, Math.max(150, w), Math.round(Math.max(150, w) * 0.66)) : figureStill({ outfit: res.item, body: L()?.body ?? 'm' }, w, h));
 
   // ------------------------------------------------------------- the page
 
@@ -49,7 +51,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     const root = $('shop-root');
     if (!root || !L()) return;
     const boxes = BOXES.filter((b) => b.family === st.family);
-    const limited = [...OUTFITS, ...WEAPON_SKINS].filter((o) => o.limited && (st.family === 'outfit' ? OUTFIT[o.id] : WSKIN[o.id]));
+    const limited = st.family === 'style' ? [] : [...OUTFITS, ...WEAPON_SKINS].filter((o) => o.limited && (st.family === 'outfit' ? OUTFIT[o.id] : WSKIN[o.id]));
     root.innerHTML = `
       <header class="shop-head">
         <h2 class="sec-h">${t('nav.shop')}</h2>
@@ -67,11 +69,12 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
       <div class="mode shop-tabs" role="tablist">
         <button type="button" class="seg" role="tab" data-fam="outfit" aria-selected="${st.family === 'outfit'}">${t('shop.bags')}</button>
         <button type="button" class="seg" role="tab" data-fam="weapon" aria-selected="${st.family === 'weapon'}">${t('shop.crates')}</button>
+        <button type="button" class="seg" role="tab" data-fam="style" aria-selected="${st.family === 'style'}">${t('shop.style')}</button>
       </div>
-      <p class="fine">${t(st.family === 'outfit' ? 'shop.bagsNote' : 'shop.cratesNote')} ${t('shop.fair', { e: PITY.epic, l: PITY.legendary })}</p>
-      ${['theme', 'class', 'tier'].map((g) => {
+      <p class="fine">${t(st.family === 'outfit' ? 'shop.bagsNote' : st.family === 'style' ? 'shop.styleNote' : 'shop.cratesNote')} ${t('shop.fair', { e: PITY.epic, l: PITY.legendary })}</p>
+      ${['style', 'theme', 'class', 'tier'].map((g) => {
         const list = boxes.filter((b) => b.group === g);
-        return list.length ? `<section class="box-group"><p class="eyebrow">${t(`shop.g.${g}`)}</p><div class="box-grid">${list.map(boxCard).join('')}</div></section>` : '';
+        return list.length ? `<section class="box-group"><p class="eyebrow">${t(g === 'style' ? 'shop.style' : `shop.g.${g}`)}</p><div class="box-grid">${list.map(boxCard).join('')}</div></section>` : '';
       }).join('')}
       ${limited.length ? `<section class="limited"><p class="eyebrow">${t('shop.limited')}</p><div class="lim-row">${limited.map(limCard).join('')}</div></section>` : ''}`;
     for (const b of root.querySelectorAll('[data-pack]')) b.addEventListener('click', () => (demoOnly() ? toast(t('err.online_only')) : send({ t: 'topup', id: b.dataset.pack })));
@@ -134,7 +137,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
       seen.add(k);
       return true;
     }).slice(0, 4);
-    const img = (i) => (bx.family === 'weapon' ? `<img src="${weaponStill(i.id, 120, 70)}" alt="">` : `<img src="${figureStill({ outfit: i.id, body: 'm' }, 56, 78)}" alt="">`);
+    const img = (i) => (bx.family === 'style' ? `<img src="${styleStill(i.id, 120, 70)}" alt="">` : bx.family === 'weapon' ? `<img src="${weaponStill(i.id, 120, 70)}" alt="">` : `<img src="${figureStill({ outfit: i.id, body: 'm' }, 56, 78)}" alt="">`);
     const strip = top.map((i) => `<figure style="--q:${RARITIES[i.rarity].color}" title="${esc(i.name)}">${img(i)}</figure>`).join('');
     const list = best.slice(0, 60).map((i) => `<li style="--q:${RARITIES[i.rarity].color}">${esc(i.name)}${i.limited ? ' ◆' : ''}</li>`).join('');
     return `<div class="box-peek${bx.family === 'outfit' ? ' fig' : ''}">${strip}</div>
@@ -291,7 +294,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     const ov = $('opening');
     // the reel: the box's prizes race past the marker and stop on the best drop
     ov.className = 'opening spinning';
-    const tile = (i) => ({ id: i.id, name: i.name, rarity: i.rarity, img: box.family === 'weapon' ? weaponStill(i.id, 120, 70) : figureStill({ outfit: i.id, body: L()?.body ?? 'm' }, 56, 78) });
+    const tile = (i) => ({ id: i.id, name: i.name, rarity: i.rarity, img: box.family === 'style' ? styleStill(i.id, 120, 70) : box.family === 'weapon' ? weaponStill(i.id, 120, 70) : figureStill({ outfit: i.id, body: L()?.body ?? 'm' }, 56, 78) });
     const pool = reelPool(box).map(tile);
     const win = tile(itemOf(best));
     spinReel($('op-stage'), { pool, win, odds: box.odds, sfx, motion: settings.motion, secs: results.length > 1 ? 4.6 : 6.2, label: t(`box.${box.id}`) }).then(() => {
@@ -331,7 +334,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     return `<div class="op-card r-${res.rarity}${big ? ' big' : ''}" style="--r:${r.color}">
       <div class="op-face op-back">${boxArt(BOX[st.last?.id] ?? BOXES[0], 64)}</div>
       <div class="op-face op-front">
-        ${big && res.kind === 'outfit' ? '<canvas class="op-live"></canvas>' : `<img alt=""${res.kind === 'weapon' ? ' class="wimg"' : ''} src="${imgOf(res, big ? 160 : 84, big ? 214 : 112)}">`}
+        ${big && res.kind === 'outfit' ? '<canvas class="op-live"></canvas>' : `<img alt=""${res.kind !== 'outfit' ? ' class="wimg"' : ''} src="${imgOf(res, big ? 160 : 84, big ? 214 : 112)}">`}
         <p class="op-rar">${esc(rn(res.rarity))}${res.pity ? ` · ${t('lk.pityDrop')}` : ''}</p>
         <p class="op-name">${esc(o.name)}</p>${lim}${tag}
       </div>
@@ -466,7 +469,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     // open a bag or crate from anywhere (inventory, the battle pass): the ones you hold are free
     open: (id, n = 1) => BOX[id] && (demoOnly() ? demo(id) : buy(id, n)),
     family(f) {
-      if (f === 'outfit' || f === 'weapon') st.family = f;
+      if (f === 'outfit' || f === 'weapon' || f === 'style') st.family = f;
     },
   };
 }

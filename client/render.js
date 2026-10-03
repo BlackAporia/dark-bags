@@ -9,6 +9,7 @@ import { FINISH, RARITY_ORDER, TURRET_SKIN } from '../shared/cosmetics.js';
 import { neonText, neonColor } from './ranked.js';
 import { drawZombie, drawZombieTag, drawGoldBag, drawMedkit } from './zombie.js';
 import { THEME, glowPoints, Weather } from './themes.js';
+import { KillFx, paintName, resetPaint } from './flair.js';
 
 const C = {
   void: '#07090f',
@@ -55,6 +56,7 @@ export class Renderer {
     this.miniBase = null;
     this.map = null;
     this.layer = new MapLayer();
+    this.killfx = new KillFx();
     this.cam = { x: 0, y: 0 };
     this.scale = 1;
     this.quality = 2;
@@ -219,6 +221,9 @@ export class Renderer {
     for (const b of v.bullets) if (inView(b.x, b.y, 80)) this.drawTracer(b, t);
     ctx.globalCompositeOperation = 'source-over';
     v.fx.drawAir(ctx, t);
+    this.killfx.draw(ctx, t, this.reduced);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
 
     // 6. darkness with wall shadows and muzzle-flash light
     this.drawDarkness(v.eye, shx, shy, v.fx.lights, t);
@@ -842,15 +847,23 @@ export class Renderer {
       ctx.textAlign = 'center';
       const label = `${f.name}${f.pr ? ` ${'★'.repeat(Math.min(3, f.pr))}` : ''}`;
       const badge = f.rk ? rankImage(f.rk) : null;
+      // a name effect (style), outside team colours
+      const fxName = f.nf && (f.isMe || f.ally == null) && !this.reduced ? f.nf : null;
+      if (fxName) ctx.font = `800 11px ${F_UI}`;
+      const tw = ctx.measureText(label).width;
       if (badge) {
         // rank insignia to the left of the name, the pair centred over the head
-        const tw = ctx.measureText(label).width;
         const x0 = p.head.x - (tw + 16) / 2;
         ctx.drawImage(badge, x0, top - 17, 14, 14);
+        if (fxName) paintName(ctx, fxName, x0 + 16 + tw / 2, tw, top - 5, performance.now());
         ctx.textAlign = 'left';
         ctx.fillText(label, x0 + 16, top - 5);
         ctx.textAlign = 'center';
-      } else ctx.fillText(label, p.head.x, top - 5);
+      } else {
+        if (fxName) paintName(ctx, fxName, p.head.x, tw, top - 5, performance.now());
+        ctx.fillText(label, p.head.x, top - 5);
+      }
+      if (fxName) resetPaint(ctx);
       if (f.title) {
         // a worn achievement title over the name, styled by its tier
         const tier = f.ttier ?? 'common';

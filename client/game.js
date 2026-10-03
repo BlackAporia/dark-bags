@@ -121,6 +121,7 @@ export class GameClient {
   begin(start, skin, gore, look = null) {
     this.active = true;
     this.outfit = start.look ?? look ?? { outfit: null, body: 'm' }; // cosmetics (this.look is the camera offset)
+    this.myNf = this.outfit.nf ?? null; // a name effect (style)
     this.gore = gore;
     this.map = start.map;
     this.plan = start.zone;
@@ -468,6 +469,11 @@ export class GameClient {
         case 'kill': {
           const from = ev.kid === this.pid ? this.meAnim : this.anims.get(ev.kid);
           if (ev.hs && ev.kid === this.pid) this.headshotFx(ev.x ?? from?.x ?? 0, ev.y ?? from?.y ?? 0, now, ev.vid);
+          // the killer's style: a kill effect where the victim falls
+          if (ev.kf) {
+            const va = ev.vid === this.pid ? this.meAnim : this.anims.get(ev.vid);
+            if (va) this.renderer.killfx.spawn(ev.kf, va.x, va.y, now);
+          }
           if (ev.vid === this.pid && this.meAnim && !this.dead) {
             this.dead = true;
             this.deathFx(this.meAnim, this.skin, now, !!ev.hs, from);
@@ -883,7 +889,7 @@ export class GameClient {
       const skins = settings.skins === 'all'; // settings: draw others' outfits and weapon skins?
       const an = this.anims.update(p.i, x, y, aim, dt, now, { w: p.w, bluff: p.b, color: p.c, outfit: skins ? p.o : null, body: p.g, ws: skins ? p.ws : null });
       this.woundCheck(an, p.h, now);
-      figures.push({ a: an, color: p.c, name: p.n, ping: p.pg, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, ttier: p.tt ? titleTier(p.tt) : null, neon: p.nt && settings.titles ? p.nt : null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
+      figures.push({ a: an, color: p.c, name: p.n, ping: p.pg, noName: !settings.names, ally: p.tm !== undefined && this.you?.tm !== undefined ? p.tm === this.you.tm : null, title: p.tt && settings.titles && settings.names ? t(`ach.${p.tt}`) : null, ttier: p.tt ? titleTier(p.tt) : null, neon: p.nt && settings.titles ? p.nt : null, nf: p.nf ?? null, hp: p.h, isMe: false, flash: now - an.hitT < 90, shield: p.s, ext: p.e, pr: p.pr, rk: p.rk, laser: WEAPONS[p.w]?.laser });
     }
     this.anims.prune(now);
     this.lastFigures = figures;
@@ -898,7 +904,7 @@ export class GameClient {
       const y = this.pred.y + this.corr.y;
       const me = (this.meAnim = this.animSelf(x, y, dt, now));
       this.woundCheck(me, you.hp, now);
-      figures.push({ a: me, color: this.skin, name: this.myName || 'you', rk: this.myRank, title: settings.titles ? this.myTitle : null, ttier: this.myTitleTier ?? null, neon: settings.titles ? this.myNeon : null, hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
+      figures.push({ a: me, color: this.skin, name: this.myName || 'you', rk: this.myRank, title: settings.titles ? this.myTitle : null, ttier: this.myTitleTier ?? null, neon: settings.titles ? this.myNeon : null, nf: this.myNf ?? null, hp: you.hp, isMe: true, flash: now - me.hitT < 90, shield: you.shield > 0, ext: you.ext, pr: you.pr, laser: WEAPONS[you.w]?.laser });
       eye = { x, y };
       // look a little ahead of where you aim
       const la = Math.min(1, 1 - Math.exp(-dt * 6));

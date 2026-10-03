@@ -1,6 +1,7 @@
 // Friends, players, private messages, profiles, guilds and room invites.
 // Everything here talks to the server by public player id; tokens never show up.
 import { t } from './i18n.js';
+import { nameHtml, frameAttrs, bannerHtml } from './flair.js';
 import { esc } from './game.js';
 import { rankBadgeSvg } from './rankbadge.js';
 import { achName, titleHtml } from './achievements.js';
@@ -305,9 +306,9 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     const stat = (k, v) => `<div><b class="num">${v}</b><span>${t(k)}</span></div>`;
     $('pf-body').innerHTML = `
       <div class="pf-top">
-        <img class="pf-fig" alt="" src="${figureStill({ outfit: m.look?.outfit, body: m.look?.body }, 90, 124)}">
+        ${bannerHtml(m.look?.bn)}<span class="pf-figw ${frameAttrs(m.look?.fr).cls}" style="${frameAttrs(m.look?.fr).style}"><img class="pf-fig" alt="" src="${figureStill({ outfit: m.look?.outfit, body: m.look?.body }, 90, 124)}"></span>
         <div class="pf-id">
-          <p class="pf-name">${rankBadgeSvg(c.rk ?? 1, 26)}<b>${esc(c.n)}</b>${c.g ? `<em class="so-g">[${esc(c.g)}]</em>` : ''}</p>
+          <p class="pf-name">${rankBadgeSvg(c.rk ?? 1, 26)}<b>${nameHtml(c.n, m.look?.nf)}</b>${c.g ? `<em class="so-g">[${esc(c.g)}]</em>` : ''}</p>
           ${c.tt ? `<p>${titleHtml(c.tt, 'so-tt big')}</p>` : ''}
           <p class="fine"><i class="so-dot ${c.st}"></i> ${esc(statusText(c))} · ${t('pf.rank', { n: c.rk })}</p>
           ${m.guild ? `<p class="fine">${t('pf.guild', { g: `${m.guild.name} [${m.guild.tag}]` })}</p>` : ''}

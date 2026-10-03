@@ -7,10 +7,45 @@ import { figureStill } from './stickman.js';
 import { boxArt, weaponStill } from './locker.js';
 import { esc, fmt, mmss } from './game.js';
 import { t } from './i18n.js';
+import { STYLE, STYLE_KINDS, STYLE_ITEMS } from '../shared/style.js';
+import { nameHtml, frameAttrs, bannerHtml, styleStill } from './flair.js';
 
 const $ = (id) => document.getElementById(id);
 
 export function createInventory({ app, go, openLocker, openCashier, send, openBox = () => {} }) {
+  let kind = 'frame';
+
+  // style: what you own of each kind, with a live preview, and the one you wear
+  function styleCard(L) {
+    const owned = (L?.sowned ?? []).filter((id) => STYLE[id]?.kind === kind);
+    const worn = L?.sequip?.[kind] ?? null;
+    const name = app.name || 'runner';
+    const preview = (it) => {
+      if (it.kind === 'frame') {
+        const f = frameAttrs(it.id);
+        return `<span class="st-prev"><span class="st-fr ${f.cls}" style="${f.style}"><img alt="" src="${figureStill({ outfit: L.outfit, body: L.body }, 44, 60)}"></span></span>`;
+      }
+      if (it.kind === 'banner') return `<span class="st-prev st-bn">${bannerHtml(it.id)}<b>${esc(name)}</b></span>`;
+      if (it.kind === 'namefx') return `<span class="st-prev st-nm">${nameHtml(name, it.id)}</span>`;
+      return `<span class="st-prev"><img alt="" src="${styleStill(it.id, 110, 64)}"></span>`;
+    };
+    const all = STYLE_ITEMS.filter((x) => x.kind === kind).length;
+    return `<section class="inv-card st-card">
+      <header><p class="eyebrow">${t('sty.title')}</p><span class="fine">${(L?.sowned ?? []).length}/${STYLE_ITEMS.length}</span></header>
+      <div class="seg-row st-tabs" role="tablist">${STYLE_KINDS.map((k) => `<button type="button" class="seg" role="tab" data-skind="${k}" aria-selected="${k === kind}">${t(`sty.${k}`)}</button>`).join('')}</div>
+      <div class="st-grid">
+        <button type="button" class="st-item${worn ? '' : ' on'}" data-sequip="">${'<span class="st-prev st-none">∅</span>'}<b>${t('sty.none')}</b></button>
+        ${owned
+          .map((id) => STYLE[id])
+          .sort((a, b) => Object.keys(RARITIES).indexOf(b.rarity) - Object.keys(RARITIES).indexOf(a.rarity))
+          .map((it) => `<button type="button" class="st-item${worn === it.id ? ' on' : ''}" data-sequip="${it.id}" style="--r:${RARITIES[it.rarity].color}">${preview(it)}<b>${esc(it.name)}</b><small style="color:${RARITIES[it.rarity].color}">${esc(RARITIES[it.rarity].name)}${worn === it.id ? ` · ${t('sty.worn')}` : ''}</small></button>`)
+          .join('')}
+      </div>
+      ${owned.length ? '' : `<p class="fine">${t('sty.empty', { n: all })}</p>`}
+      <div class="inv-actions"><button type="button" class="cta" data-go="shop" data-fam="style">${t('sty.get')}</button></div>
+    </section>`;
+  }
+
   function render() {
     const root = $('inv-root');
     if (!root) return;
@@ -48,6 +83,7 @@ export function createInventory({ app, go, openLocker, openCashier, send, openBo
         <div class="inv-actions"><button type="button" class="cta" data-go="shop">${t('shop.topup')}</button></div>
       </section>
       ${held.length ? `<section class="inv-card"><header><p class="eyebrow">${t('inv.unopened')}</p></header><div class="inv-boxes">${held.map(([id, n]) => `<div class="inv-box">${boxArt(BOX[id], 72)}<b>${esc(t(`box.${id}`))}</b><span>×${n}</span><button type="button" class="cta inv-open" data-open="${id}">${t('inv.open')}</button></div>`).join('')}</div></section>` : ''}
+      ${styleCard(L)}
       <section class="inv-card">
         <header><p class="eyebrow">${t('inv.collection')}</p></header>
         <div class="inv-stats">
@@ -75,6 +111,13 @@ export function createInventory({ app, go, openLocker, openCashier, send, openBo
         b.disabled = true;
         openBox(b.dataset.open);
       });
+    for (const b of root.querySelectorAll('[data-skind]'))
+      b.addEventListener('click', () => {
+        kind = b.dataset.skind;
+        render();
+      });
+    for (const b of root.querySelectorAll('[data-sequip]'))
+      b.addEventListener('click', () => send({ t: 'sequip', kind, id: b.dataset.sequip || null }));
     for (const b of root.querySelectorAll('[data-go]'))
       b.addEventListener('click', () => {
         const k = b.dataset.go;

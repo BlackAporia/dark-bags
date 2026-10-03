@@ -21,6 +21,7 @@
 // Rank-ups pay one thing: a random outfit to try for 72 hours. Nothing here changes
 // how a runner plays. It is all looks.
 import { WEAPONS } from './weapons.js';
+import { STYLE, STYLE_ITEMS, STYLE_CASES, STYLE_KINDS } from './style.js';
 import { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems } from './season.js';
 export { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems };
 
@@ -335,10 +336,13 @@ export const BOXES = [
   ...TIERS.map((t, i) => ({ id: BAG_IDS[i], family: 'outfit', tier: i + 1, group: 'tier', name: BAG_NAMES[i], ...t })),
   ...TIERS.map((t, i) => ({ id: CRATE_IDS[i], family: 'weapon', tier: i + 1, group: 'tier', name: CRATE_NAMES[i], ...t })),
   ...COLLECTIONS.map((c) => ({ price: 249, odds: CASE_ODDS, jackpot: 'mythic', tier: 4, group: c.weapons ? 'class' : 'theme', ...c })),
+  // style cases: frames, banners, kill effects, name effects
+  ...STYLE_CASES.map((c, i) => ({ family: 'style', group: 'style', tier: [2, 4, 7][i], ...c })),
 ];
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
 // what a box can drop: the whole family, or its collection
 export function boxCatalog(box) {
+  if (box.family === 'style') return STYLE_ITEMS;
   if (box.family === 'outfit') return box.outfits ? box.outfits.map((id) => OUTFIT[id]).filter(Boolean) : OUTFITS;
   if (!box.finishes && !box.weapons) return WEAPON_SKINS;
   return WEAPON_SKINS.filter((s) => (!box.finishes || box.finishes.includes(s.finish)) && (!box.weapons || box.weapons.includes(s.weapon)));
@@ -464,6 +468,8 @@ export function botLook(rnd) {
     const f = FINISHES.filter((x) => rank(x.rarity) <= 2);
     look.ws = { [WEAPONS[Math.floor(rnd() * WEAPONS.length)].id]: f[Math.floor(rnd() * f.length)].id };
   }
+  if (rnd() < 0.12) look.nf = STYLE_ITEMS.filter((x) => x.kind === 'namefx' && rank(x.rarity) <= 2)[Math.floor(rnd() * 6)]?.id;
+  if (rnd() < 0.1) look.kf = STYLE_ITEMS.filter((x) => x.kind === 'killfx' && rank(x.rarity) <= 1)[Math.floor(rnd() * 4)]?.id;
   return look;
 }
 
@@ -485,7 +491,7 @@ function migrate(r) {
 }
 
 function fresh() {
-  return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, wtrials: {}, spins: 0, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0 };
+  return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, wtrials: {}, spins: 0, boxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0, sowned: [], sequip: {} };
 }
 
 // The fortune wheel (one spin with the welcome bonus, more from mail gifts): a 72h trial outfit,
@@ -574,6 +580,8 @@ export class Inventory {
       supply: this.supply(),
       towned: r.towned,
       tequip: r.tequip,
+      sowned: r.sowned ?? [],
+      sequip: r.sequip ?? {},
       pass: this.passView(key),
       pity: Object.fromEntries(BOXES.map((b) => [b.id, { sinceEpic: r.pity[b.id]?.sinceEpic ?? 0, sinceLegendary: r.pity[b.id]?.sinceLegendary ?? 0, sinceExotic: r.pity[b.id]?.sinceExotic ?? 0 }])),
     };
@@ -585,7 +593,14 @@ export class Inventory {
     const ws = {};
     for (const [w, f] of Object.entries(r.wequip)) if (this.ownsW(key, `${w}.${f}`)) ws[w] = f;
     const ts = r.tequip && r.towned.includes(r.tequip) ? r.tequip : null;
-    return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm', ws, ...(ts ? { ts } : {}) };
+    // style: the frame, banner, kill effect and name effect worn (only what is owned)
+    const st = {};
+    const key2 = { frame: 'fr', banner: 'bn', killfx: 'kf', namefx: 'nf' };
+    for (const k of STYLE_KINDS) {
+      const id = r.sequip?.[k];
+      if (id && STYLE[id]?.kind === k && r.sowned?.includes(id)) st[key2[k]] = id;
+    }
+    return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm', ws, ...(ts ? { ts } : {}), ...st };
   }
 
   changed() {
@@ -649,6 +664,18 @@ export class Inventory {
   }
 
   // a turret skin you own (guns + lasers), or null for the plain one
+  // wear a frame, banner, kill effect or name effect (id null: take it off)
+  equipStyle(key, kind, id) {
+    if (!STYLE_KINDS.includes(kind)) return { ok: false, error: 'Unknown style.' };
+    const r = this.rec(key);
+    r.sequip ??= {};
+    if (!id) delete r.sequip[kind];
+    else if (STYLE[id]?.kind !== kind || !r.sowned?.includes(id)) return { ok: false, error: 'You do not own that one.' };
+    else r.sequip[kind] = id;
+    this.changed();
+    return { ok: true };
+  }
+
   equipTurret(key, id) {
     const r = this.rec(key);
     if (id && !r.towned.includes(id)) return { ok: false, error: 'You do not own that turret skin.' };
@@ -715,6 +742,11 @@ export class Inventory {
     } else if (rw.k === 'wskin' && !r.wowned.includes(rw.id)) r.wowned.push(rw.id);
     else if (rw.k === 'turret' && !r.towned.includes(rw.id)) r.towned.push(rw.id);
     else if (rw.k === 'spin') r.spins += Math.max(1, Math.min(10, rw.n ?? 1));
+    else if (rw.k === 'style' && STYLE[rw.id]) {
+      r.sowned ??= [];
+      if (r.sowned.includes(rw.id)) r.credit += RARITIES[STYLE[rw.id].rarity].refund;
+      else r.sowned.push(rw.id);
+    }
     else if (rw.k === 'trial' && OUTFIT[rw.id]) r.trials[rw.id] = Math.max(r.trials[rw.id] ?? 0, this.now()) + TRIAL_MS;
     else if (rw.k === 'wtrial' && WSKIN[rw.id]) r.wtrials[rw.id] = Math.max(r.wtrials[rw.id] ?? 0, this.now()) + TRIAL_MS;
     this.changed();
@@ -820,7 +852,8 @@ export class Inventory {
     p.sinceExotic ??= 0;
     const roll = rollRarity(box, p, this.rnd);
     const weapon = box.family === 'weapon';
-    const mine = weapon ? r.wowned : r.owned;
+    const style = box.family === 'style';
+    const mine = style ? (r.sowned ??= []) : weapon ? r.wowned : r.owned;
     const item = pickItem(boxCatalog(box), roll.rarity, new Set(mine), this.rnd, { tier: box.tier, minted: this.minted });
     const dup = mine.includes(item.id);
     let refund = 0;
@@ -830,7 +863,7 @@ export class Inventory {
       r.credit += refund;
     } else {
       mine.push(item.id);
-      if (!weapon) delete r.trials[item.id];
+      if (!weapon && !style) delete r.trials[item.id];
       if (item.limited) {
         serial = this.minted[item.id] = (this.minted[item.id] ?? 0) + 1;
         r.serials[item.id] = serial;
