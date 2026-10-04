@@ -36,25 +36,42 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
     rpcUrl: cfg.rpcUrl ?? undefined,
   });
   await discovery.ready;
-  const mine = discovery.forAccount({ address: account.address, viewingKey: s.viewingKey });
+  // the SDK wants the viewing key as a bigint: a hex string silently derives the wrong channel keys
+  const viewingKey = BigInt(s.viewingKey);
+  const mine = discovery.forAccount({ address: account.address, viewingKey });
 
   const transfers =
     account.signer && s.proverUrl
       ? sdk.createPrivateTransfers({
           account: { address: account.address, signer: account.signer },
-          viewingKeyProvider: { getViewingKey: async () => s.viewingKey },
+          viewingKeyProvider: { getViewingKey: async () => viewingKey },
           provingProvider: { url: s.proverUrl, chainId: cfg.chainId === 'SN_MAIN' ? '0x534e5f4d41494e' : '0x534e5f5345504f4c4941', nodeUrl: cfg.rpcUrl ?? undefined },
           discoveryProvider: discovery,
           poolContractAddress: s.pool,
         })
       : null;
   if (!transfers) log.warn('STRK20: set HOUSE_PRIVATE_KEY and STRK20_PROVER_URL for private cash-outs');
-  const simple = transfers ? new sdk.SimplePrivateTransfersImpl(transfers) : null;
+
+  // Prove against head - 10: notes mature 10 blocks after creation, and a proof at the head can be
+  // undone by a reorg (strk20-by-example.org/sdk/proving-config).
+  const provingBlock = async () => Math.max(0, (await provider.getBlockNumber()) - 10);
+  // tip is required for v3; proof keys only when there are proof facts (empty ones make an
+  // invalid transaction). After a failed submission the cached pool nonce is stale.
+  async function submit(callAndProof) {
+    const { call, proof } = callAndProof;
+    const extra = proof?.proofFacts?.length ? { proof: proof.data, proofFacts: proof.proofFacts } : {};
+    try {
+      return await account.execute(call, { tip: 0n, ...extra });
+    } catch (e) {
+      transfers?.invalidateProofNonceCache?.();
+      throw e;
+    }
+  }
   const house = normAddr(account.address);
 
   return {
     pool: s.pool,
-    canPay: !!simple,
+    canPay: !!transfers,
 
     // every note the house holds, as deposits; the cashier skips ids it has seen
     async scan() {
@@ -71,16 +88,15 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
     },
 
     async pay({ token, to, amount }) {
-      if (!simple) throw Object.assign(new Error('private cash-outs are not configured'), { notSent: true });
+      if (!transfers) throw Object.assign(new Error('private cash-outs are not configured'), { notSent: true });
       let res;
       try {
-        res = await simple.transfer(token, to, amount);
+        res = await transfers.build().with(token).transfer({ recipient: to, amount: BigInt(amount) }).done().execute({ autoSetup: true, autoSelectNotes: 'naive', provingBlockId: await provingBlock() });
       } catch (e) {
         // building or proving failed: nothing was signed or sent
         throw Object.assign(new Error(/regist/i.test(String(e?.message)) ? 'recipient is not registered in the STRK20 pool' : `proof failed: ${e?.message ?? e}`), { notSent: true });
       }
-      const { call, proof } = res.callAndProof;
-      const r = await account.execute(call, { proof: proof.data, proofFacts: proof.proofFacts });
+      const r = await submit(res.callAndProof);
       provider.waitForTransaction?.(r.transaction_hash).catch(() => {});
       return { tx: r.transaction_hash };
     },
@@ -99,12 +115,11 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
           .transfer({ recipient: to, amount: sdk.Open })
           .done()
           .invoke(({ openNotes }) => ({ contractAddress: contract, entrypoint: 'privacy_invoke', calldata: calldata({ noteId: BigInt(openNotes[0].noteId) }) }))
-          .execute({ autoSetup: true, autoDiscover: { channels: 'missing' } });
+          .execute({ autoSetup: true, autoDiscover: { channels: 'missing' }, provingBlockId: await provingBlock() });
       } catch (e) {
         throw Object.assign(new Error(/regist/i.test(String(e?.message)) ? 'recipient is not registered in the STRK20 pool' : `proof failed: ${e?.message ?? e}`), { notSent: true });
       }
-      const { call, proof } = res.callAndProof;
-      const r = await account.execute(call, { proof: proof.data, proofFacts: proof.proofFacts });
+      const r = await submit(res.callAndProof);
       provider.waitForTransaction?.(r.transaction_hash).catch(() => {});
       return { tx: r.transaction_hash };
     },
@@ -112,9 +127,8 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
     // one-time: publish the house viewing key so players can open channels to it
     async register() {
       if (!transfers) throw new Error('needs HOUSE_PRIVATE_KEY and STRK20_PROVER_URL');
-      const res = await transfers.execute({ setViewingKey: {} }, { autoRegister: true });
-      const { call, proof } = res.callAndProof;
-      return account.execute(call, { proof: proof.data, proofFacts: proof.proofFacts });
+      const res = await transfers.build().register().execute({ provingBlockId: await provingBlock() });
+      return submit(res.callAndProof);
     },
 
     close: () => discovery.close(),
