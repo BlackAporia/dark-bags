@@ -33,6 +33,22 @@ What it does not change: the game is custodial and the server decides who won. T
 also move free funds to the house wallet (`sweep`) to pay public cash-outs. The owner (a separate
 wallet, ideally a multisig) can pause the vault and rotate the operator.
 
+## Pattern and references
+
+The vault follows the anonymizer rules from
+[strk20-by-example.org](https://strk20-by-example.org/helpers/privacy-invoke): only the pool may
+call `privacy_invoke`, it returns exactly a `Span<OpenNoteDeposit>` (empty while funds stay
+parked), it approves the pool rather than transferring, and it credits what actually arrived. It
+is the same stateful shape as the site's Escrow example, with an operator signature in place of
+a claim secret, so nobody can claim a payout by reading the mempool.
+
+STRK20 pools: Mainnet `0x040337b1…ffe812a`, Sepolia `0x0254a6b2…cfe0d91` (the server and the deploy
+script default to them).
+
+What stays public by design: the amount of each private deposit (a pool withdrawal to the vault)
+and of each payout (an open note's filled amount). What is hidden is who: the payer's address is
+encrypted to the auditor only, and the payout note's owner is encrypted.
+
 ## Build and test
 
 Scarb 2.17 and Starknet Foundry 0.63:
@@ -59,9 +75,12 @@ only in the host's variables, never in git or chat.
 
 Before mainnet:
 
-1. **Screening.** The pool screens open-note depositors. By default a contract that fills open
-   notes needs a screening attestation for its own address. Ask the STRK20 pool admins to set the
-   vault's policy (`Exempt` or `Delegated`) or get it screened, or private cash-outs will revert.
+1. **Screening.** Every deposit into the pool is screened (Elliptic, signed by FPI, checked on
+   chain), and a contract that fills open notes is a screened subject too: by default the pool
+   needs an attestation for the vault's own address. The route to screening access is Starkscan;
+   ask them, or the STRK20 team, to screen the vault or set its policy (`Exempt` or `Delegated`).
+   Without it private cash-outs revert. Private deposits are not affected (they are withdrawals
+   from the pool, which are not screened).
 2. **Audit.** Get the vault reviewed before it holds real money, and keep the beta caps on.
 3. Private cash-outs also need `STRK20_VIEWING_KEY` and `STRK20_PROVER_URL` (the house registers
    in the pool once with `npm run house -- register`).

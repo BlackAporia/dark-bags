@@ -10,12 +10,12 @@
 // Keys only ever come from the environment: never paste them anywhere else.
 import { readFileSync } from 'node:fs';
 import { Account, RpcProvider, ec, json } from 'starknet';
-import { STRK20_POOL_MAINNET } from '../server/cashier/config.js';
+import { STRK20_POOL_MAINNET, STRK20_POOL_SEPOLIA } from '../server/cashier/config.js';
 
 const env = process.env;
 const need = (k) => env[k] || (console.error(`set ${k}`), process.exit(1));
 const network = need('CHAIN');
-const pool = env.STRK20_POOL || (network === 'mainnet' ? STRK20_POOL_MAINNET : need('STRK20_POOL'));
+const pool = env.STRK20_POOL || (network === 'mainnet' ? STRK20_POOL_MAINNET : STRK20_POOL_SEPOLIA);
 const house = need('HOUSE_ADDRESS');
 const key = need('HOUSE_PRIVATE_KEY');
 const owner = need('VAULT_OWNER');
