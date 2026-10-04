@@ -36,6 +36,64 @@ async function poolKeyOf(provider, pool, address) {
   return BigInt(r[0] ?? 0);
 }
 
+// The useful part of a starknet.js error. RPC errors print every param (the whole contract class
+// for a declare) before the node's actual answer, so keep the code, message and data, or the tail.
+export function rpcReason(e) {
+  const b = e?.baseError;
+  if (b && (b.code != null || b.message)) {
+    const data = b.data == null ? '' : ` ${typeof b.data === 'string' ? b.data : JSON.stringify(b.data)}`;
+    return `${b.code ?? ''} ${b.message ?? ''}${data}`.trim().slice(0, 800);
+  }
+  const m = String(e?.message ?? e);
+  return m.length > 800 ? `…${m.slice(-800)}` : m;
+}
+
+const STRK = '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d';
+const hint = (e, h) => Object.assign(e, { hint: h });
+
+// Declare (if needed) and deploy the vault from the house account, checking the usual blockers first.
+async function deployVault({ cfg, provider, house, pool, env, log }) {
+  // the house must be a deployed account with STRK for fees
+  try {
+    await provider.getClassHashAt(house);
+  } catch (e) {
+    throw hint(e, `The house account ${house} is not deployed on ${cfg.network}: open it in its wallet and send one transaction (or deploy it), then restart.`);
+  }
+  const bal = await provider.callContract({ contractAddress: STRK, entrypoint: 'balance_of', calldata: [house] }).then((r) => BigInt(r[0]) + (BigInt(r[1] ?? 0) << 128n), () => null);
+  if (bal !== null) log.log?.(`setup: house holds ${Number(bal / 10n ** 14n) / 1e4} STRK`);
+  if (bal === 0n) throw hint(new Error('no STRK'), `The house ${house} has no STRK for fees: send it some (Sepolia faucet), then restart.`);
+
+  const sierra = json.parse(readFileSync(new URL('dark_bags_DarkBagsVault.contract_class.json', ARTIFACTS), 'utf8'));
+  const casm = json.parse(readFileSync(new URL('dark_bags_DarkBagsVault.compiled_contract_class.json', ARTIFACTS), 'utf8'));
+  const owner = normAddr(env.VAULT_OWNER) ?? house;
+  const treasury = normAddr(env.VAULT_TREASURY) ?? house;
+  if (owner === house) log.warn('setup: VAULT_OWNER is not set, the house owns the vault (set a separate wallet before mainnet)');
+  const deployer = new Account({ provider, address: house, signer: cfg.houseKey });
+
+  log.log?.(`setup: declaring the DARK BAGS vault on ${cfg.network}…`);
+  let classHash;
+  try {
+    const d = await deployer.declareIfNot({ contract: sierra, casm });
+    classHash = d.class_hash;
+    if (d.transaction_hash) await provider.waitForTransaction(d.transaction_hash);
+  } catch (e) {
+    // a node that hashes compiled classes the other way names the hash it expects: use that one
+    const want = /expected[^0-9a-fx]*(0x[0-9a-f]+)/i.exec(rpcReason(e))?.[1];
+    if (!want) throw e;
+    log.warn(`setup: the node expects compiled class hash ${want}; declaring again with it`);
+    const d = await deployer.declare({ contract: sierra, casm, compiledClassHash: want });
+    classHash = d.class_hash;
+    await provider.waitForTransaction(d.transaction_hash);
+  }
+  log.log?.(`setup: class ${classHash} declared, deploying…`);
+  const r = await deployer.deployContract({ classHash, constructorCalldata: [pool, owner, house, ec.starkCurve.getStarkKey(cfg.houseKey), treasury] });
+  const rc = await provider.waitForTransaction(r.transaction_hash);
+  const address = normAddr(r.contract_address);
+  const fromBlock = rc.block_number ?? (await provider.getBlockNumber());
+  log.log?.(`setup: vault deployed at ${address} (block ${fromBlock})`);
+  return { address, fromBlock };
+}
+
 // Before the chain is built: viewing key and vault address. Returns the updated cfg.
 export async function setupBefore({ cfg, account, provider, env = process.env, log = console }) {
   if (env.VAULT_AUTO !== '1') return cfg;
@@ -74,23 +132,13 @@ export async function setupBefore({ cfg, account, provider, env = process.env, l
   if (!vault && s.vault) vault = { address: s.vault, fromBlock: s.vaultFromBlock ?? 0 };
   if (!vault && pool) {
     try {
-      const sierra = json.parse(readFileSync(new URL('dark_bags_DarkBagsVault.contract_class.json', ARTIFACTS), 'utf8'));
-      const casm = json.parse(readFileSync(new URL('dark_bags_DarkBagsVault.compiled_contract_class.json', ARTIFACTS), 'utf8'));
-      const owner = normAddr(env.VAULT_OWNER) ?? house;
-      const treasury = normAddr(env.VAULT_TREASURY) ?? house;
-      if (owner === house) log.warn('setup: VAULT_OWNER is not set, the house owns the vault (set a separate wallet before mainnet)');
-      log.log?.(`setup: deploying the DARK BAGS vault on ${cfg.network}…`);
-      // a plain starknet.js account on the house key: declare + deploy in one go
-      const deployer = new Account({ provider, address: house, signer: cfg.houseKey });
-      const r = await deployer.declareAndDeploy({ contract: sierra, casm, constructorCalldata: [pool, owner, house, ec.starkCurve.getStarkKey(cfg.houseKey), treasury] });
-      const rc = await provider.waitForTransaction(r.deploy.transaction_hash);
-      s.vault = normAddr(r.deploy.contract_address);
-      s.vaultFromBlock = rc.block_number ?? (await provider.getBlockNumber());
+      vault = await deployVault({ cfg, provider, house, pool, env, log });
+      s.vault = vault.address;
+      s.vaultFromBlock = vault.fromBlock;
       save(file, s);
-      log.log?.(`setup: vault deployed at ${s.vault} (block ${s.vaultFromBlock})`);
-      vault = { address: s.vault, fromBlock: s.vaultFromBlock };
     } catch (e) {
-      log.error('setup: vault deploy failed (the house needs STRK for fees); retrying on next start', e?.message ?? e);
+      vault = null;
+      log.error(`setup: vault deploy failed, retrying on next start. ${e?.hint ?? ''}${e?.hint ? ' ' : ''}Reason: ${rpcReason(e)}`);
     }
   }
   return { ...cfg, strk20, vault };
