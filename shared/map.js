@@ -35,7 +35,7 @@ function vaultWalls(v, rnd) {
 // same map on every machine. Every theme keeps the raid's bones (two vaults with doors, three
 // exits) and lays its own cover around them. `pits` (lava, water, chasms, quicksand) stop your
 // feet but not your bullets or your eyes; walls stop all three.
-export const MAP_THEMES = ['docks', 'chain', 'lego', 'dunes', 'snow', 'lava', 'city', 'neon', 'blackout', 'fantasy', 'toon', 'gravity'];
+export const MAP_THEMES = ['docks', 'chain', 'lego', 'dunes', 'snow', 'lava', 'city', 'neon', 'blackout', 'fantasy', 'toon', 'gravity', 'speedway', 'skate', 'metro', 'factory', 'jungle', 'junkyard', 'moon', 'casino'];
 
 // what stops a runner: walls and pits (kept off the wire: the client rebuilds it)
 export function solids(map) {
@@ -496,6 +496,115 @@ const BUILD = {
     L.scatter(18, () => [34, 34, 'tyres'], 60);
     L.scatter(10, () => (rnd() < 0.5 ? [90, 44, 'hay'] : [44, 90, 'hay']), 70);
     for (let t = 0; t < 40 && !L.pit({ x: cx - 120 + (rnd() - 0.5) * 700, y: cy - 70 + (rnd() - 0.5) * 600, w: 200 + rnd() * 60, h: 120 + rnd() * 40 }, 80, 'mud'); t++);
+  },
+  // the night circuit: an asphalt loop with kerbs, concrete barriers on the bends, tyre walls,
+  // a pit lane of garages and an oil spill in the infield. Open and fast, like the track.
+  speedway(L, rnd) {
+    const cx = L.W / 2;
+    const cy = L.H / 2;
+    L.map.track = { cx, cy, rx: L.W * 0.36, ry: L.H * 0.31, w: 190, asphalt: true };
+    const tr = L.map.track;
+    // barriers on the outside of the bends, cut so you can always get across the lane
+    for (let a = 0; a < Math.PI * 2; a += 0.42) {
+      if (rnd() < 0.35) continue;
+      const r = 1.18;
+      const x = cx + Math.cos(a) * tr.rx * r;
+      const y = cy + Math.sin(a) * tr.ry * r;
+      const along = Math.abs(Math.sin(a)) > 0.7;
+      L.wall(along ? { x: x - 70, y: y - 14, w: 140, h: 28 } : { x: x - 14, y: y - 70, w: 28, h: 140 }, 70, 'barrier');
+    }
+    // the infield: tyre walls, a row of garages, an oil spill
+    for (let i = 0; i < 4; i++) L.wall({ x: cx - 260 + i * 140, y: cy - 40, w: 110, h: 80 }, 20, 'garage');
+    L.scatter(14, () => [36, 36, 'tyres'], 60);
+    L.scatter(6, () => (rnd() < 0.5 ? [130, 28, 'barrier'] : [28, 130, 'barrier']), 80);
+    for (let i = 0, t = 0; i < 2 && t < 60; t++) if (L.pit({ x: cx - 300 + rnd() * 600 - 70, y: cy + 90 + rnd() * 120 - 50, w: 140 + rnd() * 50, h: 80 + rnd() * 30 }, 60, 'oil')) i++;
+  },
+  // the skatepark at night: a compact, mirrored flow of quarter pipes, funboxes and rails, with
+  // two empty bowls you can't run through
+  skate(L, rnd) {
+    L.mirror(7, () => {
+      const k = rnd();
+      if (k < 0.3) return rnd() < 0.5 ? [150, 56, 'qpipe'] : [56, 150, 'qpipe'];
+      if (k < 0.6) return [90 + Math.floor(rnd() * 40), 70 + Math.floor(rnd() * 30), 'funbox'];
+      return rnd() < 0.5 ? [170 + Math.floor(rnd() * 80), 14, 'rail'] : [14, 170 + Math.floor(rnd() * 80), 'rail'];
+    }, 80);
+    for (let i = 0, t = 0; i < 2 && t < 80; t++) {
+      const s = 150 + Math.floor(rnd() * 50);
+      if (L.pit({ x: L.rx(s), y: L.ry(s), w: s, h: s }, 90, 'bowl')) i++;
+    }
+  },
+  // the metro: long platforms with stairs cut through them, the rails between them (a drop you
+  // can't cross except at the walkways), columns and benches
+  metro(L, rnd) {
+    const horiz = rnd() < 0.5;
+    const len = horiz ? L.W : L.H;
+    const across = horiz ? L.H : L.W;
+    const lanes = [0.3, 0.7].map((f) => across * f + (rnd() - 0.5) * 60);
+    for (const at of lanes) {
+      // the track: pit segments with walkways every so often
+      for (let s = 140; s < len - 140; s += 320) {
+        const seg = 230;
+        const r = horiz ? { x: s, y: at - 45, w: seg, h: 90 } : { x: at - 45, y: s, w: 90, h: seg };
+        L.pit(r, 40, 'rails');
+      }
+      // platform edges along the track, beside each rail stretch (the walkways stay open)
+      for (const side of [-1, 1])
+        for (let s = 160; s < len - 160; s += 640) {
+          const r = horiz ? { x: s, y: at + side * 102 - 11, w: 190, h: 22 } : { x: at + side * 102 - 11, y: s, w: 22, h: 190 };
+          L.wall(r, 24, 'platform');
+        }
+    }
+    L.scatter(22, () => [40, 40, 'column'], 90);
+    L.scatter(8, () => (rnd() < 0.5 ? [110, 30, 'bench'] : [30, 110, 'bench']), 70);
+  },
+  // the factory: machines, long conveyors, barrels and vats of glowing acid
+  factory(L, rnd) {
+    L.scatter(12, () => [100 + Math.floor(rnd() * 60), 80 + Math.floor(rnd() * 50), 'machine'], 90);
+    L.scatter(8, () => (rnd() < 0.5 ? [240 + Math.floor(rnd() * 140), 36, 'conveyor'] : [36, 240 + Math.floor(rnd() * 140), 'conveyor']), 90);
+    L.scatter(22, () => [34, 34, 'barrel'], 55);
+    for (let i = 0, t = 0; i < 3 && t < 80; t++) if (L.pit({ x: L.rx(150), y: L.ry(110), w: 110 + rnd() * 60, h: 80 + rnd() * 40 }, 80, 'acid')) i++;
+  },
+  // the jungle at night: temple ruins, thick trees and a swamp creek with crossings
+  jungle(L, rnd) {
+    L.river(rnd() < 0.5, 'swamp', 66, 3);
+    for (let k = 0, t = 0; k < 6 && t < 200; t++) {
+      const parts = [[0, 0, 120 + rnd() * 60, 90 + rnd() * 50]];
+      if (rnd() < 0.6) parts.push([(rnd() - 0.5) * 160, 90 + rnd() * 30, 40, 40]);
+      if (L.clump(L.rx(0) + 80, L.ry(0) + 80, parts, 90, 'temple').length) k++;
+    }
+    L.scatter(42, () => {
+      const s = 30 + Math.floor(rnd() * 22);
+      return [s, s, 'palm'];
+    }, 50);
+  },
+  // the junkyard: stacked wrecks, scrap heaps, tyre piles and oil
+  junkyard(L, rnd) {
+    L.scatter(16, () => (rnd() < 0.5 ? [120, 64, 'wreck'] : [64, 120, 'wreck']), 75);
+    L.scatter(12, () => [70 + Math.floor(rnd() * 70), 60 + Math.floor(rnd() * 60), 'scrap'], 75);
+    L.scatter(12, () => [36, 36, 'tyres'], 60);
+    for (let i = 0, t = 0; i < 3 && t < 60; t++) if (L.pit({ x: L.rx(150), y: L.ry(110), w: 110 + rnd() * 60, h: 80 + rnd() * 40 }, 80, 'oil')) i++;
+  },
+  // the moon base: craters, domes, solar arrays and a parked rover, under a sky full of stars
+  moon(L, rnd) {
+    for (let i = 0, t = 0; i < 6 && t < 120; t++) {
+      const s = 100 + Math.floor(rnd() * 90);
+      if (L.pit({ x: L.rx(s), y: L.ry(s), w: s, h: s }, 90, 'crater')) i++;
+    }
+    L.scatter(7, () => {
+      const s = 110 + Math.floor(rnd() * 50);
+      return [s, s, 'dome'];
+    }, 100);
+    L.scatter(10, () => (rnd() < 0.5 ? [160, 50, 'solar'] : [50, 160, 'solar']), 80);
+    L.scatter(3, () => [90, 60, 'rover'], 90);
+  },
+  // the casino: card tables, rows of slot machines, roulette wheels and bars, mirrored
+  casino(L, rnd) {
+    L.mirror(8, () => {
+      const k = rnd();
+      if (k < 0.35) return [120, 76, 'ctable'];
+      if (k < 0.6) return [84, 84, 'roulette'];
+      return rnd() < 0.5 ? [200 + Math.floor(rnd() * 60), 40, 'slots'] : [40, 200 + Math.floor(rnd() * 60), 'slots'];
+    }, 80);
   },
 };
 

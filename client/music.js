@@ -471,6 +471,14 @@ const MAP_TRACKS = {
   fantasy: ['tribal', 'trance'],
   toon: ['chiptune', 'trap', 'hardstyle'],
   gravity: ['chiptune', 'dnb', 'hardstyle'],
+  speedway: ['dnb', 'hardstyle', 'trap'],
+  skate: ['phonk', 'trap', 'chiptune'],
+  metro: ['dnb', 'industrial', 'heist'],
+  factory: ['industrial', 'dubstep', 'hardstyle'],
+  jungle: ['tribal', 'dnb'],
+  junkyard: ['industrial', 'phonk', 'dubstep'],
+  moon: ['trance', 'neon', 'dnb'],
+  casino: ['heist', 'phonk', 'neon'],
 };
 
 export class Music {

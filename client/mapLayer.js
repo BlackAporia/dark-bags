@@ -6,7 +6,7 @@ import { textures, pattern, shade, canvas, TEX_SCALE } from './textures.js';
 import { THEME, floorTex, drawThemeWall, drawPit, drawUnder, drawGroundBits } from './themes.js';
 
 const ARENA_THEMES = new Set(['graveyard', 'mine']);
-const ROUND = new Set(['tree', 'pine', 'cactus', 'shroom', 'tyres', 'oak', 'log', 'candy', 'gift', 'mesa', 'ice', 'car', 'hay', 'brick', 'link']);
+const ROUND = new Set(['tree', 'pine', 'cactus', 'shroom', 'tyres', 'oak', 'log', 'candy', 'gift', 'mesa', 'ice', 'car', 'hay', 'brick', 'link', 'barrel', 'palm', 'dome', 'roulette', 'ctable', 'scrap', 'wreck', 'rover', 'qpipe', 'funbox']);
 
 export const CHUNK = 400;
 const PAD = 2; // chunks overlap slightly so no seams show between them
@@ -200,6 +200,13 @@ export class MapLayer {
     } else this.cityDecals(x, map, cx, cy, rnd, inMap);
     // vault floors, exits, the fence and the walls
     this.buildRest(x, map, near, view, tex);
+    // the older bright maps, at night: one dark tint over the whole chunk
+    if (th?.night) {
+      x.globalCompositeOperation = 'multiply';
+      x.fillStyle = th.night;
+      x.fillRect(x0, y0, view.w, view.h);
+      x.globalCompositeOperation = 'source-over';
+    }
     return c;
   }
 

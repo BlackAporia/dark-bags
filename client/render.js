@@ -382,36 +382,52 @@ export class Renderer {
   drawTracer(b, t) {
     const ctx = this.ctx;
     const sp = Math.hypot(b.vx, b.vy) || 1;
-    const ux = b.vx / sp;
-    const uy = b.vy / sp;
-    const y = b.y - GUN_Z;
+    let ux = b.vx / sp;
+    let uy = b.vy / sp;
+    let bx = b.x;
+    let y = b.y - GUN_Z;
+    if (b.ox !== undefined) {
+      // out of the drawn muzzle, easing onto the true path (game.js fromMuzzle)
+      const at = (q) => {
+        const f = Math.max(0, 1 - q / 220);
+        return [b.sx + ux * q + b.ox * f, b.sy - GUN_Z + uy * q + b.oy * f];
+      };
+      const s = b.tr ?? 0;
+      [bx, y] = at(s);
+      const [tx, ty] = at(Math.max(0, s - 40));
+      const dl = Math.hypot(bx - tx, y - ty);
+      if (dl > 1) {
+        ux = (bx - tx) / dl;
+        uy = (y - ty) / dl;
+      }
+    }
     if (b.k === 'r') {
       // a turret rocket: smoke behind, a flame, a red-tipped body
       const tail = Math.min(40, b.tr ?? 40);
-      const g = ctx.createLinearGradient(b.x - ux * tail, y - uy * tail, b.x, y);
+      const g = ctx.createLinearGradient(bx - ux * tail, y - uy * tail, bx, y);
       g.addColorStop(0, 'rgba(160,160,170,0)');
       g.addColorStop(1, 'rgba(200,200,210,0.55)');
       ctx.strokeStyle = g;
       ctx.lineWidth = 7;
       ctx.beginPath();
-      ctx.moveTo(b.x - ux * tail, y - uy * tail);
-      ctx.lineTo(b.x - ux * 6, y - uy * 6);
+      ctx.moveTo(bx - ux * tail, y - uy * tail);
+      ctx.lineTo(bx - ux * 6, y - uy * 6);
       ctx.stroke();
       ctx.strokeStyle = '#ffb347';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(b.x - ux * (12 + Math.random() * 6), y - uy * (12 + Math.random() * 6));
-      ctx.lineTo(b.x - ux * 5, y - uy * 5);
+      ctx.moveTo(bx - ux * (12 + Math.random() * 6), y - uy * (12 + Math.random() * 6));
+      ctx.lineTo(bx - ux * 5, y - uy * 5);
       ctx.stroke();
       ctx.strokeStyle = '#d9dde6';
       ctx.lineWidth = 4.5;
       ctx.beginPath();
-      ctx.moveTo(b.x - ux * 6, y - uy * 6);
-      ctx.lineTo(b.x + ux * 5, y + uy * 5);
+      ctx.moveTo(bx - ux * 6, y - uy * 6);
+      ctx.lineTo(bx + ux * 5, y + uy * 5);
       ctx.stroke();
       ctx.fillStyle = '#ff4d5e';
       ctx.beginPath();
-      ctx.arc(b.x + ux * 5, y + uy * 5, 2.4, 0, TAU);
+      ctx.arc(bx + ux * 5, y + uy * 5, 2.4, 0, TAU);
       ctx.fill();
       return;
     }
@@ -422,8 +438,8 @@ export class Renderer {
       ctx.globalAlpha = 0.5;
       ctx.lineWidth = 7;
       ctx.beginPath();
-      ctx.moveTo(b.x - ux * len, y - uy * len);
-      ctx.lineTo(b.x, y);
+      ctx.moveTo(bx - ux * len, y - uy * len);
+      ctx.lineTo(bx, y);
       ctx.stroke();
       ctx.globalAlpha = 1;
       ctx.strokeStyle = '#fff1c9';
@@ -440,8 +456,8 @@ export class Renderer {
       ctx.strokeStyle = c;
       ctx.lineWidth = sp > 1800 ? 3.2 : 2.2;
       ctx.beginPath();
-      ctx.moveTo(b.x - ux * base, y - uy * base);
-      ctx.lineTo(b.x, y);
+      ctx.moveTo(bx - ux * base, y - uy * base);
+      ctx.lineTo(bx, y);
       ctx.stroke();
       ctx.globalAlpha = 1;
       return;
@@ -450,13 +466,13 @@ export class Renderer {
     // the skin's own colour is the neon; mythic and up burn hotter in the accent at the core
     const neon = f.fx === 'rainbow' ? `hsl(${(t / 3 + b.i * 37) % 360}, 100%, 62%)` : f.color;
     const hot = f.fx === 'rainbow' ? `hsl(${(t / 3 + b.i * 37 + 60) % 360}, 100%, 70%)` : tier >= 4 && f.accent ? f.accent : f.color;
-    const tx = b.x - ux * len;
+    const tx = bx - ux * len;
     const ty = y - uy * len;
     const wob = tier >= 4 ? 1 + 0.25 * Math.sin(t / 40 + b.i) : 1;
     // glow, body, white-hot core; the tail fades out along its length
     const thick = [1, 1, 1.15, 1.3, 1.5, 1.7][tier];
     for (const [w, al, c] of [[14 * wob * thick, 0.14, neon], [6.5 * wob * thick, 0.42, hot], [2.4 * thick, 1, '#ffffff']]) {
-      const g = ctx.createLinearGradient(tx, ty, b.x, y);
+      const g = ctx.createLinearGradient(tx, ty, bx, y);
       g.addColorStop(0, 'rgba(0,0,0,0)');
       g.addColorStop(0.35, c);
       g.addColorStop(1, c);
@@ -465,7 +481,7 @@ export class Renderer {
       ctx.lineWidth = w;
       ctx.beginPath();
       ctx.moveTo(tx, ty);
-      ctx.lineTo(b.x, y);
+      ctx.lineTo(bx, y);
       ctx.stroke();
     }
     if (tier >= 3) {
@@ -476,31 +492,31 @@ export class Renderer {
         ctx.globalAlpha = 0.9 * (1 - k);
         ctx.fillStyle = tier >= 5 ? `hsl(${(t / 2 + i * 50) % 360}, 100%, 70%)` : tier === 3 ? '#ffe29a' : neon;
         ctx.beginPath();
-        ctx.arc(b.x - ux * len * k - uy * off * 1.6, y - uy * len * k + ux * off * 1.6, 1.4 + 1.4 * (1 - k), 0, TAU);
+        ctx.arc(bx - ux * len * k - uy * off * 1.6, y - uy * len * k + ux * off * 1.6, 1.4 + 1.4 * (1 - k), 0, TAU);
         ctx.fill();
       }
     }
     if (tier >= 4) {
       // the round itself: a burning orb, a star flare on exotics
       const r = tier >= 5 ? 5.2 : 4.2;
-      const g = ctx.createRadialGradient(b.x, y, 0, b.x, y, r * 3);
+      const g = ctx.createRadialGradient(bx, y, 0, bx, y, r * 3);
       g.addColorStop(0, '#ffffff');
       g.addColorStop(0.3, hot);
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.globalAlpha = 0.95;
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(b.x, y, r * 3, 0, TAU);
+      ctx.arc(bx, y, r * 3, 0, TAU);
       ctx.fill();
       if (tier >= 5) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1;
         ctx.globalAlpha = 0.7;
         ctx.beginPath();
-        ctx.moveTo(b.x - 14, y);
-        ctx.lineTo(b.x + 14, y);
-        ctx.moveTo(b.x, y - 14);
-        ctx.lineTo(b.x, y + 14);
+        ctx.moveTo(bx - 14, y);
+        ctx.lineTo(bx + 14, y);
+        ctx.moveTo(bx, y - 14);
+        ctx.lineTo(bx, y + 14);
         ctx.stroke();
       }
     }
