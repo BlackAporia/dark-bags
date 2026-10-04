@@ -40,6 +40,7 @@ import { createInvite, captureRef, deviceId } from './invite.js';
 import { createMail } from './mail.js';
 import { createFortune } from './fortune.js';
 import { createOffers } from './offers.js';
+import { VIP_LEVELS } from '../shared/vip.js';
 import { createCoinImport } from './coins.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
@@ -495,24 +496,63 @@ function tableInfo(stake) {
 
 // the mode picker: a card per mode with what it is and how the money works
 const MODE_ICON = { zombies: '🧟', gold: '💰', ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
+// the mode picker: categories, cards (what it is, how many, how long, who is in it), and the
+// chosen mode explained underneath (how you win, a tip, what it pays)
+const MODE_CAT = { raid: 'classic', br: 'classic', duel: 'classic', dm: 'classic', gl: 'classic', hardcore: 'classic', knives: 'weapons', pistols: 'weapons', shotguns: 'weapons', rifles: 'weapons', snipers: 'weapons', team2: 'teams', team4: 'teams', team8: 'teams', ranked: 'events', zombies: 'events', gold: 'events' };
+const MODE_COLOR = { raid: '#f59e0b', br: '#ffd166', duel: '#fb7185', dm: '#ef4444', gl: '#22d3ee', hardcore: '#e11d48', knives: '#cbd5e1', pistols: '#94a3b8', shotguns: '#fb923c', rifles: '#4ade80', snipers: '#60a5fa', team2: '#38bdf8', team4: '#3b82f6', team8: '#6366f1', ranked: '#ff2dd4', zombies: '#84cc16', gold: '#fbbf24' };
+const modeKey = (m) => (m.weapon ? 'weapon' : m.kind === 'team' ? 'team' : m.id);
+let modeCat = store.get('darkbags.mcat', 'all');
+function modeFacts(m) {
+  const size = m.kind === 'zombie' ? `1–${m.size}` : m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
+  const secs = m.kind === 'team' || m.ranked ? m.round : m.kind === 'zombie' ? null : (m.seconds ?? (app.mode === 'practice' ? pcfg.seconds : CFG.ROUND_SECONDS));
+  const time = m.kind === 'zombie' ? t('mi.waves') : m.rounds ? t('mi.rounds', { n: m.rounds * 2 - 1, s: mmss(secs) }) : mmss(secs);
+  const rows = app.tables.filter((x) => x.mode === m.id);
+  const waiting = rows.reduce((n, x) => n + (x.state === 'prep' ? x.ready ?? 0 : 0), 0);
+  const live = rows.reduce((n, x) => n + (x.humans ?? 0), 0);
+  return { size, time, waiting, live };
+}
 function renderModes() {
   const box = $('modes');
   // ranked is online only: practice never shows it
   const practice = app.mode === 'practice';
   if (practice && MODE[app.gameMode]?.ranked) app.gameMode = 'raid';
+  const all = MODES.filter((m) => !(practice && m.ranked));
+  const hot = all.map((m) => [m.id, modeFacts(m).waiting + modeFacts(m).live]).sort((a, b) => b[1] - a[1])[0];
+  // categories
+  const cats = ['all', 'classic', 'weapons', 'teams', 'events'];
+  if (!cats.includes(modeCat)) modeCat = 'all';
+  $('mode-cats').replaceChildren(
+    ...cats.map((c) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mcat';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(c === modeCat));
+      const n = c === 'all' ? all.length : all.filter((m) => MODE_CAT[m.id] === c).length;
+      b.innerHTML = `${esc(t(`mcat.${c}`))} <small>${n}</small>`;
+      b.addEventListener('click', () => {
+        modeCat = c;
+        store.set('darkbags.mcat', c);
+        renderModes();
+      });
+      return b;
+    }),
+  );
+  const shown = all.filter((m) => modeCat === 'all' || MODE_CAT[m.id] === modeCat || m.id === app.gameMode);
   box.replaceChildren(
-    ...MODES.filter((m) => !(practice && m.ranked)).map((m) => {
+    ...shown.map((m) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `mode-card k-${m.kind}`;
       b.dataset.mode = m.id;
+      b.style.setProperty('--mc', MODE_COLOR[m.id] ?? '#f59e0b');
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(m.id === app.gameMode));
-      const rows = app.tables.filter((x) => x.mode === m.id);
-      const waiting = rows.reduce((s, x) => s + (x.state === 'prep' ? x.ready ?? 0 : 0), 0);
-      const live = rows.reduce((s, x) => s + (x.humans ?? 0), 0);
-      const size = m.kind === 'zombie' ? `1–${m.size}` : m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
-      b.innerHTML = `<span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span><b>${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span><span class="mc-meta">${esc(size)} · ${esc(t(`kind.${m.kind}`))}${m.rounds ? ` · ${esc(t('mc.rounds', { n: m.rounds * 2 - 1, w: m.rounds }))}` : ''}${live ? ` · <i class="live-dot"></i>${live}` : ''}</span>${waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: waiting }))}</span>` : ''}`;
+      const f = modeFacts(m);
+      const isHot = hot && hot[0] === m.id && hot[1] > 0;
+      b.innerHTML = `<span class="mc-art"><span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span>${isHot ? `<i class="mc-hot">🔥 ${esc(t('mc.hot'))}</i>` : m.ranked ? `<i class="mc-hot rk">${esc(t('mc.season'))}</i>` : ''}${f.live ? `<i class="mc-live"><i class="live-dot"></i>${f.live}</i>` : ''}</span>
+        <b class="mc-name">${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span>
+        <span class="mc-chips"><i>👥 ${esc(f.size)}</i><i>⏱ ${esc(f.time)}</i></span>${f.waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: f.waiting }))}</span>` : ''}`;
       b.addEventListener('click', () => {
         if (document.body.classList.contains('tour-raid-only') && m.id !== 'raid') return; // Nyx's first raid is a Raid
         app.gameMode = m.id;
@@ -523,6 +563,46 @@ function renderModes() {
       return b;
     }),
   );
+  renderModeInfo();
+}
+function renderModeInfo() {
+  const el = $('mode-info');
+  const m = MODE[app.gameMode];
+  if (!el || !m) return;
+  const f = modeFacts(m);
+  const k = modeKey(m);
+  el.style.setProperty('--mc', MODE_COLOR[m.id] ?? '#f59e0b');
+  el.innerHTML = `<div class="mi-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</div>
+    <div class="mi-body"><p class="eyebrow">${esc(t(`mcat.${MODE_CAT[m.id] ?? 'classic'}`))} · ${esc(t(`kind.${m.kind}`))}</p><h3>${esc(t(`mode.${m.id}`))}</h3><p class="mi-d">${esc(t(`mode.${m.id}.d`))}</p>
+      <ul class="mi-facts"><li><b>🏆 ${esc(t('mi.win'))}</b> ${esc(t(`mi.win.${k}`))}</li><li><b>💡 ${esc(t('mi.tip'))}</b> ${esc(t(`mi.tip.${k}`))}</li><li><b>🎁 ${esc(t('mi.pays'))}</b> ${esc(t('mi.rew'))}</li></ul></div>
+    <div class="mi-side"><span><small>${esc(t('mi.players'))}</small><b>${esc(f.size)}</b></span><span><small>${esc(t('mi.time'))}</small><b>${esc(f.time)}</b></span><span><small>${esc(t('mi.now'))}</small><b>${f.live ? `<i class="live-dot"></i>${f.live}` : '—'}${f.waiting ? ` · ⏳${f.waiting}` : ''}</b></span></div>`;
+}
+
+// today's goals over the mode picker: what is waiting to be claimed or played for
+function renderGoals() {
+  const el = $('goals');
+  if (!el) return;
+  const online = app.mode === 'online' && !!app.token;
+  const v = daily.view;
+  const L = app.locker;
+  if (!online || (!v && !L)) {
+    el.hidden = true;
+    return;
+  }
+  const items = [];
+  if (v && !v.cal.claimed) items.push({ ico: '🎁', b: t('goal.cal', { d: v.cal.day }), s: t('goal.claim'), go: () => go('achievements'), hot: true });
+  if (v) {
+    const done = v.daily.filter((x) => x.claimed || x.have >= x.goal).length;
+    items.push({ ico: '✅', b: t('goal.tasks', { a: done, b: v.daily.length }), s: t('goal.tasksS'), go: () => go('achievements'), pct: (done / v.daily.length) * 100, hot: v.daily.some((x) => !x.claimed && x.have >= x.goal) });
+    if (!v.firstWin) items.push({ ico: '⭐', b: t('goal.first'), s: t('goal.firstS'), go: () => $('play').scrollIntoView({ behavior: 'smooth', block: 'center' }) });
+  }
+  if (L?.pass) items.push({ ico: '🎫', b: t('goal.pass', { n: L.pass.tier }), s: L.pass.premium ? t('goal.passP') : t('goal.passF'), go: () => go('pass') });
+  if (L?.card && !L.card.claimed) items.push({ ico: '✦', b: t('goal.card'), s: t('goal.claim'), go: () => go('shop'), hot: true });
+  if (L?.vip?.daily && !L.vip.claimed) items.push({ ico: '👑', b: t('goal.vip', { n: L.vip.lv }), s: t('goal.claim'), go: () => go('shop'), hot: true });
+  if (L?.spins > 0) items.push({ ico: '🎡', b: t('goal.spins', { n: L.spins }), s: t('goal.spinsS'), go: () => fortune.open(), hot: true });
+  el.hidden = !items.length;
+  el.innerHTML = `<p class="eyebrow">${esc(t('goal.title'))}</p><div class="goal-row">${items.map((x, i) => `<button type="button" class="goal${x.hot ? ' hot' : ''}" data-g="${i}"><span class="goal-ico">${x.ico}</span><span class="goal-t"><b>${esc(x.b)}</b><small>${esc(x.s)}</small>${x.pct !== undefined ? `<i class="goal-bar"><i style="width:${x.pct}%"></i></i>` : ''}</span></button>`).join('')}</div>`;
+  el.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => items[Number(b.dataset.g)].go()));
 }
 
 // ------------------------------------------------------ getting started
@@ -601,7 +681,10 @@ function renderLobby() {
   const list = $('tables');
   const fixed = MODE[app.gameMode]?.fixed;
   list.classList.toggle('fixed', !!fixed);
-  list.replaceChildren(
+  // someone is typing their own stake: leave the row alone (rebuilding it would drop what they
+  // typed and put the current stake back in the box)
+  const typing = list.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+  if (!typing) list.replaceChildren(
     ...(fixed ? [fixed] : CFG.TIERS).map((stake) => {
       const tb = tableInfo(stake);
       const b = document.createElement('button');
@@ -647,6 +730,7 @@ function renderLobby() {
   renderAssets();
   renderRankCard();
   renderModes();
+  renderGoals();
   renderPracticeCfg();
   locker.renderTile();
   const play = $('play');
@@ -701,7 +785,9 @@ function renderRankCard() {
   const r = app.rank;
   el.hidden = !r;
   if (!r) return;
-  el.innerHTML = `${rankBadgeSvg(r.rank, 34)}<div class="rk-body"><p class="rk-title"><b>${esc(r.name)}</b><span class="rk-xp">${r.max ? t('rk.max') : t('rk.toNext', { x: fmt(r.toNext), r: r.rank + 1 })}</span></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div></div>`;
+  const vip = app.mode === 'online' ? app.locker?.vip : null;
+  const vl = vip?.lv ? VIP_LEVELS.find((l) => l.lv === vip.lv) : null;
+  el.innerHTML = `${rankBadgeSvg(r.rank, 34)}<div class="rk-body"><p class="rk-title"><b>${esc(r.name)}</b>${vl ? ` <span class="vip-badge" style="--v:${vl.color}">VIP ${vl.lv}</span>` : ''}<span class="rk-xp">${r.max ? t('rk.max') : t('rk.toNext', { x: fmt(r.toNext), r: r.rank + 1 })}</span></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div></div>`;
   el.title = t('rk.of', { r: r.rank });
 }
 
@@ -828,7 +914,7 @@ function customStake() {
   const wrap = document.createElement('label');
   wrap.className = `table-btn stake-own${own ? ' on' : ''}`;
   wrap.setAttribute('aria-pressed', String(own));
-  wrap.innerHTML = `<span class="stake-own-k">${esc(t('stake.own'))}</span><span class="stake-own-in">$<input type="number" inputmode="decimal" min="0.1" max="10000" step="0.01" value="${own ? (app.stake / 1000).toFixed(2).replace(/\.00$/, '') : ''}" placeholder="0.10 – 10 000" aria-label="${esc(t('stake.own'))}"></span>`;
+  wrap.innerHTML = `<span class="stake-own-k">${esc(t('stake.own'))}</span><span class="stake-own-in">$<input type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" maxlength="9" value="${own ? (app.stake / 1000).toFixed(2).replace(/\.00$/, '') : ''}" placeholder="0.10 – 10 000" aria-label="${esc(t('stake.own'))}"></span>`;
   const input = wrap.querySelector('input');
   const apply = () => {
     if (!input.value) return;
@@ -844,6 +930,13 @@ function customStake() {
   // re-render after the change event has finished (the input is replaced by the render)
   input.addEventListener('change', () => setTimeout(apply, 0));
   input.addEventListener('keydown', (e) => e.key === 'Enter' && input.blur());
+  // typing replaces the amount that is there, never appends to it
+  input.addEventListener('focus', () => setTimeout(() => input.select(), 0));
+  // digits and one decimal point only
+  input.addEventListener('input', () => {
+    const v = input.value.replace(',', '.').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+    if (v !== input.value) input.value = v;
+  });
   return wrap;
 }
 
@@ -1034,6 +1127,7 @@ function onMessage(m) {
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'daily') daily.onMessage(m);
+  if ((m.t === 'daily' || m.t === 'locker' || m.t === 'fortune') && app.page === 'play') renderGoals();
   if (m.t === 'vc') voice.onMessage(m);
   if (m.t === 'daily' && m.career) ach.renderProfile();
   if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device

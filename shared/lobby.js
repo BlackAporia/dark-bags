@@ -298,6 +298,7 @@ export class Lobby {
       case 'store_buy':
       case 'card_buy':
       case 'card_claim':
+      case 'vip_claim':
       case 'starter_buy':
       case 'box_all':
         // practice is free play money: buying (bags, shop $, offers) and the battle pass are online only
@@ -466,6 +467,7 @@ export class Lobby {
       : msg.t === 'store_buy' ? inv.storeBuy(key, id, pay)
       : msg.t === 'card_buy' ? inv.cardBuy(key, pay)
       : msg.t === 'card_claim' ? inv.cardClaim(key)
+      : msg.t === 'vip_claim' ? inv.vipClaim(key)
       : msg.t === 'starter_buy' ? inv.starterBuy(key, pay)
       : msg.t === 'box_all' ? inv.openAll(key)
       : inv.open(key, id, pay, msg.n);

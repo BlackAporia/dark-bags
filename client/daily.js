@@ -234,5 +234,7 @@ export function createDaily({ openBox = () => {}, openWheel = () => {}, app, sen
     if (st.view && left() <= 0) refresh();
   }, 30_000);
 
-  return { onMessage, render, refresh, claimAch: (id) => claim('ach', id) };
+  return { onMessage, render, refresh, claimAch: (id) => claim('ach', id), get view() {
+    return st.view;
+  } };
 }

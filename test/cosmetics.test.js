@@ -393,3 +393,35 @@ test('offers: featured store, Insider card, starter pack, pass tiers, open every
   assert.ok(r.credit >= c, 'nothing charged');
   assert.equal(inv.openAll('b').ok, false);
 });
+
+test('VIP: levels by real money paid (never free shop $), top-up bonus, frames, a daily gift', async () => {
+  const { Inventory } = await import('../shared/cosmetics.js');
+  const { vipOf } = await import('../shared/vip.js');
+  let now = Date.UTC(2026, 9, 5, 12);
+  const inv = new Inventory({ now: () => now });
+  const r = inv.rec('v');
+  r.credit = 1e6; // free shop $: buys things, earns no VIP
+  inv.open('v', 'vault', null, 10);
+  assert.equal(inv.vipView('v').lv, 0);
+  assert.equal(inv.vipClaim('v').ok, false);
+  inv.topUp('v', 'p50', () => true); // $50: VIP 3 (bonus at the level before: none)
+  assert.equal(inv.vipView('v').lv, 3);
+  const before = r.credit;
+  const t = inv.topUp('v', 'p100', () => true); // VIP 3 pays +3%
+  assert.equal(t.vip, 300);
+  assert.equal(r.credit, before + t.added);
+  // paying the rest of a purchase in USDC counts
+  r.credit = 0;
+  inv.open('v', 'genesis', () => true, 1);
+  assert.equal(inv.vipPoints('v'), 5000 + 10000 + 9999);
+  assert.equal(inv.vipView('v').lv, vipOf(24999).lv);
+  inv.topUp('v', 'p10', () => true);
+  assert.equal(inv.vipView('v').lv, 5);
+  assert.ok(r.sowned.includes('f-vip'), 'the VIP 5 frame');
+  const s0 = r.spins;
+  assert.ok(inv.vipClaim('v').ok);
+  assert.equal(r.spins, s0 + 2);
+  assert.equal(inv.vipClaim('v').ok, false, 'once a day');
+  now += 86400000;
+  assert.ok(inv.vipClaim('v').ok);
+});
