@@ -64,6 +64,13 @@ server's signatures (`server/cashier/vault.js`) are the ones the contract accept
 
 ## Deploy
 
+Easiest: set `VAULT_AUTO=1` on the game server (with `CHAIN`, `HOUSE_ADDRESS`, `HOUSE_PRIVATE_KEY`,
+`CASHIER_FILE` on a volume). On first start it deploys the vault, makes the house viewing key and
+registers it in the pool, and keeps all of it in `strk20-setup.json`. `contracts/build/` holds the
+compiled class (rebuild with `scarb build` and copy after any contract change).
+
+By hand:
+
 ```sh
 cd contracts && scarb build && cd ..
 CHAIN=sepolia RPC_URL=… HOUSE_ADDRESS=… HOUSE_PRIVATE_KEY=… \

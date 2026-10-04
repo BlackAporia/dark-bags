@@ -1,6 +1,6 @@
 // Declare and deploy the DARK BAGS vault (contracts/) from the house account.
 //
-//   cd contracts && scarb build          # needs scarb 2.17
+//   (uses the committed contracts/build; the server can also do all this itself with VAULT_AUTO=1)
 //   CHAIN=sepolia HOUSE_ADDRESS=0x… HOUSE_PRIVATE_KEY=0x… RPC_URL=https://… \
 //   STRK20_POOL=0x… VAULT_OWNER=0x… VAULT_TREASURY=0x… npm run vault:deploy
 //
@@ -23,7 +23,7 @@ const treasury = env.VAULT_TREASURY || house;
 
 const provider = new RpcProvider({ nodeUrl: need('RPC_URL') });
 const account = new Account({ provider, address: house, signer: key });
-const dir = new URL('../contracts/target/dev/', import.meta.url);
+const dir = new URL('../contracts/build/', import.meta.url); // committed build (scarb build + copy)
 const sierra = json.parse(readFileSync(new URL('dark_bags_DarkBagsVault.contract_class.json', dir), 'utf8'));
 const casm = json.parse(readFileSync(new URL('dark_bags_DarkBagsVault.compiled_contract_class.json', dir), 'utf8'));
 const operatorKey = ec.starkCurve.getStarkKey(key);

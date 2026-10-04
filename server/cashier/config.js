@@ -15,7 +15,9 @@
 // CASHIER_FILE          JSON journal: ledger, sessions, deposits, withdrawals (required on real networks)
 // STRK20 private pool:  STRK20_POOL (mainnet and Sepolia defaults below), STRK20_VIEWING_KEY, STRK20_PROVER_URL,
 //                       STRK20_FEED_URL, STRK20_CACHE_DIR
-// Vault (contracts/):  VAULT_ADDRESS (the deployed DarkBagsVault), VAULT_FROM_BLOCK (its deploy block)
+// Vault (contracts/):  VAULT_ADDRESS (the deployed DarkBagsVault), VAULT_FROM_BLOCK (its deploy block),
+//                       or VAULT_AUTO=1: deploy it, make the viewing key and register on first start
+//                       (VAULT_OWNER, VAULT_TREASURY: who may pause it, where the cut goes; see ./setup.js)
 // Paymaster (gasless):  PAYMASTER_URL (default AVNU), PAYMASTER_API_KEY
 // Privy sign-in:        PRIVY_APP_ID, PRIVY_APP_SECRET, PRIVY_CLIENT_ID (optional)
 // Cartridge:            CARTRIDGE=0 hides the Cartridge button

@@ -5,6 +5,7 @@ import { normAddr } from './cashier.js';
 import { resolveTokens } from './config.js';
 import { createStrk20 } from './strk20.js';
 import { createVault } from './vault.js';
+import { setupBefore, setupAfter } from './setup.js';
 
 const TRANSFER = normAddr(hash.getSelectorFromName('Transfer'));
 
@@ -51,6 +52,11 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
   }
 
   const account = wallet?.getAccount();
+  // VAULT_AUTO=1: make the viewing key and deploy the vault on first start (./setup.js)
+  cfg = await setupBefore({ cfg, account, provider, log }).catch((e) => {
+    log.error('setup failed', e?.message ?? e);
+    return cfg;
+  });
   const strk20 = await createStrk20({ cfg, account: account ?? { address: house }, provider, log }).catch((e) => {
     log.error('STRK20 setup failed', e?.message ?? e);
     return null;
@@ -195,6 +201,8 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       return out;
     },
   };
+  // pool registration needs a proof: in the background, never holding up the start
+  setupAfter({ cfg, chain, provider, log }).catch((e) => log.error('setup (register) failed', e?.message ?? e));
   return chain;
 }
 
