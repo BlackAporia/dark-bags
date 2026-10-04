@@ -22,10 +22,9 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
   }
   let disc, sdk;
   try {
-    disc = await import('strk20-discovery/node');
-    sdk = await import('strk20-discovery/privacy-sdk');
+    ({ disc, sdk } = await loadPoolClient());
   } catch (e) {
-    log.warn(`STRK20: private pool off (${e?.code === 'ERR_MODULE_NOT_FOUND' ? 'install strk20-discovery on Node 24+' : e?.message})`);
+    log.warn(`STRK20: private pool off (${e?.message ?? e})`);
     return null;
   }
 
@@ -133,6 +132,22 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
 
     close: () => discovery.close(),
   };
+}
+
+// The pool client: from the game's own node_modules if it is there, else from vendor/strk20, where
+// the Docker image installs it apart (see vendor/strk20/package.json for why).
+const VENDOR = new URL('../../vendor/strk20/node_modules/strk20-discovery/dist/', import.meta.url);
+export async function loadPoolClient() {
+  try {
+    return { disc: await import('strk20-discovery/node'), sdk: await import('strk20-discovery/privacy-sdk') };
+  } catch (first) {
+    try {
+      return { disc: await import(new URL('node.js', VENDOR).href), sdk: await import(new URL('privacy-sdk.js', VENDOR).href) };
+    } catch (e) {
+      const why = e?.code === 'ERR_MODULE_NOT_FOUND' && /strk20-discovery\/dist/.test(String(e?.message)) ? first : e;
+      throw new Error(`strk20-discovery did not load on Node ${process.versions.node}: ${String(why?.message ?? why).slice(0, 300)}`);
+    }
+  }
 }
 
 // AddressMap from the SDK iterates as [key, value]; plain objects too

@@ -1,0 +1,8 @@
+{
+  "name": "dark-bags-strk20",
+  "private": true,
+  "description": "The STRK20 pool client, installed apart from the game: starkzap's optional peer on the unpublished privacy SDK makes npm abort halfway when both share one tree.",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "dependencies": { "strk20-discovery": "0.1.7" }
+}
