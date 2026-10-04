@@ -11,6 +11,7 @@ import { WAVES } from './horde.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, seasonAt } from './cosmetics.js';
 import { spinChance, rollLottery, titleBonus, DIVISIONS, DIV_PRIZES } from './ranked.js';
 import { pickStyle } from './style.js';
+import { bandMax } from './stakes.js';
 
 /**
  * A table at one stake level.
@@ -33,7 +34,8 @@ export class RoomCore {
     this.minPlayers = Math.max(1, minPlayers);
     this.mode = MODE[mode] ? mode : 'raid';
     const m = MODE[this.mode];
-    this.stake = m.fixed ?? stake; // zombies and the gold rush take one flat entry
+    this.stake = m.fixed ?? stake; // the band's lowest stake (shared/stakes.js); zombies and the gold rush: one flat entry
+    this.stakeMax = m.fixed ?? bandMax(this.stake); // the band's highest: each player picks their own stake in between
     if (m.solo) this.minPlayers = 1; // zombies: you may go in alone
     this.noBots = m.kind === 'zombie'; // the squad is humans only
     if (m.seconds) roundSeconds = m.seconds;
@@ -69,8 +71,14 @@ export class RoomCore {
 
   // --------------------------------------------------------------- clients
 
-  addClient(cid, { token, name, skin }) {
-    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle', vote: null });
+  // a stake inside this table's band (private: only its owner is ever told it)
+  ownStake(v) {
+    const n = Number(v);
+    return Number.isInteger(n) && n >= this.stake && n <= this.stakeMax && n % 10 === 0 ? n : this.stake;
+  }
+
+  addClient(cid, { token, name, skin, stake }) {
+    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle', vote: null, stake: this.ownStake(stake) });
     if (this.state === 'idle') this.openPrep();
     this.broadcastPrep();
   }
@@ -113,6 +121,7 @@ export class RoomCore {
       case 'join':
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
+        if (msg.stake != null && !c.ready) c.stake = this.ownStake(msg.stake);
         this.broadcastPrep();
         break;
       case 'pick':
@@ -174,7 +183,7 @@ export class RoomCore {
     if (c.ready || this.inRaid(c)) return;
     let units = null;
     try {
-      units = pre != null ? BigInt(pre) : this.prices.quote(asset, this.stake);
+      units = pre != null ? BigInt(pre) : this.prices.quote(asset, c.stake);
     } catch {
       units = null;
     }
@@ -188,7 +197,7 @@ export class RoomCore {
       return;
     }
     c.ready = true;
-    c.escrow = { asset, units, mills: this.stake };
+    c.escrow = { asset, units, mills: c.stake };
     if (this.state === 'idle') this.openPrep();
     if (this.state === 'prep' && this.countT === null && !this.waitForStart) this.countT = this.prepSeconds;
     this.hurry();
@@ -315,27 +324,28 @@ export class RoomCore {
     }
     for (const c of ready) {
       const look = this.inventory.look(c.token);
-      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), neon: this.ranks.neon(c.token), weapon: c.weapon, ...look });
+      const stake = c.escrow.mills; // this runner's own, private stake
+      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), neon: this.ranks.neon(c.token), weapon: c.weapon, stake, ...look });
       this.accounts.set(p.id, { token: c.token, ...c.escrow });
       this.book(c.escrow.asset, 'in', c.escrow.units);
       c.pid = p.id;
       c.ready = false;
       c.escrow = null; // the stake is in the raid's ledger now
       c.reported = false;
-      this.totals.stakesIn += this.stake;
+      this.totals.stakesIn += stake;
       // the inviter's share of the house cut on this stake, as shop $ (real matches only)
       if (!this.practice && !this.guard?.flagged(c.token)) {
-        const rake = MODE[this.mode].kind === 'zombie' ? this.stake : Math.floor(this.stake * CFG.RAKE);
+        const rake = MODE[this.mode].kind === 'zombie' ? stake : Math.floor(stake * CFG.RAKE);
         const paid = this.referrals?.onStake(c.token, rake);
         if (paid) this.inventory.give(paid.to, { k: 'credit', v: paid.cents });
       }
-      this.jackpot += Math.floor(this.stake * CFG.RAKE * CFG.JACKPOT_SHARE);
+      this.jackpot += Math.floor(stake * CFG.RAKE * CFG.JACKPOT_SHARE);
       this.send(c.cid, {
         t: 'start',
         pid: p.id,
         map: w.map,
         zone: w.zonePlan,
-        stake: this.stake,
+        stake,
         mode: this.mode,
         teamSize: w.teamSize,
         round: this.roundNo,
@@ -397,6 +407,7 @@ export class RoomCore {
     if (w && this.state === 'live') for (const p of w.players.values()) if (!p.isBot && p.status === 'alive') humans++;
     return {
       stake: this.stake,
+      max: this.stakeMax,
       mode: this.mode,
       size: this.botFill,
       state: this.state,
@@ -427,7 +438,8 @@ export class RoomCore {
     const base = {
       t: 'prep',
       state: this.state,
-      stake: this.stake,
+      stake: this.stake, // the band (lowest stake to max): never anyone's own stake
+      max: this.stakeMax,
       round: this.roundNo + (this.state === 'live' || this.state === 'results' ? 1 : 1),
       golden: this.goldenBonus(this.roundNo + 1) > 0,
       count: this.countT === null ? null : Math.max(0, Math.round(this.countT * 10) / 10),
@@ -438,7 +450,8 @@ export class RoomCore {
       waiting: this.waitForStart && this.state === 'prep' && this.countT === null, // no timer: start when you like
       bots,
       votes: this.mapVotes(),
-      pot: this.noBots ? 0 : (ready.length + (this.state === 'prep' ? shown : 0)) * this.stake,
+      // the whole pool: every ready stake together (and the bots'), never who put in what
+      pot: this.noBots ? 0 : ready.reduce((n, r) => n + (r.escrow?.mills ?? r.stake), 0) + (this.state === 'prep' ? shown : 0) * this.stake,
     };
     for (const c of this.clients.values()) {
       if (onlyIdle && this.inRaid(c)) continue;
@@ -449,7 +462,7 @@ export class RoomCore {
           const tt = this.ranks.title(r.token);
           return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(look.fr ? { fr: look.fr } : {}), ...(look.nf ? { nf: look.nf } : {}), ...(tt ? { tt } : {}), ...(this.noBots ? { wp: r.weapon } : {}), me: r === c ? 1 : 0 };
         }),
-        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, vote: c.vote, escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
+        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, vote: c.vote, stake: c.escrow?.mills ?? c.stake, escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
         balances: this.wallet.balances(c.token),
       });
     }
@@ -647,6 +660,7 @@ export class RoomCore {
         mode: this.mode,
         won: !!p.won,
         payout: p.payout,
+        ...(p.refund ? { refund: p.refund } : {}),
         lost: p.lostBag,
         stake: p.stake,
         kills: p.kills,

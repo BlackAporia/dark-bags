@@ -239,7 +239,7 @@ export class Renderer {
     }
 
     // 8. crisp overlays: exit labels, names and health, floaters
-    for (const e of this.noExits ? [] : map.extracts) {
+    for (const e of this.noExits || v.attract ? [] : map.extracts) {
       if (!inView(e.x, e.y, e.r + 60)) continue;
       const st = v.exitStates?.[e.id] ?? 'open';
       const label = map.extracts.length === 1 ? tr('ex.centre', { s: CFG.EXTRACT_TIME }) : st === 'last' ? `LAST EXIT · ${e.name.toUpperCase()}` : st === 'closed' ? `CLOSED · ${e.name.toUpperCase()}` : `EXIT · ${e.name.toUpperCase()}${st === 'closing' ? ' · CLOSING' : ''}`;

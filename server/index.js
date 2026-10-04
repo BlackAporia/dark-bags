@@ -424,6 +424,14 @@ const server = http.createServer((req, res) => {
     geoOf(req).then((cc) => res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ country: cc, lang: langForCountry(cc) })));
     return;
   }
+  // the public impact numbers for Starknet (totals only): the landing page and the in-game panel show them
+  if (req.url === '/api/impact') {
+    analytics
+      .impact()
+      .then((v) => res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=60' }).end(JSON.stringify(v)))
+      .catch(() => res.writeHead(500).end('{}'));
+    return;
+  }
   if (req.url === '/api/stats') {
     const totals = Object.fromEntries([...lobby.rooms].map(([k, r]) => [k, r.totals]));
     const body = JSON.stringify({ online: sockets.size, tables: lobby.tables(), totals }, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));

@@ -2,6 +2,7 @@ import './polyfills.js'; // first: older phone browsers need it before anything 
 import './epoch.js'; // second: a new data epoch wipes old progress before anything reads it
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
+import { bandOf } from '../shared/stakes.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
@@ -27,6 +28,7 @@ import { titleTier } from '../shared/achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
 import { createSwap } from './swap.js';
+import { createStarknetPage } from './starknet.js';
 import { renderMapPick } from './mappick.js';
 import { createScoreboard } from './scoreboard.js';
 import { createVoice } from './voice.js';
@@ -206,6 +208,19 @@ const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, 
   } });
 const inventory = createInventory({ app, send, openBox: (id, n) => shop.open(id, n), openAll: () => shop.openAll(), openWheel: (all) => fortune.open(all), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
 const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
+const starknet = createStarknetPage({
+  app,
+  base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href,
+  cashier,
+  go: (p) => go(p),
+  signIn: () => $('connect').click(),
+  toast: (m) => toast(m),
+  pickAsset: (id) => {
+    if (!id) return;
+    app.asset = id;
+    store.set('darkbags.asset', id);
+  },
+});
 const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
 const settingsUi = createSettingsUi();
 // Nyx's first-run tour: on the first launch here, and the first time a wallet signs in
@@ -289,7 +304,7 @@ const mail = createMail({
     }
   },
 });
-const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite, mail };
+const PAGES = { starknet, shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite, mail };
 document.addEventListener('darkbags:mode', () => {
   store.set('darkbags.gmode', app.gameMode);
   renderLobby();
@@ -365,11 +380,11 @@ setInterval(syncMore, 1000);
 // keep the bottom tab bar: the extras are hidden there by CSS.
 const NAV_GROUPS = [
   ['play', ['play', 'ranked', 'pass']],
-  ['store', ['shop', 'inventory', 'swap']],
+  ['store', ['starknet', 'shop', 'inventory', 'swap']],
   ['social', ['chat', 'friends', 'guilds', 'mail', 'invite']],
   ['you', ['achievements', 'settings']],
 ];
-const NAV_COLOR = { play: '#f7931a', ranked: '#ff2dd4', pass: '#ffd166', shop: '#3ddc97', inventory: '#f59e0b', swap: '#38bdf8', chat: '#a78bfa', friends: '#60a5fa', guilds: '#34d399', mail: '#fb7185', invite: '#22d3ee', achievements: '#fbbf24', settings: '#94a3b8' };
+const NAV_COLOR = { starknet: '#ec796b', play: '#f7931a', ranked: '#ff2dd4', pass: '#ffd166', shop: '#3ddc97', inventory: '#f59e0b', swap: '#38bdf8', chat: '#a78bfa', friends: '#60a5fa', guilds: '#34d399', mail: '#fb7185', invite: '#22d3ee', achievements: '#fbbf24', settings: '#94a3b8' };
 (function buildNav() {
   const nav = $('menu-nav');
   const more = $('nav-more');
@@ -427,6 +442,7 @@ function navSubs() {
     shop: online && L?.store ? t('nav.d.store', { t: hmsLeft(L.store.ends - Date.now()) }) : t('nav.s.shop'),
     inventory: online && (boxes || L?.spins) ? [boxes ? `🎁 ${boxes}` : '', L?.spins ? `🎡 ${L.spins}` : ''].filter(Boolean).join(' · ') : t('nav.s.inventory'),
     swap: t('nav.s.swap'),
+    starknet: t('nav.s.starknet'),
     chat: t('nav.s.chat'),
     friends: t('nav.s.friends'),
     guilds: t('nav.s.guilds'),
@@ -598,7 +614,9 @@ function renderAssets() {
 
 // ------------------------------------------------------------------ lobby
 function tableInfo(stake) {
-  return app.tables.find((x) => x.stake === stake && (x.mode ?? 'raid') === app.gameMode);
+  // private stakes: one table per stake band, whatever you put in inside it
+  const band = MODE[app.gameMode]?.fixed ?? bandOf(stake);
+  return app.tables.find((x) => x.stake === band && (x.mode ?? 'raid') === app.gameMode);
 }
 
 // the mode picker: a card per mode with what it is and how the money works
@@ -1058,7 +1076,7 @@ function renderPrep() {
   $('prep-server').hidden = !srv;
   if (srv) $('prep-server').innerHTML = srv;
   const fixedMode = MODE[app.gameMode]?.fixed;
-  $('prep-kicker').textContent = fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: money(p.stake) })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
+  $('prep-kicker').textContent = fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: `${money(p.stake)}–${money(p.max ?? p.stake)}` })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
   const count = $('prep-count');
   const status = $('prep-status');
   count.classList.remove('wait');
@@ -1118,6 +1136,9 @@ function renderPrep() {
   const zed = MODE[app.gameMode]?.kind === 'zombie';
   $('pot').textContent = zed ? t('prep.zFee', { v: money(p.stake) }) : money(p.pot);
   $('pot-k').textContent = t(zed ? 'prep.zSquad' : MODE[app.gameMode]?.kind === 'gold' ? 'prep.goldPot' : 'prep.pot');
+  // your stake is yours to know: the table only ever shows the whole pool
+  $('pot-mine').hidden = !!fixedMode;
+  if (!fixedMode) $('pot-mine').textContent = t('prep.mine', { v: money(p.me?.stake ?? app.stake) });
   renderZPick(MODE[app.gameMode]?.pick && p.state !== 'live', p.me?.weapon);
   // the map vote: every mode but the ones with arenas of their own (zombies, gold rush)
   const kind = MODE[app.gameMode]?.kind;
@@ -1137,7 +1158,7 @@ function renderPrep() {
   $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
   const ready = $('ready');
   const me = p.me ?? {};
-  const q = quote(p.stake);
+  const q = quote(p.me?.stake ?? app.stake);
   if (me.ready && me.escrow) {
     ready.textContent = t('prep.cancel', { v: coinAndUsd(me.escrow.asset, me.escrow.units) });
     ready.classList.add('armed');
@@ -1469,6 +1490,8 @@ function showResult(m) {
   const amt = $('res-amount');
   const det = $('res-detail');
   const inside = t('res.inside', { k: m.kills, t: mmss(m.secs) });
+  // pot modes, private stakes: the part of a bigger stake no winner matched came back
+  const refund = m.refund ? ` ${t('res.refund', { v: `<b>${money(m.refund)}</b>` })}` : '';
   const pot = MODE[m.mode]?.kind && MODE[m.mode].kind !== 'raid';
   // the announcer calls the big endings
   if (m.won) sfx.say('victory', 'en');
@@ -1495,15 +1518,15 @@ function showResult(m) {
   } else if (pot && MODE[m.mode].kind === 'dm') {
     k.textContent = t('res.dmLost', { p: m.place ?? '?' });
     k.className = 'res-kicker loss';
-    amt.textContent = `−${money(m.stake)}`;
+    amt.textContent = `−${money(m.stake - (m.refund ?? 0))}`;
     amt.className = 'res-amount';
-    det.innerHTML = `${t('res.dmText', { k: `<b>${m.kills}</b>`, d: `<b>${m.deaths ?? 0}</b>`, top: `<b>${m.top ?? 0}</b>` })}`;
+    det.innerHTML = `${t('res.dmText', { k: `<b>${m.kills}</b>`, d: `<b>${m.deaths ?? 0}</b>`, top: `<b>${m.top ?? 0}</b>` })}${refund}`;
   } else if (pot) {
     k.textContent = t(m.cause === 'storm' ? 'res.storm' : 'res.defeated');
     k.className = 'res-kicker loss';
-    amt.textContent = `−${money(m.stake)}`;
+    amt.textContent = `−${money(m.stake - (m.refund ?? 0))}`;
     amt.className = 'res-amount';
-    det.innerHTML = `${t(MODE[m.mode].kind === 'team' ? 'res.teamLost' : 'res.lostPot')} ${inside}.`;
+    det.innerHTML = `${t(MODE[m.mode].kind === 'team' ? 'res.teamLost' : 'res.lostPot')} ${inside}.${refund}`;
   } else if (m.status === 'extracted') {
     const pnl = m.payout - m.stake;
     const pct = Math.round((pnl / m.stake) * 100);
@@ -1726,7 +1749,7 @@ function loop(now) {
 }
 
 // handle for automated smoke tests and console poking
-globalThis.__darkbags = { app, game, input, renderer, sfx, cashier };
+globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, go };
 
 attract.start();
 showScreen('lobby');

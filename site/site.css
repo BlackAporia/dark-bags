@@ -228,3 +228,17 @@ body::before { content: ''; position: fixed; inset: 0; z-index: 100; pointer-eve
   .title .ch { opacity: 1; transform: none; }
   .ticker-track { animation: none; }
 }
+
+/* Starknet: privacy by default, Bitcoin, live numbers */
+.stark .sk-lede { max-width: 66ch; color: #c9c9ee; margin: 0 0 22px; line-height: 1.6; }
+.stark { background: radial-gradient(90% 70% at 10% 0%, rgba(236, 121, 107, 0.16), transparent 60%), linear-gradient(180deg, rgba(12, 12, 79, 0.35), transparent); }
+.stark .sk-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.stark .sk-card { padding: 18px; border-radius: 16px; border: 1px solid rgba(236, 121, 107, 0.3); background: rgba(12, 12, 79, 0.45); }
+.stark .sk-card b { font-size: 28px; }
+.stark .sk-card h3 { margin: 8px 0 6px; }
+.stark .sk-card p { margin: 0; opacity: 0.85; line-height: 1.5; }
+.stark .sk-card.btc { border-color: rgba(247, 147, 26, 0.55); background: linear-gradient(135deg, rgba(247, 147, 26, 0.16), rgba(12, 12, 79, 0.45)); }
+.stark .sk-live { margin-top: 18px; padding: 18px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.3); }
+.stark .sk-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 10px 0; }
+.stark .sk-stats b { display: block; font-size: 28px; font-weight: 800; color: #fafaff; }
+.stark .sk-stats span { opacity: 0.7; font-size: 13px; }

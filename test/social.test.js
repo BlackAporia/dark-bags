@@ -200,19 +200,20 @@ test('guild invites reach anyone who has played (online: a card; always: a note 
   assert.match(last('a', 'err').msg, /Already/);
 });
 
-test('a stake of your own: any whole cents from $0.10 to $10,000 opens a table', () => {
+test('a stake of your own: any whole cents from $0.10 to $10,000, at the table of its band', () => {
   const { lobby, client, last } = setup();
-  const a = client('a', 'alice');
-  assert.ok(lobby.roomFor('raid', 2500), '$2.50');
+  client('a', 'alice');
+  assert.equal(lobby.roomFor('raid', 2500), lobby.rooms.get('raid:1000'), '$2.50 sits at the $1 band');
   assert.equal(lobby.roomFor('raid', 50), null, 'below $0.10');
   assert.equal(lobby.roomFor('raid', 10_000_010), null, 'above $10,000');
   assert.equal(lobby.roomFor('raid', 2505), null, 'not whole cents');
-  assert.ok(lobby.rooms.has('raid:100000'), '$100 is a standard table');
+  assert.equal(lobby.roomFor('raid', 2_000_000), lobby.rooms.get('raid:100000'), '$2,000 sits at the $100 band');
+  const n = lobby.rooms.size;
   lobby.handle('a', { t: 'join', mode: 'raid', stake: 7770, name: 'alice' });
-  assert.ok(lobby.rooms.has('raid:7770'));
-  lobby.handle('a', { t: 'leave' });
-  lobby.tick();
-  assert.equal(lobby.rooms.has('raid:7770'), false, 'an empty custom table goes away');
-  void a;
-  void last;
+  assert.equal(lobby.rooms.size, n, 'no table of its own');
+  const prep = last('a', 'prep');
+  assert.equal(prep.me.stake, 7770, 'you see your own stake');
+  assert.equal(prep.stake, 1000);
+  assert.equal(prep.max, 9990, 'the table shows its range');
+  assert.ok(!JSON.stringify(prep.slots).includes('7770'), 'the seats never show a stake');
 });

@@ -21,7 +21,9 @@ WBTC; a price older than 10 minutes switches that coin off for staking.
 
 ## 2. Where the money goes in a raid
 
-Every entry pays the table stake ($0.10, $1 or $10), escrowed in the coin the player
+Every entry pays the player's own **private stake**: a table is a stake band ($0.10–$0.99, $1–$9.99,
+$10–$99.99, $100–$10,000) and each player picks any amount inside it. Only they are told it; the
+ready room shows the whole pool. The stake is escrowed in the coin the player
 picked at that moment's price. Winnings go back in the same coin at the **entry** rate,
 so price moves during a raid change nothing.
 
@@ -31,7 +33,7 @@ so price moves during a raid change nothing.
 | of which house | 4% | 4% |
 | of which room jackpot | 1% (players' stakes only) | 1% |
 | The other 95% | half in your bag, half scattered as loot | one prize pot |
-| Who gets paid | whoever extracts, with what they carry | the last player (or team) standing; a team splits the pot equally, fallen teammates included. Deathmatch modes: the most kills when time runs out (a tie splits it) |
+| Who gets paid | whoever extracts, with what they carry | the last player (or team) standing; a team splits the pot equally, fallen teammates included. Deathmatch modes: the most kills when time runs out (a tie splits it). With stakes of different sizes the pot splits like poker side pots: a winner takes from each runner at most what they risked themselves, and the part of a bigger stake that nobody matched goes back to its owner (`World.payPot`) |
 | Unclaimed money | rolls into the next raid at that table | rolls into the next raid (only if nobody survives, or nobody in a deathmatch scores a kill) |
 
 Guns + Lasers credits (for medkits, turrets and tripmines) are earned only by kills inside

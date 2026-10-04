@@ -25,7 +25,8 @@
     <a href="#how" data-t="nav.how">How it works</a>
     <a href="#trailer" data-t="nav.trailer">Trailer</a>
     <a href="#modes" data-t="nav.modes">Modes</a>
-    <a href="#features" data-t="nav.features">Features</a>
+    <a href="#starknet" data-t="nav.stark">Starknet</a>
+      <a href="#features" data-t="nav.features">Features</a>
     <a href="#faq" data-t="nav.faq">FAQ</a>
   </nav>
   <div class="bar-end">
@@ -69,6 +70,32 @@
     <div class="ticker-track" id="ticker"></div>
   </div>
 
+  <!-- Starknet: privacy by default, Bitcoin, live numbers -->
+  <section class="sec stark" id="starknet">
+    <p class="eyebrow reveal" data-t="sk.eyebrow">Built on Starknet</p>
+    <h2 class="h2 reveal" data-t="sk.h">Private by default. Proven on chain.</h2>
+    <p class="sk-lede reveal" data-t="sk.lede">Starknet's zero-knowledge stack does what a game with real money needs: nobody sees what you hold, what you stake or what you win. Everything below is live in the game today.</p>
+    <div class="sk-grid">
+      <article class="sk-card reveal"><b>🛡️</b><h3 data-t="sk.dep">Private deposits</h3><p data-t="sk.depP">Top up from your shielded balance through the STRK20 privacy pool. A zero-knowledge proof checks it; nobody on chain sees who paid or how much.</p></article>
+      <article class="sk-card reveal"><b>🎲</b><h3 data-t="sk.stake">Private stakes</h3><p data-t="sk.stakeP">Pick any stake in a table's range. Only you know it: the table shows only the whole pool, and prizes split fairly, like poker side pots.</p></article>
+      <article class="sk-card reveal"><b>🔁</b><h3 data-t="sk.swap">Private swaps</h3><p data-t="sk.swapP">Swap coins inside your game balance at the live price. It never touches the chain, so no explorer can show it.</p></article>
+      <article class="sk-card reveal"><b>🏦</b><h3 data-t="sk.wd">Private cash-outs</h3><p data-t="sk.wdP">Winnings go back into your shielded balance through STRK20: nobody on chain sees the payout was yours.</p></article>
+      <article class="sk-card btc reveal"><b>₿</b><h3 data-t="sk.btc">Bitcoin on Starknet</h3><p data-t="sk.btcP">Stake BTC on Starknet like any coin, and get your winnings back in Bitcoin at the live price. Bring it over with Atomiq or Garden.</p></article>
+    </div>
+    <div class="sk-live reveal">
+      <p class="eyebrow" data-t="sk.live">Live numbers</p>
+      <div class="sk-stats">
+        <div><b id="sk-players">—</b><span data-t="sk.players">players</span></div>
+        <div><b id="sk-week">—</b><span data-t="sk.week">active this week</span></div>
+        <div><b id="sk-matches">—</b><span data-t="sk.matches">matches played</span></div>
+        <div><b id="sk-staked">—</b><span data-t="sk.staked">staked in matches</span></div>
+        <div><b id="sk-private">—</b><span data-t="sk.private">private transfers</span></div>
+        <div><b id="sk-tvl">—</b><span data-t="sk.tvl">held in the game</span></div>
+      </div>
+      <p class="fine" data-t="sk.note">Totals only, straight from the game server's public API (/api/impact). Nothing here shows any player.</p>
+    </div>
+  </section>
+
   <!-- how a raid works -->
   <section class="sec how" id="how">
     <p class="eyebrow reveal" data-t="how.eyebrow">One raid, three minutes</p>
@@ -90,7 +117,7 @@
         <div class="step-ico"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="6 6"/><path d="M26 32h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <span class="step-n">03</span>
         <h3 data-t="how.s3">Extract before the storm</h3>
-        <p data-t="how.s3p">Exits open and close as the storm closes in. Stand still in one to cash out whatever is in your bag. Get hit and the timer resets.</p>
+        <p data-t="how.s3p">The one exit sits in the middle of the map. Hold it for 10 seconds while the whole raid is told you are leaving, and everything in your bag is yours. Get hit and the timer resets.</p>
       </li>
     </ol>
     <div class="bagmeter reveal" aria-hidden="true">
@@ -154,7 +181,7 @@
       </article>
       <article class="card wide reveal tilt">
         <img src="media/menu.jpg" alt="" loading="lazy">
-        <div class="card-in"><h3 data-t="ft.lang">10 languages, live ping, waiting rooms</h3><p data-t="ft.langP">English, Українська, Русский, Español, Français, Português, Türkçe, 中文, हिन्दी, العربية. See who waits in which room and jump in.</p></div>
+        <div class="card-in"><h3 data-t="ft.lang">11 languages, live ping, waiting rooms</h3><p data-t="ft.langP">English, Українська, Русский, Español, Français, Português, Türkçe, 中文, हिन्दी, العربية, Kiswahili. See who waits in which room and jump in.</p></div>
       </article>
     </div>
   </section>

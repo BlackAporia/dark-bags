@@ -4,13 +4,26 @@ A browser extraction game played for dollars. Think Escape from Tarkov crossed w
 
 **The hook is privacy.** Nobody can see how much anyone is carrying. A fat target and an empty bluffer look the same, and you choose how big your own bag *looks*. Without that, every match turns into "everyone shoots the leader".
 
+## Built on Starknet: private by default
+
+| | How | Code |
+|---|---|---|
+| Private deposits | From the player's shielded balance through the STRK20 privacy pool; the house reads the note with its viewing key. Nobody on chain sees who paid or how much. | `server/cashier/strk20.js` |
+| Private cash-outs | Into the player's shielded balance (Privacy SDK, STARK proof). | `server/cashier/strk20.js` |
+| Private stakes | A table is a stake band; each player's stake is known only to them, the ready room shows only the pool. Pot modes split like poker side pots. | `shared/stakes.js`, `World.payPot` |
+| Private swaps | Inside the game balance at the live price: never on chain. | `shared/lobby.js` |
+| Bitcoin | BTC on Starknet stakes like any coin; winnings come back in BTC. | `shared/assets.js` |
+| Public impact numbers | `GET /api/impact`: totals only (players, matches, $ staked, private transfers, TVL). Shown on the landing page and the in-game Starknet page. | `server/analytics.js` |
+
+The brief for the Starknet Foundation is in [`docs/GRANT.md`](docs/GRANT.md).
+
 > **Test build by default.** Without `CHAIN` set, every token is play money: no deposits, no withdrawals. With `CHAIN=sepolia` or `mainnet` the server runs a real cashier on Starknet (see [Real tokens](#real-tokens)); read [Before real money](#before-real-money) first.
 
 ## Play it
 
 **Site: <https://blackaporia.github.io/dark-bags/>** (landing page with the trailer) · **Game: <https://blackaporia.github.io/dark-bags/play/>** (practice vs bots runs entirely in the page). The Pages workflow publishes `npm run build`: the landing page from `site/` at the root and the one-file game at `play/`. Served straight from a branch instead, the root `index.html` forwards to `site/`, whose Play buttons then lead to `client/`.
 
-It opens with a short intro and a real loading bar, then the menu: **Play** (your runner, rank, mode, stake, coin), **Shop** (bags and crates), **Inventory**, **Swap**, **Chat**, **Achievements** and **Settings**; a side rail on desktop, a bottom tab bar on phones. The UI speaks English, 中文, हिन्दी, Español, Français, العربية (right to left), Português, Українська, Русский and Türkçe. Your first three raids show short hints (controls, loot, when and how to get out). For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
+It opens with a short intro and a real loading bar, then the menu: **Play** (your runner, rank, mode, stake, coin), **Shop** (bags and crates), **Inventory**, **Swap**, **Chat**, **Achievements** and **Settings**; a side rail on desktop, a bottom tab bar on phones. The UI speaks English, 中文, हिन्दी, Español, Français, العربية (right to left), Português, Українська, Русский, Türkçe and Kiswahili. Your first three raids show short hints (controls, loot, when and how to get out). For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
 
 ## Run it
 
@@ -21,7 +34,7 @@ npm start            # http://localhost:8080
 
 The lobby has two modes:
 
-- **Online**: humans on the same server share raids; bots fill each raid to ~10 runners.
+- **Online**: humans only. A match starts once at least two players are ready (or the room fills); bots never play for money.
 - **Practice vs bots**: the same game code running entirely in your browser tab. Works with no server. Every bot is for itself. Settings: bot difficulty (easy, normal, hard), how many runners (2–20) and raid length (1–10 minutes). When you go down you watch the survivors (◀ ▶ to switch) until you ask for your results.
 
 Game modes, each at every stake:

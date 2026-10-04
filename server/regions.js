@@ -293,10 +293,13 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
       lobby.send(cid, { t: 'err', msg: 'That stake could not be checked. Try Ready again.' });
       return;
     }
-    if (!s.room || s.room.stake !== tk.mills) {
+    // private stakes: the ticket's stake must fall inside this table's band, and becomes yours here
+    const c = s.room?.clients.get(cid);
+    if (!s.room || !c || s.room.ownStake(tk.mills) !== tk.mills) {
       lobby.send(cid, { t: 'err', msg: 'That stake is for another table.' });
       return;
     }
+    c.stake = tk.mills;
     used.add(tk.id);
     redeemed.push(tk.id);
     const room = s.room;

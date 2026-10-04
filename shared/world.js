@@ -183,9 +183,10 @@ export class World {
 
   // ---------------------------------------------------------------- entry
 
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null, nf = null, kf = null }) {
+  // stake: this runner's own (private) stake; the raid's base stake when not given (bots, tests)
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null, nf = null, kf = null, stake = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
-    const stake = this.stake;
+    stake = Number.isInteger(stake) && stake > 0 ? stake : this.stake;
     const rake = this.feeOnly ? stake : Math.floor(stake * CFG.RAKE);
     const net = stake - rake;
     const bag = this.potMode ? 0 : Math.floor(net * CFG.BAG_SHARE);
@@ -237,6 +238,7 @@ export class World {
       bag,
       startBag: bag,
       stake,
+      potIn: this.potMode ? loot : 0, // what this runner put into the pot (side pots, payPot)
       fireCd: 0,
       w: w0, // weapon index
       ammo: 0, // rounds in the magazine (set by arm())
@@ -1406,19 +1408,50 @@ export class World {
     this.payPot(winners);
   }
 
+  // The pot, split like poker side pots, so private stakes of different sizes stay fair: a
+  // winner takes from each other runner at most what they put in themselves; the part of a
+  // bigger stake that no winner matched goes back to whoever staked it. The extras (a golden
+  // bonus, last raid's rollover) go to the winners. With equal stakes: all of it to the winners.
   payPot(winners) {
-    const share = Math.floor(this.pot / winners.length);
-    let rest = this.pot - share * winners.length;
-    for (const p of winners) {
-      const amount = share + (rest > 0 ? 1 : 0);
-      if (rest > 0) rest--;
-      p.payout = amount;
-      p.won = true;
-      p.place = 1;
+    const pay = new Map();
+    const give = (list, amount) => {
+      if (amount <= 0 || !list.length) return;
+      const share = Math.floor(amount / list.length);
+      let rest = amount - share * list.length;
+      for (const p of list) {
+        pay.set(p, (pay.get(p) ?? 0) + share + (rest > 0 ? 1 : 0));
+        if (rest > 0) rest--;
+      }
+    };
+    const all = [...this.players.values()].filter((p) => (p.potIn ?? 0) > 0);
+    const staked = all.reduce((n, p) => n + p.potIn, 0);
+    const levels = [...new Set(all.map((p) => p.potIn))].sort((a, b) => a - b);
+    let prev = 0;
+    let layered = 0;
+    for (const L of levels) {
+      const inLayer = all.filter((p) => p.potIn >= L);
+      const amount = Math.min((L - prev) * inLayer.length, this.pot - layered);
+      const takers = winners.filter((p) => (p.potIn ?? 0) >= L);
+      give(takers.length ? takers : inLayer, amount);
+      layered += amount;
+      prev = L;
+    }
+    give(winners, this.pot - Math.min(layered, staked)); // the extras
+    for (const [p, amount] of pay) {
+      const won = winners.includes(p);
+      p.payout = (p.payout ?? 0) + amount;
+      if (won) {
+        p.won = true;
+        p.place = 1;
+      } else p.refund = amount; // the unmatched part of their stake, back
       if (p.isBot) this.ledger.botPaidOut += amount;
       else this.ledger.paidOut += amount;
       // gold rush pays shop credit, not coins
-      this.emit({ k: 'payout', to: [p.id], pid: p.id, amount, ...(this.goldRush ? { credit: 1 } : {}) });
+      this.emit({ k: 'payout', to: [p.id], pid: p.id, amount, ...(won ? {} : { refund: 1 }), ...(this.goldRush ? { credit: 1 } : {}) });
+    }
+    for (const p of winners) {
+      p.won = true;
+      p.place = 1;
     }
     this.pot = 0;
     this.emit({ k: 'winners', names: winners.map((p) => p.name), team: this.teamSize ? winners[0].team : null });

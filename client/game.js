@@ -1379,6 +1379,7 @@ export class Attract {
     this.fx.update(dt, now);
     const zone = zoneAt(w.zonePlan, w.time);
     this.renderer.draw({
+      attract: true, // behind the menus: no exit labels shining through the pages
       cam: this.cam,
       eye: { x: p.x, y: p.y },
       figures,
