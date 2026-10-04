@@ -48,12 +48,12 @@ test('every map theme is seeded: same seed and theme, same map', () => {
   assert.notDeepEqual(generateMap(99, 'lava').walls, generateMap(99, 'snow').walls);
 });
 
-test('every map theme keeps the raid: two vaults with doors, three exits, no stray pockets', () => {
+test('every map theme keeps the raid: two vaults with doors, one exit in the middle, no stray pockets', () => {
   for (const t of MAP_THEMES)
     for (let seed = 1; seed <= 12; seed++) {
       const m = generateMap(seed * 7717, t);
       assert.equal(m.theme, t);
-      assert.equal(m.extracts.length, 3, `${t} ${seed}`);
+      assert.equal(m.extracts.length, 1, `${t} ${seed}`);
       assert.equal(m.vaults.length, 2, `${t} ${seed}`);
       for (const v of m.vaults) assert.ok(v.doors.length >= 2);
       // exits are open ground

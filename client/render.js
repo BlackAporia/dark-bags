@@ -1,4 +1,5 @@
 import { CFG } from '../shared/config.js';
+import { t as tr } from './i18n.js';
 import { rankImage } from './rankbadge.js';
 import { segWalls } from '../shared/geom.js';
 import { WEAPONS } from '../shared/weapons.js';
@@ -241,7 +242,7 @@ export class Renderer {
     for (const e of this.noExits ? [] : map.extracts) {
       if (!inView(e.x, e.y, e.r + 60)) continue;
       const st = v.exitStates?.[e.id] ?? 'open';
-      const label = st === 'last' ? `LAST EXIT · ${e.name.toUpperCase()}` : st === 'closed' ? `CLOSED · ${e.name.toUpperCase()}` : `EXIT · ${e.name.toUpperCase()}${st === 'closing' ? ' · CLOSING' : ''}`;
+      const label = map.extracts.length === 1 ? tr('ex.centre', { s: CFG.EXTRACT_TIME }) : st === 'last' ? `LAST EXIT · ${e.name.toUpperCase()}` : st === 'closed' ? `CLOSED · ${e.name.toUpperCase()}` : `EXIT · ${e.name.toUpperCase()}${st === 'closing' ? ' · CLOSING' : ''}`;
       ctx.fillStyle = st === 'last' ? C.gold : st === 'closed' ? C.blood : st === 'closing' ? C.amber : C.exit;
       ctx.font = `600 14px ${F_UI}`;
       ctx.textAlign = 'center';

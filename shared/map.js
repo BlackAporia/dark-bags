@@ -60,13 +60,9 @@ export function generateMap(seed, theme = 'docks') {
   const W = CFG.MAP_W;
   const H = CFG.MAP_H;
 
-  const spots = [
-    [170, 170], [W / 2, 130], [W - 170, 170], [W - 130, H / 2],
-    [W - 170, H - 170], [W / 2, H - 130], [170, H - 170], [130, H / 2],
-  ].map((p, i) => ({ x: p[0], y: p[1], name: EXTRACT_NAMES[i] }));
-  const extracts = shuffle(spots, rnd)
-    .slice(0, 3)
-    .map((s, i) => ({ id: i, x: s.x, y: s.y, r: CFG.EXTRACT_R, name: s.name }));
+  // One exit, in the middle of the map: everyone knows where the way out is, so getting out
+  // means holding the centre (CFG.EXTRACT_TIME) while the whole raid comes for you.
+  const extracts = [{ id: 0, x: W / 2, y: H / 2, r: CFG.EXTRACT_R, name: EXTRACT_NAMES[0] }];
 
   // Vaults: walled rooms where chests spawn. High value, few doors, easy to camp.
   const vaults = [];
@@ -81,6 +77,7 @@ export function generateMap(seed, theme = 'docks') {
       h: vh,
     };
     if (vaults.some((o) => rectsOverlap(o, v, 320))) continue;
+    if (circleHitsRect(W / 2, H / 2, CFG.EXTRACT_R + 260, v)) continue; // clear of the exit
     vaults.push(v);
   }
   // unlucky draws: the two vaults go to opposite corners of the middle

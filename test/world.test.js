@@ -105,10 +105,23 @@ test('a hit resets extraction progress', () => {
   const p = w.addPlayer({ name: 'a', skin: '#fff' });
   const e = w.map.extracts[0];
   Object.assign(p, { x: e.x, y: e.y, shield: 0 });
-  for (let i = 0; i < 45; i++) w.step();
+  for (let i = 0; i < Math.ceil(CFG.EXTRACT_TIME * CFG.TICK_RATE * 0.45); i++) w.step();
   assert.ok(p.ext > 0.4);
   w.damage(p, null, 10);
   assert.equal(p.ext, 0);
+});
+
+test('getting out takes the full hold, and everyone hears about it', () => {
+  const w = humanWorld();
+  const p = w.addPlayer({ name: 'runner', skin: '#fff' });
+  const e = w.map.extracts[0];
+  Object.assign(p, { x: e.x, y: e.y, hp: 1e9 });
+  for (let i = 0; i < Math.floor(CFG.EXTRACT_TIME * CFG.TICK_RATE * 0.9); i++) w.step();
+  assert.equal(p.status, 'alive', 'not out before the hold is done');
+  const ev = w.events.find((x) => x.k === 'extracting');
+  assert.ok(ev && ev.pid === p.id && !ev.to, 'a public "is getting out" event');
+  for (let i = 0; i < CFG.TICK_RATE * 2 && p.status === 'alive'; i++) w.step();
+  assert.equal(p.status, 'extracted');
 });
 
 test('death drops the whole bag; only the looter learns the amount', () => {

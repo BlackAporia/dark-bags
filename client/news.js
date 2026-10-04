@@ -9,6 +9,23 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-14a',
+    at: '2026-10-14T12:00:00+03:00',
+    items: {
+      en: ["Raid: one exit, in the middle of the map. Getting out takes 10 seconds of holding it, and any hit restarts the count", "When someone starts getting out, the whole raid is told: you have 10 seconds to stop them", "The guide no longer covers what Nyx is talking about, on PC and on phones"],
+      uk: ["Рейд: вихід один — у центрі карти. Щоб вийти, треба протриматися в ньому 10 секунд, будь-яке влучання починає відлік заново", "Коли хтось починає виходити, усі в рейді отримують сповіщення: у тебе 10 секунд, щоб його зупинити", "Гід більше не перекриває те, про що розповідає Nyx, на ПК і на телефоні"],
+      ru: ["Рейд: выход один — в центре карты. Чтобы выйти, нужно продержаться в нём 10 секунд, любое попадание запускает отсчёт заново", "Когда кто-то начинает выходить, все в рейде получают оповещение: у тебя 10 секунд, чтобы его остановить", "Гид больше не перекрывает то, о чём рассказывает Nyx, на ПК и на телефоне"],
+      es: ["Incursión: una sola salida, en el centro del mapa. Salir exige aguantar 10 segundos en ella y cualquier impacto reinicia la cuenta", "Cuando alguien empieza a salir, toda la incursión recibe aviso: tienes 10 segundos para detenerlo", "La guía ya no tapa lo que Nyx está explicando, en PC y en móvil"],
+      fr: ["Raid : une seule sortie, au centre de la carte. Sortir demande de la tenir 10 secondes, chaque impact relance le compte", "Quand quelqu'un commence à sortir, tout le raid est prévenu : tu as 10 secondes pour l'arrêter", "Le guide ne cache plus ce que Nyx explique, sur PC et sur mobile"],
+      pt: ["Incursão: uma só saída, no centro do mapa. Sair exige segurar 10 segundos nela, e qualquer acerto reinicia a contagem", "Quando alguém começa a sair, toda a incursão é avisada: você tem 10 segundos para impedir", "O guia não cobre mais o que a Nyx está explicando, no PC e no celular"],
+      tr: ["Baskın: tek çıkış, haritanın ortasında. Çıkmak için orada 10 saniye dayanmak gerekir, her isabet sayacı baştan başlatır", "Biri çıkmaya başlayınca tüm baskın uyarılır: onu durdurmak için 10 saniyen var", "Rehber artık Nyx'in anlattığı yeri kapatmıyor, PC'de ve telefonda"],
+      zh: ["突袭：只有一个出口，位于地图中央。撤离需要在里面坚持 10 秒，任何命中都会重新计时", "有人开始撤离时，整场突袭都会收到提示：你有 10 秒阻止他", "新手引导不再遮挡 Nyx 正在讲解的内容，电脑和手机都已修复"],
+      hi: ["रेड: एक ही एग्ज़िट, मैप के बीच में। निकलने के लिए उसमें 10 सेकंड टिकना होगा, हर हिट गिनती फिर से शुरू करता है", "जब कोई निकलना शुरू करता है, पूरी रेड को सूचना मिलती है: उसे रोकने के लिए तुम्हारे पास 10 सेकंड हैं", "गाइड अब Nyx जिस चीज़ के बारे में बता रही है उसे नहीं ढकता, पीसी और फ़ोन दोनों पर"],
+      ar: ["الغارة: مخرج واحد في وسط الخريطة. الخروج يتطلب الصمود فيه 10 ثوانٍ، وأي إصابة تعيد العد", "عندما يبدأ أحدهم بالخروج يُبلَّغ الجميع: لديك 10 ثوانٍ لإيقافه", "الدليل لم يعد يغطي ما تشرحه نيكس، على الحاسوب والهاتف"],
+      sw: ["Uvamizi: njia moja ya kutoka, katikati ya ramani. Kutoka kunahitaji kukaa ndani yake sekunde 10, na kila pigo linaanzisha hesabu upya", "Mtu akianza kutoka, uvamizi wote unaarifiwa: una sekunde 10 kumzuia", "Mwongozo haufuniki tena kile Nyx anachoeleza, kwenye PC na simu"],
+    },
+  },
+  {
     id: '2026-10-13a',
     at: '2026-10-13T12:00:00+03:00',
     items: {
