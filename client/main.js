@@ -17,7 +17,7 @@ import { rankBadgeSvg } from './rankbadge.js';
 import { createLocker, gunStill } from './locker.js';
 import { figureStill } from './stickman.js';
 import { openShare, wireShare } from './sharecard.js';
-import { OUTFIT, OUTFITS, RARITIES, usd } from '../shared/cosmetics.js';
+import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, WSKIN, DEFAULT_OUTFIT, usd } from '../shared/cosmetics.js';
 import { spinReel } from './reel.js';
 import { createPass } from './pass.js';
 import { createNews } from './news.js';
@@ -180,14 +180,30 @@ const voice = createVoice({ send, app, game, toast: (m) => toast(m) });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
 // share cards: everything that happens can be posted
 // the runner as others see them: outfit, body and every weapon skin they have equipped
+// what you wear, as the server counts it: owned or on a trial that has not run out
 const myLook = () => {
   const L = app.locker;
   const ws = {};
   for (const [w, f] of Object.entries(L?.wequip ?? {})) if (!L.wowned || L.wowned.includes(`${w}.${f}`) || (L.wtrials?.[`${w}.${f}`] ?? 0) > Date.now()) ws[w] = f;
-  return { outfit: L?.outfit ?? 'basic-0', body: L?.body ?? 'm', ws };
+  const o = L?.outfit;
+  const wearing = o && OUTFIT[o] && (!L.owned || L.owned.includes(o) || (L.trials?.[o] ?? 0) > Date.now() || o === DEFAULT_OUTFIT);
+  return { outfit: wearing ? o : DEFAULT_OUTFIT, body: L?.body ?? 'm', ws };
 };
+// The gun on a share card: the one you finished with if it wears your skin, else the rarest
+// skin you have on (the ladder modes end on whatever gun the kills gave you), else that gun.
+function cardWeapon(last) {
+  const ws = myLook().ws;
+  if (last != null && ws[WEAPONS[last]?.id]) return last;
+  let best = null;
+  for (const [w, f] of Object.entries(ws)) {
+    const r = RARITY_ORDER.indexOf(WSKIN[`${w}.${f}`]?.rarity ?? 'common');
+    const i = WEAPONS.findIndex((x) => x.id === w);
+    if (i > 0 && (!best || r > best.r)) best = { i, r };
+  }
+  return best?.i ?? last ?? WEAPONS.findIndex((x) => x.id === 'rifle');
+}
 function shareMoment(kind, data = {}) {
-  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, player: (app.name || '').trim() || null, ...data });
+  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, player: (app.name || '').trim() || null, ...data, ...(data.weapon !== undefined || ['win', 'zombie', 'goldRush'].includes(kind) ? { weapon: cardWeapon(data.weapon) } : {}) });
 }
 wireShare();
 
@@ -1624,7 +1640,7 @@ $('res-share').addEventListener('click', () => {
   const m = app.lastResult;
   if (!m) return;
   const kind = MODE[m.mode]?.kind;
-  shareMoment(kind === 'zombie' ? 'zombie' : kind === 'gold' ? 'goldRush' : m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? 3 });
+  shareMoment(kind === 'zombie' ? 'zombie' : kind === 'gold' ? 'goldRush' : m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? game.lastW ?? null });
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
@@ -1749,7 +1765,7 @@ function loop(now) {
 }
 
 // handle for automated smoke tests and console poking
-globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, go };
+globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, go, share: shareMoment };
 
 attract.start();
 showScreen('lobby');
