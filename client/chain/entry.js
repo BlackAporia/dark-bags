@@ -134,6 +134,30 @@ export async function connectExtension(entry, chain = null) {
         throw e;
       }
     },
+    // a private deposit into the DARK BAGS vault: one STRK20 transaction that withdraws from the
+    // shielded notes to the vault and invokes it with the one-time reference the server gave us
+    // (contracts/src/vault.cairo). The payer stays hidden inside the pool.
+    async depositVault(t, units, vault, reference) {
+      const DEPOSIT = '0x4445504f534954'; // 'DEPOSIT'
+      try {
+        const r = await request('wallet_strk20InvokeTransaction', {
+          actions: [
+            { type: 'withdraw', token: t.id, amount: hex(units), recipient: vault },
+            { type: 'invoke', contract: vault, calldata: [DEPOSIT, '0x3', hex(BigInt(t.id)), hex(units), reference] },
+          ],
+        });
+        strk20 = true;
+        return r.transaction_hash;
+      } catch (e) {
+        if (e?.code === 118) throw new Error('Register this wallet in the STRK20 privacy pool first (the wallet does it on your first shield).');
+        if (e?.code === 119) throw new Error(`Not enough private ${t.symbol}. Shield some first.`);
+        if (e?.code === -32601 || /not (supported|found)|unknown method/i.test(String(e?.message))) {
+          strk20 = false;
+          throw new Error(`${w.name} does not do STRK20 private transactions. Use a public deposit or a privacy wallet (Ready, Xverse).`);
+        }
+        throw e;
+      }
+    },
     async privateBalances() {
       const r = await request('wallet_strk20Balances', { tokens: [] });
       strk20 = true;

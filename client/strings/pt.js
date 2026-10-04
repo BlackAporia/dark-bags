@@ -24,6 +24,7 @@ export default {
   'reg.eu': "Europa",
   'reg.us': "Américas",
   'reg.asia': "Ásia",
+  'cx.noRef': "O servidor não entregou uma referência de depósito. Tente de novo.",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "Privacidade · números ao vivo",
   'sk.kicker': "Feito na Starknet",

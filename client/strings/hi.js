@@ -24,6 +24,7 @@ export default {
   'reg.eu': "यूरोप",
   'reg.us': "अमेरिका",
   'reg.asia': "एशिया",
+  'cx.noRef': "सर्वर ने जमा का संदर्भ नहीं दिया। फिर से कोशिश करें।",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "प्राइवेसी · लाइव आँकड़े",
   'sk.kicker': "Starknet पर बना",

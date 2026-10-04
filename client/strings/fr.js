@@ -24,6 +24,7 @@ export default {
   'reg.eu': "Europe",
   'reg.us': "Amérique",
   'reg.asia': "Asie",
+  'cx.noRef': "Le serveur n'a pas fourni de référence de dépôt. Réessaie.",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "Confidentialité · chiffres en direct",
   'sk.kicker': "Construit sur Starknet",

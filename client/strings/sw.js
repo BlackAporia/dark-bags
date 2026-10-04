@@ -95,6 +95,7 @@ export default {
   "cx.confirmDep": "Thibitisha amana kwenye pochi yako…",
   "cx.holdsOnly": "{w} ({a}) ina {v}. Tuma {s} kwa anwani hii kwanza.",
   "cx.noPrivate": "Njia hii ya kuingia haiwezi kufanya uhamisho wa siri. Tumia uhamisho wa wazi.",
+  "cx.noRef": "Seva haikutoa nambari ya kumbukumbu ya amana. Jaribu tena.",
   "cx.sentWait": "Imetumwa ({tx}). Inasubiri Starknet…",
   "cx.youHave": "Una {v}.",
   "cx.depBad": "Amana (tokeni haikubaliwi, wasiliana na msaada)",

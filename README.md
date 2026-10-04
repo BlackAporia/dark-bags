@@ -8,9 +8,11 @@ A browser extraction game played for dollars. Think Escape from Tarkov crossed w
 
 | | How | Code |
 |---|---|---|
-| Private deposits | From the player's shielded balance through the STRK20 privacy pool; the house reads the note with its viewing key. Nobody on chain sees who paid or how much. | `server/cashier/strk20.js` |
-| Private cash-outs | Into the player's shielded balance (Privacy SDK, STARK proof). | `server/cashier/strk20.js` |
-| Private stakes | A table is a stake band; each player's stake is known only to them, the ready room shows only the pool. Pot modes split like poker side pots. | `shared/stakes.js`, `World.payPot` |
+| DARK BAGS vault (Cairo) | Our contract, invoked by the STRK20 pool like StarkWare's own anonymizers. Holds the private money, locks each staked match's pot and caps the house cut at 5% on chain. | `contracts/`, `server/cashier/vault.js` |
+| Private deposits | One STRK20 transaction from the player's shielded balance into the vault, tagged with a random one-time reference. Nobody on chain sees which wallet or which player paid. | `contracts/src/vault.cairo`, `client/chain/entry.js` |
+| Private cash-outs | The vault fills an open note owned by the player (owner encrypted), signed by the operator: the money lands in their shielded balance. | `server/cashier/vault.js` |
+| Private stakes | A table is a stake band; each player's stake is known only to them, the ready room shows only the pool. On chain the vault records only each coin's whole pot, the cut and a hash root each player can check their own stake against. | `shared/stakes.js`, `World.payPot`, `contracts/` |
+| Public routes stay | Privacy is an extra: plain transfers in and out of the house wallet work for every wallet. | `client/cashier.js` |
 | Private swaps | Inside the game balance at the live price: never on chain. | `shared/lobby.js` |
 | Bitcoin | BTC on Starknet stakes like any coin; winnings come back in BTC. | `shared/assets.js` |
 | Public impact numbers | `GET /api/impact`: totals only (players, matches, $ staked, private transfers, TVL). Shown on the landing page and the in-game Starknet page. | `server/analytics.js` |
@@ -176,6 +178,7 @@ A session is bound to the address. A leaked session token can play with that bal
 | `TOKENS`, `EXTRA_TOKENS` | Preset symbols (default `STRK,ETH,USDC,USDT,WBTC`) and extras as `SYMBOL:0xaddress:decimals[:btc]`, e.g. strkBTC. |
 | `FIXED_PRICES`, `PRICE_SECONDS`, `MIN_WITHDRAW_USD` | `$` per token overrides like `STRK=0.15`, feed period (60), smallest cash-out in $ (1). |
 | `SWAP_INTERNAL=1` | Allow in-game coin swaps on mainnet (the house must rebalance on chain). On Sepolia they are on unless `SWAP_INTERNAL=0`. |
+| `VAULT_ADDRESS`, `VAULT_FROM_BLOCK` | The deployed DARK BAGS vault (`npm run vault:deploy`, see `contracts/README.md`). Turns on private deposits through the vault and on-chain match pots; private cash-outs through it also need the STRK20 keys below. |
 | `STRK20_VIEWING_KEY`, `STRK20_PROVER_URL`, `STRK20_POOL`, `STRK20_FEED_URL`, `STRK20_CACHE_DIR` | Private deposits need the viewing key (pool defaults to mainnet `0x0403…812a`); private cash-outs also need the prover and the house key. Needs Node 24+ and the optional `strk20-discovery` package (the Docker image has both). |
 | `PAYMASTER_API_KEY`, `PAYMASTER_URL` | AVNU paymaster for gasless house payouts and sponsored player deposits. |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_CLIENT_ID` | Privy sign-in. Add the game's origin to the app's allowed origins and enable the login methods you want. |

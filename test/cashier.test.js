@@ -140,7 +140,9 @@ test('withdrawals pay the signed-in address and refund only when nothing was sen
   cashier.ledger.credit(ALICE, STRK, 100n * E18);
   const w = await cashier.withdraw(ALICE, { asset: STRK, units: (40n * E18).toString(), route: 'private' });
   assert.equal(w.status, 'sent');
-  assert.deepEqual(chain.paid[0], { route: 'private', token: STRK, to: ALICE, amount: 40n * E18 });
+  const { payoutId, ...paid } = chain.paid[0];
+  assert.deepEqual(paid, { route: 'private', token: STRK, to: ALICE, amount: 40n * E18 });
+  assert.match(payoutId, /^0x[0-9a-f]{32}$/); // one id per withdrawal: the vault pays it once
   assert.equal(cashier.ledger.balance(ALICE, STRK), 60n * E18);
 
   chain.failNext = 'notSent';

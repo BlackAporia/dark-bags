@@ -15,6 +15,7 @@
 // CASHIER_FILE          JSON journal: ledger, sessions, deposits, withdrawals (required on real networks)
 // STRK20 private pool:  STRK20_POOL (mainnet default below), STRK20_VIEWING_KEY, STRK20_PROVER_URL,
 //                       STRK20_FEED_URL, STRK20_CACHE_DIR
+// Vault (contracts/):  VAULT_ADDRESS (the deployed DarkBagsVault), VAULT_FROM_BLOCK (its deploy block)
 // Paymaster (gasless):  PAYMASTER_URL (default AVNU), PAYMASTER_API_KEY
 // Privy sign-in:        PRIVY_APP_ID, PRIVY_APP_SECRET, PRIVY_CLIENT_ID (optional)
 // Cartridge:            CARTRIDGE=0 hides the Cartridge button
@@ -88,6 +89,7 @@ export function readConfig(env = process.env) {
       feedUrl: env.STRK20_FEED_URL || STRK20_FEED[network],
       cacheDir: env.STRK20_CACHE_DIR || '.strk20-cache',
     },
+    vault: env.VAULT_ADDRESS ? { address: env.VAULT_ADDRESS, fromBlock: Number(env.VAULT_FROM_BLOCK || 0) } : null,
     paymaster: env.PAYMASTER_API_KEY ? { url: env.PAYMASTER_URL || AVNU_PAYMASTER[network], apiKey: env.PAYMASTER_API_KEY } : null,
     privy: env.PRIVY_APP_ID && env.PRIVY_APP_SECRET ? { appId: env.PRIVY_APP_ID, appSecret: env.PRIVY_APP_SECRET, clientId: env.PRIVY_CLIENT_ID || null } : null,
     cartridge: env.CARTRIDGE !== '0',

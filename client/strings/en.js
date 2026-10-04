@@ -25,6 +25,7 @@ export default {
   'reg.eu': "Europe",
   'reg.us': "Americas",
   'reg.asia': "Asia",
+  'cx.noRef': "The server did not hand out a deposit reference. Try again.",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "Privacy · live numbers",
   'sk.kicker': "Built on Starknet",

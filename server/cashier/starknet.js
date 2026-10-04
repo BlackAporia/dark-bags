@@ -4,6 +4,7 @@ import { hash, num } from 'starknet';
 import { normAddr } from './cashier.js';
 import { resolveTokens } from './config.js';
 import { createStrk20 } from './strk20.js';
+import { createVault } from './vault.js';
 
 const TRANSFER = normAddr(hash.getSelectorFromName('Transfer'));
 
@@ -55,8 +56,13 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
     return null;
   });
 
+  // the DARK BAGS vault: private deposits, cash-outs and match pots at the contract level
+  const vault = createVault({ cfg, account, provider, strk20, log });
+  if (vault) log.log?.(`vault: ${vault.address} (cash-outs ${vault.canPay ? 'on' : 'off'}, match pots ${vault.canRecord ? 'on' : 'off'})`);
+
+  // private is an extra: public deposits and cash-outs always stay open
   const routes = [];
-  if (strk20) routes.push('private');
+  if (strk20 || vault) routes.push('private');
   routes.push('public');
   const ekubo = new EkuboSwapProvider();
   const feeMode = cfg.paymaster ? { type: 'paymaster' } : undefined;
@@ -66,6 +72,7 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
     sdk,
     wallet,
     strk20,
+    vault,
     fortuneAddress: cfg.fortune ? normAddr(cfg.fortune.address) : null,
 
     info: () => ({
@@ -74,9 +81,10 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       rpcUrl: cfg.clientRpcUrl || networks[cfg.network].rpcUrl,
       rpcUrls: [...new Set([cfg.clientRpcUrl || networks[cfg.network].rpcUrl, ...(cfg.rpcFallbacks ?? [])])],
       house,
-      pool: strk20?.pool ?? null,
+      pool: strk20?.pool ?? cfg.strk20.pool ?? null,
+      vault: vault?.address ?? null,
       routes,
-      cashOut: { private: !!strk20?.canPay, public: !!wallet },
+      cashOut: { private: !!(vault?.canPay || strk20?.canPay), public: !!wallet },
       paymaster: !!cfg.paymaster,
       explorer: mainnet ? 'https://voyager.online' : 'https://sepolia.voyager.online',
       tokens: tokens.map(({ id, symbol, decimals, color, name }) => ({ id, symbol, decimals, color, name })),
@@ -111,8 +119,14 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       return { status: 'ok', transfers };
     },
 
+    // private transfers to the house's notes (pool scan; only without the vault, it is heavy)
     async scanPrivateDeposits() {
-      return strk20 ? strk20.scan() : [];
+      return strk20 && !vault ? strk20.scan() : [];
+    },
+
+    // private deposits into the vault: its Deposited events, cheap to read
+    async scanVaultDeposits() {
+      return vault ? vault.scan() : [];
     },
 
     async payPublic({ token, to, amount }) {
@@ -155,6 +169,7 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       : {}),
 
     async payPrivate(a) {
+      if (vault?.canPay) return vault.pay({ ...a, payoutId: a.payoutId });
       if (!strk20) throw Object.assign(new Error('private pool off'), { notSent: true });
       return strk20.pay(a);
     },

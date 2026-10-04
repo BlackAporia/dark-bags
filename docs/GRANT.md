@@ -15,9 +15,11 @@ repository or to a live endpoint.
 
 | Starknet priority | What DARK BAGS does with it | Where |
 |---|---|---|
-| **Privacy (STRK20)** | Private deposits: a player tops up from their shielded balance and the house reads the note with its viewing key. Nobody on chain sees who paid or how much. | `server/cashier/strk20.js`, cashier route `private` |
-| **Privacy (STRK20)** | Private cash-outs: winnings go back into the player's shielded balance (Privacy SDK, STARK proof from the proving service). | `server/cashier/strk20.js` |
-| **Privacy (product)** | Private stakes: a table is a stake range. Each player's stake is known only to them; the ready room shows only the whole pool. Pot modes split like poker side pots, so mixed stakes stay fair. | `shared/stakes.js`, `World.payPot` |
+| **Privacy (contract)** | The DARK BAGS vault, a Cairo contract the STRK20 pool invokes (the same pattern as StarkWare's Ekubo anonymizer). 15 Starknet Foundry tests, including a mock pool. | `contracts/` |
+| **Privacy (STRK20)** | Private deposits: one STRK20 transaction from the player's shielded balance into the vault, tagged with a random one-time reference. Nobody on chain sees which wallet or which player paid. | `contracts/src/vault.cairo`, `client/chain/entry.js` |
+| **Privacy (STRK20)** | Private cash-outs: the vault fills an open note owned by the player (owner encrypted), with an operator signature over the note. Winnings land in the player's shielded balance. | `server/cashier/vault.js` |
+| **Privacy (stakes)** | Private stakes: each player's stake is known only to them. On chain the vault locks only each coin's whole pot, takes a house cut the contract caps at 5%, and stores a Poseidon root every player can check their own stake against. | `shared/stakes.js`, `contracts/` |
+| **Choice** | Privacy is an extra: plain public deposits and cash-outs work with every wallet. | `client/cashier.js` |
 | **Privacy (product)** | Private swaps: coins swap inside the game balance at the live price and never touch the chain, so no explorer shows them. Public swaps run through AVNU for players who want them. | `shared/lobby.js` swap, `client/swap.js` |
 | **Bitcoin** | BTC on Starknet (WBTC and other BTC wrappers) stakes like any coin. Winnings come back in BTC at the entry rate. Players bring BTC over with Atomiq or Garden, linked from the cashier. | `shared/assets.js`, `client/bridge.js` |
 | **Onboarding** | Sign in with any Starknet wallet, Cartridge (passkey, gasless) or email (Privy). Buy with a card through AVNU, or bridge in from StarkGate, Layerswap, Atomiq, Garden and others. | `client/cashier.js`, `client/bridge.js` |

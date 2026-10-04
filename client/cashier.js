@@ -455,9 +455,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const out = [];
     // Cartridge and Privy accounts are not registered in the STRK20 pool
     const privateOk = !/^(cartridge|privy)$/.test(cs.kind ?? '') && (kind === 'deposit' ? i.routes.includes('private') : i.cashOut.private);
-    // Starknet privacy first: the STRK20 route leads whenever this wallet can use it
-    if (privateOk) out.push({ id: 'private', label: t('cx.private'), sub: t(kind === 'deposit' ? 'cx.privateDep' : 'cx.privateWd') });
+    // the plain transfer is always there; STRK20 privacy is an extra the player can pick
     if (kind === 'deposit' || i.cashOut.public) out.push({ id: 'public', label: t('cx.transfer'), sub: t(kind === 'deposit' ? 'cx.transferDep' : 'cx.transferWd') });
+    if (privateOk) out.push({ id: 'private', label: t('cx.private'), sub: t(kind === 'deposit' ? 'cx.privateDep' : 'cx.privateWd') });
     return out;
   }
 
@@ -510,6 +510,12 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
           const have = await f.balance(t).catch(() => null);
           if (have != null && units > have) throw new Error(tr('cx.holdsOnly', { w: f.name ?? 'Wallet', a: short(f.address), v: `${formatUnits(have, t.decimals, 6)} ${t.symbol}`, s: t.symbol }));
         }
+        if (cs.depRoute === 'private' && cs.chain.vault) {
+          // through the vault contract: a one-time reference ties the deposit to us off chain only
+          if (!f.depositVault) throw new Error(tr('cx.noPrivate'));
+          const { reference, vault } = await askRef();
+          return f.depositVault(t, units, vault, reference);
+        }
         if (cs.depRoute === 'private') {
           if (!f.depositPrivate) throw new Error(tr('cx.noPrivate'));
           return f.depositPrivate(t, units, cs.chain.house);
@@ -525,6 +531,24 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     } finally {
       $('dep-go').disabled = false;
     }
+  }
+
+  // the server hands out one random reference per private deposit
+  function askRef() {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cs.refWaiter = null;
+        reject(new Error(tr('cx.noRef')));
+      }, 15000);
+      cs.refWaiter = {
+        resolve: (m) => {
+          clearTimeout(timer);
+          cs.refWaiter = null;
+          resolve(m);
+        },
+      };
+      send({ t: 'deposit_ref' });
+    });
   }
 
   function withdraw() {
@@ -621,6 +645,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       }
       case 'history':
         renderHistory(m);
+        return true;
+      case 'deposit_ref':
+        cs.refWaiter?.resolve(m);
         return true;
       case 'err':
         // a refused sign-in: bring the sign-in window back with the reason
