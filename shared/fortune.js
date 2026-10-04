@@ -1,7 +1,7 @@
 // The shop's fortune wheel: $0.05 a spin, paid in any coin you hold (STRK, USDT, USDS, strkBTC,
-// WBTC, ETH, …). Every spin pays something temporary (a 1-hour runner skin or weapon skin), now and then
-// a real skin to keep, and a share of every spin builds the fortune bank. When the bank reaches its
-// next mark ($0.50, then $1, $1.50, $2 … up to $5, then back to $0.50) the spin that gets it there
+// WBTC, ETH, …), or free with the spins from tasks, the calendar and mail. Every spin pays something:
+// a 1-hour skin, shop $, pass XP, an XP boost, style, a gift box, another spin, now and then a real
+// skin. A share of every paid spin builds the fortune bank. When the bank reaches its next mark ($0.50, then $1, $1.50, $2 … up to $5, then back to $0.50) the spin that gets it there
 // wins the whole bank in real coins (USDC, else USDT, else STRK).
 //
 // The house always keeps (1 − FORTUNE.bank) of every spin: the bank is the only cash that goes back
@@ -12,14 +12,29 @@ export const FORTUNE = {
   price: 50, // mills: $0.05
   bank: 0.3, // share of each spin into the fortune bank
   marks: [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000], // mills: the bank pays out at the next mark
-  // the reel: w = weight; a real skin is rare, everything else is a 1-hour trial
+  // the wheel, segment by segment (w = weight, so the chance is w / the sum of all w). Nothing
+  // here rolls above Epic: free spins (tasks, the calendar, mail) turn this same wheel.
+  //   trial / wtrial: a 1-hour runner or weapon skin    outfit / wskin: a real skin to keep
+  //   credit: shop cents   pass: pass XP   boost: matches at ×2 XP   spin: one more turn
+  //   style: a frame, banner, kill effect or name colour   box: a gift bag or crate (up to Epic)
   slots: [
-    { k: 'trial', w: 470 },
-    { k: 'wtrial', w: 460 },
-    { k: 'outfit', rarity: 'common', w: 30 }, // real skins, kept for good
+    { k: 'trial', w: 190 },
+    { k: 'credit', v: 2, w: 150 },
+    { k: 'style', rarity: 'common', w: 60 },
+    { k: 'wtrial', w: 180 },
+    { k: 'pass', v: 100, w: 90 },
+    { k: 'outfit', rarity: 'common', w: 40 },
+    { k: 'spin', n: 1, w: 50 },
+    { k: 'credit', v: 5, w: 60 },
+    { k: 'box', id: 'street', w: 14 },
+    { k: 'style', rarity: 'rare', w: 30 },
+    { k: 'boost', n: 1, w: 50 },
     { k: 'outfit', rarity: 'rare', w: 18 },
-    { k: 'wskin', rarity: 'rare', w: 15 },
-    { k: 'outfit', rarity: 'epic', w: 5 },
+    { k: 'box', id: 'w-scrap', w: 12 },
+    { k: 'wskin', rarity: 'rare', w: 12 },
+    { k: 'credit', v: 25, w: 8 },
+    { k: 'style', rarity: 'epic', w: 6 },
+    { k: 'outfit', rarity: 'epic', w: 4 },
     { k: 'wskin', rarity: 'epic', w: 2 },
   ],
 };
@@ -29,6 +44,7 @@ export class FortuneBook {
     this.pool = data.pool ?? 0; // mills in the bank
     this.step = data.step ?? 0; // which mark is next
     this.spins = data.spins ?? 0;
+    this.frees = data.frees ?? 0; // free spins turned
     this.taken = data.taken ?? 0; // mills that came in
     this.paid = data.paid ?? 0; // mills that went back out as jackpots
     this.wins = data.wins ?? []; // last jackpots: { at, name, mills, asset }
@@ -38,7 +54,7 @@ export class FortuneBook {
   }
 
   toJSON() {
-    return { pool: this.pool, step: this.step, spins: this.spins, taken: this.taken, paid: this.paid, wins: this.wins };
+    return { pool: this.pool, step: this.step, spins: this.spins, frees: this.frees, taken: this.taken, paid: this.paid, wins: this.wins };
   }
 
   mark() {
@@ -46,11 +62,12 @@ export class FortuneBook {
   }
 
   view() {
-    return { price: FORTUNE.price, pool: this.pool, mark: this.mark(), wins: this.wins.slice(0, 8), slots: FORTUNE.slots.map(({ k, rarity }) => ({ k, rarity })) };
+    const total = FORTUNE.slots.reduce((n, x) => n + x.w, 0);
+    return { price: FORTUNE.price, pool: this.pool, mark: this.mark(), wins: this.wins.slice(0, 8), slots: FORTUNE.slots.map(({ w, ...x }) => ({ ...x, p: Math.round((w / total) * 1000) / 10 })) };
   }
 
-  // one paid spin: which slot the reel lands on, and the jackpot if this spin fills the bank
-  spin() {
+  // which slot the wheel stops on
+  roll() {
     const total = FORTUNE.slots.reduce((s, x) => s + x.w, 0);
     let roll = this.rnd() * total;
     let slot = FORTUNE.slots.length - 1;
@@ -61,6 +78,19 @@ export class FortuneBook {
       }
       roll -= FORTUNE.slots[i].w;
     }
+    return slot;
+  }
+
+  // a free spin (tasks, calendar, mail): the same wheel, but no money came in, so no bank
+  free() {
+    this.frees = (this.frees ?? 0) + 1;
+    this.onChange?.(this);
+    return { slot: this.roll(), jackpot: null };
+  }
+
+  // one paid spin: which slot the wheel stops on, and the jackpot if this spin fills the bank
+  spin() {
+    const slot = this.roll();
     this.spins++;
     this.taken += FORTUNE.price;
     this.pool += Math.floor(FORTUNE.price * FORTUNE.bank);

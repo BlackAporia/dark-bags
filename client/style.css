@@ -2166,7 +2166,7 @@ body.gold-on #bag { color: #ffd166; }
 }
 
 /* ---------------------------------------------------------------- shop fortune wheel */
-.fortune { display: grid; gap: 10px; margin-bottom: 14px; padding: 16px; border-radius: 18px; border: 1px solid rgba(255, 211, 77, 0.45); background: radial-gradient(80% 140% at 100% 0%, rgba(255, 211, 77, 0.16), transparent 60%), linear-gradient(135deg, #171326, #0b0d14); }
+.fortune { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); align-items: center; gap: 16px; margin-bottom: 14px; padding: 16px; border-radius: 18px; border: 1px solid rgba(255, 211, 77, 0.45); background: radial-gradient(80% 140% at 100% 0%, rgba(255, 211, 77, 0.16), transparent 60%), linear-gradient(135deg, #171326, #0b0d14); }
 .fw-head { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
 .fw-title { margin: 2px 0 4px; font: 900 clamp(22px, 3vw, 32px)/1 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; background: linear-gradient(90deg, #ffd34d, #ff6bd5); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .fw-bank { display: grid; gap: 4px; justify-items: center; min-width: 170px; padding: 10px 14px; border-radius: 14px; border: 1px dashed rgba(255, 211, 77, 0.6); background: rgba(0, 0, 0, 0.35); }
@@ -2179,11 +2179,6 @@ body.gold-on #bag { color: #ffd166; }
 .fw-go { flex: 1 1 200px; }
 .fw-odds ul { margin: 6px 0; padding-inline-start: 18px; display: grid; gap: 2px; font-size: 13px; }
 .fw-wins { margin: 0; font-size: 13px; color: #d9deea; }
-.fw-box { width: min(560px, 100%); }
-.fw-reel { position: relative; width: 100%; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255, 211, 77, 0.5); background: #07080d; padding: 10px 0; }
-.fw-marker { position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; transform: translateX(-50%); z-index: 2; background: #ffd34d; box-shadow: 0 0 12px #ffd34d; }
-.fw-strip { display: flex; gap: 6px; will-change: transform; }
-.fw-cell { flex: 0 0 120px; display: grid; place-items: center; height: 74px; border-radius: 10px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 22%, #0b0d14); font-size: 12px; font-weight: 800; text-align: center; padding: 4px; }
 .fw-jackpot { display: grid; justify-items: center; gap: 2px; margin-bottom: 8px; padding: 12px 18px; border-radius: 14px; background: linear-gradient(135deg, #b8860b, #ffd76a, #b8860b); color: #1a1205; animation: prize-pop 0.6s ease-out; box-shadow: 0 0 40px rgba(255, 211, 77, 0.7); }
 .fw-jackpot b { font: 900 42px/1 var(--f-display); }
 .fw-jackpot small { font-weight: 900; letter-spacing: 0.1em; }
@@ -2504,3 +2499,50 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 .vc-mic.on { border-color: #3ddc97; box-shadow: 0 0 12px rgba(61, 220, 151, 0.45); }
 .vc-talk, .vc-n { font: 700 12px/1.2 var(--f-ui); color: #3ddc97; background: rgba(7, 9, 15, 0.6); padding: 4px 8px; border-radius: 8px; }
 .vc-n { color: var(--dust); }
+
+/* fortune wheel: the wheel itself (shop and full screen) */
+.fw-side { display: grid; gap: 10px; min-width: 0; }
+.fw-mini, .fw-big { position: relative; aspect-ratio: 1; cursor: pointer; }
+.fw-mini { width: 100%; max-width: 260px; justify-self: center; }
+.fw-mini .fw-rot { animation: fw-idle 40s linear infinite; transform-origin: 0 0; }
+.fw-mini:hover .fw-rot { animation-duration: 8s; }
+@keyframes fw-idle { to { transform: rotate(360deg); } }
+.fw-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 26px rgba(255, 211, 77, 0.35)); overflow: visible; }
+.fw-ico { font-size: 19px; }
+.fw-tag { font: 900 11px/1 var(--f-num, monospace); fill: #fff; paint-order: stroke; stroke: rgba(0, 0, 0, 0.7); stroke-width: 3px; letter-spacing: 0.04em; }
+.fw-hub { font: 900 28px/1 var(--f-display); fill: #ffd34d; }
+.fw-bulb { fill: #ffd34d; opacity: 0.35; animation: fw-bulb 1.2s steps(1) infinite; }
+.fw-bulb.b2 { animation-delay: 0.6s; }
+.spinning .fw-bulb { animation-duration: 0.24s; }
+.spinning .fw-bulb.b2 { animation-delay: 0.12s; }
+.landed .fw-bulb { animation: fw-bulb-win 0.5s ease-in-out 5; }
+@keyframes fw-bulb { 0% { opacity: 1; filter: drop-shadow(0 0 4px #ffd34d); } 50% { opacity: 0.3; filter: none; } }
+@keyframes fw-bulb-win { 50% { opacity: 1; fill: #fff; } }
+.fw-rare path { filter: saturate(1.3); }
+.fw-seg.r-epic .fw-ico, .fw-seg.r-rare .fw-ico { filter: drop-shadow(0 0 4px #fff); }
+.fw-seg.win path { stroke: #fff; stroke-width: 4; animation: fw-win 0.6s ease-in-out infinite alternate; }
+@keyframes fw-win { to { filter: brightness(1.8); } }
+.fw-pointer { position: absolute; top: -4%; left: 50%; width: 0; height: 0; transform: translateX(-50%); transform-origin: 50% 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 30px solid #ffd34d; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 8px rgba(255, 211, 77, 0.8)); z-index: 2; pointer-events: none; }
+.fw-pointer.kick { animation: fw-kick 0.12s ease-out; }
+@keyframes fw-kick { 40% { transform: translateX(-50%) rotate(-16deg); } }
+.fw-box { width: min(520px, 100%); max-height: 100%; overflow: auto; }
+.fw-big { width: min(420px, 82vw, 54vh); cursor: default; }
+.fw-big.spinning .fw-svg { filter: drop-shadow(0 0 40px rgba(255, 211, 77, 0.6)); }
+.fw-free { animation: spin-glow 1.6s ease-in-out infinite; }
+.fw-freenote { margin: 0; }
+.fw-odds li { display: flex; justify-content: space-between; gap: 10px; padding-inline-start: 6px; border-inline-start: 3px solid var(--c); list-style: none; }
+.fw-odds ul { padding-inline-start: 0; }
+.fw-odds li b { font-variant-numeric: tabular-nums; color: var(--dust, #9aa3b5); }
+.fw-burst { position: absolute; left: 50%; top: 4%; width: 0; height: 0; pointer-events: none; z-index: 3; }
+.fw-burst i { position: absolute; width: 8px; height: 12px; border-radius: 2px; animation: fw-conf var(--d) cubic-bezier(0.15, 0.7, 0.3, 1) forwards; }
+@keyframes fw-conf { to { transform: translate(var(--x), calc(var(--y) + 160px)) rotate(var(--r)); opacity: 0; } }
+.fw-bigwin { box-shadow: 0 0 50px -2px var(--r); animation: prize-pop 0.5s ease-out, fw-glow 1.2s ease-in-out 0.5s infinite alternate; }
+@keyframes fw-glow { to { box-shadow: 0 0 80px 4px var(--r); } }
+.fw-emo { font-size: 54px; }
+.fw-gold { color: #ffd34d; }
+.fw-red { color: #fb7185; }
+.inv-spins { border-color: rgba(232, 121, 249, 0.5); }
+@media (max-width: 720px) {
+  .fortune { grid-template-columns: 1fr; }
+  .fw-mini { max-width: 200px; }
+}

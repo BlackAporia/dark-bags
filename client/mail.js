@@ -1,15 +1,13 @@
 // The Mail page: letters from the team and from the game (the welcome bonus), each maybe with a gift
-// to claim (shop $, a bag, a trial skin, wheel spins), and the fortune wheel for the spins you hold.
-// The server owns the mailbox and the wheel; this page only shows them and asks.
-import { OUTFIT, WSKIN, WHEEL, RARITIES, usd } from '../shared/cosmetics.js';
-import { figureStill } from './stickman.js';
-import { weaponStill } from './locker.js';
+// to claim (shop $, a bag, a trial skin, wheel spins); a claimed bag opens and a spin turns the shop's
+// fortune wheel right from the letter. The server owns the mailbox; this page only shows it and asks.
+import { OUTFIT, WSKIN, usd } from '../shared/cosmetics.js';
 import { esc } from './game.js';
 import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createMail({ app, send, sfx, toast, onUnread = () => {} }) {
+export function createMail({ app, send, sfx, toast, openBox = () => {}, openWheel = () => {}, onUnread = () => {} }) {
   const st = { list: null, open: null, unread: 0, spins: 0, spinning: false };
   const signedIn = () => app.mode === 'online' && !!app.token;
 
@@ -53,7 +51,6 @@ export function createMail({ app, send, sfx, toast, onUnread = () => {} }) {
       toast(t('mail.claimed', { g: giftText(m.claimed) }));
       sfx?.play('coin');
     }
-    if (m.spin) return showPrize(m.spin);
     if (app.page === 'mail') render();
   }
 
@@ -82,7 +79,7 @@ export function createMail({ app, send, sfx, toast, onUnread = () => {} }) {
         <article class="mail-view">${
           open
             ? `<h3>${esc(titleOf(open))}</h3><p class="fine">${new Date(open.at).toLocaleString()}</p><div class="mail-body">${esc(bodyOf(open)).replace(/\n/g, '<br>')}</div>
-              ${open.gift ? `<div class="mail-gift"><span>🎁 ${esc(giftText(open.gift))}</span>${open.claimed ? `<b class="ok">✓ ${t('mail.taken')}</b>` : `<button type="button" class="cta" id="mail-claim">${t('mail.claim')}</button>`}</div>` : ''}`
+              ${open.gift ? `<div class="mail-gift"><span>🎁 ${esc(giftText(open.gift))}</span>${open.claimed ? `<b class="ok">✓ ${t('mail.taken')}</b>${useBtn(open.gift)}` : `<button type="button" class="cta" id="mail-claim">${t('mail.claim')}</button>`}</div>` : ''}`
             : `<p class="muted">${t('mail.pick')}</p>`
         }</article>
       </div>`;
@@ -98,79 +95,17 @@ export function createMail({ app, send, sfx, toast, onUnread = () => {} }) {
       });
     $('mail-claim')?.addEventListener('click', () => send({ t: 'mail_claim', id: st.open }));
     $('mail-spin')?.addEventListener('click', openWheel);
+    $('mail-use')?.addEventListener('click', (e) => (e.currentTarget.dataset.box ? openBox(e.currentTarget.dataset.box) : openWheel()));
   }
 
-  // ------------------------------------------------------------------ the wheel
-  const SEG_ICON = (seg) => (seg.k === 'trial' ? '👕' : seg.k === 'wtrial' ? '🔫' : `$${(seg.v / 100).toFixed(seg.v % 100 ? 2 : 0)}`);
-  const SEG_COLORS = ['#7c3aed', '#16a34a', '#0ea5e9', '#16a34a', '#db2777', '#ca8a04', '#2563eb', '#f59e0b'];
-  function wheelSvg() {
-    const n = WHEEL.length;
-    const R = 150;
-    const seg = (i) => {
-      const a0 = ((i - 0.5) / n) * Math.PI * 2 - Math.PI / 2;
-      const a1 = ((i + 0.5) / n) * Math.PI * 2 - Math.PI / 2;
-      const p = (a) => `${(R * Math.cos(a)).toFixed(1)} ${(R * Math.sin(a)).toFixed(1)}`;
-      const am = (i / n) * Math.PI * 2 - Math.PI / 2;
-      return `<path d="M0 0 L${p(a0)} A${R} ${R} 0 0 1 ${p(a1)} Z" fill="${SEG_COLORS[i % SEG_COLORS.length]}" stroke="#0b0d14" stroke-width="3"/>
-        <text x="${(R * 0.66 * Math.cos(am)).toFixed(1)}" y="${(R * 0.66 * Math.sin(am)).toFixed(1)}" font-size="${WHEEL[i].k === 'credit' ? 22 : 30}" font-weight="900" fill="#fff" text-anchor="middle" dominant-baseline="central">${SEG_ICON(WHEEL[i])}</text>`;
-    };
-    return `<svg viewBox="-160 -160 320 320" class="wheel-svg" id="wheel-svg"><circle r="157" fill="#0b0d14" stroke="#ffd34d" stroke-width="5"/>${WHEEL.map((_, i) => seg(i)).join('')}<circle r="26" fill="#0b0d14" stroke="#ffd34d" stroke-width="4"/><text font-size="18" text-anchor="middle" dominant-baseline="central" fill="#ffd34d">★</text></svg>`;
+  // a claimed bag opens and a claimed spin turns right from the letter
+  function useBtn(g) {
+    if (g?.k === 'box' && (app.locker?.boxes?.[g.id] || app.locker?.gboxes?.[g.id])) return `<button type="button" class="cta" id="mail-use" data-box="${esc(g.id)}">🎁 ${t('inv.open')}</button>`;
+    if (g?.k === 'spin' && st.spins > 0) return `<button type="button" class="cta" id="mail-use">🎡 ${t('dl.spinNow')}</button>`;
+    return '';
   }
 
-  function openWheel() {
-    let ov = $('wheel');
-    if (!ov) {
-      ov = document.createElement('div');
-      ov.id = 'wheel';
-      ov.className = 'wheel-ov';
-      document.body.append(ov);
-    }
-    ov.hidden = false;
-    ov.innerHTML = `<div class="wheel-box"><h2 class="ref-title">${t('mail.wheel')}</h2><p class="fine">${t('mail.wheelNote')}</p>
-      <div class="wheel-wrap"><div class="wheel-pin">▼</div><div class="wheel-rot" id="wheel-rot">${wheelSvg()}</div></div>
-      <div class="wheel-out" id="wheel-out"></div>
-      <div class="ap-row"><button type="button" class="cta" id="wheel-go">${t('mail.spinNow')}</button><button type="button" class="ghost" id="wheel-close">${t('share.close')}</button></div></div>`;
-    $('wheel-close').addEventListener('click', () => !st.spinning && (ov.hidden = true));
-    $('wheel-go').addEventListener('click', () => {
-      if (st.spinning || st.spins <= 0) return;
-      st.spinning = true;
-      $('wheel-go').disabled = true;
-      sfx?.play('ready');
-      send({ t: 'spin' });
-    });
-  }
-
-  // the server picked the slot: turn the wheel so the pin lands on it, then show the prize
-  function showPrize(spin) {
-    const rot = $('wheel-rot');
-    const n = WHEEL.length;
-    const done = () => {
-      st.spinning = false;
-      const p = spin.prize;
-      const img = p.k === 'trial' ? `<img alt="" src="${figureStill({ outfit: p.id, body: app.locker?.body ?? 'm' }, 90, 126)}">` : p.k === 'wtrial' ? `<img alt="" class="wimg" src="${weaponStill(p.id, 180, 110)}">` : `<b class="wheel-cash">${usd(p.v)}</b>`;
-      const item = p.k === 'trial' ? OUTFIT[p.id] : p.k === 'wtrial' ? WSKIN[p.id] : null;
-      const out = $('wheel-out');
-      if (out)
-        out.innerHTML = `<div class="wheel-prize" style="--r:${item ? RARITIES[item.rarity].color : '#4ade80'}">${img}<p><b>${esc(item ? item.name : t('mail.g.credit', { v: usd(p.v) }))}</b></p><p class="fine">${item ? t('mail.trial72') : t('mail.creditNote')}</p></div>`;
-      if ($('wheel-go')) {
-        $('wheel-go').disabled = st.spins <= 0;
-        $('wheel-go').textContent = st.spins > 0 ? t('mail.spinNow') : t('mail.noSpins');
-      }
-      sfx?.play('bag');
-      if (app.page === 'mail') render();
-    };
-    if (!rot) return done();
-    const turns = 6 + Math.random();
-    const target = 360 * Math.round(turns) - (spin.slot / n) * 360 + (Math.random() - 0.5) * (300 / n);
-    rot.style.transition = 'none';
-    rot.style.transform = 'rotate(0deg)';
-    void rot.offsetWidth;
-    rot.style.transition = 'transform 5.2s cubic-bezier(0.12, 0.8, 0.12, 1)';
-    rot.style.transform = `rotate(${target}deg)`;
-    setTimeout(done, 5300);
-  }
-
-  return { render, onMessage, openWheel, get unread() {
+  return { render, onMessage, get unread() {
     return st.unread;
   } };
 }

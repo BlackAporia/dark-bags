@@ -21,7 +21,7 @@
 // Rank-ups pay one thing: a random outfit to try for 72 hours. Nothing here changes
 // how a runner plays. It is all looks.
 import { WEAPONS } from './weapons.js';
-import { STYLE, STYLE_ITEMS, STYLE_CASES, STYLE_KINDS } from './style.js';
+import { STYLE, STYLE_ITEMS, STYLE_CASES, STYLE_KINDS, pickStyle } from './style.js';
 import { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems } from './season.js';
 export { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems };
 
@@ -503,18 +503,6 @@ function fresh() {
   return { credit: 0, owned: [], wowned: [], wequip: {}, towned: [], tequip: null, serials: {}, trials: {}, wtrials: {}, spins: 0, boxes: {}, gboxes: { ...START_BOXES }, outfit: DEFAULT_OUTFIT, body: 'm', pity: {}, opened: 0, spent: 0, sowned: [], sequip: {} };
 }
 
-// The fortune wheel (one spin with the welcome bonus, more from mail gifts): a 1-hour trial outfit,
-// a 1-hour trial weapon skin, or a little shop $ (never withdrawn or sold). w: chance of the slot.
-export const WHEEL = [
-  { k: 'trial', w: 18 },
-  { k: 'credit', v: 25, w: 14 },
-  { k: 'wtrial', w: 17 },
-  { k: 'credit', v: 50, w: 10 },
-  { k: 'trial', w: 18 },
-  { k: 'credit', v: 100, w: 4 },
-  { k: 'wtrial', w: 17 },
-  { k: 'credit', v: 200, w: 2 },
-];
 
 /**
  * Per-player inventory (same keys as balances and ranks). Every method returns
@@ -737,7 +725,8 @@ export class Inventory {
     const list = track === 'p' ? ps.p : ps.f;
     if (list.includes(tier)) return { ok: false, error: 'Already claimed.' };
     list.push(tier);
-    this.give(key, rw);
+    // boxes on the free track are gifts (up to Epic); the premium track's roll the full odds
+    this.give(key, track !== 'p' && rw.k === 'box' ? { ...rw, cap: 1 } : rw);
     return { ok: true, track, tier, reward: rw };
   }
 
@@ -781,7 +770,16 @@ export class Inventory {
       return pool.length ? pool[Math.floor(this.rnd() * pool.length)] : null;
     };
     let prize = null;
-    if (slot.k === 'outfit') {
+    // shop $, another spin, a gift box: as they are; pass XP and the boost the lobby hands out
+    if (slot.k === 'credit') prize = { k: 'credit', v: slot.v };
+    else if (slot.k === 'spin') prize = { k: 'spin', n: slot.n ?? 1 };
+    else if (slot.k === 'box') prize = { k: 'box', id: slot.id, n: 1, cap: 1 };
+    else if (slot.k === 'pass') return { k: 'pass', v: slot.v };
+    else if (slot.k === 'boost') return { k: 'boost', n: slot.n ?? 1 };
+    else if (slot.k === 'style') {
+      const id = pickStyle(slot.rarity, r.sowned ?? [], this.rnd);
+      prize = id ? { k: 'style', id } : { k: 'credit', v: RARITIES[slot.rarity].refund };
+    } else if (slot.k === 'outfit') {
       const o = fresh(OUTFITS, r.owned, null, [slot.rarity]);
       if (o) prize = { k: 'outfit', id: o.id };
     } else if (slot.k === 'wskin') {
@@ -799,39 +797,13 @@ export class Inventory {
     return prize;
   }
 
-  // one turn of the fortune wheel: the slot it stops on and what it paid
-  spin(key) {
+  // use one free spin (from tasks, the calendar, mail); false when there is none
+  useSpin(key) {
     const r = this.rec(key);
-    if (!(r.spins > 0)) return { ok: false, error: 'No spins left.' };
-    const total = WHEEL.reduce((s, x) => s + x.w, 0);
-    let roll = this.rnd() * total;
-    let slot = WHEEL.length - 1;
-    for (let i = 0; i < WHEEL.length; i++) {
-      if (roll < WHEEL[i].w) {
-        slot = i;
-        break;
-      }
-      roll -= WHEEL[i].w;
-    }
-    const seg = WHEEL[slot];
-    // the skins: one you neither own nor are trying, rare to legendary, never exotic or limited
-    const pickOf = (list, owned, trying) => {
-      const pool = list.filter((o) => !o.basic && !o.limited && ['rare', 'epic', 'legendary'].includes(o.rarity) && !owned.includes(o.id) && !((trying[o.id] ?? 0) > this.now()));
-      return pool.length ? pool[Math.floor(this.rnd() * pool.length)] : null;
-    };
-    let prize;
-    if (seg.k === 'trial') {
-      const o = pickOf(OUTFITS, r.owned, r.trials);
-      prize = o ? { k: 'trial', id: o.id } : { k: 'credit', v: 50 };
-    } else if (seg.k === 'wtrial') {
-      const o = pickOf(WEAPON_SKINS, r.wowned, r.wtrials);
-      prize = o ? { k: 'wtrial', id: o.id } : { k: 'credit', v: 50 };
-    } else prize = { k: 'credit', v: seg.v };
+    if (!(r.spins > 0)) return false;
     r.spins -= 1;
-    this.give(key, prize);
-    if (prize.k === 'trial') prize.until = r.trials[prize.id];
-    if (prize.k === 'wtrial') prize.until = r.wtrials[prize.id];
-    return { ok: true, slot, prize };
+    this.changed();
+    return true;
   }
 
   setBody(key, body) {

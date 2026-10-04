@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CFG } from '../shared/config.js';
-import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, TRIAL_MS, WEAPON_SKINS, WSKIN, MAX_OPEN, rollRarity, botLook, boxCost } from '../shared/cosmetics.js';
+import { Inventory, BOXES, BOX, OUTFITS, OUTFIT, PITY, RARITIES, RARITY_ORDER, TRIAL_MS, WEAPON_SKINS, WSKIN, MAX_OPEN, rollRarity, botLook, boxCost, passRewards } from '../shared/cosmetics.js';
 import { RoomCore } from '../shared/room.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
@@ -317,4 +317,16 @@ test('gift boxes (free rewards) roll no higher than Epic and leave the pity alon
   inv.rec('g').credit = 1e9;
   const paid = inv.open('g', 'apex', () => false, 1);
   assert.ok(!paid.results[0].gift);
+});
+
+test('pass: boxes on the free track are gifts (up to Epic), the premium track rolls the full odds', () => {
+  const inv = new Inventory({ rnd: Math.random });
+  const ps = inv.passRec('p');
+  const { f } = passRewards(ps.sid);
+  const tier = Number(Object.keys(f).find((k) => f[k].k === 'box'));
+  inv.passXp('p', 1e6);
+  delete inv.rec('p').gboxes[f[tier].id];
+  assert.ok(inv.passClaim('p', 'f', tier).ok);
+  assert.equal(inv.rec('p').gboxes[f[tier].id], 1);
+  assert.ok(!inv.rec('p').boxes[f[tier].id]);
 });
