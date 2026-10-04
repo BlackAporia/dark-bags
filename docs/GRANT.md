@@ -80,7 +80,9 @@ and Starknet fees, which the paymaster can sponsor.
 - the value players hold in the game (TVL);
 - a 30-day daily series.
 
-The same numbers show on the landing page and on the in-game **Starknet** page.
+The same numbers show on the landing page and on the in-game **Starknet** page. Revenue (rake and
+shop) stays private: it is on the team's analytics page (`/api/admin/stats`, admin wallets only)
+and can be shared with the Foundation directly.
 
 > Fill in from `/api/impact` at the time of applying: players, 7-day actives, matches,
 > $ staked, private transfers, TVL. Attach the 30-day chart.

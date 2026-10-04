@@ -2346,7 +2346,7 @@ Object.assign(THEME, {
 });
 
 // every older map at night too: a dark tint over its bright colours (the docks are the model)
-const NIGHT = { lego: '#48506a', dunes: '#56484a', snow: '#465270', neon: '#665a80', fantasy: '#444e66', toon: '#56486c', gravity: '#3a4256' };
+const NIGHT = { lego: '#48506a', dunes: '#56484a', snow: '#36405a', neon: '#665a80', fantasy: '#444e66', toon: '#56486c', gravity: '#3a4256' };
 for (const [id, tint] of Object.entries(NIGHT)) {
   THEME[id].night = tint;
   THEME[id].bright = false;
