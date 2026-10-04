@@ -10,5 +10,6 @@ import pt from './strings/pt.js';
 import uk from './strings/uk.js';
 import ru from './strings/ru.js';
 import tr from './strings/tr.js';
+import sw from './strings/sw.js';
 
-export const STRINGS = { en, zh, hi, es, fr, ar, pt, uk, ru, tr };
+export const STRINGS = { en, zh, hi, es, fr, ar, pt, uk, ru, tr, sw };

@@ -73,7 +73,9 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     if (st.list) probe();
   }
 
+  const listeners = new Set();
   function render() {
+    for (const f of listeners) f();
     const box = $('regions');
     if (!box) return;
     box.hidden = !st.list || app.mode !== 'online';
@@ -224,5 +226,21 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
   }
 
   setInterval(() => app.mode === 'online' && !app.inRoom && !document.hidden && probe(), 30_000);
-  return { route, onMain, render, remote, current, closeEdge, probe, prepLine, inEdge: () => !!st.edge };
+  // for the first-run welcome: every region with its ping and players, and picking one
+  const info = () => ({
+    list: (st.list ?? []).map((r) => ({ id: r.id, flag: FLAG[r.id] ?? '🌐', name: t(`reg.${r.id}`) === `reg.${r.id}` ? r.id.toUpperCase() : t(`reg.${r.id}`), ping: st.ping[r.id], online: st.online[r.id] ?? null })),
+    pick: st.pick,
+    current: current(),
+    probing: st.probing,
+  });
+  function choose(id) {
+    st.pick = id || null;
+    store.set('darkbags.region', st.pick);
+    render();
+  }
+  const onChange = (f) => {
+    listeners.add(f);
+    return () => listeners.delete(f);
+  };
+  return { route, onMain, render, remote, current, closeEdge, probe, prepLine, info, choose, onChange, inEdge: () => !!st.edge };
 }

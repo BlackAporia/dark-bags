@@ -19,6 +19,7 @@ import { Guard } from '../shared/guard.js';
 import { createBridge } from './bridge.js';
 import { MailBook, cleanGift } from '../shared/mail.js';
 import { FortuneBook } from '../shared/fortune.js';
+import { langForCountry } from '../shared/geo.js';
 import { StatsBook } from '../shared/stats.js';
 import { createAnalytics, adminSet } from './analytics.js';
 import { track, note, stalls, watchStalls } from './stall.js';
@@ -391,9 +392,36 @@ async function serveStatic(req, res) {
 const bridge = real && (real.cfg.network === 'mainnet' || process.env.BRIDGE === '1') ? createBridge({ accountFor: (s) => real.cashier.accountFor(s) }) : null;
 if (bridge) console.log(`bridge: NEAR Intents 1Click on, our fee ${bridge.feeBps / 100}%${bridge.feeBps ? '' : ' (set BRIDGE_FEE_RECIPIENT to earn one)'}`);
 
+// A new player's country, for their first language: the host's own header when there is one
+// (Cloudflare, Vercel, Fly), else a free lookup (ip-api.com, the address only, cached). null when
+// unknown (a private address, the lookup down): the game then starts in English.
+const geoCache = new Map();
+async function geoOf(req) {
+  const h = req.headers['cf-ipcountry'] ?? req.headers['x-vercel-ip-country'] ?? req.headers['fly-client-country'] ?? req.headers['x-country-code'];
+  if (h && /^[A-Z]{2}$/i.test(h) && h !== 'XX') return String(h).toUpperCase();
+  const ip = String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim() || req.socket.remoteAddress || ''; // the hop the proxy appended
+  if (!ip || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1|fc|fd|fe80|::ffff:127\.)/i.test(ip)) return null;
+  if (geoCache.has(ip)) return geoCache.get(ip);
+  let cc = null;
+  try {
+    const r = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=countryCode`, { signal: AbortSignal.timeout(1500) });
+    const j = await r.json();
+    if (/^[A-Z]{2}$/.test(j?.countryCode ?? '')) cc = j.countryCode;
+  } catch {
+    /* no answer: English */
+  }
+  if (geoCache.size > 5000) geoCache.clear();
+  geoCache.set(ip, cc);
+  return cc;
+}
+
 const server = http.createServer((req, res) => {
   if (req.url === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
+    return;
+  }
+  if (req.url === '/api/geo') {
+    geoOf(req).then((cc) => res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ country: cc, lang: langForCountry(cc) })));
     return;
   }
   if (req.url === '/api/stats') {

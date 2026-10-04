@@ -170,7 +170,7 @@ export function createDaily({ openBox = () => {}, openWheel = () => {}, app, sen
     const v = st.view;
     if (!v || v.cal.claimed || app.screen !== 'lobby' || app.inRoom) return;
     // one thing at a time: wait for the intro, the news, Nyx's tour or another dialog to close
-    if (document.querySelector('dialog[open], .tour') || ($('intro') && !$('intro').hidden) || !$('dl-pop').hidden) {
+    if (document.querySelector('dialog[open], .tour, #welcome') || ($('intro') && !$('intro').hidden) || !$('dl-pop').hidden) {
       clearTimeout(st.popT);
       st.popT = setTimeout(maybePop, 2500);
       return;
