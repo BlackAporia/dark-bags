@@ -229,6 +229,7 @@ export class GameClient {
     const wasAlive = this.you?.st === 'alive';
     if (you.rl > 0 && !(this.you?.rl > 0) && you.st === 'alive') this.sfx.play('reload', { secs: WEAPONS[you.w]?.reload });
     this.you = you;
+    if (you?.w != null) this.lastW = you.w; // the gun in your hands, kept for the share card after the match
     if (this.dead && you.st === 'alive') {
       // deathmatch: back in. Fresh body, fresh prediction.
       this.dead = false;
