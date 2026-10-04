@@ -2893,3 +2893,5 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
   .sk-btc { grid-template-columns: 52px minmax(0, 1fr); }
   .sk-btc .sk-go { grid-column: 1 / -1; }
 }
+/* phones held sideways in a match: the track name would sit on the clock; it shows in the menus and the pause menu instead */
+@media (max-height: 500px) { body:has(#hud:not([hidden])) .now-playing { display: none; } }
