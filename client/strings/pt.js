@@ -24,6 +24,8 @@ export default {
   'reg.eu': "Europa",
   'reg.us': "Américas",
   'reg.asia': "Ásia",
+  'medal.long': "Tiro longo",
+  'medal.knife': "Morte na faca",
   'ex.centre': "SAÍDA · SEGURE {s} S",
   'feed.extracting': "{name} está segurando a saída",
   'hud.holdExit': "Segure a saída {s} s · todos sabem · um acerto reinicia a contagem",

@@ -24,6 +24,8 @@ export default {
   'reg.eu': "Avrupa",
   'reg.us': "Amerika",
   'reg.asia': "Asya",
+  'medal.long': "Uzak atış",
+  'medal.knife': "Bıçakla öldürme",
   'ex.centre': "ÇIKIŞ · {s} SN TUT",
   'feed.extracting': "{name} çıkışı tutuyor",
   'hud.holdExit': "Çıkışı {s} sn tut · herkes biliyor · isabet sayacı baştan başlatır",

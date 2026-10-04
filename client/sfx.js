@@ -425,16 +425,15 @@ export class Sfx {
     }
   }
 
-  // Announcer: recorded lines (voice-data.js) in the player's language, English where a
-  // language has no recording. Played through the effects bus with a little extra punch
+  // Announcer: recorded lines (voice-data.js), one English voice for every language. Played through the effects bus with a little extra punch
   // and a hall tail, so it follows the sound volume and mute. Keys: s1..s5 (kill streaks),
   // victory, extracted, final, lead, lostLead, headshot.
-  say(key, lang = 'en', delay = 0.15) {
+  say(key, _lang = 'en', delay = 0.15) {
     if (this.muted || this.voiceOff || !this.ctx) return;
-    const src = VOICE[lang]?.[key] ? VOICE[lang][key] : VOICE.en[key];
+    const src = VOICE.en[key];
     if (!src) return;
     this.voiceBufs ??= new Map();
-    const id = `${VOICE[lang]?.[key] ? lang : 'en'}:${key}`;
+    const id = `en:${key}`;
     const play = (buf) => {
       const c = this.ctx;
       const t = c.currentTime + delay;

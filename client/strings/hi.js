@@ -24,6 +24,8 @@ export default {
   'reg.eu': "यूरोप",
   'reg.us': "अमेरिका",
   'reg.asia': "एशिया",
+  'medal.long': "लंबा शॉट",
+  'medal.knife': "चाकू से किल",
   'ex.centre': "एग्ज़िट · {s} सेकंड टिको",
   'feed.extracting': "{name} एग्ज़िट पकड़े हुए है",
   'hud.holdExit': "एग्ज़िट {s} सेकंड पकड़े रहो · सबको पता है · हिट से गिनती फिर शुरू",

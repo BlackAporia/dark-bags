@@ -24,6 +24,8 @@ export default {
   'reg.eu': "欧洲",
   'reg.us': "美洲",
   'reg.asia': "亚洲",
+  'medal.long': "远距离击杀",
+  'medal.knife': "近战刀杀",
   'ex.centre': "出口 · 坚持 {s} 秒",
   'feed.extracting': "{name} 正在坚守出口",
   'hud.holdExit': "坚守出口 {s} 秒 · 所有人都知道 · 被击中重新计时",

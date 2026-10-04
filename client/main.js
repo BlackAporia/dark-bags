@@ -1471,8 +1471,8 @@ function showResult(m) {
   const inside = t('res.inside', { k: m.kills, t: mmss(m.secs) });
   const pot = MODE[m.mode]?.kind && MODE[m.mode].kind !== 'raid';
   // the announcer calls the big endings
-  if (m.won) sfx.say('victory', getLang());
-  else if (m.status === 'extracted') sfx.say('extracted', getLang());
+  if (m.won) sfx.say('victory', 'en');
+  else if (m.status === 'extracted') sfx.say('extracted', 'en');
   if (MODE[m.mode]?.kind === 'zombie') {
     const w = m.zWave ?? 0;
     k.textContent = m.won ? t('res.zCleared') : t('res.zFell', { n: Math.min(m.waves ?? 10, w + 1) });

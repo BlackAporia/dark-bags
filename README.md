@@ -89,10 +89,10 @@ Your runner is **him or her** in one of **80 outfits** across six rarities (Comm
 
 Opening is a show: the box charges up and glows through the rarities up to your best drop, bursts in its colour (god rays and particles; screen shake for Exotics), then the cards flip one by one. Tap to skip. A single drop shows your runner alive in the new outfit. **Share cards** (1200×675) exist for nearly everything: a win, an extraction, a death, a box hit or miss, a rank-up.
 
-**Announcer**: first blood, double and triple kills, rampage, godlike, victory, extraction, the final circle and, in deathmatch, "you have taken / lost the lead" are recorded voice lines (`client/voice-data.js`, about 500 KB) played through the game's own mixer, so they work on every device and follow the sound volume; the music ducks under them. Recorded in English, Ukrainian, Spanish, French and Portuguese; other languages hear English. Off in Settings.
+**Announcer**: first blood, double and triple kills, rampage, godlike, victory, extraction, the final circle and, in deathmatch, "you have taken / lost the lead" are recorded voice lines (`client/voice-data.js`, about 100 KB) played through the game's own mixer, so they work on every device and follow the sound volume; the music ducks under them. One English announcer for every language, like the big shooters; each line comes with a medal in the centre of the screen (`client/medals.js`): first blood, multi-kills, headshot, long shot, knife kill. Off in Settings.
 
 Voices (generated offline with [Piper](https://github.com/rhasspy/piper), MIT):
-English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0), Ukrainian "Lada" (Apache 2.0), Spanish "carlfm" (public domain), French "SIWIS" (CC BY 4.0), Brazilian Portuguese "Edresson" (CC BY 4.0).
+English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0).
 
 **Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
 

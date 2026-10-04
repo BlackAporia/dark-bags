@@ -6,7 +6,8 @@ import { OUTFIT, FINISH, RARITY_ORDER, modelFor, meleeOf } from '../shared/cosme
 import { MODE } from '../shared/modes.js';
 import { WAVES } from '../shared/horde.js';
 import { usdText } from '../shared/assets.js';
-import { t, getLang } from './i18n.js';
+import { t } from './i18n.js';
+import { medalSvg } from './medals.js';
 import { settings } from './settings.js';
 
 const usdTextCents = (c) => usdText(c * 10, 1000); // cents → "$x.xx"
@@ -368,9 +369,9 @@ export class GameClient {
       this.hsPing = now;
       this.sfx.play('headshot');
     }
-    if (now - (this.hsSay ?? 0) > 2500) {
+    if (now - (this.hsSay ?? 0) > 1200) {
       this.hsSay = now;
-      this.sfx.say?.('headshot', getLang(), 0.05);
+      this.medal('hs', { title: t('hud.headshot') });
     }
   }
 
@@ -472,6 +473,14 @@ export class GameClient {
         case 'kill': {
           const from = ev.kid === this.pid ? this.meAnim : this.anims.get(ev.kid);
           if (ev.hs && ev.kid === this.pid) this.headshotFx(ev.x ?? from?.x ?? 0, ev.y ?? from?.y ?? 0, now, ev.vid);
+          else if (ev.kid === this.pid && ev.vid !== this.pid && (!ev.cause || ev.cause === 'shot')) {
+            // a knife kill, or a long shot
+            const va = this.anims.get(ev.vid);
+            const vx = ev.x ?? va?.x;
+            const vy = ev.y ?? va?.y;
+            if (WEAPONS[this.you?.w]?.melee) this.medal('knife', { title: t('medal.knife'), sub: ev.victim ?? '' });
+            else if (vx != null && this.pred && Math.hypot(vx - this.pred.x, vy - this.pred.y) > 650) this.medal('long', { title: t('medal.long'), sub: `${Math.round(Math.hypot(vx - this.pred.x, vy - this.pred.y) / 10)} m` });
+          }
           // the killer's style: a kill effect where the victim falls
           if (ev.kf) {
             const va = ev.vid === this.pid ? this.meAnim : this.anims.get(ev.vid);
@@ -523,7 +532,7 @@ export class GameClient {
           break;
         case 'storm':
           this.banner(t(ev.text), 'warn', 2600);
-          if (/final/i.test(ev.text) && !this.dead) this.sfx.say?.('final', getLang());
+          if (/final/i.test(ev.text) && !this.dead) this.sfx.say?.('final', 'en');
           this.sfx.play('storm');
           break;
         case 'exitClosed':
@@ -566,11 +575,11 @@ export class GameClient {
           break;
         case 'lead':
           this.banner(t('hud.tookLead'), 'gold', 2000);
-          this.sfx.say?.('lead', getLang(), 0.9);
+          this.sfx.say?.('lead', 'en', 0.9);
           break;
         case 'lostLead':
           this.banner(t('hud.lostLead'), 'warn', 2000);
-          this.sfx.say?.('lostLead', getLang(), 0.9);
+          this.sfx.say?.('lostLead', 'en', 0.9);
           break;
         case 'leader':
           if (ev.pid !== this.pid) this.feed(t('feed.leader', { name: `<b>${esc(ev.name)}</b>`, k: ev.kills }), 'warnline');
@@ -613,7 +622,7 @@ export class GameClient {
           this.banner(ev.boss ? t(ev.n >= ev.of ? 'hud.bossWave' : 'hud.midBossWave') : t('hud.wave', { n: ev.n, of: ev.of }), ev.boss ? 'warn' : 'gold', 2600);
           this.sfx.play('storm');
           if (ev.boss) {
-            this.sfx.say?.('final', getLang());
+            this.sfx.say?.('final', 'en');
             this.shake = Math.max(this.shake, 10);
           }
           break;
@@ -677,15 +686,40 @@ export class GameClient {
   // ------------------------------------------------------------- local ui
 
   showStreak(tier, who) {
-    const s = STREAKS[tier];
+    this.medal(`s${tier}`, { title: t(`streak.${tier}`), sub: who ? who : tier === 1 ? t('streak.you1') : '', tier });
+  }
+
+  // A medal in the centre of the screen: the badge (medals.js), its title and a line under it,
+  // the sting and the (English) announcer. One at a time: the rest wait their turn, shorter.
+  medal(kind, { title, sub = '', tier = 0 } = {}) {
+    this.medals ??= [];
+    if (this.medals.length >= 3) this.medals.shift();
+    this.medals.push({ kind, title, sub, tier });
+    if (!this.medalOn) return this.nextMedal();
+    // one is showing: cut it to 1.3 s so the new one is not kept waiting
+    clearTimeout(this.streakT);
+    this.streakT = setTimeout(() => this.nextMedal(), Math.max(0, 1300 - (performance.now() - this.medalAt)));
+  }
+
+  nextMedal() {
+    const m = this.medals?.shift();
     const el = this.el.streak;
-    this.el.banner.hidden = true; // the streak owns the centre of the screen
+    if (!m) {
+      this.medalOn = false;
+      el.hidden = true;
+      this.el.banner.classList.remove('low');
+      return;
+    }
+    this.medalOn = true;
+    this.medalAt = performance.now();
+    this.el.banner.classList.add('low'); // the medal owns the centre of the screen
     el.hidden = false;
-    el.className = `streak ${s.cls}`;
-    el.querySelector('.st-title').textContent = t(`streak.${tier}`);
-    el.querySelector('.st-sub').textContent = who ? who : tier === 1 ? t('streak.you1') : '';
+    el.className = `streak ${m.tier ? STREAKS[m.tier].cls : `m-${m.kind}`}`;
+    el.querySelector('.st-medal').innerHTML = medalSvg(m.kind);
+    el.querySelector('.st-title').textContent = m.title;
+    el.querySelector('.st-sub').textContent = m.sub;
     for (const c of el.querySelectorAll('.coin-rain')) c.remove();
-    if (tier === 5) {
+    if (m.tier === 5) {
       for (let i = 0; i < 28; i++) {
         const c = document.createElement('span');
         c.className = 'coin-rain';
@@ -698,10 +732,14 @@ export class GameClient {
     void el.offsetWidth; // restart the CSS animation
     el.classList.add('go');
     clearTimeout(this.streakT);
-    this.streakT = setTimeout(() => (el.hidden = true), 2600);
-    this.sfx.sting?.(tier);
-    this.sfx.say?.(`s${tier}`, getLang(), tier === 1 ? 0.35 : 0.15);
-    if (tier >= 4) this.shake = Math.max(this.shake, 10);
+    this.streakT = setTimeout(() => this.nextMedal(), this.medals.length ? 1500 : 2400);
+    // one announcer for every language: the English lines
+    if (m.tier) {
+      this.sfx.sting?.(m.tier);
+      this.sfx.say?.(`s${m.tier}`, 'en', m.tier === 1 ? 0.35 : 0.15);
+      if (m.tier >= 4) this.shake = Math.max(this.shake, 10);
+    } else if (m.kind === 'hs') this.sfx.say?.('headshot', 'en', 0.05);
+    else this.sfx.play('level');
   }
 
   feed(html, cls = '') {
@@ -718,7 +756,7 @@ export class GameClient {
   banner(text, kind, ms) {
     const b = this.el.banner;
     b.textContent = text;
-    b.className = `banner ${kind}`;
+    b.className = `banner ${kind}${this.medalOn ? ' low' : ''}`; // under a medal, never over it
     b.hidden = false;
     clearTimeout(this.bannerT);
     this.bannerT = setTimeout(() => (b.hidden = true), ms);

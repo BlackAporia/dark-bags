@@ -24,6 +24,8 @@ export default {
   'reg.eu': "أوروبا",
   'reg.us': "الأمريكتان",
   'reg.asia': "آسيا",
+  'medal.long': "طلقة بعيدة",
+  'medal.knife': "قتل بالسكين",
   'ex.centre': "مخرج · اصمد {s} ث",
   'feed.extracting': "{name} يصمد في المخرج",
   'hud.holdExit': "اصمد في المخرج {s} ث · الجميع يعلم · الإصابة تعيد العد",
