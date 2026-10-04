@@ -75,7 +75,9 @@ export class Renderer {
     addEventListener('resize', () => this.resize());
   }
 
-  resize() {
+  // keepMap: a quality step only changes the canvas resolution; the map chunks already built
+  // are kept (scaled when drawn), so the adaptive quality never rebuilds the whole map mid-fight
+  resize(keepMap = false) {
     const cap = [1, 1.5, 2][this.quality];
     const dpr = Math.min(devicePixelRatio || 1, cap);
     this.dpr = dpr;
@@ -87,7 +89,7 @@ export class Renderer {
     }
     this.scale = Math.max(0.5, Math.min(1.6, Math.sqrt((this.w * this.h) / 1.1e6)));
     const res = Math.max(0.5, Math.min(2, Math.round(this.scale * dpr * 4) / 4));
-    this.layer.setRes(res, this.quality >= 1);
+    if (!keepMap || !this.layer.cache.size) this.layer.setRes(res, this.quality >= 1);
     this.miniBase = null;
   }
 
@@ -110,15 +112,20 @@ export class Renderer {
       if (this.slowT > 2000 && this.quality > 0) {
         this.quality--;
         this.slowT = 0;
-        this.resize();
+        this.downs = (this.downs ?? 0) + 1;
+        this.resize(true);
       }
     } else if (this.ema < 14) {
       this.fastT += dtMs;
       this.slowT = 0;
-      if (this.fastT > 8000 && this.quality < 2) {
+      // stepping back up waits longer each time it had to come down again, and stops after
+      // two tries: a device on the edge would otherwise see-saw (a hitch every few seconds)
+      const wait = 8000 * 2 ** (this.downs ?? 0);
+      if (this.fastT > wait && this.quality < 2 && (this.ups ?? 0) < 2) {
         this.quality++;
         this.fastT = 0;
-        this.resize();
+        this.ups = (this.ups ?? 0) + 1;
+        this.resize(true);
       }
     } else {
       this.slowT = 0;

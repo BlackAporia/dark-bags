@@ -96,13 +96,27 @@ if (EPOCH_FILE) {
   }
 }
 
-// a save never leaves a half-written file behind: write a temp file, then swap it in
-async function saveJSON(file, obj) {
-  const tmp = `${file}.tmp`;
-  const body = track(`save ${path.basename(file)}`, () => JSON.stringify(obj));
-  await writeFile(tmp, body);
-  await rename(tmp, file);
+// a save never leaves a half-written file behind: write a temp file, then swap it in.
+// Turning a store into JSON holds the one thread every raid runs on (tens of ms for a big
+// store), so saves queue up and run one at a time with a gap between them: a tick always gets
+// in between, and two stores never freeze the raids back to back.
+let saveChain = Promise.resolve();
+function saveJSON(file, obj) {
+  const run = saveChain.then(async () => {
+    await new Promise((r) => setTimeout(r, SAVE_GAP));
+    const tmp = `${file}.tmp`;
+    const body = track(`save ${path.basename(file)}`, () => JSON.stringify(obj));
+    await writeFile(tmp, body);
+    await rename(tmp, file);
+  });
+  saveChain = run.catch(() => {});
+  return run;
 }
+const SAVE_GAP = 60; // ms between two saves in the queue
+// how long a change may wait before it is written: money-related stores soon, the rest in
+// batches (a deploy or restart saves everything on the way out anyway)
+const SAVE_SOON = 5000;
+const SAVE_LATER = 30000;
 watchStalls();
 // players, friends, messages, guilds: on the data volume when there is one
 
@@ -126,7 +140,7 @@ const wallet = new MemoryWallet({
     saveTimer = setTimeout(async () => {
       saveTimer = null;
       await saveJSON(WALLET_FILE, w.toJSON()).catch((e) => console.error('wallet save failed', e));
-    }, 2000);
+    }, SAVE_SOON);
   },
 });
 
@@ -140,7 +154,7 @@ const ranks = new RankBook({
     rankTimer = setTimeout(async () => {
       rankTimer = null;
       await saveJSON(RANKS_FILE, r.toJSON()).catch((e) => console.error('ranks save failed', e));
-    }, 2000);
+    }, SAVE_LATER);
   },
 });
 
@@ -154,7 +168,7 @@ const inventory = new Inventory({
     lockerTimer = setTimeout(async () => {
       lockerTimer = null;
       await saveJSON(LOCKER_FILE, inv.toJSON()).catch((e) => console.error('locker save failed', e));
-    }, 1000);
+    }, SAVE_SOON);
   },
 });
 
@@ -167,7 +181,7 @@ const social = new SocialBook({
     socialTimer = setTimeout(async () => {
       socialTimer = null;
       await saveJSON(SOCIAL_FILE, sb.toJSON()).catch((e) => console.error('social save failed', e));
-    }, 1500);
+    }, SAVE_LATER);
   },
 });
 
@@ -180,7 +194,7 @@ const referrals = new ReferralBook({
     refTimer = setTimeout(async () => {
       refTimer = null;
       await saveJSON(REFERRAL_FILE, rb.toJSON()).catch((e) => console.error('referrals save failed', e));
-    }, 1500);
+    }, SAVE_LATER);
   },
 });
 
@@ -204,7 +218,7 @@ const guard = new Guard({
     guardTimer = setTimeout(async () => {
       guardTimer = null;
       await saveGuard(g).catch((e) => console.error('guard save failed', e));
-    }, 3000);
+    }, SAVE_LATER);
   },
 });
 for (const k of (process.env.GUARD_CLEAR ?? '').split(',').map((x) => x.trim()).filter(Boolean)) guard.clear(k);
@@ -219,7 +233,7 @@ const mail = new MailBook({
     mailTimer = setTimeout(async () => {
       mailTimer = null;
       await saveJSON(MAIL_FILE, mb.toJSON()).catch((e) => console.error('mail save failed', e));
-    }, 1500);
+    }, SAVE_LATER);
   },
 });
 
@@ -233,7 +247,7 @@ const daily = new DailyBook({
     dailyTimer = setTimeout(async () => {
       dailyTimer = null;
       await saveJSON(DAILY_FILE, db.toJSON()).catch((e) => console.error('daily save failed', e));
-    }, 1500);
+    }, SAVE_LATER);
   },
 });
 
@@ -247,7 +261,7 @@ const fortune = new FortuneBook({
     fortuneTimer = setTimeout(async () => {
       fortuneTimer = null;
       await saveJSON(FORTUNE_FILE, fb.toJSON()).catch((e) => console.error('fortune save failed', e));
-    }, 1000);
+    }, SAVE_LATER);
   },
 });
 
@@ -261,7 +275,7 @@ const stats = new StatsBook({
     statsTimer = setTimeout(async () => {
       statsTimer = null;
       await saveJSON(STATS_FILE, sb.toJSON()).catch((e) => console.error('stats save failed', e));
-    }, 5000);
+    }, SAVE_LATER);
   },
 });
 stats.changed();
