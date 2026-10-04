@@ -25,21 +25,21 @@ const FLOW = [
   { key: 'modeInfo', target: ['#mode-info'], page: 'play' },
   { key: 'stake', target: ['#tables'], page: 'play' },
   { key: 'coins', target: ['#paywith'], page: 'play' },
-  { key: 'wallet', target: ['#cashier:not([hidden])', '#tb-wallet', '.tb-chip'], page: 'play' },
+  { key: 'wallet', target: ['.topbar .tb-right', '#tb-wallet', '.tb-chip'], page: 'play' },
   // the store
   { key: 'shop', target: ['#offers-root', '.shop-tabs', '#shop-root'], page: 'shop' },
   { key: 'cases', target: ['.box-group', '.shop-tabs'], page: 'shop' },
   { key: 'wheel', target: ['#fortune-root', '.fortune'], page: 'shop' },
   { key: 'inventory', target: ['#inv-root'], page: 'inventory' },
-  { key: 'swap', target: ['.nav-btn[data-page="swap"]'], page: 'swap' },
+  { key: 'swap', target: ['.nav-btn[data-page="swap"]', '.page[data-page="swap"] > :not([hidden])'], page: 'swap' },
   // play more, earn more
   { key: 'pass', target: ['.bp-hero', '#pass-root', '.nav-btn[data-page="pass"]'], page: 'pass' },
-  { key: 'ranked', target: ['.nav-btn[data-page="ranked"]'], page: 'ranked' },
-  { key: 'tasks', target: ['.nav-btn[data-page="achievements"]'], page: 'achievements' },
+  { key: 'ranked', target: ['.nav-btn[data-page="ranked"]', '.page[data-page="ranked"] > :not([hidden])'], page: 'ranked' },
+  { key: 'tasks', target: ['.nav-btn[data-page="achievements"]', '.page[data-page="achievements"] > :not([hidden])'], page: 'achievements' },
   // together
-  { key: 'social', target: ['.nav-btn[data-page="friends"]', '.nav-btn[data-page="chat"]'], page: 'friends' },
-  { key: 'mail', target: ['.nav-btn[data-page="mail"]', '.nav-btn[data-page="invite"]'], page: 'invite' },
-  { key: 'settings', target: ['.nav-btn[data-page="settings"]'], page: 'settings' },
+  { key: 'social', target: ['.nav-btn[data-page="friends"]', '.nav-btn[data-page="chat"]', '.page[data-page="friends"] > :not([hidden])'], page: 'friends' },
+  { key: 'mail', target: ['.nav-btn[data-page="mail"]', '.nav-btn[data-page="invite"]', '.page[data-page="invite"] > :not([hidden])'], page: 'invite' },
+  { key: 'settings', target: ['.nav-btn[data-page="settings"]', '.page[data-page="settings"] > :not([hidden])'], page: 'settings' },
   // the first match, together
   { key: 'match', page: 'play', mood: 'wow' },
   { key: 'practice', target: ['#mode-practice'], wait: 'practice', ok: 'practiceOk', page: 'play' },
@@ -136,7 +136,7 @@ export function createTour({ app, go, touch = () => false, sfx = null, game = nu
     nyx = createNyx($('tour-nyx'));
     face = nyx;
     $('tour-next').addEventListener('click', () => {
-      if (!steps[i]?.wait) advance();
+      if (!steps[i]?.wait && !more(true)) advance();
     });
     $('tour-back').addEventListener('click', back);
     $('tour-skip').addEventListener('click', skip);
@@ -154,25 +154,60 @@ export function createTour({ app, go, touch = () => false, sfx = null, game = nu
     const hold = s.raid || (rk && !rk.hidden) || (s.hold && !n);
     el.classList.toggle('hold', !!hold);
     card.classList.remove('top');
+    // on phones the menu is a bar at the bottom: the card sits just above it
+    const nav = $('menu-nav')?.getBoundingClientRect();
+    card.style.bottom = nav && nav.height && nav.top > innerHeight / 2 && nav.top < innerHeight ? `${Math.round(innerHeight - nav.top + 8)}px` : '';
     if (!n) {
       spot.className = 'tour-spot none';
       return;
     }
-    if (!s.scrolled) {
-      s.scrolled = true;
-      // something to press goes to the top of the screen, clear of the card at the bottom
-      n.scrollIntoView?.({ block: s.wait ? 'start' : 'nearest', behavior: 'auto' });
-      if (s.wait) document.querySelector('.pages')?.scrollBy?.(0, -90);
+    const card0 = card.getBoundingClientRect();
+    if (s.scrolled !== n) {
+      s.scrolled = n;
+      // bring the target to the top of the page, so the card at the bottom covers none of it
+      const sc = n.closest('.pages');
+      if (sc) {
+        const r0 = n.getBoundingClientRect();
+        sc.scrollTo({ top: Math.max(0, sc.scrollTop + r0.top - sc.getBoundingClientRect().top - 14), behavior: 'instant' });
+      } else n.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
     }
     const r = n.getBoundingClientRect();
     const pad = 8;
+    const sc = n.closest('.pages');
+    const top = Math.max(sc ? sc.getBoundingClientRect().top : 0, r.top - pad);
+    const bottom = Math.min(innerHeight, r.bottom + pad);
     spot.className = `tour-spot${s.wait ? ' act' : ''}`;
-    Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${Math.min(r.height + pad * 2, innerHeight)}px` });
-    // the card goes where it hides less of the target
-    const cr = card.getBoundingClientRect();
-    const hideBelow = Math.max(0, r.bottom + pad - (innerHeight - cr.height - 18));
-    const hideAbove = Math.max(0, 18 + cr.height - (r.top - pad));
-    if (hideBelow > 0 && hideAbove < hideBelow && !(s.wait && r.top < innerHeight / 2)) card.classList.add('top');
+    Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${top}px`, width: `${r.width + pad * 2}px`, height: `${Math.max(0, bottom - top)}px` });
+    // the card stays at the bottom unless the target sits there (the phone menu, the end of a
+    // page): then it goes to the top
+    const free = innerHeight - card0.height - 18;
+    const hidBottom = Math.max(0, Math.min(bottom, innerHeight) - free);
+    const hidTop = Math.max(0, Math.min(bottom, card0.height + 18) - top);
+    if (hidBottom > 0 && hidTop < hidBottom && top > free - 40) card.classList.add('top');
+    if (!s.wait) $('tour-next').textContent = i === steps.length - 1 ? t('tour.finish') : `${t('tour.next')} ${more(false) ? '↓' : '→'}`;
+  }
+
+  // A section taller than the room above the card (the shop, the cases, the inventory): Next
+  // first scrolls the rest of it into view, then moves on. go=false only asks.
+  function more(go) {
+    const s = steps[i];
+    if (!s || s.wait || s.raid || (s.pans ?? 0) >= 4) return false;
+    const n = visible(s.target);
+    const sc = n?.closest('.pages');
+    const card = $('tour-card');
+    if (!sc || card.classList.contains('top')) return false;
+    const free = card.getBoundingClientRect().top - 14;
+    const r = n.getBoundingClientRect();
+    if (r.bottom <= free + 6) return false;
+    const room = free - sc.getBoundingClientRect().top - 70;
+    const want = Math.min(r.bottom - free + 14, Math.max(80, room));
+    const max = sc.scrollHeight - sc.clientHeight - sc.scrollTop;
+    if (max < 20) return false;
+    if (go) {
+      s.pans = (s.pans ?? 0) + 1;
+      sc.scrollTo({ top: sc.scrollTop + Math.min(want, max), behavior: 'smooth' });
+    }
+    return true;
   }
 
   // is what this step asks for already done?
@@ -210,7 +245,8 @@ export function createTour({ app, go, touch = () => false, sfx = null, game = nu
     $('tour-dots').innerHTML = dots.map((_, k) => `<i class="${k === at ? 'on' : k < at ? 'past' : ''}"></i>`).join('');
     nyx?.mood(s.mood ?? null);
     write(el, s.key);
-    s.scrolled = false;
+    s.scrolled = null;
+    s.pans = 0;
     requestAnimationFrame(place);
     setTimeout(place, 450);
     if (!s.wait) $('tour-next').focus({ preventScroll: true });
