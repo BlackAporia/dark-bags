@@ -39,6 +39,7 @@ import { createIntro } from './intro.js';
 import { createInvite, captureRef, deviceId } from './invite.js';
 import { createMail } from './mail.js';
 import { createFortune } from './fortune.js';
+import { createOffers } from './offers.js';
 import { createCoinImport } from './coins.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
@@ -195,9 +196,13 @@ const daily = createDaily({ app, send, sfx, toast: (m) => toast(m), go: (p) => g
 app.renderAch = () => ach.renderList();
 app.claimAch = (id) => daily.claimAch(id);
 const coinImport = createCoinImport({ app, send, toast: (m) => toast(m) });
+const offers = createOffers({ app, send, sfx, toast: (m) => toast(m) });
 const fortune = createFortune({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
-const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }), onRender: (root) => fortune.mount(root) });
-const inventory = createInventory({ app, send, openBox: (id) => shop.open(id), openWheel: () => fortune.open(), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
+const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }), onRender: (root) => {
+    fortune.mount(root);
+    offers.mount(root);
+  } });
+const inventory = createInventory({ app, send, openBox: (id, n) => shop.open(id, n), openAll: () => shop.openAll(), openWheel: (all) => fortune.open(all), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
 const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
 const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
 const settingsUi = createSettingsUi();
@@ -1034,6 +1039,7 @@ function onMessage(m) {
   if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
   if (m.t === 'locker') pass.onMessage(m);
+  if (m.t === 'locker') offers.onMessage(m);
   if (m.t === 'leaderboard' || m.t === 'career' || m.t === 'result') ranked.onMessage(m);
   if (m.t === 'ref' || m.t === 'welcome' || m.t === 'authed') invite.onMessage(m);
   if (m.t === 'mailbox' || m.t === 'welcome' || m.t === 'authed' || m.t === 'locker') mail.onMessage(m);

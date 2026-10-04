@@ -405,14 +405,14 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     }
     const again = st.last;
     const held = L().boxes?.[box.id] ?? 0;
-    const cost = boxCost(box, Math.max(0, again.n - held));
+    const cost = again.all ? 0 : boxCost(box, Math.max(0, again.n - held));
     const tally = RARITY_ORDER.filter((k) => counts[k]).map((k) => `<span style="color:${RARITIES[k].color}">${counts[k]}× ${rn(k)}</span>`).join(' · ');
     $('op-actions').innerHTML = `
       ${results.length > 1 ? `<p class="op-tally">${tally}${back ? ` · ${t('shop.back', { v: usd(back) })}` : ''}</p>` : ''}
       <div class="op-btns">
         ${!best.dup ? `<button type="button" class="cta" data-op="equip">${t('shop.equipBest', { n: o.name })}</button>` : ''}
         <button type="button" class="ghost share" data-op="share">${best.jackpot ? t('lk.showOff') : t('lk.postMiss')}</button>
-        <button type="button" class="ghost" data-op="again" ${cost > reach() ? 'disabled' : ''}>${t('lk.another')} ×${again.n} · ${cost ? usd(cost) : t('lk.free1')}</button>
+        ${again.all ? '' : `<button type="button" class="ghost" data-op="again" ${cost > reach() ? 'disabled' : ''}>${t('lk.another')} ×${again.n} · ${cost ? usd(cost) : t('lk.free1')}</button>`}
         <button type="button" class="link" data-op="close">${t('share.close')}</button>
       </div>`;
     const act = (k, f) => $('op-actions').querySelector(`[data-op="${k}"]`)?.addEventListener('click', f);
@@ -441,7 +441,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
       return;
     }
     if (m.t === 'locker') {
-      if (m.op === 'box') reveal(m.result);
+      if (m.op === 'box' || m.op === 'box_all') reveal(m.result);
       if (m.op === 'topup') {
         sfx.play('coin');
         toast(`+${usd(m.result.added)} ${t('lk.shopUsd')}`);
@@ -468,6 +468,17 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     onMessage,
     // open a bag or crate from anywhere (inventory, the battle pass): the ones you hold are free
     open: (id, n = 1) => BOX[id] && (demoOnly() ? demo(id) : buy(id, n)),
+    // open every box you hold, all kinds at once (free)
+    openAll() {
+      if (st.busy || demoOnly()) return;
+      st.busy = true;
+      st.last = { id: null, n: 0, all: true };
+      sfx.unlock?.();
+      sfx.play('ready');
+      const first = Object.keys(L().boxes ?? {}).find((id) => L().boxes[id] > 0);
+      if (first) charge(BOX[first]);
+      send({ t: 'box_all' });
+    },
     family(f) {
       if (f === 'outfit' || f === 'weapon' || f === 'style') st.family = f;
     },

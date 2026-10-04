@@ -22,6 +22,7 @@
 // how a runner plays. It is all looks.
 import { WEAPONS } from './weapons.js';
 import { STYLE, STYLE_ITEMS, STYLE_CASES, STYLE_KINDS, pickStyle } from './style.js';
+import { featured, storeDay, CARD, STARTER, tierCost } from './store.js';
 import { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems } from './season.js';
 export { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems };
 
@@ -342,7 +343,7 @@ export const BOXES = [
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
 // what a box can drop: the whole family, or its collection
 export function boxCatalog(box) {
-  if (box.family === 'style') return STYLE_ITEMS;
+  if (box.family === 'style') return STYLE_ITEMS.filter((x) => !x.excl);
   if (box.family === 'outfit') return box.outfits ? box.outfits.map((id) => OUTFIT[id]).filter(Boolean) : OUTFITS;
   if (!box.finishes && !box.weapons) return WEAPON_SKINS;
   return WEAPON_SKINS.filter((s) => (!box.finishes || box.finishes.includes(s.finish)) && (!box.weapons || box.weapons.includes(s.weapon)));
@@ -411,9 +412,10 @@ export const PACKS = [
   { id: 'p1000', price: 100000, bonus: 30000 },
 ];
 export const PACK = Object.fromEntries(PACKS.map((p) => [p.id, p]));
-// First top-up doubles: extra shop $ equal to the price, up to $10 (the step from a free
-// player to a paying one is the one that matters most; shop $ costs the house nothing to mint)
-export const FIRST_TOPUP_MAX = 10000;
+// First top-up doubles: extra shop $ equal to the price, up to $25 (the step from a free
+// player to a paying one is the one that matters most; capped so the bigger packs' own bonus
+// still counts for the second top-up and after)
+export const FIRST_TOPUP_MAX = 2500;
 export const firstBonus = (price) => Math.min(price, FIRST_TOPUP_MAX);
 
 // The rarity of the 1-hour trial outfit one rank-up pays (the only rank-up reward).
@@ -581,6 +583,9 @@ export class Inventory {
       sowned: r.sowned ?? [],
       sequip: r.sequip ?? {},
       pass: this.passView(key),
+      card: this.cardView(key),
+      store: this.store(key),
+      starter: !!r.starter,
       pity: Object.fromEntries(BOXES.map((b) => [b.id, { sinceEpic: r.pity[b.id]?.sinceEpic ?? 0, sinceLegendary: r.pity[b.id]?.sinceLegendary ?? 0, sinceExotic: r.pity[b.id]?.sinceExotic ?? 0 }])),
     };
   }
@@ -701,7 +706,9 @@ export class Inventory {
   passXp(key, xp) {
     const ps = this.passRec(key);
     const before = passTier(ps.xp);
-    ps.xp = Math.min(PASS_TIERS * PASS_STEP, ps.xp + Math.max(0, Math.floor(xp)));
+    // the Insider card: +25% pass XP while it lasts
+    const boost = (this.rec(key).card?.until ?? 0) > this.now() ? 1 + CARD.passBoost : 1;
+    ps.xp = Math.min(PASS_TIERS * PASS_STEP, ps.xp + Math.max(0, Math.floor(xp * boost)));
     this.changed();
     return { before, after: passTier(ps.xp), xp: ps.xp };
   }
@@ -713,6 +720,104 @@ export class Inventory {
     ps.premium = true;
     this.changed();
     return { ok: true, premium: true };
+  }
+
+  // buy pass tiers outright ($0.99 each, ten for $8.99), up to the last tier
+  passTiers(key, n, external) {
+    const ps = this.passRec(key);
+    const left = PASS_TIERS - passTier(ps.xp);
+    n = Math.max(1, Math.min(left, Math.floor(Number(n) || 1)));
+    if (left <= 0) return { ok: false, error: 'The pass is complete.' };
+    const cost = tierCost(n);
+    if (!this.charge(key, cost, external)) return { ok: false, error: `Not enough $ (${usd(cost)} needed).` };
+    ps.xp = Math.min(PASS_TIERS * PASS_STEP, (passTier(ps.xp) + n) * PASS_STEP);
+    this.changed();
+    return { ok: true, tiers: n, tier: passTier(ps.xp), cost };
+  }
+
+  // ------------------------------------------------------------------ offers (shared/store.js)
+  // today's featured store, with what you already own marked
+  store(key) {
+    const r = this.rec(key);
+    const day = storeDay(this.now());
+    const items = featured(day, { outfits: OUTFITS, wskins: WEAPON_SKINS }).map((x) => ({ ...x, owned: (x.kind === 'outfit' ? r.owned : x.kind === 'wskin' ? r.wowned : r.sowned ?? []).includes(x.id) }));
+    return { day, ends: (day + 1) * 86400000, items };
+  }
+
+  storeBuy(key, id, external) {
+    const it = this.store(key).items.find((x) => x.id === id);
+    if (!it) return { ok: false, error: 'That one is not in the store today.' };
+    if (it.owned) return { ok: false, error: 'You already own it.' };
+    if (!this.charge(key, it.price, external)) return { ok: false, error: `Not enough $ (${usd(it.price)} needed).` };
+    this.give(key, { k: it.kind, id: it.id });
+    return { ok: true, item: it };
+  }
+
+  cardView(key) {
+    const c = this.rec(key).card;
+    const now = this.now();
+    if (!c || c.until <= now) return null;
+    return { until: c.until, claimed: c.day === storeDay(now), left: Math.ceil((c.until - now) / 86400000) };
+  }
+
+  // the Insider card: buying it again while it lasts adds 30 more days
+  cardBuy(key, external) {
+    const r = this.rec(key);
+    if (!this.charge(key, CARD.price, external)) return { ok: false, error: `Not enough $ (${usd(CARD.price)} needed).` };
+    const now = this.now();
+    const from = Math.max(now, r.card?.until ?? 0);
+    r.card = { until: from + CARD.days * 86400000, day: r.card?.day ?? -1 };
+    r.credit += CARD.now;
+    r.sowned ??= [];
+    if (!r.sowned.includes(CARD.frame)) r.sowned.push(CARD.frame);
+    this.changed();
+    return { ok: true, card: this.cardView(key), added: CARD.now };
+  }
+
+  cardClaim(key) {
+    const r = this.rec(key);
+    const v = this.cardView(key);
+    if (!v) return { ok: false, error: 'No Insider card.' };
+    if (v.claimed) return { ok: false, error: 'Already claimed today.' };
+    r.card.day = storeDay(this.now());
+    r.credit += CARD.daily;
+    r.spins += CARD.spins;
+    this.changed();
+    return { ok: true, credit: CARD.daily, spins: CARD.spins, card: this.cardView(key) };
+  }
+
+  // the starter pack, once per account
+  starterBuy(key, external) {
+    const r = this.rec(key);
+    if (r.starter) return { ok: false, error: 'Already bought.' };
+    if (!this.charge(key, STARTER.price, external)) return { ok: false, error: `Not enough $ (${usd(STARTER.price)} needed).` };
+    r.starter = this.now();
+    const pool = OUTFITS.filter((o) => o.rarity === STARTER.outfit && !o.basic && !o.limited && !o.season && !r.owned.includes(o.id));
+    const outfit = pool.length ? pool[Math.floor(this.rnd() * pool.length)].id : null;
+    if (outfit) this.give(key, { k: 'outfit', id: outfit });
+    for (const [id, n] of STARTER.boxes) this.give(key, { k: 'box', id, n });
+    r.spins += STARTER.spins;
+    this.give(key, { k: 'style', id: STARTER.style });
+    return { ok: true, outfit, boxes: STARTER.boxes, spins: STARTER.spins, style: STARTER.style };
+  }
+
+  // open everything you hold, every box kind at once (up to 300); nothing is charged
+  openAll(key) {
+    const r = this.rec(key);
+    const held = BOXES.map((b) => [b.id, (r.boxes[b.id] ?? 0) + (r.gboxes?.[b.id] ?? 0)]).filter(([, n]) => n > 0);
+    if (!held.length) return { ok: false, error: 'No boxes to open.' };
+    const results = [];
+    let left = 300;
+    for (const [id, n] of held) {
+      if (left <= 0) break;
+      const k = Math.min(n, MAX_OPEN, left);
+      const o = this.open(key, id, null, k);
+      if (!o.ok) continue;
+      left -= k;
+      for (const x of o.results) results.push({ ...x, box: id });
+    }
+    const best = results.reduce((a, b) => (rank(b.rarity) > rank(a.rarity) ? b : a));
+    return { ok: true, all: true, box: best.box, count: results.length, results };
   }
 
   passClaim(key, track, tier) {

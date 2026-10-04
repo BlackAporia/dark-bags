@@ -12,7 +12,7 @@ and from `node scripts/sim.js`.
 | **Shop $** | Store credit, 1 shop $ = 1 USDC/USDT. | Bought with USDC/USDT (packs add 0–30% bonus); duplicates refund 10% of their value | Only spent on bags and crates. **Never withdrawable.** |
 | **Rank XP** | Progress only. | Raids and achievements | Nothing: it only moves your rank (1–90). |
 
-Rank-ups pay one thing: a random outfit to wear for 72 hours. There is no currency
+Rank-ups pay one thing: a random outfit to wear for 1 hour. There is no currency
 reward for ranks, so XP cannot be farmed into money.
 
 Internally every value is an integer in mills ($0.001). Token prices come from USDC
@@ -64,7 +64,7 @@ players has neither problem.
 
 ## 3. The shop
 
-Skins come only from boxes (and rank-up trials). Two families, always sold separately:
+Skins come from boxes, the featured store (bought outright), the battle pass and ranked. Two families, always sold separately:
 **outfit bags** for your runner and **weapon crates** for your guns and knife. Nine tiers
 each:
 
@@ -104,11 +104,35 @@ each:
   once a player has the whole rarity; everything else is margin.
 
 **First top-up doubles.** A player's first shop $ pack comes with the same amount again,
-up to $10 extra (the $5 pack gives $10 of shop $). Turning a free player into a paying
+up to $25 extra (the $5 pack gives $10 of shop $; capped so the bigger packs' own bonus
+still matters on the second top-up). Turning a free player into a paying
 one is the biggest single step in conversion, and shop $ costs nothing to mint: it can
 only be spent on boxes, never withdrawn.
 
 **Margin.** Digital goods: close to 100% gross margin, less payment and chain costs.
+
+### Offers next to the cases (`shared/store.js`)
+
+| Offer | Price | What you get | Why |
+|---|---|---|---|
+| **Featured store** | $1.49 Rare · $3.99 Epic · $14.99 Legendary · $39.99 Mythic | six skins a day (2 outfits, 2 weapon skins, 2 style), the same for everyone, new set at 00:00 UTC; never limited, Exotic or season items | buy the exact skin you want, no roll; a timer creates urgency; lowers the loot-box-only regulatory risk |
+| **Insider card** | $4.99 / 30 days | $1 shop $ at once, $0.15 shop $ + 1 wheel spin a day (claimed), +25% pass XP, the card-only Insider frame | the best retention tool in mobile games: a reason to log in every day; ~$5.50 of shop $ + 30 spins for $4.99 |
+| **Starter pack** | $1.99, once | an Epic outfit, 2 Vault bags + 1 Armory crate (full odds), 5 spins, an Epic frame (~$11 at shop prices) | a second, cheap first-purchase moment for players who never top up |
+| **Pass tiers** | $0.99 each, 10 for $8.99 | battle-pass tiers outright | the end-of-season push for the last rewards |
+
+### Free versus paid
+
+Free play (the calendar, daily/weekly tasks, achievements, invites, the free pass track,
+free wheel spins) tops out at **Epic**: free boxes are gift boxes that roll no higher than
+Epic, free style items are Common to Epic, and a player who does everything every day
+gets about **$3 of shop $** and ~58 wheel spins a month (free shop $ is kept small because
+it buys full-odds boxes). Legendary, Mythic and Exotic come from paid boxes, the premium
+pass, ranked division prizes and the featured store. Wheel trial skins last 1 hour.
+
+The **fortune wheel** ($0.05 a spin, or free spins) has 18 slots, all Epic or lower: 1-hour
+skins, real skins, shop $, pass XP, XP boosts, style, gift boxes, extra spins. Paid spins
+put 30% into the fortune bank, paid out in real coins when it reaches its mark; free spins
+never touch the bank.
 
 ## 4. Other income
 
@@ -173,6 +197,10 @@ public testnet with real players → real-money tables in licensed regions.
 
 **Not built yet, worth adding before real money:** spending and session limits
 (responsible gaming), self-exclusion, provably fair box seeds (commit and reveal),
-KYC/geo-blocking hooks, an operator dashboard for `room.totals`, a daily login reward
-and a battle pass (retention + a second shop line that is not a loot box, which also
-lowers the regulatory risk of selling skins only through boxes).
+KYC/geo-blocking hooks. Built since: the daily calendar and tasks, the battle pass, the
+featured store, the Insider card, the starter pack.
+
+**Next levers (not built):** a trade-up contract (10 duplicates → one rarity up), collection
+sets with a completion reward, gifting boxes and skins to friends, VIP levels by lifetime
+spend, two-week event cases, kill-counter add-ons. A player-to-player market would add a
+fee line but is the riskiest one legally (skin gambling): only with legal advice.

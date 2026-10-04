@@ -3,6 +3,7 @@
 // The server owns the pass; this page only shows it and sends claims.
 import { BOX, OUTFIT, WSKIN, RARITIES, TURRET_SKIN, PASS_TIERS, PASS_STEP, PASS_PRICE, passRewards, seasonItems, usd } from '../shared/cosmetics.js';
 import { seasonInfo, seasonAt } from '../shared/season.js';
+import { tierCost } from '../shared/store.js';
 import { boxArt, weaponStill } from './locker.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { esc } from './game.js';
@@ -84,6 +85,7 @@ export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
           <p class="fine">${t('bp.how')}</p>
           <div class="bp-prog"><b>${t('bp.tier', { n: ps.tier, m: PASS_TIERS })}</b><div class="bp-bar"><i style="width:${(inTier / PASS_STEP) * 100}%"></i></div><span class="fine">${ps.tier >= PASS_TIERS ? t('bp.maxed') : t('bp.xp', { a: inTier, b: PASS_STEP })}</span></div>
           <div class="bp-cta">${ps.premium ? `<span class="bp-prem-on">★ ${t('bp.owned')}</span>` : `<button type="button" class="cta bp-buy" data-buy>${t('bp.buy', { v: usd(PASS_PRICE) })}</button><p class="fine">${t('bp.perks')}</p>`}
+            ${ps.tier < PASS_TIERS ? `<div class="bp-tiers"><button type="button" class="ghost" data-tiers="1">${t('bp.buyTier', { n: 1, v: usd(tierCost(1)) })}</button>${PASS_TIERS - ps.tier >= 10 ? `<button type="button" class="ghost" data-tiers="10">${t('bp.buyTier', { n: 10, v: usd(tierCost(10)) })}</button>` : ''}</div>` : ''}
             ${avail.length ? `<button type="button" class="ghost bp-all" data-all>${t('bp.claimAll', { n: avail.length })}</button>` : ''}</div>
         </div>
         <div class="bp-show"><canvas id="bp-live" aria-label="${esc(OUTFIT[items.apex].name)}"></canvas><p class="bp-show-name">${esc(OUTFIT[items.apex].name)} · <span style="color:${RARITIES.mythic.color}">${t('r.mythic')}</span></p></div>
@@ -116,6 +118,7 @@ export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
       }
     });
     root.querySelector('[data-buy]')?.addEventListener('click', () => send({ t: 'pass_buy' }));
+    for (const b of root.querySelectorAll('[data-tiers]')) b.addEventListener('click', () => send({ t: 'pass_tiers', n: Number(b.dataset.tiers) }));
     for (const b of root.querySelectorAll('[data-open]')) b.addEventListener('click', () => openBox(b.dataset.open));
     for (const b of root.querySelectorAll('[data-tequip]')) b.addEventListener('click', () => send({ t: 'tequip', id: b.dataset.tequip || null }));
     live(items.apex);
@@ -153,6 +156,10 @@ export function createPass({ app, send, sfx, toast, openBox = () => {} }) {
       sfx.play(rw.k === 'credit' || rw.k === 'box' ? 'coin' : 'bag');
       if (rw.k === 'box') gotBox(rw.id);
       else toast(t('bp.got', { x: rewardName(rw) }));
+    }
+    if (m.op === 'pass_tiers') {
+      sfx.play('coin');
+      toast(t('bp.tiersGot', { n: m.result.tiers, t: m.result.tier }));
     }
     if (m.op === 'pass_buy') {
       sfx.music?.sting(true);

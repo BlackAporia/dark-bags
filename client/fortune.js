@@ -138,7 +138,7 @@ export function createFortune({ app, send, sfx, toast, share }) {
           <div><p class="eyebrow">${t('fw.kicker')}</p><h3 class="fw-title">${t('fw.title')}</h3><p class="fine">${t('fw.lead')}</p></div>
           <div class="fw-bank"><small>${t('fw.bank')}</small><b>${v ? money(v.pool) : '…'}</b><div class="fw-bar"><i style="width:${pct}%"></i></div><small>${v ? t('fw.next', { m: money(v.mark) }) : ''}</small></div>
         </div>
-        ${n > 0 ? `<button type="button" class="cta fw-free" id="fw-free" ${st.spinning ? 'disabled' : ''}>🎁 ${t('fw.free', { n })}</button>` : ''}
+        ${n > 0 ? `<div class="fw-row"><button type="button" class="cta fw-free" id="fw-free" ${st.spinning ? 'disabled' : ''}>🎁 ${t('fw.free', { n })}</button>${n > 1 ? `<button type="button" class="cta fw-free" id="fw-all" ${st.spinning ? 'disabled' : ''}>🎡 ${t('fw.all', { n: Math.min(50, n) })}</button>` : ''}</div>` : ''}
         <div class="fw-row">
           <select id="fw-coin" aria-label="${esc(t('fw.coin'))}">${list.map((a) => `<option value="${esc(a.id)}"${a.id === st.asset ? ' selected' : ''}>${esc(a.symbol)} · ${esc(formatUnits(app.balances?.[a.id] ?? '0', a.decimals, 4))}</option>`).join('')}</select>
           <button type="button" class="${n > 0 ? 'ghost' : 'cta'} fw-go" id="fw-go" ${list.length && !st.spinning ? '' : 'disabled'}>🎰 ${t('fw.spin')} · $0.05</button>
@@ -151,6 +151,7 @@ export function createFortune({ app, send, sfx, toast, share }) {
     $('fw-coin')?.addEventListener('change', (e) => (st.asset = e.target.value));
     $('fw-go')?.addEventListener('click', () => spin(false));
     $('fw-free')?.addEventListener('click', () => spin(true));
+    $('fw-all')?.addEventListener('click', () => spin(true, spins()));
     const mini = $('fw-mini');
     const go = () => spin(spins() > 0);
     mini?.addEventListener('click', go);
@@ -169,7 +170,7 @@ export function createFortune({ app, send, sfx, toast, share }) {
   }
 
   // the big wheel: open it (or keep it open for another spin) and ask the server to spin
-  function spin(free) {
+  function spin(free, many = 1) {
     if (st.spinning) return;
     if (free && spins() <= 0) free = false;
     if (!free && !st.asset) return toast?.(t('fw.noCoins'));
@@ -191,7 +192,7 @@ export function createFortune({ app, send, sfx, toast, share }) {
     for (const g of document.querySelectorAll('#fw-big .fw-seg.win')) g.classList.remove('win');
     $('fw-out').innerHTML = '';
     acts();
-    send(free ? { t: 'fortune_spin', free: 1 } : { t: 'fortune_spin', asset: st.asset });
+    send(free ? { t: 'fortune_spin', free: Math.max(1, Math.min(50, many)) } : { t: 'fortune_spin', asset: st.asset });
     paint();
   }
 
@@ -200,9 +201,10 @@ export function createFortune({ app, send, sfx, toast, share }) {
     const el = $('fw-acts');
     if (!el) return;
     const n = spins();
-    const again = st.spinning ? '' : n > 0 ? `<button type="button" class="cta" id="fw-again-free">🎁 ${t('fw.free', { n })}</button>` : st.asset ? `<button type="button" class="cta" id="fw-again">🎰 ${t('fw.again')} · $0.05</button>` : '';
+    const again = st.spinning ? '' : n > 0 ? `<button type="button" class="cta" id="fw-again-free">🎁 ${t('fw.free', { n })}</button>${n > 1 ? `<button type="button" class="cta" id="fw-again-all">🎡 ${t('fw.all', { n: Math.min(50, n) })}</button>` : ''}` : st.asset ? `<button type="button" class="cta" id="fw-again">🎰 ${t('fw.again')} · $0.05</button>` : '';
     el.innerHTML = `${again}<button type="button" class="ghost" id="fw-close" ${st.spinning ? 'disabled' : ''}>${t('share.close')}</button>`;
     $('fw-again-free')?.addEventListener('click', () => spin(true));
+    $('fw-again-all')?.addEventListener('click', () => spin(true, spins()));
     $('fw-again')?.addEventListener('click', () => spin(false));
     $('fw-close')?.addEventListener('click', () => {
       if (!st.spinning) overlay().hidden = true;
@@ -311,6 +313,7 @@ export function createFortune({ app, send, sfx, toast, share }) {
     if (out)
       out.innerHTML = `${jp ? `<div class="fw-jackpot"><small>${t('fw.jackpot')}</small><b>${money(jp.mills)}</b><span>${esc(formatUnits(jp.units, dec(jp.asset), 6))} ${esc(jp.symbol)}</span><p class="fine">${jp.onchain ? t('fw.sentChain') : t('fw.inBalance')}</p></div>` : ''}
         <div class="wheel-prize${card.big ? ' fw-bigwin' : ''}" style="--r:${card.color}">${card.img}<p><b>${esc(card.name)}</b></p><p class="fine">${card.note}</p></div>
+        ${r.all ? `<p class="fine">${t('fw.allGot', { n: r.all.length })}</p><div class="fw-list">${r.all.map((x) => { const c = prizeCard(x.prize); return `<span class="fw-chip" style="--r:${c.color}">${esc(c.name)}</span>`; }).join('')}</div>` : ''}
         ${jp || card.share ? `<button type="button" class="cta" id="fw-share">📣 ${t('fw.share')}</button>` : ''}`;
     $('fw-share')?.addEventListener('click', () => share('fortune', { jackpot: jp ? { usd: money(jp.mills), amount: formatUnits(jp.units, dec(jp.asset), 4), symbol: jp.symbol } : null, item: card.share, look: r.prize.k === 'outfit' ? { outfit: r.prize.id } : null }));
     burst(card.color, !!(jp || card.big));
@@ -337,10 +340,12 @@ export function createFortune({ app, send, sfx, toast, share }) {
     paint();
   }
 
-  // open the shop at the wheel (the mail's and the calendar's "spin" buttons)
-  function open() {
+  // open the shop at the wheel (the mail's and the calendar's "spin" buttons); all: spin every
+  // free spin at once
+  function open(all = false) {
     app.go?.('shop');
     setTimeout(() => $('fortune-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    if (all && spins() > 0) setTimeout(() => spin(true, spins()), 400);
   }
 
   return { mount, onMessage, paint, open };
