@@ -348,6 +348,101 @@ function syncMore() {
 }
 setInterval(syncMore, 1000);
 
+// the side menu (wide screens): groups, a coloured tile per page, a live line under each name
+// (pass tier, the store's countdown, tasks ready, boxes to open…) and you at the bottom. Phones
+// keep the bottom tab bar: the extras are hidden there by CSS.
+const NAV_GROUPS = [
+  ['play', ['play', 'ranked', 'pass']],
+  ['store', ['shop', 'inventory', 'swap']],
+  ['social', ['chat', 'friends', 'guilds', 'mail', 'invite']],
+  ['you', ['achievements', 'settings']],
+];
+const NAV_COLOR = { play: '#f7931a', ranked: '#ff2dd4', pass: '#ffd166', shop: '#3ddc97', inventory: '#f59e0b', swap: '#38bdf8', chat: '#a78bfa', friends: '#60a5fa', guilds: '#34d399', mail: '#fb7185', invite: '#22d3ee', achievements: '#fbbf24', settings: '#94a3b8' };
+(function buildNav() {
+  const nav = $('menu-nav');
+  const more = $('nav-more');
+  for (const [g, pages] of NAV_GROUPS) {
+    const h = document.createElement('p');
+    h.className = 'nav-group';
+    h.dataset.i18n = `nav.g.${g}`;
+    h.textContent = t(`nav.g.${g}`);
+    nav.insertBefore(h, more);
+    for (const page of pages) {
+      const b = nav.querySelector(`.nav-btn[data-page="${page}"]`);
+      if (!b) continue;
+      b.style.setProperty('--nc', NAV_COLOR[page]);
+      const svg = b.querySelector('svg');
+      const label = b.querySelector('span[data-i18n]');
+      if (svg && !svg.parentElement.classList.contains('nav-ico')) {
+        const ico = document.createElement('i');
+        ico.className = 'nav-ico';
+        svg.replaceWith(ico);
+        ico.append(svg);
+      }
+      if (label && !label.parentElement.classList.contains('nav-txt')) {
+        const txt = document.createElement('span');
+        txt.className = 'nav-txt';
+        label.replaceWith(txt);
+        const sub = document.createElement('small');
+        sub.className = 'nav-sub';
+        sub.dataset.sub = page;
+        txt.append(label, sub);
+      }
+      nav.insertBefore(b, more);
+    }
+  }
+  const me = document.createElement('button');
+  me.type = 'button';
+  me.className = 'nav-me';
+  me.id = 'nav-me';
+  me.addEventListener('click', () => go('play'));
+  nav.append(me);
+})();
+const hmsLeft = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`;
+};
+function navSubs() {
+  if (innerWidth <= 760) return;
+  const L = app.locker;
+  const online = app.mode === 'online' && !!app.token;
+  const dv = daily.view;
+  const boxes = Object.values(L?.boxes ?? {}).reduce((n, k) => n + k, 0);
+  const lines = {
+    play: app.online && app.mode === 'online' ? t('net.online', { n: app.online }) : t(`mode.${app.gameMode}`),
+    ranked: t('nav.s.ranked'),
+    pass: online && L?.pass ? t('nav.d.pass', { n: L.pass.tier }) : t('nav.s.pass'),
+    shop: online && L?.store ? t('nav.d.store', { t: hmsLeft(L.store.ends - Date.now()) }) : t('nav.s.shop'),
+    inventory: online && (boxes || L?.spins) ? [boxes ? `🎁 ${boxes}` : '', L?.spins ? `🎡 ${L.spins}` : ''].filter(Boolean).join(' · ') : t('nav.s.inventory'),
+    swap: t('nav.s.swap'),
+    chat: t('nav.s.chat'),
+    friends: t('nav.s.friends'),
+    guilds: t('nav.s.guilds'),
+    mail: mail.unread ? t('nav.d.mail', { n: mail.unread }) : t('nav.s.mail'),
+    invite: t('nav.s.invite'),
+    achievements: online && dv?.ready ? t('nav.d.tasks', { n: dv.ready }) : t('nav.s.achievements'),
+    settings: t('nav.s.settings'),
+  };
+  for (const el of document.querySelectorAll('.nav-sub')) {
+    const v = lines[el.dataset.sub] ?? '';
+    if (el.textContent !== v) el.textContent = v;
+    el.classList.toggle('hot', ['achievements', 'mail', 'inventory'].includes(el.dataset.sub) && v !== t(`nav.s.${el.dataset.sub}`));
+  }
+  for (const h of document.querySelectorAll('.nav-group')) h.textContent = t(h.dataset.i18n);
+  // you, at the bottom
+  const me = $('nav-me');
+  const r = app.rank;
+  const vip = online ? L?.vip : null;
+  const vl = vip?.lv ? VIP_LEVELS.find((l) => l.lv === vip.lv) : null;
+  const html = r ? `${rankBadgeSvg(r.rank, 30)}<span class="nm-t"><b>${esc(app.name || $('name')?.value || 'Runner')}</b><small>${esc(r.name)}${vl ? ` · <span class="vip-badge" style="--v:${vl.color}">VIP ${vl.lv}</span>` : ''}</small><i class="nm-bar"><i style="width:${r.max ? 100 : Math.max(0, Math.min(100, (r.into / r.need) * 100))}%"></i></i></span>` : '';
+  if (me && me.dataset.h !== html) {
+    me.dataset.h = html;
+    me.innerHTML = html;
+    me.hidden = !html;
+  }
+}
+setInterval(navSubs, 1000);
+
 // your style on the menu card: the frame around your runner, the banner behind the card
 let heroStyleKey = '';
 function heroStyle() {
