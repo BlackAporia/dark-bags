@@ -24,6 +24,8 @@ export default {
   'reg.eu': "Європа",
   'reg.us': "Америка",
   'reg.asia': "Азія",
+  'medal.long': "Далекий постріл",
+  'medal.knife': "Вбивство ножем",
   'ex.centre': "ВИХІД · ТРИМАЙ {s} С",
   'feed.extracting': "{name} утримує вихід",
   'hud.holdExit': "Тримай вихід {s} с · усі знають · влучання починає відлік заново",

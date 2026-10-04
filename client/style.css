@@ -2832,3 +2832,26 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 @media (max-width: 760px) {
   .tour-actions .tour-skip { max-width: 36%; white-space: normal !important; overflow-wrap: anywhere; }
 }
+
+/* medals: the badge over the title (medals.js) */
+.streak { padding-top: 12vh; }
+.st-medal { position: relative; z-index: 1; width: clamp(110px, 16vw, 168px); aspect-ratio: 1; margin-bottom: 4px; filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.7)); }
+.st-medal svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.streak .st-title { font-size: clamp(34px, 7vw, 78px); }
+.streak.go .st-medal { animation: medal-in 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both, medal-out 0.35s 2.05s ease-in both; }
+.streak.go .md-shine { animation: medal-shine 0.9s 0.45s ease-out both; }
+.streak.go .md-glow { transform-origin: 100px 100px; animation: medal-glow 1.6s ease-in-out infinite; }
+.streak.go .md-ico { transform-origin: 100px 100px; animation: medal-ico 0.5s 0.25s cubic-bezier(0.2, 1.8, 0.4, 1) both; }
+@keyframes medal-in { 0% { transform: scale(2.6) rotate(-25deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes medal-out { to { transform: scale(0.6) translateY(-30px); opacity: 0; } }
+@keyframes medal-shine { from { transform: skewX(-20deg) translateX(0); } to { transform: skewX(-20deg) translateX(300px); } }
+@keyframes medal-glow { 0%, 100% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.08); opacity: 1; } }
+@keyframes medal-ico { from { transform: scale(0); } to { transform: scale(1); } }
+/* headshot, long shot, knife: one style for the "skill" medals */
+.streak.m-hs .st-title { color: #ff3b5c; text-shadow: 0 4px 0 #4d0614, 0 0 26px rgba(255, 59, 92, 0.6); }
+.streak.m-long .st-title { color: #3ce6ff; text-shadow: 0 4px 0 #03384a, 0 0 26px rgba(60, 230, 255, 0.55); }
+.streak.m-knife .st-title { color: #e8edf6; text-shadow: 0 4px 0 #2b3140, 0 0 22px rgba(200, 210, 230, 0.5); }
+.streak[class*='m-'].go .st-title { animation: slam 2.4s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@media (prefers-reduced-motion: reduce) { .streak.go .st-medal, .streak.go .md-shine, .streak.go .md-glow, .streak.go .md-ico { animation: none; } }
+.banner.low { top: 66%; font-size: 22px; }
+.streak .st-title { font-size: clamp(28px, 5.4vw, 66px); max-width: calc(100vw - 32px); overflow-wrap: anywhere; }

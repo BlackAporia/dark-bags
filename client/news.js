@@ -9,6 +9,23 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-15a',
+    at: '2026-10-15T12:00:00+03:00',
+    items: {
+      en: ["Medals in the match: first blood, double and triple kill, rampage, godlike, headshot, long shot and knife kill each get their own animated emblem in the centre of the screen", "One English announcer for every language, like the big shooters (the game also downloads faster)"],
+      uk: ["Медалі в матчі: перша кров, подвійне й потрійне вбивство, буйство, божественно, хедшот, далекий постріл і вбивство ножем отримали власну анімовану емблему по центру екрана", "Один англійський диктор для всіх мов, як у великих шутерах (і гра завантажується швидше)"],
+      ru: ["Медали в матче: первая кровь, двойное и тройное убийство, буйство, божественно, хедшот, дальний выстрел и убийство ножом получили свою анимированную эмблему по центру экрана", "Один английский диктор для всех языков, как в больших шутерах (и игра грузится быстрее)"],
+      es: ["Medallas en la partida: primera sangre, doble y triple muerte, masacre, divino, tiro a la cabeza, tiro lejano y muerte a cuchillo tienen su propio emblema animado en el centro de la pantalla", "Un solo locutor en inglés para todos los idiomas, como en los grandes shooters (y el juego carga más rápido)"],
+      fr: ["Médailles en match : premier sang, double et triple élimination, carnage, divin, tir à la tête, tir lointain et mise à mort au couteau ont chacun leur emblème animé au centre de l'écran", "Un seul annonceur en anglais pour toutes les langues, comme dans les grands shooters (et le jeu se charge plus vite)"],
+      pt: ["Medalhas na partida: primeiro sangue, abate duplo e triplo, massacre, divino, tiro na cabeça, tiro longo e morte na faca ganharam um emblema animado no centro da tela", "Um só locutor em inglês para todos os idiomas, como nos grandes shooters (e o jogo carrega mais rápido)"],
+      tr: ["Maçta madalyalar: ilk kan, çift ve üçlü öldürme, katliam, tanrısal, kafadan vuruş, uzak atış ve bıçakla öldürme ekranın ortasında kendi animasyonlu amblemini aldı", "Büyük nişancı oyunlarındaki gibi her dil için tek bir İngilizce spiker (oyun da daha hızlı yükleniyor)"],
+      zh: ["比赛勋章：第一滴血、双杀、三杀、暴走、神一般、爆头、远距离击杀和刀杀，屏幕中央都有专属动画徽章", "所有语言统一使用英文播报，像大型射击游戏一样（游戏加载也更快了）"],
+      hi: ["मैच में मेडल: फ़र्स्ट ब्लड, डबल और ट्रिपल किल, रैम्पेज, गॉडलाइक, हेडशॉट, लंबा शॉट और चाकू से किल — हर एक का स्क्रीन के बीच अपना एनिमेटेड प्रतीक", "हर भाषा के लिए एक ही अंग्रेज़ी उद्घोषक, बड़े शूटर्स की तरह (और गेम तेज़ी से लोड होता है)"],
+      ar: ["أوسمة في المباراة: الدم الأول، القتل المزدوج والثلاثي، الهيجان، الأسطوري، طلقة الرأس، الطلقة البعيدة والقتل بالسكين، لكل منها شعار متحرك في وسط الشاشة", "معلّق إنجليزي واحد لكل اللغات مثل ألعاب التصويب الكبرى (واللعبة تُحمَّل أسرع)"],
+      sw: ["Medali mechini: damu ya kwanza, mauaji mawili na matatu, ghasia, kama mungu, risasi ya kichwa, risasi ya mbali na kuua kwa kisu kila moja ina nembo yake inayosonga katikati ya skrini", "Mtangazaji mmoja wa Kiingereza kwa lugha zote, kama michezo mikubwa ya kufyatua (na mchezo unapakia haraka zaidi)"],
+    },
+  },
+  {
     id: '2026-10-14a',
     at: '2026-10-14T12:00:00+03:00',
     items: {

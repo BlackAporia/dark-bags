@@ -24,6 +24,8 @@ export default {
   'reg.eu': "Europa",
   'reg.us': "América",
   'reg.asia': "Asia",
+  'medal.long': "Tiro lejano",
+  'medal.knife': "Muerte a cuchillo",
   'ex.centre': "SALIDA · AGUANTA {s} S",
   'feed.extracting': "{name} está aguantando la salida",
   'hud.holdExit': "Aguanta la salida {s} s · todos lo saben · un impacto reinicia la cuenta",

@@ -25,6 +25,8 @@ export default {
   'reg.eu': "Europe",
   'reg.us': "Americas",
   'reg.asia': "Asia",
+  'medal.long': "Long shot",
+  'medal.knife': "Blade kill",
   'ex.centre': "EXIT · HOLD {s} S",
   'feed.extracting': "{name} is holding the exit",
   'hud.holdExit': "Hold the exit {s} s · everyone knows · a hit restarts the count",

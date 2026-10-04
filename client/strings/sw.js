@@ -25,6 +25,8 @@ export default {
   "reg.eu": "Ulaya",
   "reg.us": "Amerika",
   "reg.asia": "Asia",
+  "medal.long": "Risasi ya mbali",
+  "medal.knife": "Kuua kwa kisu",
   "ex.centre": "TOKA · KAA SEK {s}",
   "feed.extracting": "{name} anashika njia ya kutoka",
   "hud.holdExit": "Shika njia ya kutoka sekunde {s} · kila mtu anajua · pigo linaanzisha hesabu upya",

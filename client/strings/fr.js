@@ -24,6 +24,8 @@ export default {
   'reg.eu': "Europe",
   'reg.us': "Amérique",
   'reg.asia': "Asie",
+  'medal.long': "Tir lointain",
+  'medal.knife': "Mise à mort au couteau",
   'ex.centre': "SORTIE · TIENS {s} S",
   'feed.extracting': "{name} tient la sortie",
   'hud.holdExit': "Tiens la sortie {s} s · tout le monde le sait · un impact relance le compte",
