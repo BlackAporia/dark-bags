@@ -13,7 +13,7 @@
 // PRICE_SECONDS         feed refresh (60)
 // MIN_WITHDRAW_USD      smallest cash-out in $ (1)
 // CASHIER_FILE          JSON journal: ledger, sessions, deposits, withdrawals (required on real networks)
-// STRK20 private pool:  STRK20_POOL (mainnet and Sepolia defaults below), STRK20_VIEWING_KEY, STRK20_PROVER_URL,
+// STRK20 private pool:  STRK20_POOL, STRK20_PROVER_URL, STRK20_FEED_URL (all default per network, below), STRK20_VIEWING_KEY,
 //                       STRK20_FEED_URL, STRK20_CACHE_DIR
 // Vault (contracts/):  VAULT_ADDRESS (the deployed DarkBagsVault), VAULT_FROM_BLOCK (its deploy block),
 //                       or VAULT_AUTO=1: deploy it, make the viewing key and register on first start
@@ -25,9 +25,15 @@
 // STRK20 pools (strk20-by-example.org/contract-addresses, checked 29 Sep 2026)
 export const STRK20_POOL_MAINNET = '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a';
 export const STRK20_POOL_SEPOLIA = '0x0254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91';
+// the strk20-discovery feeds: Sepolia's is the hosted instance's root /feed (kfastov/strk20-indexer)
 export const STRK20_FEED = {
   mainnet: 'https://strk20.nullref.cc/mainnet/feed',
-  sepolia: 'https://strk20.nullref.cc/sepolia/feed',
+  sepolia: 'https://strk20.nullref.cc/feed',
+};
+// StarkWare's hosted proving services (the ones the strk20-indexer demo uses)
+export const STRK20_PROVER = {
+  mainnet: 'https://transaction-prover.alpha-mainnet.sw-dev.io',
+  sepolia: 'https://transaction-prover.alpha-sepolia.sw-dev.io',
 };
 // spare nodes, tried after RPC_URL / the preset when they do not answer
 export const RPC_SPARES = {
@@ -91,7 +97,7 @@ export function readConfig(env = process.env) {
     strk20: {
       pool: env.STRK20_POOL || (network === 'mainnet' ? STRK20_POOL_MAINNET : STRK20_POOL_SEPOLIA),
       viewingKey: env.STRK20_VIEWING_KEY || null,
-      proverUrl: env.STRK20_PROVER_URL || null,
+      proverUrl: env.STRK20_PROVER_URL || STRK20_PROVER[network],
       feedUrl: env.STRK20_FEED_URL || STRK20_FEED[network],
       cacheDir: env.STRK20_CACHE_DIR || '.strk20-cache',
     },
