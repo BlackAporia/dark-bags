@@ -17,6 +17,7 @@ COPY server ./server
 COPY shared ./shared
 COPY client ./client
 COPY scripts/house.js ./scripts/house.js
+COPY contracts/build ./contracts/build
 COPY --from=build /app/client/vendor ./client/vendor
 # mount a volume here for real tokens: the cashier journal and the STRK20 discovery cache.
 # Hosts mount volumes owned by root (Fly, Railway): the entrypoint hands /data to the
