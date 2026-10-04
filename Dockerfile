@@ -13,6 +13,9 @@ FROM node:24-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
+# the STRK20 pool client in its own tree (vendor/strk20/package.json says why)
+COPY vendor/strk20/package.json vendor/strk20/package-lock.json ./vendor/strk20/
+RUN cd vendor/strk20 && npm ci --omit=dev --no-audit --no-fund
 COPY server ./server
 COPY shared ./shared
 COPY client ./client

@@ -52,7 +52,9 @@ export function readConfig(env = process.env) {
   const network = String(env.CHAIN || 'off').toLowerCase();
   if (network === 'off' || network === '0' || network === '') return null;
   if (network !== 'mainnet' && network !== 'sepolia') throw new Error(`CHAIN must be off, sepolia or mainnet (got ${env.CHAIN})`);
-  const fixedPrices = {};
+  // Sepolia has no swap routes to quote from, and its tokens are worth nothing: fixed test prices
+  // unless FIXED_PRICES says otherwise
+  const fixedPrices = network === 'sepolia' ? { STRK: 0.15, ETH: 2500, USDC: 1, USDT: 1, WBTC: 60000 } : {};
   for (const kv of list(env.FIXED_PRICES)) {
     const [k, v] = kv.split('=');
     if (k && Number(v) > 0) fixedPrices[k.trim().toUpperCase()] = Number(v);
