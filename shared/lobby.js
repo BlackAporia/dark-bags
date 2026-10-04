@@ -33,7 +33,7 @@ export { STAKE_MIN as CUSTOM_MIN, STAKE_MAX as CUSTOM_MAX } from './stakes.js';
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
@@ -68,7 +68,7 @@ export class Lobby {
     this.fortune = fortune;
     this.daily = daily; // the login calendar, the daily and weekly tasks, achievement rewards
     this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
-    this.roomArgs = { edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    this.roomArgs = { pots, edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
@@ -353,6 +353,7 @@ export class Lobby {
       case 'auth_privy':
       case 'logout':
       case 'deposit':
+      case 'deposit_ref':
       case 'withdraw':
       case 'history':
         if (this.cashier) this.cashierOp(cid, s, msg);
@@ -699,6 +700,13 @@ export class Lobby {
     }
     if (msg.t !== 'auth' && msg.t !== 'auth_privy' && !s.account) return reply({ t: 'err', msg: 'Connect a wallet first.' });
     if (msg.t === 'history') return reply({ t: 'history', ...c.history(s.account) });
+    if (msg.t === 'deposit_ref') {
+      try {
+        return reply({ t: 'deposit_ref', ...c.depositRef(s.account) });
+      } catch (e) {
+        return reply({ t: 'err', msg: e?.user ? e.message : 'The cashier hit an error.' });
+      }
+    }
     if (s.busy) return reply({ t: 'err', msg: 'One moment, the cashier is still on your last request.' });
     s.busy = true;
     try {
@@ -727,7 +735,8 @@ export class Lobby {
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
         let r;
-        if (msg.route === 'private') r = { status: 'ok', credited: (await c.scanPrivate()).filter((x) => x.account === s.account) };
+        if (msg.route === 'private' && c.chain.vault) r = { status: 'ok', credited: (await c.scanVault()).filter((x) => x.account === s.account) };
+        else if (msg.route === 'private') r = { status: 'ok', credited: (await c.scanPrivate()).filter((x) => x.account === s.account) };
         else r = await c.depositPublic(s.account, msg.tx);
         if (r.credited.some((x) => !x.held && !x.unsupported)) this.welcome(s.account); // the first deposit earns the welcome bonus
         reply({ t: 'cashier', op: 'deposit', route: msg.route, status: r.status, credited: r.credited.map((x) => ({ asset: x.token, units: x.amount.toString(), unsupported: !!x.unsupported, held: x.held ?? null })) });

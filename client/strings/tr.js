@@ -24,6 +24,7 @@ export default {
   'reg.eu': "Avrupa",
   'reg.us': "Amerika",
   'reg.asia': "Asya",
+  'cx.noRef': "Sunucu bir yatırma referansı vermedi. Tekrar dene.",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "Gizlilik · canlı rakamlar",
   'sk.kicker': "Starknet üzerinde",

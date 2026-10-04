@@ -24,6 +24,7 @@ export default {
   'reg.eu': "أوروبا",
   'reg.us': "الأمريكتان",
   'reg.asia': "آسيا",
+  'cx.noRef': "لم يقدّم الخادم مرجعًا للإيداع. حاول مرة أخرى.",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "الخصوصية · أرقام مباشرة",
   'sk.kicker': "مبنية على Starknet",

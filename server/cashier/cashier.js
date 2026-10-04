@@ -25,8 +25,14 @@ import { MILLS } from '../../shared/assets.js';
  *   readPublicDeposit(tx) → Promise<{ status: 'pending'|'ok'|'failed', transfers: [{ id, token, from, amount }] }>
  *   scanPrivateDeposits() → Promise<[{ id, token, from, amount }]>   (may repeat old notes)
  *   payPublic({ token, to, amount }) → Promise<{ tx }>
- *   payPrivate({ token, to, amount }) → Promise<{ tx }>
+ *   payPrivate({ token, to, amount, payoutId }) → Promise<{ tx }>
+ *   scanVaultDeposits() → Promise<[{ id, reference, token, amount }]>   (optional: the vault)
+ *   vault: { address, cursor }                                        (optional)
  * }
+ *
+ * Private deposits through the vault carry no sender: the player asks for a one-time reference
+ * (depositRef), puts it in their STRK20 transaction, and the deposit is credited to whoever was
+ * handed that reference.
  * A payX error with `notSent: true` means nothing was submitted, so the debit is refunded.
  */
 
@@ -39,6 +45,8 @@ const PENDING_TOTAL = 1000;
 const SCAN_EVERY_MS = 10 * 1000;
 const BG_SCAN_IDLE_MS = 60 * 1000;
 const BG_SCAN_LIVE_MS = 5 * 60 * 1000;
+const REF_TTL_MS = 30 * 24 * 3600 * 1000;
+const REFS_PER_ACCOUNT = 10;
 
 export function normAddr(x) {
   let v;
@@ -126,6 +134,8 @@ export class Cashier {
     this.privyWallets = data.privyWallets ?? {}; // Privy user id → { walletId, publicKey, account }
     this.deposits = data.deposits ?? []; // [{ id, account, token, amount, route, at }]
     this.imported = data.imported ?? []; // coins players brought from the AVNU / Ekubo lists
+    this.refs = data.refs ?? {}; // vault deposit reference → { account, at }
+    if (chain.vault && data.vaultBlock) chain.vault.cursor = data.vaultBlock;
     this.logins = new Map(); // session token → { nonce, issued, at }
     this.pending = new Map(); // public deposit tx → { account, at }
     this.queue = Promise.resolve(); // withdrawals go out one at a time (house nonce)
@@ -181,6 +191,8 @@ export class Cashier {
       deposits: this.deposits.slice(-5000),
       privyWallets: this.privyWallets,
       imported: this.imported,
+      refs: this.refs,
+      vaultBlock: this.chain.vault?.cursor ?? null,
     };
   }
 
@@ -365,6 +377,44 @@ export class Cashier {
     return credited;
   }
 
+  // A one-time reference for a private deposit into the vault. Random, so the chain learns
+  // nothing about who asked; kept 30 days so a slow deposit still finds its owner.
+  depositRef(account) {
+    const vault = this.chain.info().vault;
+    if (!vault) throw new CashierError('Private deposits are off on this server.');
+    const now = this.now();
+    for (const [k, r] of Object.entries(this.refs)) if (now - r.at > REF_TTL_MS) delete this.refs[k];
+    const mine = Object.values(this.refs).filter((r) => r.account === account && !r.used);
+    if (mine.length >= REFS_PER_ACCOUNT) throw new CashierError('Too many private deposits waiting. Finish one first.');
+    const reference = `0x${(BigInt(`0x${crypto.randomBytes(31).toString('hex')}`) || 1n).toString(16)}`;
+    this.refs[reference] = { account, at: now };
+    this.persist();
+    return { reference, vault };
+  }
+
+  // Deposited events of the vault, credited to whoever holds each reference.
+  async scanVault() {
+    if (!this.chain.scanVaultDeposits) return [];
+    const found = await this.chain.scanVaultDeposits();
+    const credited = [];
+    for (const d of found) {
+      if (this.seen.has(d.id)) continue;
+      const r = this.refs[`0x${BigInt(d.reference).toString(16)}`] ?? null;
+      if (!r) {
+        // nobody we know asked for it: keep a record for the operator
+        this.seen.add(d.id);
+        this.deposits.push({ id: d.id, account: null, token: d.token, amount: d.amount.toString(), route: 'private', at: this.now(), held: 'unknown-ref' });
+        console.warn(`vault deposit ${d.id} with unknown reference ${d.reference}`);
+        continue;
+      }
+      r.used = true;
+      const c = this.credit({ id: d.id, from: r.account, token: d.token, amount: d.amount }, 'private');
+      if (c) credited.push(c);
+    }
+    this.persist();
+    return credited;
+  }
+
   // Background: re-check public deposits still pending, scan the pool.
   async poll() {
     for (const [tx, p] of [...this.pending]) {
@@ -375,6 +425,8 @@ export class Cashier {
       await this.depositPublic(p.account, tx).catch(() => {});
     }
     if (!this.chain.info().routes.includes('private')) return [];
+    // the vault's events are one cheap RPC call: every poll
+    if (this.chain.vault) return this.scanVault().catch((e) => console.error('vault scan failed', e?.message ?? e));
     // A pool scan opens every note with the viewing key: seconds of CPU on one thread, and every
     // raid on the server stalls meanwhile. In the background it runs once a minute when nobody is
     // in a raid, at most every 5 minutes while one is live. A player asking for a private deposit
@@ -408,7 +460,8 @@ export class Cashier {
       try {
         await this.flush?.(); // the 'sending' entry is on disk before anything is signed
         const pay = route === 'private' ? this.chain.payPrivate : this.chain.payPublic;
-        const r = await pay.call(this.chain, { token, to: account, amount });
+        // the vault signs each payout once: its id (the withdrawal's uuid) can never be paid twice
+        const r = await pay.call(this.chain, { token, to: account, amount, payoutId: `0x${w.id.replace(/-/g, '')}` });
         w.status = 'sent';
         w.tx = r.tx;
       } catch (e) {

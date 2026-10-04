@@ -28,7 +28,7 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ edge = false, stats = null, guard = null, referrals = null, daily = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
+  constructor({ pots = null, edge = false, stats = null, guard = null, referrals = null, daily = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
@@ -45,6 +45,9 @@ export class RoomCore {
     this.daily = daily; // tasks, the XP boost, the first win of the day
     this.guard = guard;
     this.stats = stats; // the team's analytics (online only)
+    this.pots = practice ? null : pots; // the on-chain vault: each staked match's pot per coin (server/cashier/vault.js)
+    this.potKey = null;
+    this.receipts = new Map(); // account → this match's stake receipt (salt + leaf under the on-chain root)
     this.edge = edge; // a regional match server: stakes arrive already taken by the main server
     this.practice = practice;
     this.wallet = wallet;
@@ -357,6 +360,12 @@ export class RoomCore {
         balances: this.wallet.balances(c.token),
       });
     }
+    // the whole pot per coin goes on chain (the vault locks it); who staked what never does
+    if (this.pots && this.accounts.size) {
+      this.potKey = `${this.mode}:${this.stake}:${this.roundNo}:${Date.now()}`;
+      const r = this.pots.start(this.potKey, [...this.accounts.values()].map((a) => ({ account: a.token, asset: a.asset, units: a.units })));
+      this.receipts = new Map((r?.receipts ?? []).map((x) => [x.account, { match: r.matchId, salt: x.salt, leaf: x.leaf }]));
+    }
     this.broadcastPrep();
   }
 
@@ -387,6 +396,8 @@ export class RoomCore {
         this.totals.paidOut += w.ledger.paidOut;
         this.totals.sponsorIn += w.ledger.sponsorIn;
         if (!this.practice) this.stats?.raid({ mode: this.mode, stake: this.stake, humans: this.accounts.size, stakes: w.ledger.stakesIn, rake: w.ledger.rake, paid: w.ledger.paidOut, seconds: w.time ?? 0, golden: !!w.golden });
+        if (this.potKey) this.pots.end(this.potKey);
+        this.potKey = null;
         this.state = 'results';
         this.resT = CFG.INTERMISSION;
         this.broadcastPrep();
@@ -672,6 +683,7 @@ export class RoomCore {
         cause: p.cause,
         asset: this.accounts.get(p.id)?.asset,
         stakeUnits: this.accounts.get(p.id)?.units?.toString(),
+        ...(this.receipts.has(c.token) ? { receipt: this.receipts.get(c.token) } : {}),
         payoutUnits: (this.accounts.get(p.id)?.paidUnits ?? 0n).toString(),
         balances: this.wallet.balances(c.token),
         round: this.roundNo,

@@ -24,6 +24,7 @@ export default {
   'reg.eu': "Європа",
   'reg.us': "Америка",
   'reg.asia': "Азія",
+  'cx.noRef': "Сервер не видав референс для депозиту. Спробуй ще раз.",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "Приватність · живі цифри",
   'sk.kicker': "Створено на Starknet",

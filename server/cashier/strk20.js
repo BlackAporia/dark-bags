@@ -85,6 +85,30 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
       return { tx: r.transaction_hash };
     },
 
+    // One private tx: an open note owned by `to` (the owner is encrypted on chain) and an invoke
+    // of `contract`, whose returned deposit fills that note. `calldata({ noteId })` builds the
+    // invoke's calldata once the note id is known (the vault's payout is signed over it).
+    canInvoke: !!transfers,
+    async invokeWithOpenNote({ token, to, contract, calldata }) {
+      if (!transfers) throw Object.assign(new Error('private cash-outs are not configured'), { notSent: true });
+      let res;
+      try {
+        res = await transfers
+          .build({ autoSetup: true })
+          .with(token)
+          .transfer({ recipient: to, amount: sdk.Open })
+          .done()
+          .invoke(({ openNotes }) => ({ contractAddress: contract, entrypoint: 'privacy_invoke', calldata: calldata({ noteId: BigInt(openNotes[0].noteId) }) }))
+          .execute({ autoSetup: true, autoDiscover: { channels: 'missing' } });
+      } catch (e) {
+        throw Object.assign(new Error(/regist/i.test(String(e?.message)) ? 'recipient is not registered in the STRK20 pool' : `proof failed: ${e?.message ?? e}`), { notSent: true });
+      }
+      const { call, proof } = res.callAndProof;
+      const r = await account.execute(call, { proof: proof.data, proofFacts: proof.proofFacts });
+      provider.waitForTransaction?.(r.transaction_hash).catch(() => {});
+      return { tx: r.transaction_hash };
+    },
+
     // one-time: publish the house viewing key so players can open channels to it
     async register() {
       if (!transfers) throw new Error('needs HOUSE_PRIVATE_KEY and STRK20_PROVER_URL');

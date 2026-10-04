@@ -10,6 +10,7 @@ import { CFG } from '../shared/config.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
 import { createCashier } from './cashier/index.js';
+import { createPotRecorder } from './cashier/vault.js';
 import { RankBook } from '../shared/ranks.js';
 import { Inventory } from '../shared/cosmetics.js';
 import { SocialBook } from '../shared/social.js';
@@ -300,7 +301,10 @@ const send = (cid, msg) => {
 // a match server journals what its matches write to these books, for the main server to replay
 const journal = [];
 const J = (name, book) => (EDGE ? journaled(name, book, journal) : book);
+// the vault records each staked match's pot per coin on chain (never who staked what)
+const pots = real?.chain.vault?.canRecord ? createPotRecorder({ vault: real.chain.vault, houseShare: CFG.RAKE * (1 - CFG.JACKPOT_SHARE), rand: crypto.randomBytes }) : null;
 const lobby = new Lobby({
+  pots,
   edge: EDGE,
   stats: J('stats', stats),
   isAdmin: (account) => admins.has(norm64(account)),

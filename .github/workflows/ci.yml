@@ -28,3 +28,22 @@ jobs:
           path: |
             dist/play/index.html
             dist/index.html
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Scarb, Starknet Foundry and the Sierra compiler
+        run: |
+          set -e
+          mkdir -p "$HOME/cairo" && cd "$HOME/cairo"
+          curl -sSL https://github.com/software-mansion/scarb/releases/download/v2.17.0/scarb-v2.17.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          curl -sSL https://github.com/foundry-rs/starknet-foundry/releases/download/v0.63.0/starknet-foundry-v0.63.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          curl -sSL https://github.com/software-mansion/universal-sierra-compiler/releases/download/v2.9.0/universal-sierra-compiler-v2.9.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          echo "$HOME/cairo/scarb-v2.17.0-x86_64-unknown-linux-gnu/bin" >> "$GITHUB_PATH"
+          echo "$HOME/cairo/starknet-foundry-v0.63.0-x86_64-unknown-linux-gnu/bin" >> "$GITHUB_PATH"
+          echo "$HOME/cairo/universal-sierra-compiler-v2.9.0-x86_64-unknown-linux-gnu/bin" >> "$GITHUB_PATH"
+      - run: scarb build
+        working-directory: contracts
+      - run: snforge test
+        working-directory: contracts

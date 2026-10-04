@@ -2,7 +2,7 @@
   "name": "dark-bags",
   "version": "0.1.0",
   "private": true,
-  "description": "DARK BAGS — a browser extraction game with private bags and sats stakes",
+  "description": "DARK BAGS \u2014 a browser extraction game with private bags and sats stakes",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
@@ -16,7 +16,9 @@
     "build": "node scripts/build.js",
     "build:wallets": "node scripts/build-wallets.js",
     "sim": "node scripts/sim.js",
-    "house": "node scripts/house.js"
+    "house": "node scripts/house.js",
+    "vault:deploy": "node scripts/deploy-vault.mjs",
+    "test:contracts": "cd contracts && snforge test"
   },
   "dependencies": {
     "@avnu/avnu-sdk": "^4.2.0",

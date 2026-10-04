@@ -24,6 +24,7 @@ export default {
   'reg.eu': "欧洲",
   'reg.us': "美洲",
   'reg.asia': "亚洲",
+  'cx.noRef': "服务器没有给出充值编号。请重试。",
   'nav.starknet': "Starknet",
   'nav.s.starknet': "隐私 · 实时数据",
   'sk.kicker': "基于 Starknet",
