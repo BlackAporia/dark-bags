@@ -2809,3 +2809,26 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
   .tut-text { max-height: 28vh; }
   .tut-title { font-size: 17px; }
 }
+/* during the tour any part of a page can be scrolled to the top, clear of Nyx's card */
+.touring .pages { padding-bottom: 80vh; }
+.touring .play-dock { position: relative; bottom: auto; }
+/* phones: a compact card (Nyx as a small portrait in the header, the text full width, the
+   buttons in one row), so more of the page stays in view */
+@media (max-width: 760px) {
+  .tour-card { grid-template-columns: 1fr; align-items: start; }
+  .tour-nyx { position: absolute; left: 12px; top: 10px; width: 50px; height: 50px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(247, 147, 26, 0.55); background: radial-gradient(circle at 50% 30%, #2a2140, #0d0f17); z-index: 1; }
+  .tour-nyx svg { position: absolute; width: 112px; left: -31px; top: -6px; bottom: auto; }
+  .tour-body { padding: 10px 12px 10px; gap: 4px; }
+  .tour-who { padding-left: 58px; min-height: 22px; }
+  .tut-title { padding-left: 58px; min-height: 26px; }
+  .tut-text { max-height: 24vh; font-size: 14.5px; line-height: 1.5; }
+  .tour-dots { display: none; }
+  .tour-actions { flex-wrap: nowrap; gap: 6px; }
+  .tour-actions .tour-skip { flex: 0 1 auto; min-width: 0; padding: 6px 8px; font-size: 12px; white-space: normal; line-height: 1.15; text-align: start; }
+  .tour-actions .tour-grow { flex: 0 0 0; }
+  .tour-actions .cta, .tour-actions .ghost { padding: 9px 13px; white-space: nowrap; }
+}
+.tour-card.top { bottom: auto !important; }
+@media (max-width: 760px) {
+  .tour-actions .tour-skip { max-width: 36%; white-space: normal !important; overflow-wrap: anywhere; }
+}

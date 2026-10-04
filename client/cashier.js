@@ -62,11 +62,14 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     if (!on) return;
     $('acct-label').innerHTML = cs.account
       ? `<b>${esc(short(cs.account))}</b> <span class="unit">${esc(kindLabel())} · ${esc(cs.chain.network)}</span>`
-      : `Real tokens on Starknet ${esc(cs.chain.network)}. Sign in to play.`;
+      : esc(t('cs.signedOut', { n: cs.chain.network }));
     $('connect').hidden = !!cs.account;
     $('open-cashier').hidden = !cs.account;
     $('logout').hidden = !cs.account;
-    $('fine').textContent = `Real tokens on Starknet ${cs.chain.network}. The house holds deposits until you cash out; cash-outs go only to the address you signed in with.${cs.chain.maxBalanceUsd ? ` Beta: up to $${cs.chain.maxBalanceUsd} per player.` : ''}`;
+    $('connect').textContent = t('acct.signin');
+    $('open-cashier').textContent = t('cs.manage');
+    $('logout').textContent = t('acct.signout');
+    $('fine').textContent = t('cs.fine', { n: cs.chain.network }) + (cs.chain.maxBalanceUsd ? ` ${t('cs.beta', { v: `$${cs.chain.maxBalanceUsd}` })}` : '');
   }
 
   // ------------------------------------------------- the account chip (top right)
