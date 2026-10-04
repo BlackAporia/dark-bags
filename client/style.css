@@ -2580,3 +2580,92 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
   .of-starter, .of-card { grid-template-columns: 1fr; }
   .of-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.vip-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; padding: 3px 8px; border-radius: 6px; font: 900 12px/1 var(--f-display); letter-spacing: 0.06em; color: #0b0d14; background: linear-gradient(135deg, var(--v), color-mix(in srgb, var(--v) 55%, #fff)); box-shadow: 0 0 10px -2px var(--v); }
+.of-vip { padding: 14px 16px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--v) 60%, transparent); background: radial-gradient(80% 140% at 0% 0%, color-mix(in srgb, var(--v) 16%, transparent), transparent 60%), #0d1018; display: grid; gap: 8px; }
+.of-vip-top { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; }
+.of-vip-top > .vip-badge { font-size: 18px; padding: 8px 12px; }
+.of-vip-prog { display: grid; gap: 4px; min-width: 0; }
+.of-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.of-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--v), #fff); }
+.of-vip-t { width: 100%; border-collapse: collapse; font-size: 12px; }
+.of-vip-t th, .of-vip-t td { padding: 4px 6px; text-align: start; border-bottom: 1px solid var(--line); }
+.of-vip-t tr.on td { background: rgba(255, 255, 255, 0.05); }
+@media (max-width: 640px) {
+  .of-vip-top { grid-template-columns: auto 1fr; }
+  .of-vip-top > button, .of-vip-top > .of-owned { grid-column: 1 / -1; }
+  .of-vip-t { font-size: 11px; }
+}
+
+/* ---------------------------------------------------------------- play tab: goals, modes, mode info */
+.goals { display: grid; gap: 8px; margin: 4px 0 14px; }
+.goal-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.goal { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-width: 170px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), transparent), var(--glass); color: var(--paper); text-align: start; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+.goal:hover { transform: translateY(-2px); border-color: #3a4459; }
+.goal.hot { border-color: rgba(255, 211, 77, 0.7); box-shadow: 0 0 18px -8px #ffd34d; }
+.goal-ico { font-size: 22px; line-height: 1; }
+.goal-t { display: grid; gap: 2px; min-width: 0; }
+.goal-t b { font-size: 13px; white-space: nowrap; }
+.goal-t small { font-size: 11px; color: var(--dust); white-space: nowrap; }
+.goal-bar { display: block; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-top: 2px; }
+.goal-bar i { display: block; height: 100%; background: linear-gradient(90deg, #3ddc97, #ffd34d); }
+
+.modes-head { display: flex; align-items: end; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.mode-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+.mcat { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); color: var(--dust); font: 700 13px/1 var(--f-ui); cursor: pointer; }
+.mcat small { opacity: 0.7; font-weight: 600; }
+.mcat[aria-selected='true'] { color: #0b0d14; background: var(--loot); border-color: var(--loot); }
+
+.modes { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 12px; }
+.modes .mode-card { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 0 0 12px; overflow: hidden; border-radius: 16px; min-height: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 10%, transparent), transparent 50%), var(--glass); }
+.modes .mode-card > * { margin-inline: 12px; }
+.modes .mode-card .mc-art { position: relative; margin: 0; height: 74px; display: grid; place-items: center; background: radial-gradient(70% 120% at 50% 100%, color-mix(in srgb, var(--mc) 55%, transparent), transparent 70%), linear-gradient(135deg, color-mix(in srgb, var(--mc) 25%, #0b0d14), #0b0d14); border-bottom: 1px solid color-mix(in srgb, var(--mc) 40%, transparent); }
+.modes .mode-card .mc-ico { grid-row: auto; font-size: 38px; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); transition: transform 0.2s; }
+.modes .mode-card:hover .mc-ico { transform: scale(1.12) rotate(-4deg); }
+.mc-hot { position: absolute; top: 6px; left: 6px; padding: 3px 7px; border-radius: 999px; font: 800 10px/1 var(--f-ui); font-style: normal; letter-spacing: 0.06em; text-transform: uppercase; color: #1a0d05; background: #ffb347; }
+.mc-hot.rk { color: #fff; background: #ff2dd4; }
+.mc-live { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 999px; font: 700 11px/1 var(--f-num); font-style: normal; background: rgba(0, 0, 0, 0.55); }
+.modes .mode-card .mc-name { font-size: 16px; line-height: 1.15; margin-top: 4px; }
+.modes .mode-card .mc-sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.35; min-height: 2.7em; }
+.mc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
+.mc-chips i { font: 600 11px/1 var(--f-num); font-style: normal; padding: 4px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); color: #d9deea; white-space: nowrap; }
+.modes .mode-card .mc-wait { grid-column: auto; margin-top: 0; }
+.modes .mode-card[aria-checked='true'] { border-color: var(--mc); box-shadow: 0 0 0 1px var(--mc), 0 14px 34px -18px var(--mc); }
+.modes .mode-card[aria-checked='true']::after { content: '✓'; position: absolute; top: 48px; right: 10px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--mc); color: #0b0d14; font-weight: 900; font-size: 13px; }
+
+.mode-info { display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; margin: 12px 0 6px; padding: 16px 18px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--mc) 55%, transparent); background: radial-gradient(60% 140% at 0% 50%, color-mix(in srgb, var(--mc) 18%, transparent), transparent 70%), var(--glass-2, #11141c); animation: mi-in 0.25s ease-out; }
+@keyframes mi-in { from { opacity: 0; transform: translateY(6px); } }
+.mi-ico { font-size: 54px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6)); }
+.mi-body h3 { margin: 2px 0 4px; font: 900 clamp(20px, 2.4vw, 26px)/1.1 var(--f-display); text-transform: uppercase; letter-spacing: 0.03em; color: var(--mc); }
+.mi-d { margin: 0 0 8px; color: #d9deea; }
+.mi-facts { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: #c9cfdc; }
+.mi-facts b { color: var(--paper); }
+.mi-side { display: grid; gap: 8px; min-width: 130px; }
+.mi-side span { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: rgba(0, 0, 0, 0.3); }
+.mi-side small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dust); }
+.mi-side b { font: 800 15px/1.1 var(--f-num); display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 760px) {
+  .mode-info { grid-template-columns: auto 1fr; }
+  .mi-side { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); min-width: 0; }
+  .mi-ico { font-size: 40px; align-self: start; }
+}
+@media (max-width: 640px) {
+  .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .modes .mode-card { padding: 0 0 10px; }
+  .modes .mode-card > * { margin-inline: 10px; }
+  .modes .mode-card .mc-art { height: 58px; }
+  .modes .mode-card .mc-ico { font-size: 30px; }
+  .modes .mode-card .mc-sub { display: -webkit-box; font-size: 11px; }
+  .modes .mode-card .mc-name { font-size: 14px; }
+  .modes .mode-card[aria-checked='true']::after { top: 34px; }
+  .mode-cats { overflow-x: auto; flex-wrap: nowrap; width: 100%; }
+  .mcat { flex: none; }
+  .goal { min-width: 150px; }
+}
+@media (max-width: 640px) {
+  .mode-info { padding: 12px; gap: 8px 10px; }
+  .mode-info .mi-d, .mode-info .mi-facts li:nth-child(3) { display: none; }
+  .mode-info .mi-ico { font-size: 30px; }
+  .mode-info .mi-body h3 { font-size: 18px; }
+  .mode-info .mi-facts { font-size: 12px; }
+  .mi-side span { padding: 6px 8px; }
+}

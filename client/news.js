@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-11a',
+    at: '2026-10-11T12:00:00+03:00',
+    items: {
+      en: ["The Play tab, rebuilt: today's goals at the top, modes by category, and the chosen mode explained: how you win, a tip, what it pays", "VIP levels 1–10 from real money paid: top-up bonus up to +15%, daily free spins, VIP frames and a badge", "Fixed: typing your own stake no longer gets overwritten"],
+      uk: ["Нова вкладка Play: цілі на сьогодні зверху, режими за категоріями й пояснення обраного режиму: як виграти, порада, що дає", "Рівні VIP 1–10 за реальні оплати: бонус до поповнення до +15%, щоденні безкоштовні спіни, VIP-рамки й значок", "Виправлено: власна ставка більше не перезаписується під час введення"],
+      ru: ["Новая вкладка Play: цели на сегодня, режимы по категориям и объяснение выбранного режима", "Уровни VIP 1–10 за реальные оплаты: бонус к пополнению до +15%, ежедневные спины, VIP-рамки и значок", "Исправлено: своя ставка больше не перезаписывается при вводе"],
+      es: ["Nueva pestaña Jugar: metas de hoy, modos por categoría y explicación del modo elegido", "Niveles VIP 1–10 por dinero real pagado: bono de recarga hasta +15%, giros diarios, marcos VIP", "Arreglado: tu apuesta propia ya no se sobrescribe al escribir"],
+      fr: ["Onglet Jouer refait : objectifs du jour, modes par catégorie et explication du mode choisi", "Niveaux VIP 1–10 selon l’argent réel payé : bonus de recharge jusqu’à +15 %, tours quotidiens, cadres VIP", "Corrigé : ta mise perso n’est plus écrasée pendant la saisie"],
+      pt: ["Nova aba Jogar: metas de hoje, modos por categoria e explicação do modo escolhido", "Níveis VIP 1–10 por dinheiro real pago: bônus de recarga até +15%, giros diários, molduras VIP", "Corrigido: sua aposta própria não é mais sobrescrita ao digitar"],
+      tr: ["Yeni Oyna sekmesi: günün hedefleri, kategorili modlar ve seçili modun açıklaması", "Gerçek ödemelerle VIP 1–10: %15'e kadar yükleme bonusu, günlük çevirmeler, VIP çerçeveleri", "Düzeltildi: kendi bahsini yazarken artık üzerine yazılmıyor"],
+      zh: ["全新开始页：今日目标、分类模式、所选模式说明", "VIP 1–10 级（按真实付款）：充值加成最高 +15%、每日免费转动、VIP 头像框", "修复：输入自定义赌注时不再被覆盖"],
+      hi: ["नया प्ले टैब: आज के लक्ष्य, कैटेगरी में मोड और चुने मोड की जानकारी", "असली भुगतान से VIP 1–10: +15% तक टॉप-अप बोनस, रोज़ स्पिन, VIP फ़्रेम", "ठीक किया: अपना दांव लिखते समय अब नहीं बदलता"],
+      ar: ["تبويب اللعب الجديد: أهداف اليوم، أوضاع حسب الفئة، وشرح الوضع المختار", "مستويات VIP 1–10 بالمدفوعات الحقيقية: مكافأة شحن حتى +15%، دورات يومية، إطارات VIP", "إصلاح: رهانك الخاص لم يعد يُستبدل أثناء الكتابة"],
+    },
+  },
+  {
     id: '2026-10-10a',
     at: '2026-10-10T12:00:00+03:00',
     items: {

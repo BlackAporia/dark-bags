@@ -5,6 +5,7 @@
 import { OUTFIT, WSKIN, BOX, RARITIES, usd } from '../shared/cosmetics.js';
 import { STYLE } from '../shared/style.js';
 import { CARD, STARTER } from '../shared/store.js';
+import { VIP_LEVELS } from '../shared/vip.js';
 import { figureStill } from './stickman.js';
 import { weaponStill } from './locker.js';
 import { styleStill } from './flair.js';
@@ -80,11 +81,22 @@ export function createOffers({ app, send, sfx, toast }) {
           <ul class="of-perks"><li>💵 ${t('of.c.now', { v: usd(CARD.now) })}</li><li>📅 ${t('of.cardDaily', { v: usd(CARD.daily), n: CARD.spins })}</li><li>★ ${t('of.c.pass', { n: Math.round(CARD.passBoost * 100) })}</li><li>👑 ${t('of.c.frame', { n: esc(STYLE[CARD.frame]?.name ?? '') })}</li></ul>
           <p class="fine">${t('of.c.value', { v: usd(CARD.now + CARD.daily * CARD.days), s: CARD.spins * CARD.days })}</p></div>
           <div class="of-card-buy"><img alt="" src="${styleStill(CARD.frame, 120, 80)}">${btn('card', t('of.buy', { v: usd(CARD.price) }), CARD.price)}</div></div>`;
+    const vip = L().vip;
+    const cur = VIP_LEVELS.find((l) => l.lv === vip?.lv);
+    const vipHtml = vip
+      ? `<div class="of-vip" style="--v:${cur?.color ?? '#9aa3b5'}">
+          <div class="of-vip-top"><span class="vip-badge" style="--v:${cur?.color ?? '#5b6273'}">VIP ${vip.lv}</span>
+            <div class="of-vip-prog"><b>${vip.next ? t('vip.toNext', { v: usd(vip.toNext), n: vip.lv + 1 }) : t('vip.max')}</b><div class="of-bar"><i style="width:${vip.next ? Math.min(100, (vip.points / vip.next) * 100) : 100}%"></i></div><span class="fine">${t('vip.how')}</span></div>
+            ${vip.daily ? (vip.claimed ? `<span class="of-owned">✓ ${t('of.claimed')}</span>` : `<button type="button" class="cta" data-vipclaim>🎡 ${t('vip.claim', { n: vip.daily })}</button>`) : ''}</div>
+          <details class="of-vip-more"><summary>${t('vip.perks')}</summary><table class="of-vip-t"><tr><th>VIP</th><th>${t('vip.paid')}</th><th>${t('vip.bonus')}</th><th>${t('vip.daily')}</th><th>${t('vip.frame')}</th></tr>${VIP_LEVELS.map((l) => `<tr class="${l.lv === vip.lv ? 'on' : ''}"><td><span class="vip-badge" style="--v:${l.color}">${l.lv}</span></td><td>${usd(l.min)}</td><td>${l.bonus ? `+${l.bonus}%` : '—'}</td><td>${l.daily ? `🎡×${l.daily}` : '—'}</td><td>${l.frame ? esc(STYLE[l.frame]?.name ?? '') : ''}</td></tr>`).join('')}</table><p class="fine">${t('vip.note')}</p></details>
+        </div>`
+      : '';
     sec.innerHTML = `${starter}
       <div class="of-head"><div><p class="eyebrow">${t('of.kicker')}</p><h3 class="of-title">${t('of.store')}</h3></div><span class="of-left">${t('of.newIn')} <b id="of-left">${hms((s?.ends ?? 0) - Date.now())}</b></span></div>
       <div class="of-grid">${items}</div>
       <p class="fine">${t('of.storeNote')}</p>
-      ${insider}`;
+      ${insider}
+      ${vipHtml}`;
     for (const b of sec.querySelectorAll('[data-buy]'))
       b.addEventListener('click', () => {
         const k = b.dataset.buy;
@@ -107,6 +119,7 @@ export function createOffers({ app, send, sfx, toast }) {
         paint();
       });
     sec.querySelector('[data-claim]')?.addEventListener('click', () => send({ t: 'card_claim' }));
+    sec.querySelector('[data-vipclaim]')?.addEventListener('click', () => send({ t: 'vip_claim' }));
   }
 
   function onMessage(m) {
@@ -121,6 +134,9 @@ export function createOffers({ app, send, sfx, toast }) {
     } else if (m.op === 'card_claim') {
       sfx?.play('coin');
       toast(t('of.claimGot', { v: usd(r.credit), n: r.spins }));
+    } else if (m.op === 'vip_claim') {
+      sfx?.play('coin');
+      toast(t('vip.got', { n: r.spins }));
     } else if (m.op === 'starter_buy') {
       sfx?.play('bag');
       toast(t('of.starterGot'));

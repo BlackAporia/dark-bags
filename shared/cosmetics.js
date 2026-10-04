@@ -23,6 +23,7 @@
 import { WEAPONS } from './weapons.js';
 import { STYLE, STYLE_ITEMS, STYLE_CASES, STYLE_KINDS, pickStyle } from './style.js';
 import { featured, storeDay, CARD, STARTER, tierCost } from './store.js';
+import { vipOf, VIP_LEVELS } from './vip.js';
 import { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems } from './season.js';
 export { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems };
 
@@ -546,6 +547,8 @@ export class Inventory {
     if (rest > 0 && !(external && external(rest))) return false;
     r.credit -= fromCredit;
     r.spent += cents;
+    r.paid = (r.paid ?? 0) + rest; // real money: counts toward VIP
+    this.vipSync(key);
     return { fromCredit, external: rest };
   }
 
@@ -584,6 +587,7 @@ export class Inventory {
       sequip: r.sequip ?? {},
       pass: this.passView(key),
       card: this.cardView(key),
+      vip: this.vipView(key),
       store: this.store(key),
       starter: !!r.starter,
       pity: Object.fromEntries(BOXES.map((b) => [b.id, { sinceEpic: r.pity[b.id]?.sinceEpic ?? 0, sinceLegendary: r.pity[b.id]?.sinceLegendary ?? 0, sinceExotic: r.pity[b.id]?.sinceExotic ?? 0 }])),
@@ -617,10 +621,12 @@ export class Inventory {
     if (!(external && external(p.price))) return { ok: false, error: `Not enough USDC or USDT (${usd(p.price)} needed).` };
     const r = this.rec(key);
     const first = r.bought ? 0 : firstBonus(p.price);
-    r.credit += p.price + p.bonus + first;
+    const vip = Math.floor((p.price * (vipOf(this.vipPoints(key)).cur?.bonus ?? 0)) / 100); // the level before this pack
+    r.credit += p.price + p.bonus + first + vip;
     r.bought = (r.bought ?? 0) + p.price;
+    this.vipSync(key);
     this.changed();
-    return { ok: true, pack: p.id, added: p.price + p.bonus + first, first };
+    return { ok: true, pack: p.id, added: p.price + p.bonus + first + vip, first, vip };
   }
 
   // rank-ups: one 1-hour trial outfit per rank gained, nothing else
@@ -733,6 +739,38 @@ export class Inventory {
     ps.xp = Math.min(PASS_TIERS * PASS_STEP, (passTier(ps.xp) + n) * PASS_STEP);
     this.changed();
     return { ok: true, tiers: n, tier: passTier(ps.xp), cost };
+  }
+
+  // ------------------------------------------------------------------ VIP (shared/vip.js)
+  vipPoints(key) {
+    const r = this.rec(key);
+    return (r.bought ?? 0) + (r.paid ?? 0);
+  }
+
+  // hand out the frames of every level reached
+  vipSync(key) {
+    const r = this.rec(key);
+    const v = vipOf(this.vipPoints(key));
+    r.sowned ??= [];
+    for (const l of VIP_LEVELS) if (l.lv <= v.lv && l.frame && !r.sowned.includes(l.frame)) r.sowned.push(l.frame);
+  }
+
+  vipView(key) {
+    const r = this.rec(key);
+    const v = vipOf(this.vipPoints(key));
+    return { lv: v.lv, points: v.points, next: v.next?.min ?? null, toNext: v.toNext, daily: v.cur?.daily ?? 0, claimed: r.vipDay === storeDay(this.now()) };
+  }
+
+  // the VIP daily gift: free wheel spins by level
+  vipClaim(key) {
+    const r = this.rec(key);
+    const v = this.vipView(key);
+    if (!v.daily) return { ok: false, error: 'Your VIP level has no daily gift yet.' };
+    if (v.claimed) return { ok: false, error: 'Already claimed today.' };
+    r.vipDay = storeDay(this.now());
+    r.spins += v.daily;
+    this.changed();
+    return { ok: true, spins: v.daily, vip: this.vipView(key) };
   }
 
   // ------------------------------------------------------------------ offers (shared/store.js)

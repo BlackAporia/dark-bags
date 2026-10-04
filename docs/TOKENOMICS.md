@@ -120,6 +120,14 @@ only be spent on boxes, never withdrawn.
 | **Starter pack** | $1.99, once | an Epic outfit, 2 Vault bags + 1 Armory crate (full odds), 5 spins, an Epic frame (~$11 at shop prices) | a second, cheap first-purchase moment for players who never top up |
 | **Pass tiers** | $0.99 each, 10 for $8.99 | battle-pass tiers outright | the end-of-season push for the last rewards |
 
+### VIP levels (`shared/vip.js`)
+
+Ten levels by real money paid over all time (shop $ packs plus the USDC/USDT part of any
+purchase; free shop $ never counts): $5, $20, $50, $100, $250, $500, $1,000, $2,500, $5,000,
+$10,000. Perks are comfort and status, never power in a match: +2% to +15% extra shop $ on
+every top-up, 1 to 5 free wheel spins a day (from VIP 3), the VIP Gold frame at VIP 5 and
+VIP Diamond at VIP 8, and a VIP badge next to your rank.
+
 ### Free versus paid
 
 Free play (the calendar, daily/weekly tasks, achievements, invites, the free pass track,

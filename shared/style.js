@@ -25,6 +25,9 @@ export const STYLE_ITEMS = [
   S('frame', 'prism', 'Prism', 'exotic', ['#ff3cc8', '#3ce6ff']),
   // only with the Insider card (shared/store.js): never in a case, a reward or the store
   { ...S('frame', 'insider', 'Insider', 'legendary', ['#ffd34d', '#ff6bd5'], 'gold'), excl: true },
+  // VIP levels 5 and 8 (shared/vip.js)
+  { ...S('frame', 'vip', 'VIP Gold', 'legendary', ['#ffd166', '#b8860b'], 'gold'), excl: true },
+  { ...S('frame', 'vipx', 'VIP Diamond', 'mythic', ['#bae6fd', '#a855f7'], 'prism'), excl: true },
   // banners
   S('banner', 'grid', 'Night Grid', 'common', ['#1b2440', '#0b1020']),
   S('banner', 'stripes', 'Hazard Tape', 'common', ['#c9a227', '#1a1712']),
