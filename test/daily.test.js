@@ -100,7 +100,7 @@ test('the lobby pays daily gifts into the locker, and practice gets none', () =>
   lobby.handle('c1', { t: 'daily_claim', what: 'day' });
   const msg = out.map(([, m]) => m).find((m) => m.t === 'daily' && m.claimed);
   assert.ok(msg, 'claimed');
-  assert.equal(lobby.inventory.view(key).credit, before + 5);
+  assert.equal(lobby.inventory.view(key).credit, before + CALENDAR[0][0].v);
   assert.equal(msg.view.cal.claimed, true);
   const p = new Lobby({ wallet: new MemoryWallet(), send: (cid, m) => out.push([cid, m]), newToken: () => 'tok2', practice: true });
   p.connect?.('c2');

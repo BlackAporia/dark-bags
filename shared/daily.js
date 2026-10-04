@@ -6,7 +6,8 @@
 // day starts it again at day 1, and after day 30 a new round starts. Tasks are the same for
 // everyone on a day (and in a week), so friends can chase them together.
 //
-// Everything free here tops out at Epic: style items given are Common to Epic, and boxes come as
+// Free shop $ stays small (it buys bought boxes, which roll the full odds), and free spins come a
+// few a day at most. Everything free here tops out at Epic: style items given are Common to Epic, and boxes come as
 // gift boxes that roll no higher than Epic (Legendary and better: bought boxes, ranked, the pass).
 //
 // Pure bookkeeping, no I/O: the lobby hands out the gifts, the server persists toJSON().
@@ -30,35 +31,35 @@ const G = {
 
 // the calendar: something every day, a big one every week, the biggest on day 30
 export const CALENDAR = [
-  [G.c(5), G.pass(50)], // 1
+  [G.c(2), G.pass(50)], // 1
   [G.spin(1)],
-  [G.c(10), G.style('n-mint')],
+  [G.c(3), G.style('n-mint')],
   [G.boost(2)],
   [G.box('street')],
-  [G.c(15), G.pass(80)],
+  [G.c(4), G.pass(80)],
   [G.box('vault'), G.spin(2)], // 7: the first big one
-  [G.c(10), G.xp(250)],
+  [G.c(3), G.xp(250)],
   [G.spin(1), G.boost(2)],
   [G.box('w-scrap'), G.style('f-neon')],
-  [G.c(15), G.pass(100)],
-  [G.spin(2)],
-  [G.c(20), G.boost(3)],
+  [G.c(4), G.pass(100)],
+  [G.spin(1), G.pass(100)],
+  [G.c(6), G.boost(3)],
   [G.box('vault'), G.style('b-sunset')], // 14
-  [G.c(15), G.xp(400)],
-  [G.spin(2), G.pass(120)],
+  [G.c(4), G.xp(400)],
+  [G.spin(1), G.pass(120)],
   [G.box('s-street'), G.style('k-confetti')],
-  [G.c(20), G.boost(3)],
+  [G.c(6), G.boost(3)],
   [G.box('w-armory')],
-  [G.spin(3)],
+  [G.spin(2)],
   [G.box('golden'), G.style('k-pixel')], // 21
-  [G.c(25), G.xp(600)],
-  [G.spin(3), G.pass(150)],
+  [G.c(8), G.xp(600)],
+  [G.spin(2), G.pass(150)],
   [G.box('b-crypto'), G.style('n-gold')],
-  [G.c(30), G.boost(5)],
+  [G.c(9), G.boost(5)],
   [G.box('c-pistol')],
-  [G.spin(3), G.xp(800)],
+  [G.spin(2), G.xp(800)],
   [G.box('vault'), G.style('k-coins')],
-  [G.c(50), G.boost(5)],
+  [G.c(15), G.boost(5)],
   [G.box('golden', 2), G.style('f-circuit'), G.style('n-fire'), G.spin(5), G.xp(2000)], // 30: the grand prize
 ];
 export const BIG_DAYS = [7, 14, 21, 30];
@@ -66,22 +67,22 @@ export const BIG_DAYS = [7, 14, 21, 30];
 // the daily task pool (stat: a raidStats counter; three a day, one from each band)
 export const DAILY_TASKS = [
   // easy
-  { id: 'd_play3', stat: 'raids', goal: 3, band: 0, gifts: [G.c(5), G.pass(60)] },
-  { id: 'd_kill5', stat: 'kills', goal: 5, band: 0, gifts: [G.spin(1)] },
-  { id: 'd_alive10', stat: 'secs', goal: 600, band: 0, gifts: [G.c(5), G.xp(150)] },
-  { id: 'd_fb1', stat: 'firstBloods', goal: 1, band: 0, gifts: [G.c(5), G.pass(60)] },
+  { id: 'd_play3', stat: 'raids', goal: 3, band: 0, gifts: [G.c(2), G.pass(60)] },
+  { id: 'd_kill5', stat: 'kills', goal: 5, band: 0, gifts: [G.pass(60), G.xp(100)] },
+  { id: 'd_alive10', stat: 'secs', goal: 600, band: 0, gifts: [G.c(2), G.xp(150)] },
+  { id: 'd_fb1', stat: 'firstBloods', goal: 1, band: 0, gifts: [G.c(2), G.pass(60)] },
   // medium
-  { id: 'd_extract1', stat: 'extracts', goal: 1, band: 1, gifts: [G.c(10), G.pass(80)] },
-  { id: 'd_pvp10', stat: 'pvpKills', goal: 10, band: 1, gifts: [G.spin(1), G.xp(200)] },
-  { id: 'd_head5', stat: 'headshots', goal: 5, band: 1, gifts: [G.c(10), G.boost(1)] },
-  { id: 'd_zed60', stat: 'zKills', goal: 60, band: 1, gifts: [G.c(10), G.pass(80)] },
-  { id: 'd_gold10', stat: 'goldBags', goal: 10, band: 1, gifts: [G.c(10), G.pass(80)] },
+  { id: 'd_extract1', stat: 'extracts', goal: 1, band: 1, gifts: [G.c(3), G.pass(80)] },
+  { id: 'd_pvp10', stat: 'pvpKills', goal: 10, band: 1, gifts: [G.pass(80), G.xp(200)] },
+  { id: 'd_head5', stat: 'headshots', goal: 5, band: 1, gifts: [G.c(3), G.boost(1)] },
+  { id: 'd_zed60', stat: 'zKills', goal: 60, band: 1, gifts: [G.c(3), G.pass(80)] },
+  { id: 'd_gold10', stat: 'goldBags', goal: 10, band: 1, gifts: [G.c(3), G.pass(80)] },
   // hard
-  { id: 'd_win1', stat: 'wins', goal: 1, band: 2, gifts: [G.c(15), G.spin(1)] },
+  { id: 'd_win1', stat: 'wins', goal: 1, band: 2, gifts: [G.c(4), G.pass(100)] },
   { id: 'd_extract3', stat: 'extracts', goal: 3, band: 2, gifts: [G.box('street')] },
-  { id: 'd_kill20', stat: 'kills', goal: 20, band: 2, gifts: [G.spin(2)] },
-  { id: 'd_knife3', stat: 'kKnife', goal: 3, band: 2, gifts: [G.c(15), G.boost(2)] },
-  { id: 'd_sniper5', stat: 'kSniper', goal: 5, band: 2, gifts: [G.c(15), G.boost(2)] },
+  { id: 'd_kill20', stat: 'kills', goal: 20, band: 2, gifts: [G.spin(1), G.pass(80)] },
+  { id: 'd_knife3', stat: 'kKnife', goal: 3, band: 2, gifts: [G.c(4), G.boost(2)] },
+  { id: 'd_sniper5', stat: 'kSniper', goal: 5, band: 2, gifts: [G.c(4), G.boost(2)] },
 ];
 // all three of the day done: one more
 export const DAILY_SWEEP = [G.spin(1), G.pass(100)];
@@ -89,12 +90,12 @@ export const DAILY_SWEEP = [G.spin(1), G.pass(100)];
 export const WEEKLY_TASKS = [
   { id: 'w_play25', stat: 'raids', goal: 25, gifts: [G.box('vault'), G.pass(300)] },
   { id: 'w_kill75', stat: 'kills', goal: 75, gifts: [G.box('s-street'), G.boost(3)] },
-  { id: 'w_win5', stat: 'wins', goal: 5, gifts: [G.box('w-armory'), G.c(30)] },
-  { id: 'w_extract10', stat: 'extracts', goal: 10, gifts: [G.box('vault'), G.c(20)] },
+  { id: 'w_win5', stat: 'wins', goal: 5, gifts: [G.box('w-armory'), G.c(9)] },
+  { id: 'w_extract10', stat: 'extracts', goal: 10, gifts: [G.box('vault'), G.c(6)] },
   { id: 'w_alive2h', stat: 'secs', goal: 7200, gifts: [G.spin(2), G.xp(1500)] },
   { id: 'w_ranked5', stat: 'rankedGames', goal: 5, gifts: [G.box('c-rifle')] },
   { id: 'w_zclear2', stat: 'zClears', goal: 2, gifts: [G.box('vault'), G.spin(2)] },
-  { id: 'w_head25', stat: 'headshots', goal: 25, gifts: [G.box('s-street'), G.c(20)] },
+  { id: 'w_head25', stat: 'headshots', goal: 25, gifts: [G.box('s-street'), G.c(6)] },
 ];
 
 export const FIRST_WIN_XP = 300; // the first win (or extraction) of the day
@@ -106,11 +107,11 @@ export function achGifts(id) {
   const tier = titleTier(id);
   switch (tier) {
     case 'common':
-      return [G.c(5)];
+      return [G.c(2)];
     case 'rare':
       return [G.spin(1)];
     case 'epic':
-      return [G.c(20), G.spin(1)];
+      return [G.c(6), G.spin(1)];
     case 'legendary':
       return [G.box('vault'), G.box('s-street'), G.boost(2)];
     case 'mythic':

@@ -34,12 +34,45 @@ test('fortune in the lobby: $0.05 in any coin, a prize every spin, the jackpot c
   return lobby.fortuneSpin(1, lobby.sessions.get(1), { asset: strk }).then(() => {
     const r = out.filter((m) => m.t === 'fortune').at(-1).spun;
     assert.equal(BigInt(wallet.balance('tok00009', strk)), before.strk - lobby.prices.quote(strk, FORTUNE.price), '$0.05 of STRK');
-    assert.ok(['trial', 'wtrial', 'outfit', 'wskin', 'credit'].includes(r.prize.k));
-    assert.ok(r.prize.k === 'credit' || OUTFIT[r.prize.id] || WSKIN[r.prize.id]);
+    assert.ok(['trial', 'wtrial', 'outfit', 'wskin', 'credit', 'pass', 'boost', 'spin', 'box', 'style'].includes(r.prize.k));
+    if (['trial', 'wtrial', 'outfit', 'wskin'].includes(r.prize.k)) assert.ok(OUTFIT[r.prize.id] || WSKIN[r.prize.id]);
     assert.equal(r.jackpot.symbol, 'USDC');
     assert.equal(BigInt(wallet.balance('tok00009', usdc)), before.usdc + BigInt(r.jackpot.units), 'the bank in USDC');
     assert.equal(lobby.fortune.pool, 0);
     assert.equal(lobby.fortune.view().mark, 1000);
     assert.equal(lobby.fortune.view().wins[0].name, 'lucky');
   });
+});
+
+test('fortune: free spins turn the same wheel without touching the bank; every slot pays and nothing is above Epic', () => {
+  const out = [];
+  const lobby = new Lobby({ wallet: new MemoryWallet(), send: (cid, m) => out.push(m), newToken: () => 'tok00010' });
+  lobby.connect(1);
+  lobby.handle(1, { t: 'hello', name: 'free' });
+  const s = lobby.sessions.get(1);
+  const key = lobby.key(s);
+  lobby.inventory.give(key, { k: 'spin', n: 10 });
+  lobby.inventory.give(key, { k: 'spin', n: 10 });
+  const pool = lobby.fortune.pool;
+  const kinds = new Set();
+  for (let i = 0; i < 20; i++) {
+    lobby.fortuneSpin(1, s, { free: 1 });
+    const r = out.filter((m) => m.t === 'fortune').at(-1).spun;
+    assert.ok(r.free && r.prize && !r.jackpot);
+    kinds.add(r.prize.k);
+  }
+  assert.equal(lobby.fortune.pool, pool, 'no money came in, so no bank');
+  assert.equal(lobby.fortune.taken, 0);
+  // every slot kind can pay out
+  for (const slot of FORTUNE.slots) {
+    const p = lobby.inventory.fortunePrize(key, slot);
+    assert.ok(p && p.k, slot.k);
+    if (p.k === 'pass' || p.k === 'boost') lobby.grant(key, [p]);
+  }
+  const ranks = ['common', 'rare', 'epic'];
+  assert.ok(FORTUNE.slots.every((x) => !x.rarity || ranks.includes(x.rarity)), 'the wheel tops out at Epic');
+  // out of free spins: refused
+  for (let i = 0; i < 500 && out.at(-1).t !== 'err'; i++) lobby.fortuneSpin(1, s, { free: 1 });
+  assert.equal(out.at(-1).t, 'err');
+  assert.equal(lobby.inventory.view(key).spins, 0);
 });

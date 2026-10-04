@@ -12,7 +12,7 @@ import { nameHtml, frameAttrs, bannerHtml, styleStill } from './flair.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createInventory({ app, go, openLocker, openCashier, send, openBox = () => {} }) {
+export function createInventory({ app, go, openLocker, openCashier, send, openBox = () => {}, openWheel = () => {} }) {
   let kind = 'frame';
 
   // style: what you own of each kind, with a live preview, and the one you wear
@@ -82,6 +82,7 @@ export function createInventory({ app, go, openLocker, openCashier, send, openBo
         <p class="fine">${t('inv.shopNote')}</p>
         <div class="inv-actions"><button type="button" class="cta" data-go="shop">${t('shop.topup')}</button></div>
       </section>
+      ${L?.spins > 0 ? `<section class="inv-card inv-spins"><header><p class="eyebrow">${t('inv.spins')}</p><b class="inv-total num">🎡 ×${L.spins}</b></header><p class="fine">${t('fw.freeNote')}</p><div class="inv-actions"><button type="button" class="cta" data-spin>🎡 ${t('dl.spinNow')}</button></div></section>` : ''}
       ${held.length ? `<section class="inv-card"><header><p class="eyebrow">${t('inv.unopened')}</p></header><div class="inv-boxes">${held.map(([id, n]) => `<div class="inv-box">${boxArt(BOX[id], 72)}<b>${esc(t(`box.${id}`))}</b><span>×${n}</span>${L.gboxes?.[id] ? `<small class="fine">${t('inv.giftCap', { n: L.gboxes[id] })}</small>` : ''}<button type="button" class="cta inv-open" data-open="${id}">${t('inv.open')}</button></div>`).join('')}</div></section>` : ''}
       ${styleCard(L)}
       <section class="inv-card">
@@ -105,6 +106,7 @@ export function createInventory({ app, go, openLocker, openCashier, send, openBo
           ${stat('inv.time', s.secs ? (s.secs >= 3600 ? `${(s.secs / 3600).toFixed(1)} h` : mmss(s.secs)) : '0:00')}
         </div>
       </section>`;
+    root.querySelector('[data-spin]')?.addEventListener('click', openWheel);
     // open a held bag right here: the same show as in the shop, and it is free
     for (const b of root.querySelectorAll('[data-open]'))
       b.addEventListener('click', () => {

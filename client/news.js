@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-09a',
+    at: '2026-10-09T12:00:00+03:00',
+    items: {
+      en: ["Fortune wheel rebuilt: a real spinning wheel with lights, clicks and confetti, 18 kinds of prizes (style, gift boxes, pass XP, XP boosts, extra spins, real skins…)", "Free spins from tasks, the calendar and mail now spin the shop wheel; open boxes and spin right from the reward, the mail or the inventory", "Balance: free shop $ from tasks and the calendar is smaller, and boxes on the free pass track roll up to Epic"],
+      uk: ["Нове колесо фортуни: справжнє колесо з вогнями, клацанням і конфеті, 18 видів призів (стиль, подарункові кейси, XP пасу, бусти XP, додаткові спіни, справжні скіни…)", "Безкоштовні спіни із завдань, календаря й пошти тепер крутять колесо в магазині; відкривай кейси й крути колесо прямо з нагороди, пошти чи інвентаря", "Баланс: менше безкоштовних $ магазину із завдань і календаря, кейси на безкоштовній доріжці пасу — до Епічного"],
+      ru: ["Новое колесо фортуны: настоящее колесо с огнями, щелчками и конфетти, 18 видов призов", "Бесплатные спины из заданий, календаря и почты теперь крутят колесо в магазине; открывай кейсы и крути колесо прямо из награды, почты или инвентаря", "Баланс: меньше бесплатных $ магазина, кейсы на бесплатной дорожке пасса — до Эпического"],
+      es: ["Nueva rueda de la fortuna: luces, clics, confeti y 18 tipos de premios", "Los giros gratis giran la rueda de la tienda; abre cajas y gira desde la recompensa, el correo o el inventario", "Balance: menos $ de tienda gratis; las cajas del pase gratis llegan hasta Épico"],
+      fr: ["Nouvelle roue de la fortune : lumières, clics, confettis et 18 types de prix", "Les tours gratuits font tourner la roue de la boutique ; ouvre caisses et roue depuis la récompense, le courrier ou l’inventaire", "Équilibrage : moins de $ boutique gratuits ; les caisses du pass gratuit vont jusqu’à Épique"],
+      pt: ["Nova roda da fortuna: luzes, cliques, confete e 18 tipos de prêmio", "Giros grátis giram a roda da loja; abra caixas e gire direto da recompensa, do correio ou do inventário", "Balanço: menos $ grátis da loja; caixas do passe grátis vão até Épico"],
+      tr: ["Yeni şans çarkı: ışıklar, tıklamalar, konfeti ve 18 çeşit ödül", "Ücretsiz çevirmeler mağaza çarkını döndürür; kasaları ödülden, postadan veya envanterden aç", "Denge: daha az ücretsiz mağaza $; ücretsiz pass kasaları Epik'e kadar"],
+      zh: ["全新幸运轮盘：灯光、咔哒声、彩带，18 种奖品", "免费次数现在用来转商店轮盘；可直接从奖励、邮件或库存开箱和转盘", "平衡：免费商店币减少；免费通行证的箱子最高史诗"],
+      hi: ["नया फ़ॉर्च्यून व्हील: लाइट, क्लिक, कॉन्फ़ेटी और 18 तरह के इनाम", "मुफ़्त स्पिन अब दुकान का व्हील घुमाती हैं; इनाम, मेल या इन्वेंटरी से सीधे बॉक्स खोलो और व्हील घुमाओ", "बैलेंस: कम मुफ़्त शॉप $; फ़्री पास के बॉक्स एपिक तक"],
+      ar: ["عجلة حظ جديدة: أضواء ونقرات وقصاصات و18 نوعًا من الجوائز", "الدورات المجانية تدير عجلة المتجر؛ افتح الصناديق وأدر العجلة من المكافأة أو البريد أو المخزون", "التوازن: رصيد متجر مجاني أقل؛ صناديق التذكرة المجانية حتى ملحمي"],
+    },
+  },
+  {
     id: '2026-10-08a',
     at: '2026-10-08T12:00:00+03:00',
     items: {

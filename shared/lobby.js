@@ -301,8 +301,10 @@ export class Lobby {
       case 'mail_list':
       case 'mail_read':
       case 'mail_claim':
-      case 'spin':
         this.mailOp(cid, s, msg);
+        return;
+      case 'spin': // older clients: a free spin turns the shop's fortune wheel
+        this.fortuneSpin(cid, s, { free: 1 });
         return;
       case 'coin_list':
       case 'coin_import':
@@ -550,18 +552,12 @@ export class Lobby {
     const key = this.key(s);
     if (!key) return this.send(cid, { t: 'mailbox', signedOut: true, list: [], unread: 0 });
     let gift = null;
-    let spin = null;
     if (msg.t === 'mail_read') this.mail.read(key, String(msg.id ?? ''));
     if (msg.t === 'mail_claim') {
       gift = this.mail.claim(key, String(msg.id ?? ''));
       if (gift) this.inventory.give(key, gift);
     }
-    if (msg.t === 'spin') {
-      if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
-      spin = this.inventory.spin(key);
-      if (!spin.ok) return this.send(cid, { t: 'err', msg: spin.error });
-    }
-    this.send(cid, { t: 'mailbox', list: this.mail.inbox(key), unread: this.mail.unread(key), ...(gift ? { claimed: gift } : {}), ...(spin ? { spin } : {}), locker: this.inventory.view(key) });
+    this.send(cid, { t: 'mailbox', list: this.mail.inbox(key), unread: this.mail.unread(key), ...(gift ? { claimed: gift } : {}), locker: this.inventory.view(key) });
   }
 
   // A paid turn of the shop's fortune wheel ($0.05 in any coin the player holds). The prize lands
@@ -572,13 +568,20 @@ export class Lobby {
     if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
     if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
     if (s.busy) return this.send(cid, { t: 'err', msg: 'One moment.' });
+    // a free spin (tasks, the calendar, mail) turns the same wheel, without the bank
+    if (msg.free) {
+      if (!this.inventory.useSpin(key)) return this.send(cid, { t: 'err', msg: 'No free spins left.' });
+      const { slot } = this.fortune.free();
+      const prize = this.fortunePay(key, slot);
+      return this.send(cid, { t: 'fortune', spun: { slot, prize, free: true }, view: this.fortune.view(), locker: this.inventory.view(key) });
+    }
     const asset = String(msg.asset ?? '');
     const units = this.prices.quote(asset, FORTUNE.price);
     if (units === null) return this.send(cid, { t: 'err', msg: 'That coin has no price right now.' });
     if (!this.wallet.debit(key, asset, units)) return this.send(cid, { t: 'err', code: 'fortune_funds', msg: `Not enough ${this.prices.get(asset)?.symbol ?? 'coins'} for a spin.` });
     const { slot, jackpot } = this.fortune.spin();
     this.stats?.buy('fortune', FORTUNE.price / 10);
-    const prize = this.inventory.fortunePrize(key, FORTUNE.slots[slot]);
+    const prize = this.fortunePay(key, slot);
     let win = null;
     if (jackpot) {
       s.busy = true;
@@ -591,6 +594,14 @@ export class Lobby {
       }
     }
     this.send(cid, { t: 'fortune', spun: { slot, prize, paid: { asset, units: units.toString() }, ...(win ? { jackpot: win } : {}) }, view: this.fortune.view(), locker: this.inventory.view(key), balances: this.balances(s), mail: this.mail.unread(key) });
+  }
+
+  // what a wheel slot pays: skins, shop $, spins, style and gift boxes go to the inventory; pass XP
+  // and XP boosts are handed out here
+  fortunePay(key, slot) {
+    const prize = this.inventory.fortunePrize(key, FORTUNE.slots[slot]);
+    if (prize.k === 'pass' || prize.k === 'boost') this.grant(key, [prize]);
+    return prize;
   }
 
   // Coins a player can bring to the table: the merged AVNU / Ekubo list, and importing one of them.

@@ -41,7 +41,7 @@ export function taskText(x) {
   return t(`dl.t.${x.stat}`, { n: fmt(n) });
 }
 
-export function createDaily({ app, send, toast, sfx, go }) {
+export function createDaily({ openBox = () => {}, openWheel = () => {}, app, send, toast, sfx, go }) {
   const st = { view: null, at: 0, popped: store.get('darkbags.dailyPop', -1), busy: false };
   app.daily = null;
 
@@ -131,6 +131,24 @@ export function createDaily({ app, send, toast, sfx, go }) {
     send({ t: 'daily_claim', what, ...(id ? { id } : {}) });
   }
 
+  // open a box or spin the wheel right from the reward
+  function useBtns(gifts) {
+    const boxes = [...new Set((gifts ?? []).filter((g) => g.k === 'box').map((g) => g.id))];
+    const spin = (gifts ?? []).some((g) => g.k === 'spin');
+    return `${boxes.map((id) => `<button type="button" class="cta" data-openbox="${esc(id)}">🎁 ${esc(t('dl.openBox', { name: t(`box.${id}`) }))}</button>`).join('')}${spin ? `<button type="button" class="cta" data-spinnow>🎡 ${esc(t('dl.spinNow'))}</button>` : ''}`;
+  }
+  function wireUse(el, close) {
+    for (const b of el.querySelectorAll('[data-openbox]'))
+      b.addEventListener('click', () => {
+        close();
+        openBox(b.dataset.openbox);
+      });
+    el.querySelector('[data-spinnow]')?.addEventListener('click', () => {
+      close();
+      openWheel();
+    });
+  }
+
   // the reward pops up big in the middle of the screen
   function celebrate(c) {
     const el = $('dl-pop');
@@ -139,9 +157,10 @@ export function createDaily({ app, send, toast, sfx, go }) {
     el.innerHTML = `<div class="dl-pop-card" role="dialog" aria-label="${esc(title)}"><p class="eyebrow">${esc(t('dl.reward'))}</p><h3>${esc(title)}</h3>
       <div class="dl-pop-gifts">${c.gifts.map((g) => giftHtml(g, true)).join('')}</div>
       ${c.achievements?.length ? `<p class="fine">${esc(t('ach.unlocked'))}: ${c.achievements.map((a) => esc(t(`ach.${a}`))).join(', ')}</p>` : ''}
-      <button type="button" class="cta" data-ok>${esc(t('dl.nice'))}</button></div>`;
+      <div class="dl-pop-row">${useBtns(c.gifts)}<button type="button" class="${useBtns(c.gifts) ? 'ghost' : 'cta'}" data-ok>${esc(t('dl.nice'))}</button></div></div>`;
     el.hidden = false;
     el.querySelector('[data-ok]').addEventListener('click', () => (el.hidden = true));
+    wireUse(el, () => (el.hidden = true));
     sfx?.play('beep', { f: 1320, dur: 0.12 });
     setTimeout(() => sfx?.play('beep', { f: 1760, dur: 0.18 }), 120);
   }

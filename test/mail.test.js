@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MailBook } from '../shared/mail.js';
-import { Inventory, WHEEL, OUTFIT, WSKIN } from '../shared/cosmetics.js';
+import { Inventory, OUTFIT, WSKIN } from '../shared/cosmetics.js';
 import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
 
@@ -24,28 +24,6 @@ test('mail: news for all, notes for one, gifts claimed once', () => {
   assert.deepEqual(new MailBook({ data: JSON.parse(JSON.stringify(mb.toJSON())) }).inbox('a').length, 2);
 });
 
-test('wheel: a spin pays a 72h trial outfit, a 72h trial weapon skin or up to $2 of shop credit', () => {
-  const seen = new Set();
-  for (let i = 0; i < 300; i++) {
-    const inv = new Inventory({ rnd: Math.random });
-    assert.equal(inv.spin('p').ok, false, 'no spins yet');
-    inv.give('p', { k: 'spin', n: 1 });
-    const r = inv.spin('p');
-    assert.ok(r.ok);
-    assert.ok(r.slot >= 0 && r.slot < WHEEL.length);
-    const v = inv.view('p');
-    if (r.prize.k === 'credit') assert.ok(r.prize.v > 0 && r.prize.v <= 200 && v.credit === r.prize.v);
-    if (r.prize.k === 'trial') assert.ok(OUTFIT[r.prize.id] && v.trials[r.prize.id] > Date.now() && inv.owns('p', r.prize.id));
-    if (r.prize.k === 'wtrial') {
-      assert.ok(WSKIN[r.prize.id] && v.wtrials[r.prize.id] > Date.now());
-      assert.ok(inv.equipWeapon('p', r.prize.id).ok, 'a trial weapon skin can be worn');
-    }
-    assert.equal(v.spins, 0);
-    seen.add(r.prize.k);
-  }
-  assert.deepEqual([...seen].sort(), ['credit', 'trial', 'wtrial']);
-});
-
 test('welcome bonus: the first top-up gives the Founder title and a letter with a spin, once', () => {
   const out = [];
   const wallet = new MemoryWallet();
@@ -63,9 +41,10 @@ test('welcome bonus: the first top-up gives the Founder title and a letter with 
   lobby.handle(1, { t: 'mail_claim', id: box.list[0].id });
   assert.deepEqual(last('mailbox').claimed, { k: 'spin', n: 1 });
   assert.equal(last('mailbox').locker.spins, 1);
-  lobby.handle(1, { t: 'spin' });
-  assert.ok(last('mailbox').spin.ok);
-  assert.equal(last('mailbox').locker.spins, 0);
+  lobby.handle(1, { t: 'spin' }); // the spin turns the shop's fortune wheel, for free
+  const spun = last('fortune').spun;
+  assert.ok(spun.free && spun.prize);
+  assert.equal(last('fortune').locker.spins, spun.prize.k === 'spin' ? 1 : 0);
 });
 
 test('welcome bonus catches up: a player who topped up before it existed gets it on the next visit', () => {

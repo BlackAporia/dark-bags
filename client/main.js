@@ -191,13 +191,13 @@ const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: (
 // the menu pages
 const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
 const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
-const daily = createDaily({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p) });
+const daily = createDaily({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id), openWheel: () => fortune.open() });
 app.renderAch = () => ach.renderList();
 app.claimAch = (id) => daily.claimAch(id);
 const coinImport = createCoinImport({ app, send, toast: (m) => toast(m) });
 const fortune = createFortune({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data) });
 const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, data) => shareMoment(kind, data), equip: (r) => send({ t: r.kind === 'weapon' ? 'wequip' : 'equip', id: r.item }), onRender: (root) => fortune.mount(root) });
-const inventory = createInventory({ app, send, openBox: (id) => shop.open(id), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
+const inventory = createInventory({ app, send, openBox: (id) => shop.open(id), openWheel: () => fortune.open(), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
 const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
 const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
 const settingsUi = createSettingsUi();
@@ -260,6 +260,8 @@ const mail = createMail({
   app,
   send,
   sfx,
+  openBox: (id) => shop.open(id),
+  openWheel: () => fortune.open(),
   toast: (m) => toast(m),
   onUnread: (n) => {
     const b = document.querySelector('.nav-btn[data-page="mail"] .nav-badge');
