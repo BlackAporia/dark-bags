@@ -9,6 +9,22 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-10a',
+    at: '2026-10-10T12:00:00+03:00',
+    items: {
+      en: ["Today's store: six skins a day bought outright, no roll, a new set every day", "Insider card: 30 days of daily shop $ and a wheel spin, +25% pass XP and its own frame", "Starter pack (once): an Epic outfit, 3 boxes, 5 spins and a frame for $1.99", "Buy battle-pass tiers; open every box you hold at once; spin all your free spins at once"],
+      uk: ["Магазин дня: шість скінів щодня, купуєш одразу без рулетки, новий набір щодня", "Insider-картка: 30 днів щоденних $ у магазин і спіну колеса, +25% XP пасу і власна рамка", "Стартовий набір (один раз): епічний скін, 3 кейси, 5 спінів і рамка за $1.99", "Купівля рівнів батл-пасу; відкривай усі кейси одразу; крути всі безкоштовні спіни разом"],
+      ru: ["Магазин дня: шесть скинов в день, покупка сразу без рулетки", "Insider-карта: 30 дней ежедневных $ в магазин и спина, +25% XP пасса и своя рамка", "Стартовый набор (один раз): эпический скин, 3 кейса, 5 спинов и рамка за $1.99", "Покупка уровней батл-пасса; открывай все кейсы сразу; крути все бесплатные спины разом"],
+      es: ["Tienda del día: seis skins al día, compra directa", "Tarjeta Insider: 30 días de $ de tienda y giros diarios", "Pack de inicio por $1.99", "Compra niveles del pase; abre todas las cajas a la vez; gira todos tus giros"],
+      fr: ["Boutique du jour : six skins par jour, achat direct", "Carte Insider : 30 jours de $ boutique et de tours quotidiens", "Pack de départ à 1,99 $", "Achète des paliers de pass ; ouvre toutes tes caisses d’un coup ; tous tes tours d’un coup"],
+      pt: ["Loja do dia: seis skins por dia, compra direta", "Cartão Insider: 30 dias de $ da loja e giros diários", "Pacote inicial por $1.99", "Compre níveis do passe; abra todas as caixas de uma vez; gire todos os giros"],
+      tr: ["Günün mağazası: günde altı skin, doğrudan satın al", "Insider kart: 30 gün günlük mağaza $ ve çevirme", "1,99 $ başlangıç paketi", "Pass seviyesi satın al; tüm kasaları tek seferde aç; tüm çevirmeleri birden çevir"],
+      zh: ["今日商店：每天六款皮肤，直接购买", "内部人卡：30 天每日商店币和转盘次数", "新手礼包 $1.99", "购买通行证等级；一次打开所有箱子；一次用完所有转动"],
+      hi: ["आज की दुकान: रोज़ छह स्किन, सीधी खरीद", "इनसाइडर कार्ड: 30 दिन रोज़ शॉप $ और स्पिन", "$1.99 का स्टार्टर पैक", "पास टियर खरीदो; सारे बॉक्स एक साथ खोलो; सारे स्पिन एक साथ"],
+      ar: ["متجر اليوم: ستة سكنات يوميًا بشراء مباشر", "بطاقة Insider: 30 يومًا من رصيد المتجر والدورات اليومية", "حزمة بداية بـ 1.99$", "اشترِ مستويات التذكرة؛ افتح كل الصناديق دفعة واحدة؛ أدر كل الدورات معًا"],
+    },
+  },
+  {
     id: '2026-10-09a',
     at: '2026-10-09T12:00:00+03:00',
     items: {

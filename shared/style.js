@@ -23,6 +23,8 @@ export const STYLE_ITEMS = [
   S('frame', 'inferno', 'Inferno', 'mythic', ['#ff3d3d', '#ffb347']),
   S('frame', 'void', 'Void Gate', 'mythic', ['#a855f7', '#1e0b3a']),
   S('frame', 'prism', 'Prism', 'exotic', ['#ff3cc8', '#3ce6ff']),
+  // only with the Insider card (shared/store.js): never in a case, a reward or the store
+  { ...S('frame', 'insider', 'Insider', 'legendary', ['#ffd34d', '#ff6bd5'], 'gold'), excl: true },
   // banners
   S('banner', 'grid', 'Night Grid', 'common', ['#1b2440', '#0b1020']),
   S('banner', 'stripes', 'Hazard Tape', 'common', ['#c9a227', '#1a1712']),
@@ -71,6 +73,6 @@ export const STYLE_CASES = [
 
 // one item of that rarity (and kind, if given) you don't own yet; null when you have them all
 export function pickStyle(rarity, owned = [], rnd = Math.random, kind = null) {
-  const pool = STYLE_ITEMS.filter((x) => x.rarity === rarity && (!kind || x.kind === kind) && !owned.includes(x.id));
+  const pool = STYLE_ITEMS.filter((x) => !x.excl && x.rarity === rarity && (!kind || x.kind === kind) && !owned.includes(x.id));
   return pool.length ? pool[Math.floor(rnd() * pool.length)].id : null;
 }

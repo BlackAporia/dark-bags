@@ -76,3 +76,18 @@ test('fortune: free spins turn the same wheel without touching the bank; every s
   assert.equal(out.at(-1).t, 'err');
   assert.equal(lobby.inventory.view(key).spins, 0);
 });
+
+test('fortune: all free spins at once, one result each', () => {
+  const out = [];
+  const lobby = new Lobby({ wallet: new MemoryWallet(), send: (cid, m) => out.push(m), newToken: () => 'tok00011' });
+  lobby.connect(1);
+  lobby.handle(1, { t: 'hello', name: 'many' });
+  const s = lobby.sessions.get(1);
+  const key = lobby.key(s);
+  lobby.inventory.give(key, { k: 'spin', n: 7 });
+  lobby.fortuneSpin(1, s, { free: 7 });
+  const r = out.filter((m) => m.t === 'fortune').at(-1).spun;
+  assert.equal(r.all.length, 7);
+  assert.ok(r.all.some((x) => x.slot === r.slot), 'the wheel shows one of them');
+  assert.equal(lobby.fortune.taken, 0);
+});

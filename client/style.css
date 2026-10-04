@@ -2546,3 +2546,37 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
   .fortune { grid-template-columns: 1fr; }
   .fw-mini { max-width: 200px; }
 }
+
+.fw-list { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-height: 140px; overflow: auto; margin: 6px 0; }
+.fw-chip { font-size: 11px; padding: 3px 7px; border-radius: 999px; border: 1px solid var(--r); background: color-mix(in srgb, var(--r) 14%, #0b0d14); }
+
+/* offers: starter pack, featured store, Insider card */
+.offers { display: grid; gap: 12px; margin-bottom: 14px; }
+.of-starter { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 16px; border-radius: 18px; border: 1px solid rgba(61, 220, 151, 0.55); background: radial-gradient(90% 140% at 0% 0%, rgba(61, 220, 151, 0.18), transparent 60%), linear-gradient(135deg, #0f1d18, #0b0d14); }
+.of-starter h3, .of-card h3 { margin: 2px 0 6px; font: 900 clamp(18px, 2.4vw, 24px)/1.1 var(--f-display); text-transform: uppercase; letter-spacing: 0.03em; }
+.of-perks { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: #d9deea; }
+.of-st-buy, .of-card-buy { display: grid; justify-items: center; gap: 4px; }
+.of-st-buy b { font: 900 30px/1 var(--f-display); color: #3ddc97; }
+.of-head { display: flex; align-items: end; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.of-title { margin: 2px 0 0; font: 900 clamp(20px, 2.6vw, 28px)/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.04em; }
+.of-left { font-size: 13px; color: var(--dust, #9aa3b5); }
+.of-left b { font-variant-numeric: tabular-nums; color: #ffd34d; }
+.of-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.of-item { position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; padding: 12px 10px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--r) 60%, transparent); background: radial-gradient(100% 70% at 50% 0%, color-mix(in srgb, var(--r) 22%, transparent), transparent 70%), #0d1018; text-align: center; }
+.of-item.r-legendary, .of-item.r-mythic { box-shadow: 0 0 22px -6px var(--r); }
+.of-item img { height: 90px; max-width: 100%; object-fit: contain; }
+.of-item b { font-size: 13px; }
+.of-kind { position: absolute; top: 6px; left: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dust, #9aa3b5); }
+.of-rar { font-size: 11px; font-weight: 800; color: var(--r); text-transform: uppercase; letter-spacing: 0.06em; }
+.of-buy { width: 100%; }
+.of-buy.armed { background: #ffd34d; color: #1a1205; animation: spin-glow 1s ease-in-out infinite; }
+.of-owned { font-size: 12px; font-weight: 800; color: #3ddc97; padding: 8px 0; }
+.of-card { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 16px; border-radius: 18px; border: 1px solid rgba(255, 211, 77, 0.5); background: radial-gradient(90% 140% at 100% 0%, rgba(255, 107, 213, 0.16), transparent 60%), linear-gradient(135deg, #1b1426, #0b0d14); }
+.of-card.on { border-color: #3ddc97; }
+.of-card-buy img { height: 70px; }
+.bp-tiers { display: flex; gap: 6px; flex-wrap: wrap; }
+.inv-openall { margin-inline-start: auto; }
+@media (max-width: 640px) {
+  .of-starter, .of-card { grid-template-columns: 1fr; }
+  .of-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

@@ -274,14 +274,14 @@ test('the top tiers guarantee an Exotic within their pity window', () => {
   }
 });
 
-test('the first top-up bonus is capped at $10', async () => {
+test('the first top-up bonus is capped at $25', async () => {
   const { Inventory, firstBonus } = await import('../shared/cosmetics.js');
   assert.equal(firstBonus(500), 500);
-  assert.equal(firstBonus(100000), 10000);
+  assert.equal(firstBonus(100000), 2500);
   const inv = new Inventory();
   inv.rec('w');
   const r = inv.topUp('w', 'p100', () => true);
-  assert.equal(r.added, 10000 + 2000 + 10000);
+  assert.equal(r.added, 10000 + 2000 + 2500);
 });
 
 test('collection cases: every rarity they list can drop, and only from their collection', async () => {
@@ -329,4 +329,67 @@ test('pass: boxes on the free track are gifts (up to Epic), the premium track ro
   assert.ok(inv.passClaim('p', 'f', tier).ok);
   assert.equal(inv.rec('p').gboxes[f[tier].id], 1);
   assert.ok(!inv.rec('p').boxes[f[tier].id]);
+});
+
+test('offers: featured store, Insider card, starter pack, pass tiers, open everything at once', async () => {
+  const { Inventory, OUTFIT, WSKIN } = await import('../shared/cosmetics.js');
+  const { STYLE: ST } = await import('../shared/style.js');
+  const { CARD, STARTER, tierCost, STORE_PRICE } = await import('../shared/store.js');
+  let now = Date.UTC(2026, 9, 5, 12);
+  const inv = new Inventory({ now: () => now });
+  const r = inv.rec('b');
+  r.credit = 100000;
+  // the store: six items, the same all day, never limited/exotic/basic/season/exclusive
+  const st = inv.store('b');
+  assert.equal(st.items.length, 6);
+  assert.deepEqual(inv.store('b').items.map((x) => x.id), st.items.map((x) => x.id));
+  for (const x of st.items) {
+    const o = OUTFIT[x.id] ?? WSKIN[x.id] ?? ST[x.id];
+    assert.ok(o && !o.limited && !o.basic && !o.season && !o.excl && o.rarity !== 'exotic', x.id);
+    assert.equal(x.price, STORE_PRICE[o.rarity]);
+  }
+  const it = st.items[0];
+  const before = r.credit;
+  assert.ok(inv.storeBuy('b', it.id, null).ok);
+  assert.equal(r.credit, before - it.price);
+  assert.equal(inv.storeBuy('b', it.id, null).ok, false, 'owned');
+  assert.equal(inv.storeBuy('b', 'olive-not-today', null).ok, false);
+  // the card: $1 now, the frame, a claim a day, +25% pass XP
+  let c = r.credit;
+  assert.ok(inv.cardBuy('b', null).ok);
+  assert.equal(r.credit, c - CARD.price + CARD.now);
+  assert.ok(r.sowned.includes(CARD.frame));
+  const spins = r.spins;
+  assert.ok(inv.cardClaim('b').ok);
+  assert.equal(inv.cardClaim('b').ok, false, 'once a day');
+  assert.equal(r.spins, spins + CARD.spins);
+  now += 86400000;
+  assert.ok(inv.cardClaim('b').ok, 'the next day');
+  const xp0 = inv.passRec('b').xp;
+  inv.passXp('b', 100);
+  assert.equal(inv.passRec('b').xp, xp0 + 125);
+  now += 31 * 86400000;
+  assert.equal(inv.cardView('b'), null, 'ran out');
+  // the frame is the card's alone
+  assert.ok(ST[CARD.frame].excl);
+  // starter pack: once
+  c = r.credit;
+  assert.ok(inv.starterBuy('b', null).ok);
+  assert.equal(r.credit, c - STARTER.price);
+  assert.equal(r.boxes.vault, 2);
+  assert.equal(inv.starterBuy('b', null).ok, false);
+  // pass tiers
+  const t0 = inv.passView('b').tier;
+  c = r.credit;
+  assert.ok(inv.passTiers('b', 10, null).ok);
+  assert.equal(inv.passView('b').tier, t0 + 10);
+  assert.equal(r.credit, c - tierCost(10));
+  assert.equal(tierCost(10), 899);
+  // open everything held at once, free
+  r.gboxes = { street: 3 };
+  c = r.credit;
+  const all = inv.openAll('b');
+  assert.ok(all.ok && all.results.length === 3 + 2 + 1);
+  assert.ok(r.credit >= c, 'nothing charged');
+  assert.equal(inv.openAll('b').ok, false);
 });

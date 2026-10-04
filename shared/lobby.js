@@ -294,8 +294,14 @@ export class Lobby {
       case 'sequip':
       case 'pass_buy':
       case 'pass_claim':
-        // practice is free play money: buying (bags, shop $) and the battle pass are online only
-        if (this.practice && ['box', 'topup', 'pass_buy', 'pass_claim'].includes(msg.t)) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
+      case 'pass_tiers':
+      case 'store_buy':
+      case 'card_buy':
+      case 'card_claim':
+      case 'starter_buy':
+      case 'box_all':
+        // practice is free play money: buying (bags, shop $, offers) and the battle pass are online only
+        if (this.practice && !['equip', 'wequip', 'body', 'tequip', 'sequip'].includes(msg.t)) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
         this.lockerOp(cid, s, msg);
         return;
       case 'mail_list':
@@ -310,6 +316,12 @@ export class Lobby {
       case 'coin_import':
         this.coinOp(cid, s, msg);
         return;
+      case 'locker_sync': {
+        // the store turned over at midnight (UTC): the new set
+        const key = this.key(s);
+        if (key) this.send(cid, { t: 'locker', op: 'sync', locker: this.inventory.view(key) });
+        return;
+      }
       case 'fortune_info':
         return this.send(cid, { t: 'fortune', view: this.fortune.view() });
       case 'fortune_spin':
@@ -450,12 +462,19 @@ export class Lobby {
       : msg.t === 'sequip' ? inv.equipStyle(key, String(msg.kind ?? ''), msg.id ? id : null)
       : msg.t === 'pass_buy' ? inv.passBuy(key, pay)
       : msg.t === 'pass_claim' ? inv.passClaim(key, msg.track, msg.tier)
+      : msg.t === 'pass_tiers' ? inv.passTiers(key, msg.n, pay)
+      : msg.t === 'store_buy' ? inv.storeBuy(key, id, pay)
+      : msg.t === 'card_buy' ? inv.cardBuy(key, pay)
+      : msg.t === 'card_claim' ? inv.cardClaim(key)
+      : msg.t === 'starter_buy' ? inv.starterBuy(key, pay)
+      : msg.t === 'box_all' ? inv.openAll(key)
       : inv.open(key, id, pay, msg.n);
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
     if (!this.practice && this.stats) {
       const now = inv.rec(key);
       if ((now.bought ?? 0) > was.bought) this.stats.buy('topup', now.bought - was.bought, id);
-      if ((now.spent ?? 0) > was.spent) this.stats.buy(msg.t === 'pass_buy' ? 'pass' : 'box', now.spent - was.spent, msg.t === 'pass_buy' ? 'pass' : id);
+      const kind = { pass_buy: 'pass', pass_tiers: 'pass', store_buy: 'store', card_buy: 'card', starter_buy: 'starter' }[msg.t] ?? 'box';
+      if ((now.spent ?? 0) > was.spent) this.stats.buy(kind, now.spent - was.spent, kind === 'box' ? id : msg.t);
     }
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (msg.t === 'topup' && !this.practice) this.welcome(key); // the first top-up earns the welcome bonus (its toast comes last)
@@ -569,11 +588,17 @@ export class Lobby {
     if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'This works in online play only.' });
     if (s.busy) return this.send(cid, { t: 'err', msg: 'One moment.' });
     // a free spin (tasks, the calendar, mail) turns the same wheel, without the bank
+    // several at once (free: n, up to 50): one result each, the wheel shows the best
     if (msg.free) {
-      if (!this.inventory.useSpin(key)) return this.send(cid, { t: 'err', msg: 'No free spins left.' });
-      const { slot } = this.fortune.free();
-      const prize = this.fortunePay(key, slot);
-      return this.send(cid, { t: 'fortune', spun: { slot, prize, free: true }, view: this.fortune.view(), locker: this.inventory.view(key) });
+      const n = Math.max(1, Math.min(50, Math.floor(Number(msg.free) || 1)));
+      const all = [];
+      for (let i = 0; i < n && this.inventory.useSpin(key); i++) {
+        const { slot } = this.fortune.free();
+        all.push({ slot, prize: this.fortunePay(key, slot) });
+      }
+      if (!all.length) return this.send(cid, { t: 'err', msg: 'No free spins left.' });
+      const best = all.reduce((a, b) => (FORTUNE.slots[b.slot].w < FORTUNE.slots[a.slot].w ? b : a));
+      return this.send(cid, { t: 'fortune', spun: { ...best, free: true, ...(all.length > 1 ? { all } : {}) }, view: this.fortune.view(), locker: this.inventory.view(key) });
     }
     const asset = String(msg.asset ?? '');
     const units = this.prices.quote(asset, FORTUNE.price);

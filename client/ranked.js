@@ -172,7 +172,7 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {}, pr
     const caseTile = (b) => ({ id: b.id, name: t(`box.${b.id}`), rarity: 'rare', img: svgUri(boxArt(b, 90).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')) });
     const skins = WEAPON_SKINS.filter((x) => !x.limited && ['legendary', 'mythic'].includes(x.rarity));
     const styleTile = (id) => ({ id, name: STYLE[id].name, rarity: STYLE[id].rarity, img: styleStill(id, 120, 70) });
-    const styles = STYLE_ITEMS.filter((x) => ['legendary', 'mythic'].includes(x.rarity));
+    const styles = STYLE_ITEMS.filter((x) => !x.excl && ['legendary', 'mythic'].includes(x.rarity));
     const skinTile = (s) => ({ id: s.id, name: s.name, rarity: s.rarity, img: weaponStill(s.id, 120, 70) });
     const pool = [...TITLE_TIERS.map((x) => titleTile(x.key)), ...cases.slice(0, 8).map(caseTile), ...Array.from({ length: 8 }, () => skinTile(skins[Math.floor(Math.random() * skins.length)])), ...Array.from({ length: 6 }, () => styleTile(styles[Math.floor(Math.random() * styles.length)].id))];
     const win = sp.k === 'title' ? titleTile(seasonTitle(sp.id).key) : sp.k === 'style' ? styleTile(sp.id) : sp.k === 'wskin' ? skinTile(WSKIN[sp.id]) : caseTile(BOX[sp.id]);
