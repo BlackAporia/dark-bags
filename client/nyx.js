@@ -15,9 +15,11 @@ export function nyxSvg() {
     <clipPath id="nx-eyeR"><path d="M152 110 C150 99 132 95 123 104 C124 115 134 121 145 119 C149 117 151 114 152 110Z"/></clipPath>
   </defs>
   <circle cx="120" cy="128" r="120" fill="url(#nx-glow)"/>
+  <g class="nx-ring"><circle cx="120" cy="120" r="104" fill="none" stroke="#f7931a" stroke-opacity=".35" stroke-width="1.5" stroke-dasharray="4 10"/><circle cx="120" cy="120" r="92" fill="none" stroke="#b06cff" stroke-opacity=".25" stroke-width="1" stroke-dasharray="18 8"/></g>
+  <g class="nx-sparks"><path class="nx-spark s1" d="M30 70 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3z" fill="#ffd27a"/><path class="nx-spark s2" d="M206 58 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z" fill="#c7b3ff"/><path class="nx-spark s3" d="M214 168 l2.4 7 7 2.4 -7 2.4 -2.4 7 -2.4 -7 -7 -2.4 7 -2.4z" fill="#f7931a"/><path class="nx-spark s4" d="M24 180 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" fill="#ff8fd6"/></g>
   <g class="nx-body">
     <!-- hair, back: long, falling past the shoulders -->
-    <path d="M60 110 C52 52 88 24 122 24 C160 24 192 54 184 112 C182 150 198 190 188 222 L170 214 L160 236 L148 214 L92 214 L80 236 L70 214 L52 222 C42 190 58 150 60 110Z" fill="url(#nx-hair)"/>
+    <path class="nx-hairback" d="M60 110 C52 52 88 24 122 24 C160 24 192 54 184 112 C182 150 198 190 188 222 L170 214 L160 236 L148 214 L92 214 L80 236 L70 214 L52 222 C42 190 58 150 60 110Z" fill="url(#nx-hair)"/>
     <!-- jacket and collar -->
     <path d="M18 300 C22 240 58 208 98 200 L142 200 C182 208 218 240 222 300Z" fill="url(#nx-jacket)"/>
     <path d="M98 200 L120 240 L142 200 L154 216 L120 272 L86 216Z" fill="#141a28"/>
@@ -39,8 +41,8 @@ export function nyxSvg() {
       <path d="M169 124 C170 146 158 154 140 154" stroke="#232835" stroke-width="3" fill="none" stroke-linecap="round"/>
       <circle cx="138" cy="154" r="3.6" fill="#f7931a"/>
       <!-- brows: thin, a little arched -->
-      <path d="M92 92 C98 87 107 86 113 89" stroke="#3a2a4a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-      <path d="M127 89 C133 86 142 87 148 92" stroke="#3a2a4a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <g class="nx-brows"><path d="M92 92 C98 87 107 86 113 89" stroke="#3a2a4a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M127 89 C133 86 142 87 148 92" stroke="#3a2a4a" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
       <!-- eyes: big, glossy, two highlights each -->
       <g class="nx-eyes">
         <!-- each eye is drawn once at the centre line and moved into place -->
@@ -67,6 +69,9 @@ export function nyxSvg() {
           </g>
         </g>
       </g>
+      <!-- happy: eyes closed in two arcs (^ ^); wink: the right one only -->
+      <g class="nx-happy"><path d="M90 112 C96 102 108 102 115 112" stroke="#1a1020" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M125 112 C132 102 144 102 150 112" stroke="#1a1020" stroke-width="3.4" fill="none" stroke-linecap="round"/></g>
+      <g class="nx-wink"><path d="M125 112 C132 102 144 102 150 112" stroke="#1a1020" stroke-width="3.4" fill="none" stroke-linecap="round"/></g>
       <!-- nose: a tiny shadow; blush in anime hatching -->
       <path d="M121 124 C121.5 127 120.5 129 119 130" stroke="#d48e74" stroke-width="1.5" fill="none" stroke-linecap="round"/>
       <ellipse cx="97" cy="128" rx="8" ry="4" fill="#ff8f9a" opacity=".32"/>
@@ -80,8 +85,8 @@ export function nyxSvg() {
       </g>
       <!-- hair, front: sharp bangs, side locks, a gloss band and one orange strand -->
       <path d="M80 104 C72 62 94 36 122 36 C152 36 172 58 166 100 C162 92 158 84 152 80 L150 96 C146 86 140 78 132 74 L130 92 C126 82 120 76 112 74 L108 90 C104 82 100 78 94 78 L92 96 C88 92 86 92 84 96Z" fill="url(#nx-hair)"/>
-      <path d="M84 96 C80 124 82 150 74 176 C70 150 72 124 78 100Z" fill="url(#nx-hair)"/>
-      <path d="M158 96 C164 126 162 152 170 178 C176 150 172 122 164 98Z" fill="url(#nx-hair)"/>
+      <path class="nx-lockL" d="M84 96 C80 124 82 150 74 176 C70 150 72 124 78 100Z" fill="url(#nx-hair)"/>
+      <path class="nx-lockR" d="M158 96 C164 126 162 152 170 178 C176 150 172 122 164 98Z" fill="url(#nx-hair)"/>
       <path d="M92 58 C106 46 136 44 152 56" stroke="url(#nx-shine)" stroke-width="6" fill="none" stroke-linecap="round"/>
       <path d="M140 42 C152 50 160 62 160 80" stroke="#f7931a" stroke-width="3.2" fill="none" stroke-linecap="round" opacity=".95"/>
     </g>
@@ -89,8 +94,9 @@ export function nyxSvg() {
 </svg>`;
 }
 
-// Mounts Nyx into `el` and returns controls: talk(level 0..1) moves the lips; she blinks
-// and breathes on her own.
+// Mounts Nyx into `el` and returns controls: talk(level 0..1) moves the lips, chatter(ms) talks
+// for a while (the text typing out), mood('happy' | 'wink' | 'wow' | null) changes her face. On
+// her own she breathes, blinks, sways her hair, glances around and follows the pointer.
 export function createNyx(el) {
   el.innerHTML = nyxSvg();
   const svg = el.querySelector('svg');
@@ -100,6 +106,9 @@ export function createNyx(el) {
   const look = svg.querySelectorAll('.nx-look');
   let alive = true;
   let mouth = 0;
+  let chatT = 0;
+  let moodT = 0;
+  let follow = 0; // until when the eyes follow the pointer
   const blink = () => {
     if (!alive) return;
     for (const l of lids) l.classList.add('shut');
@@ -107,24 +116,63 @@ export function createNyx(el) {
     setTimeout(blink, 2200 + Math.random() * 3200);
   };
   setTimeout(blink, 1200);
+  const lookAt = (x, y) => {
+    for (const l of look) l.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+  };
   const glance = () => {
     if (!alive) return;
-    const x = (Math.random() - 0.5) * 3;
-    const y = (Math.random() - 0.5) * 1.5;
-    for (const l of look) l.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    if (performance.now() > follow) lookAt((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 1.5);
     setTimeout(glance, 1500 + Math.random() * 2500);
   };
   setTimeout(glance, 900);
+  const onMove = (e) => {
+    if (!alive || !svg.isConnected) return;
+    const r = svg.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height * 0.38);
+    const d = Math.hypot(dx, dy) || 1;
+    follow = performance.now() + 1800;
+    lookAt((dx / d) * Math.min(3.2, d / 60), (dy / d) * Math.min(1.8, d / 90));
+  };
+  addEventListener('pointermove', onMove, { passive: true });
+  const talk = (level) => {
+    mouth += (Math.max(0, Math.min(1, level)) - mouth) * 0.5;
+    open.setAttribute('ry', (1.2 + mouth * 5.2).toFixed(2));
+    open.setAttribute('rx', (5 + mouth * 1.8).toFixed(2));
+    open.setAttribute('cy', (142 + mouth * 2.2).toFixed(2));
+    for (const l of lower) l.setAttribute('transform', `translate(0 ${(mouth * 4.4).toFixed(2)})`);
+  };
+  function mood(m, ms = 0) {
+    clearTimeout(moodT);
+    svg.classList.remove('m-happy', 'm-wink', 'm-wow');
+    if (m) svg.classList.add(`m-${m}`);
+    if (m && ms) moodT = setTimeout(() => mood(null), ms);
+  }
+  // lips moving while her words type out (no voice: the text is the voice)
+  function chatter(ms) {
+    clearInterval(chatT);
+    const end = performance.now() + ms;
+    svg.classList.add('talking');
+    chatT = setInterval(() => {
+      if (!alive || performance.now() > end) {
+        clearInterval(chatT);
+        svg.classList.remove('talking');
+        talk(0);
+        talk(0);
+        return;
+      }
+      talk(Math.random() < 0.25 ? 0.1 : 0.35 + Math.random() * 0.6);
+    }, 90);
+  }
   return {
-    talk(level) {
-      mouth += (Math.max(0, Math.min(1, level)) - mouth) * 0.5;
-      open.setAttribute('ry', (1.2 + mouth * 5.2).toFixed(2));
-      open.setAttribute('rx', (5 + mouth * 1.8).toFixed(2));
-      open.setAttribute('cy', (142 + mouth * 2.2).toFixed(2));
-      for (const l of lower) l.setAttribute('transform', `translate(0 ${(mouth * 4.4).toFixed(2)})`);
-    },
+    talk,
+    chatter,
+    mood,
     destroy() {
       alive = false;
+      clearInterval(chatT);
+      clearTimeout(moodT);
+      removeEventListener('pointermove', onMove);
     },
   };
 }

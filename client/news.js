@@ -9,6 +9,23 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-12a',
+    at: '2026-10-12T12:00:00+03:00',
+    items: {
+      en: ["New players: pick a runner name and a region (with live ping) on the first visit", "Nyx, now fully animated, walks you through every part of the game in text, then plays your first match with you", "The game starts in the language of your country; new: Kiswahili"],
+      uk: ["Нові гравці: при першому вході — нік і регіон (з живим пінгом)", "Nyx, тепер повністю анімована, текстом проводить по кожній частині гри, а потім грає з тобою перший матч", "Гра стартує мовою твоєї країни; нова мова: суахілі"],
+      ru: ["Новые игроки: при первом входе — ник и регион (с живым пингом)", "Nyx, теперь полностью анимированная, текстом проводит по каждой части игры, а потом играет с тобой первый матч", "Игра стартует на языке твоей страны; новый язык: суахили"],
+      es: ["Jugadores nuevos: nombre y región (con ping en vivo) al entrar por primera vez", "Nyx, ahora totalmente animada, te guía por todo el juego en texto y juega tu primera partida contigo", "El juego empieza en el idioma de tu país; nuevo: suajili"],
+      fr: ["Nouveaux joueurs : pseudo et région (ping en direct) à la première visite", "Nyx, désormais animée, te guide dans tout le jeu en texte puis joue ton premier match avec toi", "Le jeu démarre dans la langue de ton pays ; nouveau : swahili"],
+      pt: ["Novos jogadores: nome e região (com ping ao vivo) na primeira visita", "Nyx, agora animada, te guia por todo o jogo em texto e joga sua primeira partida com você", "O jogo começa no idioma do seu país; novo: suaíli"],
+      tr: ["Yeni oyuncular: ilk girişte ad ve bölge (canlı ping ile)", "Artık tamamen animasyonlu Nyx, oyunun her bölümünü metinle anlatır ve ilk maçını seninle oynar", "Oyun ülkenin diliyle başlar; yeni: Svahili"],
+      zh: ["新玩家：首次进入时设置名字并选择区域（实时延迟）", "全新动画的 Nyx 用文字带你了解游戏的每个部分，并陪你打第一场比赛", "游戏自动使用你所在国家的语言；新增斯瓦希里语"],
+      hi: ["नए खिलाड़ी: पहली बार में नाम और रीजन (लाइव पिंग के साथ)", "अब पूरी तरह एनिमेटेड Nyx पूरे खेल को टेक्स्ट में समझाती है और पहला मैच साथ खेलती है", "खेल तुम्हारे देश की भाषा में शुरू होता है; नई भाषा: स्वाहिली"],
+      ar: ["لاعبون جدد: اختر اسمًا ومنطقة (مع بينغ مباشر) عند أول دخول", "نيكس، متحركة بالكامل الآن، تشرح كل جزء من اللعبة نصًا ثم تلعب معك مباراتك الأولى", "تبدأ اللعبة بلغة بلدك؛ جديد: السواحيلية"],
+      sw: ["Wachezaji wapya: chagua jina la mkimbiaji na eneo (na ping ya moja kwa moja) mara ya kwanza", "Nyx, sasa mwenye uhuishaji kamili, anakuonyesha kila sehemu ya mchezo kwa maandishi, kisha anacheza mechi yako ya kwanza nawe", "Mchezo unaanza kwa lugha ya nchi yako; mpya: Kiswahili"],
+    },
+  },
+  {
     id: '2026-10-11a',
     at: '2026-10-11T12:00:00+03:00',
     items: {

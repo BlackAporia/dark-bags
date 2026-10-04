@@ -1,4 +1,5 @@
-// Languages: the seven most spoken in the world plus Ukrainian, Russian and Turkish.
+// Languages: the seven most spoken in the world plus Ukrainian, Russian, Turkish and Swahili.
+// A new player gets the language of their country (by IP, see /api/geo), English otherwise.
 // t('key', {vars}) for strings built in code; data-i18n="key" (text), data-i18n-ph
 // (placeholder) and data-i18n-title (tooltip) for the HTML. English is the fallback.
 import { STRINGS } from './strings.js';
@@ -14,6 +15,7 @@ export const LANGS = [
   { id: 'uk', name: 'Українська' },
   { id: 'ru', name: 'Русский' },
   { id: 'tr', name: 'Türkçe' },
+  { id: 'sw', name: 'Kiswahili' },
 ];
 
 const KEY = 'darkbags.lang';
@@ -22,11 +24,16 @@ function initial() {
     const saved = localStorage.getItem(KEY);
     if (saved && STRINGS[saved]) return saved;
   } catch {}
-  for (const l of navigator.languages ?? [navigator.language ?? 'en']) {
-    const id = String(l).slice(0, 2).toLowerCase();
-    if (STRINGS[id]) return id;
-  }
+  // no choice yet: English until the player's country answers (main.js asks /api/geo)
   return 'en';
+}
+// has the player (or the country lookup) picked a language on this device yet?
+export function langChosen() {
+  try {
+    return !!localStorage.getItem(KEY);
+  } catch {
+    return false;
+  }
 }
 
 let lang = typeof navigator === 'undefined' ? 'en' : initial();
@@ -60,4 +67,7 @@ export function setLang(id) {
   for (const f of listeners) f(id);
 }
 
-export const onLang = (f) => listeners.add(f);
+export const onLang = (f) => {
+  listeners.add(f);
+  return () => listeners.delete(f);
+};

@@ -10,7 +10,7 @@ const en = STRINGS.en;
 const vars = (s) => (s.match(/\{\w+\}/g) ?? []).sort().join();
 
 test('every language has every string, with the same placeholders', () => {
-  assert.equal(Object.keys(STRINGS).length, 10);
+  assert.equal(Object.keys(STRINGS).length, 11);
   for (const [lang, d] of Object.entries(STRINGS)) {
     for (const k of Object.keys(en)) {
       assert.ok(typeof d[k] === 'string' && d[k].length, `${lang} is missing ${k}`);

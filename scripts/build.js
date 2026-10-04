@@ -42,7 +42,6 @@ await rm('dist', { recursive: true, force: true });
 await mkdir('dist/play', { recursive: true });
 await cp('site', 'dist', { recursive: true });
 await writeFile('dist/play/index.html', page(false));
-await cp('client/voice', 'dist/play/voice', { recursive: true }); // Nyx's voice lines, loaded on demand
 await writeFile('dist/artifact.html', page(true));
 const kb = (s) => `${(Buffer.byteLength(s) / 1024).toFixed(0)} KB`;
 console.log(`dist/index.html (landing), dist/play/index.html ${kb(page(false))}, dist/artifact.html ${kb(page(true))}${server ? `, online → ${server}` : ''}`);

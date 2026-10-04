@@ -2709,3 +2709,103 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
   .nav-group { margin: 7px 14px 2px; }
   .nav-me { padding: 7px 10px; }
 }
+
+/* Nyx, alive: hair sways, the hologram turns, sparks twinkle, moods change her face */
+.nyx-svg .nx-ring { transform-origin: 120px 120px; animation: nx-ring 24s linear infinite; }
+@keyframes nx-ring { to { transform: rotate(360deg); } }
+.nyx-svg .nx-spark { transform-box: fill-box; transform-origin: center; animation: nx-spark 2.6s ease-in-out infinite; }
+.nyx-svg .nx-spark.s2 { animation-delay: 0.7s; }
+.nyx-svg .nx-spark.s3 { animation-delay: 1.3s; }
+.nyx-svg .nx-spark.s4 { animation-delay: 1.9s; }
+@keyframes nx-spark { 0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); } 50% { opacity: 1; transform: scale(1.1) rotate(45deg); } }
+.nyx-svg .nx-hairback { transform-origin: 120px 40px; animation: nx-hair 5.5s ease-in-out infinite; }
+.nyx-svg .nx-lockL { transform-origin: 80px 96px; animation: nx-lock 4.2s ease-in-out infinite; }
+.nyx-svg .nx-lockR { transform-origin: 162px 96px; animation: nx-lock 4.6s ease-in-out infinite reverse; }
+@keyframes nx-hair { 50% { transform: rotate(1.4deg) skewX(1deg); } }
+@keyframes nx-lock { 50% { transform: rotate(3deg); } }
+.nyx-svg .nx-happy, .nyx-svg .nx-wink { opacity: 0; transition: opacity 0.15s; }
+.nyx-svg.m-happy .nx-happy { opacity: 1; }
+.nyx-svg.m-happy .nx-eyes { opacity: 0; }
+.nyx-svg.m-wink .nx-wink { opacity: 1; }
+.nyx-svg.m-wink .nx-eyes > g:last-child { opacity: 0; }
+.nyx-svg .nx-brows { transition: transform 0.2s; }
+.nyx-svg.m-wow .nx-brows, .nyx-svg.m-happy .nx-brows { transform: translateY(-3px); }
+.nyx-svg.m-wow .nx-open { ry: 4.5; }
+.nyx-svg.talking .nx-head { animation: nx-sway 7s ease-in-out infinite, nx-nod 0.6s ease-in-out infinite; }
+@keyframes nx-nod { 50% { translate: 0 0.8px; } }
+@media (prefers-reduced-motion: reduce) { .nyx-svg .nx-ring, .nyx-svg .nx-spark, .nyx-svg .nx-hairback, .nyx-svg .nx-lockL, .nyx-svg .nx-lockR { animation: none; } }
+
+/* ---------------------------------------------------------------- first visit: name, region */
+.welcome { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; padding: 16px; background: radial-gradient(80% 70% at 50% 40%, rgba(247, 147, 26, 0.14), transparent 70%), rgba(3, 4, 8, 0.88); backdrop-filter: blur(8px); opacity: 0; transition: opacity 0.3s; }
+.welcome.in { opacity: 1; }
+.wel-card { position: relative; width: min(860px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; grid-template-columns: 300px minmax(0, 1fr); border-radius: 26px; border: 1px solid rgba(247, 147, 26, 0.45); background: linear-gradient(135deg, rgba(24, 28, 42, 0.98), rgba(10, 12, 18, 0.98)); box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7), 0 0 60px -20px rgba(247, 147, 26, 0.5); animation: wel-in 0.6s cubic-bezier(0.2, 0.9, 0.25, 1.15); }
+@keyframes wel-in { from { transform: translateY(30px) scale(0.96); opacity: 0; } }
+.wel-nyx { position: relative; min-height: 360px; background: radial-gradient(circle at 50% 45%, rgba(176, 108, 255, 0.22), transparent 65%), radial-gradient(circle at 50% 80%, rgba(247, 147, 26, 0.2), transparent 60%); overflow: hidden; }
+.wel-nyx svg { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 300px; height: auto; }
+.wel-main { padding: 22px 24px 20px; display: grid; align-content: start; gap: 12px; min-width: 0; }
+.wel-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wel-who { font: 600 12px var(--f-num); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dust); }
+.wel-who b { color: var(--loot); font: 900 20px/1 var(--f-display); letter-spacing: 0.08em; }
+.wel-dots { display: flex; gap: 5px; margin-inline-start: auto; }
+.wel-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.wel-dots i.on { width: 22px; border-radius: 4px; background: var(--loot); }
+.wel-dots i.past { background: rgba(247, 147, 26, 0.5); }
+.wel-lang select { padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--paper); }
+.wel-t { margin: 0; font: 900 clamp(24px, 3.4vw, 34px)/1.1 var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; background: linear-gradient(90deg, #ffd34d, #ff8fd6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.wel-b { margin: 0; font-size: 17px; line-height: 1.55; color: #e3e7f1; }
+.wel-namebox { display: flex; gap: 8px; }
+.wel-namebox input { flex: 1; min-width: 0; width: 100%; padding: 14px 16px; border-radius: 14px; border: 2px solid rgba(247, 147, 26, 0.6); background: rgba(0, 0, 0, 0.4); color: var(--paper); font: 800 22px/1 var(--f-ui); }
+.wel-namebox input:focus { outline: none; border-color: #ffd34d; box-shadow: 0 0 0 4px rgba(255, 211, 77, 0.18); }
+.wel-dice { font-size: 24px; padding: 0 16px; border-radius: 14px; }
+.wel-hint { margin: 0; font-size: 13px; color: var(--dust); }
+.wel-hint.bad { color: #ff6b6b; }
+.wel-acts { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.wel-acts .cta { padding: 14px 26px; font-size: 16px; }
+.wel-regs { display: grid; gap: 8px; }
+.wel-reg { display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'f n ms' 'f n pl'; align-items: center; column-gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); color: var(--paper); text-align: start; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+.wel-reg:hover:not(:disabled) { transform: translateY(-1px); border-color: #3a4459; }
+.wel-reg.on { border-color: var(--loot); background: rgba(247, 147, 26, 0.1); box-shadow: 0 0 0 1px var(--loot); }
+.wel-reg.off { opacity: 0.45; cursor: not-allowed; }
+.wr-flag { grid-area: f; font-size: 28px; }
+.wr-n { grid-area: n; display: grid; gap: 2px; }
+.wr-n b { font-size: 16px; }
+.wr-n small { font-size: 12px; color: var(--dust); }
+.wr-best { font-style: normal; font: 800 11px/1 var(--f-ui); color: #3ddc97; }
+.wr-ms { grid-area: ms; font: 800 15px/1 var(--f-num); text-align: end; }
+.wr-ms.good { color: #3ddc97; }
+.wr-ms.ok { color: #ffd166; }
+.wr-ms.bad { color: #ff6b6b; }
+.wr-pl { grid-area: pl; font-size: 12px; color: var(--dust); text-align: end; }
+.wel-reg.auto { grid-template-areas: 'f n'; grid-template-columns: auto 1fr; }
+@media (max-width: 700px) {
+  .wel-card { grid-template-columns: minmax(0, 1fr); }
+  .wel-t { overflow-wrap: anywhere; font-size: 22px; }
+  .wel-who { font-size: 10px; }
+  .wel-lang select { max-width: 110px; }
+  .wel-nyx { min-height: 170px; }
+  .wel-nyx svg { width: 190px; bottom: -40px; }
+  .wel-main { padding: 16px; }
+  .wel-b { font-size: 15.5px; }
+}
+
+/* the tour card: bigger, easier text */
+.tour-card { width: min(820px, calc(100vw - 24px)); grid-template-columns: 190px 1fr; }
+.tour-nyx svg { width: 206px; }
+.tour-count { margin-inline-start: auto; font: 700 12px var(--f-num); color: var(--dust); letter-spacing: 0.06em; }
+.tut-title { margin: 2px 0 0; font: 900 clamp(19px, 2.4vw, 24px)/1.15 var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; color: #ffd34d; }
+.tut-title[hidden] { display: none; }
+.tut-text { min-height: 5.5em; max-height: 42vh; overflow: auto; font-size: 16.5px; line-height: 1.55; color: var(--paper); }
+.tut-text p { margin: 0 0 8px; }
+.tut-text p:last-child { margin-bottom: 0; }
+.tut-text b { color: #ffd34d; }
+.nyx-dock .tut-text { min-height: 0; max-height: none; font-size: 15px; line-height: 1.4; }
+@media (max-width: 760px) {
+  .tour-card { grid-template-columns: 92px 1fr; }
+  .tour-nyx svg { width: 120px; }
+  .tut-text { font-size: 14.5px; max-height: 36vh; }
+}
+.tour-nyx svg, .wel-nyx svg, .nyx-face svg { pointer-events: none; }
+@media (max-width: 760px) {
+  .tut-text { max-height: 28vh; }
+  .tut-title { font-size: 17px; }
+}

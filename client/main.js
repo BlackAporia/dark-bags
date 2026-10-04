@@ -35,6 +35,7 @@ import { MAP_THEMES } from '../shared/map.js';
 import { createChat } from './chat.js';
 import { createSettingsUi } from './settingsui.js';
 import { createTour } from './tour.js';
+import { createWelcome } from './welcome.js';
 import { createIntro } from './intro.js';
 import { createInvite, captureRef, deviceId } from './invite.js';
 import { createMail } from './mail.js';
@@ -45,7 +46,7 @@ import { createCoinImport } from './coins.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
-import { t, applyI18n, setLang, getLang, onLang, LANGS } from './i18n.js';
+import { t, applyI18n, setLang, getLang, onLang, LANGS, langChosen } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -236,6 +237,17 @@ const tour = createTour({
   },
 });
 document.addEventListener('darkbags:tour', () => tour.start());
+// the first visit: a runner name and a region, then the tour
+const welcome = createWelcome({ app, regions, sfx, onDone: () => tour.start() });
+// a new player's language: the one of their country (by IP), English when it does not answer
+const geoReady = langChosen() || !SERVER
+  ? Promise.resolve()
+  : fetch(`${SERVER.replace(/^ws/, 'http').replace(/\/ws\/?$/, '')}/api/geo`, { signal: AbortSignal.timeout(2500) })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!langChosen() && j?.lang && LANGS.some((l) => l.id === j.lang)) setLang(j.lang);
+      })
+      .catch(() => {});
 
 // ------------------------------------------------------------------ pages
 // friends, messages, profiles, guilds and room invites
@@ -1225,7 +1237,6 @@ function onMessage(m) {
   if ((m.t === 'daily' || m.t === 'locker' || m.t === 'fortune') && app.page === 'play') renderGoals();
   if (m.t === 'vc') voice.onMessage(m);
   if (m.t === 'daily' && m.career) ach.renderProfile();
-  if (m.t === 'authed' && m.account) tour.maybeStart(String(m.account).toLowerCase()); // a wallet new to this device
   if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
   if (m.t === 'locker') pass.onMessage(m);
   if (m.t === 'locker') offers.onMessage(m);
@@ -1739,10 +1750,13 @@ applyI18n();
 const intro = createIntro({
   onDone: () => {
     document.body.classList.add('ready');
-    // a new player gets Nyx (the update notes would mean nothing yet); everyone else, once
-    // after an update, the notes
-    if (tour.maybeStart('device')) news.markSeen();
-    else news.maybeShow();
+    // a new player: the language of their country first, then a name and a region (welcome.js),
+    // then Nyx's tour of the game; everyone else, once after an update, the notes
+    geoReady.then(() => {
+      if (welcome.maybeStart()) news.markSeen();
+      else if (tour.maybeStart()) news.markSeen();
+      else news.maybeShow();
+    });
   },
 });
 for (const s of ['fonts', 'world', 'connect', 'profile']) intro.need(s);
