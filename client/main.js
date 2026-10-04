@@ -28,6 +28,7 @@ import { titleTier } from '../shared/achievements.js';
 import { createShop } from './shop.js';
 import { createInventory } from './inventory.js';
 import { createSwap } from './swap.js';
+import { createStarknetPage } from './starknet.js';
 import { renderMapPick } from './mappick.js';
 import { createScoreboard } from './scoreboard.js';
 import { createVoice } from './voice.js';
@@ -207,6 +208,19 @@ const shop = createShop({ app, send, sfx, toast: (m) => toast(m), share: (kind, 
   } });
 const inventory = createInventory({ app, send, openBox: (id, n) => shop.open(id, n), openAll: () => shop.openAll(), openWheel: (all) => fortune.open(all), go: (p, fam) => go(p, fam), openLocker: () => locker.open('outfits'), openCashier: () => cashier.openCashier() });
 const swap = createSwap({ app, send, toast: (m) => toast(m), cashier, signIn: () => $('connect').click() });
+const starknet = createStarknetPage({
+  app,
+  base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href,
+  cashier,
+  go: (p) => go(p),
+  signIn: () => $('connect').click(),
+  toast: (m) => toast(m),
+  pickAsset: (id) => {
+    if (!id) return;
+    app.asset = id;
+    store.set('darkbags.asset', id);
+  },
+});
 const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
 const settingsUi = createSettingsUi();
 // Nyx's first-run tour: on the first launch here, and the first time a wallet signs in
@@ -290,7 +304,7 @@ const mail = createMail({
     }
   },
 });
-const PAGES = { shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite, mail };
+const PAGES = { starknet, shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite, mail };
 document.addEventListener('darkbags:mode', () => {
   store.set('darkbags.gmode', app.gameMode);
   renderLobby();
@@ -366,11 +380,11 @@ setInterval(syncMore, 1000);
 // keep the bottom tab bar: the extras are hidden there by CSS.
 const NAV_GROUPS = [
   ['play', ['play', 'ranked', 'pass']],
-  ['store', ['shop', 'inventory', 'swap']],
+  ['store', ['starknet', 'shop', 'inventory', 'swap']],
   ['social', ['chat', 'friends', 'guilds', 'mail', 'invite']],
   ['you', ['achievements', 'settings']],
 ];
-const NAV_COLOR = { play: '#f7931a', ranked: '#ff2dd4', pass: '#ffd166', shop: '#3ddc97', inventory: '#f59e0b', swap: '#38bdf8', chat: '#a78bfa', friends: '#60a5fa', guilds: '#34d399', mail: '#fb7185', invite: '#22d3ee', achievements: '#fbbf24', settings: '#94a3b8' };
+const NAV_COLOR = { starknet: '#ec796b', play: '#f7931a', ranked: '#ff2dd4', pass: '#ffd166', shop: '#3ddc97', inventory: '#f59e0b', swap: '#38bdf8', chat: '#a78bfa', friends: '#60a5fa', guilds: '#34d399', mail: '#fb7185', invite: '#22d3ee', achievements: '#fbbf24', settings: '#94a3b8' };
 (function buildNav() {
   const nav = $('menu-nav');
   const more = $('nav-more');
@@ -428,6 +442,7 @@ function navSubs() {
     shop: online && L?.store ? t('nav.d.store', { t: hmsLeft(L.store.ends - Date.now()) }) : t('nav.s.shop'),
     inventory: online && (boxes || L?.spins) ? [boxes ? `🎁 ${boxes}` : '', L?.spins ? `🎡 ${L.spins}` : ''].filter(Boolean).join(' · ') : t('nav.s.inventory'),
     swap: t('nav.s.swap'),
+    starknet: t('nav.s.starknet'),
     chat: t('nav.s.chat'),
     friends: t('nav.s.friends'),
     guilds: t('nav.s.guilds'),

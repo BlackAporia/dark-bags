@@ -231,5 +231,61 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
     reply(200, await snapshot());
   }
 
-  return { isAdmin, snapshot, handle };
+  // The public impact numbers (GET /api/impact): what DARK BAGS brings to Starknet, in totals
+  // only, never a player or an amount of anyone's. Users, matches and the $ staked in them, the
+  // value held in the game, deposits and cash-outs on chain and how many went privately through
+  // STRK20, and the Bitcoin share. Cached for a minute.
+  let impactCache = null;
+  async function impact() {
+    const t = now();
+    if (impactCache && t - impactCache.at < 60_000) return impactCache.v;
+    const DAY = 86_400_000;
+    const totals = Object.values(stats.modes).reduce((a, m) => ({ matches: a.matches + (m.raids ?? 0), entries: a.entries + (m.humans ?? 0), staked: a.staked + (m.stakes ?? 0), paid: a.paid + (m.paid ?? 0), rake: a.rake + (m.rake ?? 0), seconds: a.seconds + (m.seconds ?? 0) }), { matches: 0, entries: 0, staked: 0, paid: 0, rake: 0, seconds: 0 });
+    let wallets = 0;
+    for (const p of stats.players.values()) if (p.w) wallets++;
+    const shopCents = Object.values(stats.shop).reduce((n, k) => n + (k.cents ?? 0), 0);
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const k = dayOf(t - i * DAY);
+      const d = stats.days[k] ?? {};
+      days.push({ day: k, active: d.active ?? 0, matches: d.raids ?? 0, staked: d.stakes ?? 0, dep: 0 });
+    }
+    const usd = (id, u) => usdOf(id, u) ?? 0;
+    const isBtc = (id) => /btc/i.test(sym(id));
+    let chain = null;
+    if (real) {
+      const c = real.cashier;
+      const okDep = (d) => !d.unsupported && !d.held;
+      const deps = c.deposits.filter(okDep);
+      const sent = c.withdrawals.filter((w) => w.status === 'sent');
+      const byDay = Object.fromEntries(days.map((d) => [d.day, d]));
+      for (const d of deps) if (byDay[dayOf(d.at)]) byDay[dayOf(d.at)].dep += usd(d.token, d.amount);
+      const priv = (list) => list.filter((x) => x.route === 'private');
+      const sum = (list) => list.reduce((n, x) => n + usd(x.token, x.amount), 0);
+      const liab = basket(c.liabilities());
+      chain = {
+        network,
+        deposits: { n: deps.length, usd: sum(deps), private: priv(deps).length, privateUsd: sum(priv(deps)), btcUsd: sum(deps.filter((d) => isBtc(d.token))), depositors: new Set(deps.map((d) => d.account)).size },
+        cashouts: { n: sent.length, usd: sum(sent), private: priv(sent).length },
+        tvl: liab.mills, // what players hold inside the game right now
+        tokens: real.chain.tokens.length,
+        routes: c.info().routes,
+      };
+    }
+    const v = {
+      at: t,
+      since: Date.parse(env.GAME_LAUNCH_AT || GAME_BORN) || Date.parse(GAME_BORN),
+      network,
+      players: { total: stats.players.size, wallets, d1: stats.activeWithin(DAY), d7: stats.activeWithin(7 * DAY), d30: stats.activeWithin(30 * DAY), online: sockets.size, peak: stats.peak?.n ?? 0 },
+      matches: { total: totals.matches, entries: totals.entries, hours: Math.round(totals.seconds / 3600), staked: totals.staked, paid: totals.paid },
+      revenue: { rake: totals.rake, shop: shopCents * 10 }, // mills
+      privacy: { privateStakes: true, stakesPrivate: totals.entries, privateDeposits: chain?.deposits.private ?? 0, privateCashouts: chain?.cashouts.private ?? 0 },
+      chain,
+      days,
+    };
+    impactCache = { at: t, v };
+    return v;
+  }
+
+  return { isAdmin, snapshot, handle, impact };
 }

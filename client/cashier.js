@@ -717,7 +717,14 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 
   return {
     avnu,
-    openCashier: () => cs.account && openCashier(),
+    openCashier: (tab, route) => {
+      if (!cs.account) return false;
+      // the Starknet page opens it on the private (STRK20) route when the wallet can use it
+      if (route && routes(tab === 'withdraw' ? 'withdraw' : 'deposit').some((r) => r.id === route)) cs[tab === 'withdraw' ? 'wdRoute' : 'depRoute'] = route;
+      openCashier(tab);
+      return true;
+    },
+    privateOk: (kind = 'deposit') => !!cs.chain && routes(kind).some((r) => r.id === 'private'),
     onMessage,
     render,
     get active() {
