@@ -58,17 +58,16 @@ test('the storm kills runners caught outside, and their bag drops', () => {
   assert.ok(w.audit().ok);
 });
 
-test('a closed exit does not extract you', () => {
+test('the one exit is in the middle and the storm closes onto it', () => {
   const w = new World({ stake: 1000, seed: 5, bots: false });
-  const p = w.addPlayer({ name: 'late', skin: '#fff' });
-  const shut = w.map.extracts.find((e) => e.id !== w.zonePlan.finalExit);
-  // jump to the end of the raid, when every other exit is shut
+  assert.equal(w.map.extracts.length, 1);
+  const e = w.map.extracts[0];
+  assert.equal(e.x, w.map.w / 2);
+  assert.equal(e.y, w.map.h / 2);
+  assert.equal(w.zonePlan.finalExit, e.id);
   w.time = w.zonePlan.times.at(-1)[1] - 1;
   w.updateZone();
-  assert.equal(w.exitStates[shut.id], 'closed');
-  Object.assign(p, { x: shut.x, y: shut.y, hp: 1e9 });
-  for (let i = 0; i < CFG.TICK_RATE * (CFG.EXTRACT_TIME + 0.5); i++) w.step();
-  assert.notEqual(p.status, 'extracted');
+  assert.equal(w.exitStates[e.id], 'last');
 });
 
 test('new loot lands inside the circle the storm is heading to', () => {

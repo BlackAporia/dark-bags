@@ -499,6 +499,15 @@ export class GameClient {
           else this.feed(t('feed.down', { name: b(ev.victim) }));
           break;
         }
+        case 'extracting':
+          // someone is holding the exit: the whole raid knows (and has EXTRACT_TIME to stop them)
+          if (ev.pid === this.pid) this.banner(t('hud.holdExit', { s: CFG.EXTRACT_TIME }), 'gold', 2600);
+          else {
+            this.banner(t('hud.someoneOut', { name: ev.name, s: CFG.EXTRACT_TIME }), 'warn', 3000);
+            this.feed(t('feed.extracting', { name: `<b>${esc(ev.name)}</b>` }), 'warnline');
+            this.sfx.play('beep', { f: 880, dur: 0.08 });
+          }
+          break;
         case 'extract': {
           const a = this.anims.get(ev.pid);
           if (a && now - a.seen < 400) {
@@ -1238,7 +1247,8 @@ export class GameClient {
           best = e;
         }
       }
-      el.extName.textContent = best ? best.name : '';
+      // one exit: the seconds still to hold; several: which one
+      el.extName.textContent = this.map.extracts.length === 1 ? String(Math.max(1, Math.ceil((1 - you.ext) * CFG.EXTRACT_TIME - 1e-6))) : best ? best.name : '';
       el.extBar.style.width = `${Math.min(100, you.ext * 100)}%`;
     } else el.extract.hidden = true;
     if (you.st === 'dead' && this.roundsMode) {

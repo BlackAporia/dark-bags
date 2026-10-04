@@ -436,6 +436,11 @@ export class World {
           p.ext = 0;
           p.extId = zone.id;
         }
+        // starting the hold (again): the whole raid is told who is getting out
+        if (p.ext === 0 && this.time - (p.extWarnAt ?? -99) > 4) {
+          p.extWarnAt = this.time;
+          this.emit({ k: 'extracting', name: p.name, pid: p.id, x: r1(zone.x), y: r1(zone.y) });
+        }
         p.ext += DT / CFG.EXTRACT_TIME;
         if (p.ext >= 1 - 1e-9) this.extract(p);
       } else {
@@ -1347,8 +1352,14 @@ export class World {
       if (tl <= 10) say('10', 'warn.gold10');
       return;
     }
-    if (tl <= 30) say('30', this.potMode ? 'warn.pot30' : 'warn.exit30');
-    if (tl <= 10) say('10', this.potMode ? 'warn.pot10' : 'warn.exit10');
+    if (this.potMode) {
+      if (tl <= 30) say('30', 'warn.pot30');
+      if (tl <= 10) say('10', 'warn.pot10');
+      return;
+    }
+    // getting out takes EXTRACT_TIME of holding the exit: the warnings leave room for it
+    if (tl <= CFG.EXTRACT_TIME + 30) say('30', 'warn.exit30');
+    if (tl <= CFG.EXTRACT_TIME + 8) say('10', 'warn.exit10');
   }
 
   // Pot modes: the last side standing takes the pot. If the clock runs out first, the side

@@ -38,8 +38,8 @@ export const CFG = {
   // weapons live in weapons.js (Arms Race ladder)
 
   // extraction
-  EXTRACT_R: 80,
-  EXTRACT_TIME: 3,        // seconds standing in the zone; any hit resets it
+  EXTRACT_R: 100,         // the one exit, in the middle of the map
+  EXTRACT_TIME: 10,       // seconds standing in it; any hit resets it, and everyone is told
 
   // loot
   PICKUP_R: 26,
@@ -103,4 +103,4 @@ export const GL = {
 
 export const SKINS = ['#ff5a5f', '#4cc9f0', '#b5e48c', '#f72585', '#ffd166', '#9b5de5', '#00f5d4', '#ff9f1c'];
 
-export const EXTRACT_NAMES = ['North Gate', 'Rail Tunnel', 'East Pier', 'Old Culvert', 'Scrapyard', 'South Dock', 'Sewer Hatch', 'West Bridge'];
+export const EXTRACT_NAMES = ['Centre', 'North Gate', 'Rail Tunnel', 'East Pier', 'Old Culvert', 'Scrapyard', 'South Dock', 'Sewer Hatch', 'West Bridge'];
