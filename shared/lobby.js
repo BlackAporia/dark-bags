@@ -3,6 +3,7 @@ import { RoomCore } from './room.js';
 import { cleanName } from './wallet.js';
 import { PriceBook, isStable } from './assets.js';
 import { RankBook } from './ranks.js';
+import { validStake, bandOf } from './stakes.js';
 import { MODES, MODE } from './modes.js';
 import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
 import { SocialBook, GUILD_RANK } from './social.js';
@@ -26,8 +27,7 @@ import { DailyBook } from './daily.js';
 const PAUSABLE = new Set(['ready', 'stake_ticket', 'box', 'topup', 'swap']);
 const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite', 'guild_invite']);
 
-export const CUSTOM_MIN = 100; // $0.10 (stakes are in thousandths of a dollar)
-export const CUSTOM_MAX = 10_000_000; // $10,000
+export { STAKE_MIN as CUSTOM_MIN, STAKE_MAX as CUSTOM_MAX } from './stakes.js';
 
 // the welcome bag for a player who came through an invite, and the inviter's bonus bag
 export const REF_GIFT = 'vault';
@@ -79,17 +79,13 @@ export class Lobby {
     return [...this.rooms.values()].map((r) => r.info());
   }
 
-  // A table at a stake of your own ($0.10 to $10,000 in whole cents): made when someone
-  // sits down, removed again once it stands empty.
+  // The table for a stake: one per mode and stake band (shared/stakes.js). Whatever you stake
+  // inside the band is yours to know: the table only shows the whole pool.
   roomFor(mode, stake) {
-    if (MODE[mode]?.fixed) stake = MODE[mode].fixed;
-    const id = `${MODE[mode] ? mode : 'raid'}:${stake}`;
-    if (this.rooms.has(id)) return this.rooms.get(id);
-    if (!Number.isInteger(stake) || stake < CUSTOM_MIN || stake > CUSTOM_MAX || stake % 10) return null;
-    const room = new RoomCore({ stake, mode: MODE[mode] ? mode : 'raid', ...this.roomArgs });
-    room.custom = true;
-    this.rooms.set(id, room);
-    return room;
+    const m = MODE[mode] ? mode : 'raid';
+    if (MODE[m].fixed) return this.rooms.get(`${m}:${MODE[m].fixed}`) ?? null;
+    if (!validStake(stake)) return null;
+    return this.rooms.get(`${m}:${bandOf(stake)}`) ?? null;
   }
 
   // people connected right now (every signed session, in a raid or browsing)
@@ -381,7 +377,7 @@ export class Lobby {
         if (!s.room) {
           // fair play: one person, one seat at a staked table (no feeding a second account)
           if (!room.practice && !this.seatOk(s, room)) return this.send(cid, { t: 'err', code: 'guard_seat', msg: 'Another account from your network or device is already at this table.' });
-          room.addClient(cid, { token: this.key(s), name: msg.name || s.name, skin: msg.skin });
+          room.addClient(cid, { token: this.key(s), name: msg.name || s.name, skin: msg.skin, stake: Number(msg.stake) });
           s.room = room;
         } else room.handle(cid, msg);
         return;

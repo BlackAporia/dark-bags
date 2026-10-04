@@ -202,6 +202,7 @@
       <fieldset class="tables">
         <legend class="eyebrow" data-i18n="lobby.stakePer">Stake per raid</legend>
         <div id="tables" class="table-list"></div>
+        <p class="fine stake-priv" data-i18n="stake.private">🔒 Your stake is private: the table shows only the whole pool, never who put in what.</p>
       </fieldset>
       <details id="pcfg" class="pcfg" hidden>
       <summary><span class="eyebrow" data-i18n="pcfg.title">Practice settings</span> <span id="pcfg-sum" class="fine"></span></summary>
@@ -221,7 +222,7 @@
       <div id="cashier" class="cashier" hidden>
       <div class="acct">
         <span id="acct-label" class="acct-label">Not signed in</span>
-        <button id="connect" class="ghost" type="button">Sign in</button>
+        <button id="connect" class="ghost" type="button" data-i18n="cx.signIn">Sign in</button>
         <button id="open-cashier" class="ghost" type="button" hidden>Deposit · cash out</button>
         <button id="logout" class="link" type="button" hidden>Sign out</button>
       </div>
@@ -286,6 +287,7 @@
     <div id="zpick" class="zpick" hidden></div>
     <div id="mappick" class="mappick" hidden></div>
     <p class="pot"><span id="pot-k" class="eyebrow" data-i18n="prep.pot">Pot</span> <b id="pot" class="num">$0</b></p>
+    <p class="fine pot-mine" id="pot-mine" hidden></p>
     <div class="prep-actions">
       <button id="ready" class="cta" type="button">Stake &amp; ready</button>
       <button id="prep-start" class="cta start" type="button" hidden data-i18n="prep.start">Start now</button>
@@ -393,20 +395,20 @@
 <div id="invites" class="invites" aria-live="polite"></div>
 <dialog id="dlg-connect" class="dlg" aria-labelledby="dlg-connect-title">
   <div class="dlg-inner">
-    <header class="dlg-head"><h2 id="dlg-connect-title">Sign in to play for tokens</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <header class="dlg-head"><h2 id="dlg-connect-title" data-i18n="cx.connectT">Sign in to play for tokens</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
     <section class="opt-group">
-      <p class="eyebrow">Starknet wallet</p>
-      <div id="wallet-list" class="wallet-list"><p class="fine">Looking for wallets…</p></div>
-      <p class="fine" id="login-private-note" hidden>Any Starknet wallet works. Ready and Xverse can also deposit and cash out privately through the STRK20 pool (optional).</p>
+      <p class="eyebrow" data-i18n="cx.swallet">Starknet wallet</p>
+      <div id="wallet-list" class="wallet-list"><p class="fine" data-i18n="cx.looking">Looking for wallets…</p></div>
+      <p class="fine" id="login-private-note" hidden data-i18n="cx.privNote">Any Starknet wallet works. Ready and Xverse can also deposit and cash out privately through the STRK20 pool.</p>
     </section>
     <section id="login-cartridge" class="opt-group" hidden>
-      <p class="eyebrow">No wallet · Cartridge</p>
-      <button type="button" id="btn-cartridge" class="opt"><span class="opt-name">Cartridge Controller</span><span class="opt-sub">passkey or social login, gasless</span></button>
+      <p class="eyebrow" data-i18n="cx.noWallet">No wallet · Cartridge</p>
+      <button type="button" id="btn-cartridge" class="opt"><span class="opt-name">Cartridge Controller</span><span class="opt-sub" data-i18n="cx.cartSub">passkey or social login, gasless</span></button>
     </section>
     <section id="login-privy" class="opt-group" hidden>
-      <p class="eyebrow">Email or social · Privy</p>
-      <div class="row"><input id="privy-email" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email"><button type="button" id="privy-send" class="ghost">Send code</button></div>
-      <div id="privy-code-row" class="row" hidden><input id="privy-code" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" aria-label="Code"><button type="button" id="privy-verify" class="ghost">Sign in</button></div>
+      <p class="eyebrow" data-i18n="cx.privyT">Email or social · Privy</p>
+      <div class="row"><input id="privy-email" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email"><button type="button" id="privy-send" class="ghost" data-i18n="cx.sendCode">Send code</button></div>
+      <div id="privy-code-row" class="row" hidden><input id="privy-code" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" data-i18n-ph="cx.codePh" aria-label="Code"><button type="button" id="privy-verify" class="ghost" data-i18n="cx.signIn">Sign in</button></div>
       <div class="row socials">
         <button type="button" class="ghost sm" data-oauth="google">Google</button>
         <button type="button" class="ghost sm" data-oauth="twitter">X</button>
@@ -421,27 +423,27 @@
 <!-- real-token mode: cashier -->
 <dialog id="dlg-cashier" class="dlg" aria-labelledby="dlg-cashier-title">
   <div class="dlg-inner">
-    <header class="dlg-head"><h2 id="dlg-cashier-title">Cashier</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <header class="dlg-head"><h2 id="dlg-cashier-title" data-i18n="cx.cashier">Cashier</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
     <p id="cash-acct" class="fine"></p>
     <div class="mode" role="tablist" aria-label="Cashier">
-      <button type="button" class="seg" role="tab" data-tab="deposit">Deposit</button>
-      <button type="button" class="seg" role="tab" data-tab="withdraw">Cash out</button>
+      <button type="button" class="seg" role="tab" data-tab="deposit" data-i18n="cx.tDeposit">Deposit</button>
+      <button type="button" class="seg" role="tab" data-tab="withdraw" data-i18n="cx.tCash">Cash out</button>
       <button type="button" class="seg" role="tab" data-tab="bridge" data-i18n="br.tab">Bridge</button>
-      <button type="button" class="seg" role="tab" data-tab="history">History</button>
+      <button type="button" class="seg" role="tab" data-tab="history" data-i18n="cx.tHistory">History</button>
     </div>
     <section data-pane="deposit" class="pane">
-      <div class="row"><select id="dep-token" aria-label="Token"></select><input id="dep-amount" inputmode="decimal" placeholder="Amount" aria-label="Amount"><button type="button" id="dep-max" class="link">Max</button></div>
+      <div class="row"><select id="dep-token" aria-label="Token"></select><input id="dep-amount" inputmode="decimal" placeholder="Amount" data-i18n-ph="cx.amount" aria-label="Amount"><button type="button" id="dep-max" class="link">Max</button></div>
       <p id="dep-have" class="dep-have"></p>
-      <p id="dep-faucet" class="fine" hidden>Testnet: get free STRK for your address at <a href="https://starknet-faucet.vercel.app" target="_blank" rel="noopener">starknet-faucet.vercel.app</a>, then deposit it here.</p>
+      <p id="dep-faucet" class="fine" hidden data-i18n="cx.testFaucet">Testnet: get free STRK for your address at starknet-faucet.vercel.app, then deposit it here.</p>
       <div id="dep-route" class="route" role="radiogroup" aria-label="How"></div>
       <p id="dep-hint" class="fine"></p>
-      <button type="button" id="dep-go" class="cta">Deposit</button>
+      <button type="button" id="dep-go" class="cta" data-i18n="cx.tDeposit">Deposit</button>
     </section>
     <section data-pane="withdraw" class="pane" hidden>
-      <div class="row"><select id="wd-token" aria-label="Token"></select><input id="wd-amount" inputmode="decimal" placeholder="Amount" aria-label="Amount"><button type="button" id="wd-max" class="link">Max</button></div>
+      <div class="row"><select id="wd-token" aria-label="Token"></select><input id="wd-amount" inputmode="decimal" placeholder="Amount" data-i18n-ph="cx.amount" aria-label="Amount"><button type="button" id="wd-max" class="link">Max</button></div>
       <div id="wd-route" class="route" role="radiogroup" aria-label="How"></div>
       <p id="wd-hint" class="fine"></p>
-      <button type="button" id="wd-go" class="cta">Cash out</button>
+      <button type="button" id="wd-go" class="cta" data-i18n="cx.tCash">Cash out</button>
     </section>
     <section data-pane="bridge" class="pane" hidden><div id="bridge-root" class="bridge"></div></section>
     <section data-pane="history" class="pane" hidden>

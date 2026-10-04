@@ -5,6 +5,7 @@ import { store } from './store.js';
 import { formatUnits, parseUnits } from '../shared/assets.js';
 import { esc, fmt } from './game.js';
 import { t } from './i18n.js';
+const tr = t; // where a local `t` (a token) shadows it
 import { createBridgeUi } from './bridge.js';
 
 const $ = (id) => document.getElementById(id);
@@ -34,7 +35,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 
   const vendor = async () => {
     if (!cs.vendor) {
-      setStatus('connect-status', 'Loading wallets…');
+      setStatus('connect-status', t('cx.loading'));
       const url = new URL('vendor/wallets.js', base).href; // runtime URL: stays out of the single-file build
       cs.vendor = await import(/* @vite-ignore */ url).catch((e) => {
         cs.vendor = null;
@@ -228,7 +229,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     if (!inPage(kind)) return fn();
     const open = ['dlg-connect', 'dlg-cashier'].filter((id) => $(id).open);
     for (const id of open) $(id).close();
-    toast('Continue in the Cartridge window…');
+    toast(t('cx.cartridgeGo'));
     try {
       return await fn();
     } finally {
@@ -247,24 +248,24 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   async function signInWith(kind, connect) {
     if (inPage(kind)) {
       $('dlg-connect').close();
-      toast('Continue in the Cartridge window…');
+      toast(t('cx.cartridgeGo'));
     }
     try {
-      setStatus('connect-status', 'Waiting for the wallet…');
+      setStatus('connect-status', t('cx.waitWallet'));
       const f = await connect();
-      setStatus('connect-status', 'Sign the login message in your wallet (it costs nothing).');
+      setStatus('connect-status', t('cx.signMsg'));
       const td = await new Promise((resolve, reject) => {
         cs.waiter = { resolve, reject };
         send({ t: 'auth_start' });
-        setTimeout(() => reject(new Error('The server did not answer.')), 15000);
+        setTimeout(() => reject(new Error(t('cx.noAnswer'))), 15000);
       });
-      const sig = await within(f.signTypedData(td), 180000, 'The wallet did not return a signature. Try again.');
-      say('Signed. Checking the signature on Starknet…');
+      const sig = await within(f.signTypedData(td), 180000, t('cx.noSig'));
+      say(t('cx.checkingSig'));
       cs.facade = f;
       cs.kind = kind;
       store.set('darkbags.walletName', kind === 'cartridge' ? f.name : null);
       const parts = Array.isArray(sig) ? sig : Array.isArray(sig?.signature) ? sig.signature : sig?.r != null ? [sig.r, sig.s] : [];
-      if (!parts.length) throw new Error('The wallet returned no signature.');
+      if (!parts.length) throw new Error(t('cx.noSig'));
       cs.authPending = true; // the server's answer may come while the dialog is out of the way
       send({ t: 'auth', address: f.address, signature: parts.map((x) => (typeof x === 'bigint' ? `0x${x.toString(16)}` : String(x))) });
       // never wait in silence: no answer in time brings the dialog back with a reason
@@ -273,7 +274,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         if (!cs.authPending) return;
         cs.authPending = false;
         if (!$('dlg-connect').open) $('dlg-connect').showModal();
-        setStatus('connect-status', 'The server did not confirm the sign-in in time. Try again.', true);
+        setStatus('connect-status', t('cx.notConfirmed'), true);
       }, 45000);
     } catch (e) {
       if (inPage(kind) && !$('dlg-connect').open) $('dlg-connect').showModal();
@@ -285,14 +286,14 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 
   async function privySend() {
     const email = $('privy-email').value.trim();
-    if (!/.+@.+\..+/.test(email)) return setStatus('connect-status', 'Type your email first.', true);
+    if (!/.+@.+\..+/.test(email)) return setStatus('connect-status', t('cx.typeEmail'), true);
     try {
       const v = await vendor();
-      setStatus('connect-status', 'Sending a code…');
+      setStatus('connect-status', t('cx.sendingCode'));
       await v.privyAuth.sendCode(cs.chain.login.privy, email);
       $('privy-code-row').hidden = false;
       $('privy-code').focus();
-      setStatus('connect-status', `Code sent to ${email}.`);
+      setStatus('connect-status', t('cx.codeSent', { e: email }));
     } catch (e) {
       setStatus('connect-status', friendly(e), true);
     }
@@ -301,7 +302,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   async function privyVerify() {
     try {
       const v = await vendor();
-      setStatus('connect-status', 'Checking the code…');
+      setStatus('connect-status', t('cx.checkingCode'));
       const tok = await v.privyAuth.loginWithCode(cs.chain.login.privy, $('privy-email').value.trim(), $('privy-code').value.trim());
       cs.kind = 'privy';
       send({ t: 'auth_privy', token: tok });
@@ -341,14 +342,14 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const v = await vendor();
     let f;
     if (cs.kind === 'privy') {
-      if (!cs.privyWallet) throw new Error('Sign in with Privy again.');
+      if (!cs.privyWallet) throw new Error(t('cx.privyAgain'));
       f = await v.connectPrivy(cs.chain, app.token, cs.privyWallet, base);
     } else if (cs.kind === 'cartridge' || v.isCartridgeEntry?.((cs.kind ?? '').replace(/^extension:/, ''))) f = await v.connectCartridge(cs.chain, app.token, base);
     else {
       // the very wallet you signed in with, never just any installed one: extensions (the
       // MetaMask snap above all) can show up a moment after the page loads, so look for a while
       const name = (cs.kind ?? '').replace(/^extension:/, '').toLowerCase();
-      if (!name) throw new Error('Sign in again to pick your wallet.');
+      if (!name) throw new Error(t('cx.signAgain'));
       let w = null;
       for (let i = 0; i < 16 && !w; i++) {
         w = v.listWallets().find((x) => x.installed && x.name.toLowerCase() === name) ?? null;
@@ -359,7 +360,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     }
     if (norm(f.address) !== cs.account) {
       // the wallet has another account selected than the one you signed in with
-      const e = new Error(`${f.name ?? 'The wallet'} is on account ${short(f.address)}, but you are signed in as ${short(cs.account)}. Switch the account in the wallet, or sign in with ${short(f.address)}.`);
+      const e = new Error(t('cx.otherAcct', { w: f.name ?? 'Wallet', a: short(f.address), b: short(cs.account) }));
       e.other = f;
       throw e;
     }
@@ -375,7 +376,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     b.type = 'button';
     b.className = 'ghost';
     b.style.marginTop = '8px';
-    b.textContent = `Sign in as ${short(e.other.address)}`;
+    b.textContent = t('cx.signInAs', { a: short(e.other.address) });
     b.addEventListener('click', () => {
       for (const id of ['dlg-cashier']) if ($(id).open) $(id).close();
       if (!$('dlg-connect').open) $('dlg-connect').showModal();
@@ -405,13 +406,13 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const t = token($('dep-token').value);
     const el = $('dep-have');
     if (!t || !cs.account) return;
-    el.textContent = `In your wallet: checking…`;
+    el.textContent = tr('cx.inWalletChecking');
     try {
       const v = await vendor();
       const bal = await v.walletBalance(cs.chain, t, cs.account);
       cs.walletBal = { ...(cs.walletBal ?? {}), [t.id]: bal };
       if (token($('dep-token').value)?.id !== t.id) return;
-      el.textContent = `In your wallet: ${formatUnits(bal, t.decimals, 6)} ${t.symbol}${isStrk(t) ? ' (keep ~1 STRK for network fees)' : ''}`;
+      el.textContent = tr('cx.inWallet', { v: `${formatUnits(bal, t.decimals, 6)} ${t.symbol}` }) + (isStrk(t) ? tr('cx.keepStrk') : '');
       el.classList.toggle('empty', bal === 0n);
     } catch {
       el.textContent = '';
@@ -454,8 +455,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const out = [];
     // Cartridge and Privy accounts are not registered in the STRK20 pool
     const privateOk = !/^(cartridge|privy)$/.test(cs.kind ?? '') && (kind === 'deposit' ? i.routes.includes('private') : i.cashOut.private);
-    if (kind === 'deposit' || i.cashOut.public) out.push({ id: 'public', label: 'Transfer', sub: kind === 'deposit' ? 'any wallet: a plain token transfer to the house' : 'a plain token transfer to your address' });
-    if (privateOk) out.push({ id: 'private', label: 'Private · STRK20 (optional)', sub: kind === 'deposit' ? 'Ready or Xverse only: from your shielded balance, nobody sees the amount' : 'into your shielded balance; your address must be registered in the pool' });
+    // Starknet privacy first: the STRK20 route leads whenever this wallet can use it
+    if (privateOk) out.push({ id: 'private', label: t('cx.private'), sub: t(kind === 'deposit' ? 'cx.privateDep' : 'cx.privateWd') });
+    if (kind === 'deposit' || i.cashOut.public) out.push({ id: 'public', label: t('cx.transfer'), sub: t(kind === 'deposit' ? 'cx.transferDep' : 'cx.transferWd') });
     return out;
   }
 
@@ -483,38 +485,38 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       );
     }
     $('wd-go').disabled = !cs.wdRoute;
-    $('wd-hint').textContent = cs.wdRoute ? `Minimum $${cs.chain.minWithdrawUsd ?? 1}. Paid to ${short(cs.account)}.` : 'Cash-outs are switched off on this server right now.';
-    $('dep-hint').textContent = cs.depRoute === 'private' ? 'Your wallet builds a zero-knowledge proof; that can take a minute.' : 'Your balance updates once the transfer is accepted on Starknet.';
+    $('wd-hint').textContent = cs.wdRoute ? t('cx.minWd', { m: cs.chain.minWithdrawUsd ?? 1, a: short(cs.account) }) : t('cx.wdOff');
+    $('dep-hint').textContent = t(cs.depRoute === 'private' ? 'cx.hintPrivate' : 'cx.hintPublic');
   }
 
   async function deposit() {
     const t = token($('dep-token').value);
     const units = t && parseUnits($('dep-amount').value, t.decimals);
-    if (!units) return setStatus('cash-status', 'Type an amount.', true);
+    if (!units) return setStatus('cash-status', tr('cx.typeAmount'), true);
     const bal = cs.walletBal?.[t.id];
     if (bal != null) {
       const room = isStrk(t) ? bal - FEE_RESERVE : bal;
-      const faucet = cs.chain.network === 'sepolia' ? ' Get free test STRK at starknet-faucet.vercel.app.' : '';
-      if (units > bal) return setStatus('cash-status', `Your wallet has only ${formatUnits(bal, t.decimals, 6)} ${t.symbol}.${faucet}`, true);
-      if (units > room) return setStatus('cash-status', `Leave about 1 STRK in your wallet for the network fee (use Max).`, true);
+      const faucet = cs.chain.network === 'sepolia' ? tr('cx.faucet') : '';
+      if (units > bal) return setStatus('cash-status', tr('cx.walletOnly', { v: `${formatUnits(bal, t.decimals, 6)} ${t.symbol}` }) + faucet, true);
+      if (units > room) return setStatus('cash-status', tr('cx.leaveStrk'), true);
     }
     $('dep-go').disabled = true;
     try {
-      setStatus('cash-status', 'Confirm the deposit in your wallet…');
+      setStatus('cash-status', tr('cx.confirmDep'));
       const tx = await aside(cs.kind, async () => {
         const f = await ensureFacade();
         // no reading from the chain yet: ask the wallet itself before it builds a transfer that fails
         if (cs.depRoute !== 'private' && bal == null && f.balance) {
           const have = await f.balance(t).catch(() => null);
-          if (have != null && units > have) throw new Error(`${f.name ?? 'Your wallet'} (${short(f.address)}) holds ${formatUnits(have, t.decimals, 6)} ${t.symbol}. Send ${t.symbol} to this address first.`);
+          if (have != null && units > have) throw new Error(tr('cx.holdsOnly', { w: f.name ?? 'Wallet', a: short(f.address), v: `${formatUnits(have, t.decimals, 6)} ${t.symbol}`, s: t.symbol }));
         }
         if (cs.depRoute === 'private') {
-          if (!f.depositPrivate) throw new Error('This sign-in cannot make private transfers. Use a public deposit.');
+          if (!f.depositPrivate) throw new Error(tr('cx.noPrivate'));
           return f.depositPrivate(t, units, cs.chain.house);
         }
         return f.depositPublic(t, units, cs.chain.house);
       });
-      setStatus('cash-status', `Sent (${short(tx)}). Waiting for Starknet…`);
+      setStatus('cash-status', tr('cx.sentWait', { tx: short(tx) }));
       send({ t: 'deposit', route: cs.depRoute, tx });
       store.set('darkbags.lastDeposit', { tx, at: Date.now() });
     } catch (e) {
@@ -528,16 +530,16 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   function withdraw() {
     const t = token($('wd-token').value);
     const units = t && parseUnits($('wd-amount').value, t.decimals);
-    if (!units) return setStatus('cash-status', 'Type an amount.', true);
-    if (units > ledger(t.id)) return setStatus('cash-status', `You have ${formatUnits(ledger(t.id), t.decimals, 6)} ${t.symbol}.`, true);
+    if (!units) return setStatus('cash-status', tr('cx.typeAmount'), true);
+    if (units > ledger(t.id)) return setStatus('cash-status', tr('cx.youHave', { v: `${formatUnits(ledger(t.id), t.decimals, 6)} ${t.symbol}` }), true);
     $('wd-go').disabled = true;
     send({ t: 'withdraw', asset: t.id, units: units.toString(), route: cs.wdRoute });
   }
 
   function renderHistory(m) {
     const rows = [
-      ...m.deposits.map((d) => ({ ...d, what: d.unsupported ? 'Deposit (token not accepted, contact support)' : d.held ? 'Deposit held (over a beta limit, being refunded)' : 'Deposit' })),
-      ...m.withdrawals.map((w) => ({ ...w, what: `Cash-out · ${w.status}` })),
+      ...m.deposits.map((d) => ({ ...d, what: t(d.unsupported ? 'cx.depBad' : d.held ? 'cx.depHeld' : 'cx.dep') })),
+      ...m.withdrawals.map((w) => ({ ...w, what: t('cx.cashout', { s: w.status }) })),
     ].sort((a, b) => b.at - a.at);
     const link = (tx) => (tx && tx.startsWith('0x') ? ` · <a href="${esc(cs.chain.explorer)}/tx/${esc(tx)}" target="_blank" rel="noopener">${esc(short(tx))}</a>` : '');
     $('hist').innerHTML = rows.length
@@ -548,7 +550,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
             return `<li><span>${esc(r.what)} · ${esc(r.route)}</span><b class="num">${esc(amt)}</b><span class="fine">${new Date(r.at).toLocaleString()}${link(r.tx)}</span></li>`;
           })
           .join('')
-      : '<li class="fine">Nothing yet.</li>';
+      : `<li class="fine">${esc(t('cx.none'))}</li>`;
   }
 
   // ------------------------------------------------------------- messages
@@ -585,33 +587,33 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         app.rank = m.rank ?? null;
         if (m.account) {
           $('dlg-connect').close();
-          toast(`Signed in as ${short(m.account)}.`);
+          toast(t('cx.signedAs', { a: short(m.account) }));
         }
         render();
         onChange();
         return true;
       case 'cashier': {
         if (m.op === 'deposit') {
-          if (m.status === 'checking') setStatus('cash-status', 'The cashier is checking the chain…');
+          if (m.status === 'checking') setStatus('cash-status', t('cx.checkingChain'));
           else if (m.status === 'ok' && m.credited?.some((c) => c.held)) {
             const why = { 'not-allowed': 'this address is not in the closed beta', 'over-limit': `it would take you over the beta limit of $${cs.chain.maxBalanceUsd ?? '?'}`, 'house-limit': 'the beta is full right now', 'no-price': 'that token has no price right now' };
             const reason = why[m.credited.find((c) => c.held).held] ?? 'of a beta limit';
-            setStatus('cash-status', `Received but not credited because ${reason}. It is safe with the house and will be sent back to you.`, true);
+            setStatus('cash-status', t('cx.notCredited', { r: reason }), true);
           } else if (m.status === 'ok' && m.credited?.length) {
             const txt = m.credited.map((c) => (token(c.asset) ? `${formatUnits(c.units, token(c.asset).decimals, 6)} ${token(c.asset).symbol}` : 'an unsupported token')).join(', ');
-            setStatus('cash-status', `Credited ${txt}.`);
-            toast(`Deposit credited: ${txt}.`);
-          } else if (m.status === 'failed') setStatus('cash-status', 'That transaction failed on chain. Nothing was taken.', true);
-          else setStatus('cash-status', m.route === 'private' ? 'Sent. The note shows up for the house within a minute or two; your balance updates by itself.' : 'Waiting for Starknet to accept it. Your balance updates by itself.');
+            setStatus('cash-status', t('cx.credited', { v: txt }));
+            toast(t('cx.creditedToast', { v: txt }));
+          } else if (m.status === 'failed') setStatus('cash-status', t('cx.txFailed'), true);
+          else setStatus('cash-status', t(m.route === 'private' ? 'cx.sentPrivate' : 'cx.sentPublic'));
         } else if (m.op === 'withdraw') {
-          if (m.status === 'sending') setStatus('cash-status', 'Paying out…');
+          if (m.status === 'sending') setStatus('cash-status', t('cx.paying'));
           else {
             $('wd-go').disabled = false;
             if (m.status === 'sent') {
-              setStatus('cash-status', `Paid. Transaction ${short(m.tx)}.`);
-              toast('Cash-out sent.');
-            } else if (m.status === 'failed') setStatus('cash-status', 'The payout could not be sent. Your balance is back.', true);
-            else setStatus('cash-status', 'The payout is held for a manual check. Your funds are safe; it is in your history.', true);
+              setStatus('cash-status', t('cx.paid', { tx: short(m.tx) }));
+              toast(t('cx.paidToast'));
+            } else if (m.status === 'failed') setStatus('cash-status', t('cx.payFailed'), true);
+            else setStatus('cash-status', t('cx.payHeld'), true);
           }
           fillTokens('wd-token');
         }
@@ -744,13 +746,13 @@ function reasonOf(e) {
       m = JSON.stringify(e).slice(0, 400);
     } catch {}
   }
-  return m || String(e ?? 'Something went wrong.');
+  return m || String(e ?? t('cx.wrong'));
 }
 
 function friendly(e) {
   const m = reasonOf(e);
-  if (/user (rejected|refused|abort)|USER_REFUSED|denied/i.test(m) || e?.code === 113) return 'Cancelled in the wallet.';
-  if (/multicall failed|u256_sub Overflow|insufficient|exceeds balance|transfer amount exceeds|not enough balance/i.test(m)) return 'Your wallet could not send this: usually not enough of that token, or no STRK left for the network fee. Try a smaller amount (Max leaves room for the fee).';
-  if (/not deployed|Contract not found|account.*deploy/i.test(m)) return 'Your wallet account is not deployed on this network yet. Make any transaction in the wallet first (for example, send yourself a little STRK), then try again.';
+  if (/user (rejected|refused|abort)|USER_REFUSED|denied/i.test(m) || e?.code === 113) return t('cx.cancelled');
+  if (/multicall failed|u256_sub Overflow|insufficient|exceeds balance|transfer amount exceeds|not enough balance/i.test(m)) return t('cx.cantSend');
+  if (/not deployed|Contract not found|account.*deploy/i.test(m)) return t('cx.notDeployed');
   return m.length > 220 ? `${m.slice(0, 220)}…` : m;
 }

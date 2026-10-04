@@ -2,6 +2,7 @@ import './polyfills.js'; // first: older phone browsers need it before anything 
 import './epoch.js'; // second: a new data epoch wipes old progress before anything reads it
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
+import { bandOf } from '../shared/stakes.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
@@ -598,7 +599,9 @@ function renderAssets() {
 
 // ------------------------------------------------------------------ lobby
 function tableInfo(stake) {
-  return app.tables.find((x) => x.stake === stake && (x.mode ?? 'raid') === app.gameMode);
+  // private stakes: one table per stake band, whatever you put in inside it
+  const band = MODE[app.gameMode]?.fixed ?? bandOf(stake);
+  return app.tables.find((x) => x.stake === band && (x.mode ?? 'raid') === app.gameMode);
 }
 
 // the mode picker: a card per mode with what it is and how the money works
@@ -1058,7 +1061,7 @@ function renderPrep() {
   $('prep-server').hidden = !srv;
   if (srv) $('prep-server').innerHTML = srv;
   const fixedMode = MODE[app.gameMode]?.fixed;
-  $('prep-kicker').textContent = fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: money(p.stake) })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
+  $('prep-kicker').textContent = fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: `${money(p.stake)}–${money(p.max ?? p.stake)}` })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
   const count = $('prep-count');
   const status = $('prep-status');
   count.classList.remove('wait');
@@ -1118,6 +1121,9 @@ function renderPrep() {
   const zed = MODE[app.gameMode]?.kind === 'zombie';
   $('pot').textContent = zed ? t('prep.zFee', { v: money(p.stake) }) : money(p.pot);
   $('pot-k').textContent = t(zed ? 'prep.zSquad' : MODE[app.gameMode]?.kind === 'gold' ? 'prep.goldPot' : 'prep.pot');
+  // your stake is yours to know: the table only ever shows the whole pool
+  $('pot-mine').hidden = !!fixedMode;
+  if (!fixedMode) $('pot-mine').textContent = t('prep.mine', { v: money(p.me?.stake ?? app.stake) });
   renderZPick(MODE[app.gameMode]?.pick && p.state !== 'live', p.me?.weapon);
   // the map vote: every mode but the ones with arenas of their own (zombies, gold rush)
   const kind = MODE[app.gameMode]?.kind;
@@ -1137,7 +1143,7 @@ function renderPrep() {
   $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
   const ready = $('ready');
   const me = p.me ?? {};
-  const q = quote(p.stake);
+  const q = quote(p.me?.stake ?? app.stake);
   if (me.ready && me.escrow) {
     ready.textContent = t('prep.cancel', { v: coinAndUsd(me.escrow.asset, me.escrow.units) });
     ready.classList.add('armed');
@@ -1469,6 +1475,8 @@ function showResult(m) {
   const amt = $('res-amount');
   const det = $('res-detail');
   const inside = t('res.inside', { k: m.kills, t: mmss(m.secs) });
+  // pot modes, private stakes: the part of a bigger stake no winner matched came back
+  const refund = m.refund ? ` ${t('res.refund', { v: `<b>${money(m.refund)}</b>` })}` : '';
   const pot = MODE[m.mode]?.kind && MODE[m.mode].kind !== 'raid';
   // the announcer calls the big endings
   if (m.won) sfx.say('victory', 'en');
@@ -1495,15 +1503,15 @@ function showResult(m) {
   } else if (pot && MODE[m.mode].kind === 'dm') {
     k.textContent = t('res.dmLost', { p: m.place ?? '?' });
     k.className = 'res-kicker loss';
-    amt.textContent = `−${money(m.stake)}`;
+    amt.textContent = `−${money(m.stake - (m.refund ?? 0))}`;
     amt.className = 'res-amount';
-    det.innerHTML = `${t('res.dmText', { k: `<b>${m.kills}</b>`, d: `<b>${m.deaths ?? 0}</b>`, top: `<b>${m.top ?? 0}</b>` })}`;
+    det.innerHTML = `${t('res.dmText', { k: `<b>${m.kills}</b>`, d: `<b>${m.deaths ?? 0}</b>`, top: `<b>${m.top ?? 0}</b>` })}${refund}`;
   } else if (pot) {
     k.textContent = t(m.cause === 'storm' ? 'res.storm' : 'res.defeated');
     k.className = 'res-kicker loss';
-    amt.textContent = `−${money(m.stake)}`;
+    amt.textContent = `−${money(m.stake - (m.refund ?? 0))}`;
     amt.className = 'res-amount';
-    det.innerHTML = `${t(MODE[m.mode].kind === 'team' ? 'res.teamLost' : 'res.lostPot')} ${inside}.`;
+    det.innerHTML = `${t(MODE[m.mode].kind === 'team' ? 'res.teamLost' : 'res.lostPot')} ${inside}.${refund}`;
   } else if (m.status === 'extracted') {
     const pnl = m.payout - m.stake;
     const pct = Math.round((pnl / m.stake) * 100);
@@ -1726,7 +1734,7 @@ function loop(now) {
 }
 
 // handle for automated smoke tests and console poking
-globalThis.__darkbags = { app, game, input, renderer, sfx, cashier };
+globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, go };
 
 attract.start();
 showScreen('lobby');

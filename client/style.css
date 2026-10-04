@@ -2855,3 +2855,7 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 @media (prefers-reduced-motion: reduce) { .streak.go .st-medal, .streak.go .md-shine, .streak.go .md-glow, .streak.go .md-ico { animation: none; } }
 .banner.low { top: 66%; font-size: 22px; }
 .streak .st-title { font-size: clamp(28px, 5.4vw, 66px); max-width: calc(100vw - 32px); overflow-wrap: anywhere; }
+.stake-priv { margin: 8px 2px 0; color: var(--dust); }
+.pot-mine { margin: -6px 0 10px; text-align: center; color: var(--dust); }
+.br-link.buy { border-color: rgba(247, 147, 26, 0.6); background: linear-gradient(135deg, rgba(247, 147, 26, 0.16), transparent 70%); }
+.br-link.buy b { color: var(--loot); }
