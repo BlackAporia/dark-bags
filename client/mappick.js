@@ -47,11 +47,17 @@ export function mapThumb(theme) {
       x.fillRect(w.x, w.y, w.w, w.h);
     }
   }
-  // a hint of the night: brighter maps stay brighter
+  // every map at night, like the docks
   x.setTransform(1, 0, 0, 1, 0, 0);
+  if (THEME[theme]?.night) {
+    x.globalCompositeOperation = 'multiply';
+    x.fillStyle = THEME[theme].night;
+    x.fillRect(0, 0, W * 2, H * 2);
+    x.globalCompositeOperation = 'source-over';
+  }
   const g = x.createRadialGradient(W, H, 30, W, H, W * 1.1);
   g.addColorStop(0, 'rgba(0,0,0,0)');
-  g.addColorStop(1, THEME[theme]?.bright ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.6)');
+  g.addColorStop(1, 'rgba(0,0,0,0.6)');
   x.fillStyle = g;
   x.fillRect(0, 0, W * 2, H * 2);
   const url = c.toDataURL('image/jpeg', 0.82);

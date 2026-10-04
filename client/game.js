@@ -1,4 +1,6 @@
 import { CFG, GL } from '../shared/config.js';
+
+const GUN_Z = 18; // the height rounds fly at (render.js draws them there)
 import { titleTier } from '../shared/achievements.js';
 import { OUTFIT, FINISH, RARITY_ORDER, modelFor, meleeOf } from '../shared/cosmetics.js';
 import { MODE } from '../shared/modes.js';
@@ -895,7 +897,7 @@ export class GameClient {
     this.anims.prune(now);
     this.lastFigures = figures;
     this.lastZombies = zombies;
-    const bullets = this.tracers(a, b, rt);
+    const bullets = this.fromMuzzle(this.tracers(a, b, rt), now);
 
     const you = this.you;
     let eye;
@@ -986,6 +988,48 @@ export class GameClient {
       out.push({ ...x, x: x.x - (x.vx / sp) * back, y: x.y - (x.vy / sp) * back, tr: d - back });
     }
     return out;
+  }
+
+  // The server fires a round from the runner's body along the aim; the gun is drawn in a hand,
+  // off to the side and as long as its model. So a round leaves the drawn muzzle of whoever
+  // fired it and eases onto its true path over its first ~220 units (the hit is the server's,
+  // unchanged). The shooter is the runner whose own fire point the round started from.
+  fromMuzzle(list, now) {
+    this.muz ??= new Map();
+    const R = CFG.PLAYER_R + 10;
+    const seen = new Set();
+    for (const x of list) {
+      if (x.k) continue; // turret rockets and shells leave the turret
+      seen.add(x.i);
+      const sp = Math.hypot(x.vx, x.vy) || 1;
+      const ux = x.vx / sp;
+      const uy = x.vy / sp;
+      const s = Math.min(x.tr ?? 0, 4000);
+      const sx = x.x - ux * s;
+      const sy = x.y - uy * s;
+      let m = this.muz.get(x.i);
+      if (m === undefined) {
+        m = null;
+        if (s < 400) {
+          let best = null;
+          let bd = 70;
+          for (const an of this.anims.map.values()) {
+            if (WEAPONS[an.w]?.melee) continue;
+            if (x.o && an.id !== -1) continue; // your own rounds leave your own gun
+            const d = Math.hypot(an.x + Math.cos(an.aim) * R - sx, an.y + Math.sin(an.aim) * R - sy);
+            if (d < bd) (bd = d), (best = an);
+          }
+          if (best) {
+            const p = pose(best, now, this.gore);
+            m = { ox: p.muzzle.x - sx, oy: p.muzzle.y - (sy - GUN_Z) };
+          }
+        }
+        this.muz.set(x.i, m);
+      }
+      if (m) Object.assign(x, { sx, sy, ox: m.ox, oy: m.oy, tr: s });
+    }
+    if (this.muz.size > 400) for (const id of this.muz.keys()) if (!seen.has(id)) this.muz.delete(id);
+    return list;
   }
 
   animSelf(x, y, dt, now) {

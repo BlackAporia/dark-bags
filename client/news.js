@@ -9,6 +9,23 @@ const SEEN = 'darkbags.news.seen';
 
 export const NEWS = [
   {
+    id: '2026-10-13a',
+    at: '2026-10-13T12:00:00+03:00',
+    items: {
+      en: ["8 new maps, 20 in all: Night Speedway, Skatepark, Metro, Factory, Jungle Temple, Junkyard, Moon Base, Casino", "Every map is now at night, like Night Docks: dark ground, lamps and neon glowing through it", "Fixed: bullets and tracers (neon too) now leave the gun's muzzle, not the runner's side"],
+      uk: ["8 нових карт, усього 20: Нічний автодром, Скейтпарк, Метро, Завод, Храм у джунглях, Звалище, Місячна база, Казино", "Усі карти тепер нічні, як Night Docks: темна земля, ліхтарі й неон світяться крізь темряву", "Виправлено: кулі й трасери (і неонові) тепер вилітають зі ствола, а не збоку від персонажа"],
+      ru: ["8 новых карт, всего 20: Ночной автодром, Скейтпарк, Метро, Завод, Храм в джунглях, Свалка, Лунная база, Казино", "Все карты теперь ночные, как Night Docks: тёмная земля, фонари и неон светятся сквозь темноту", "Исправлено: пули и трассеры (и неоновые) теперь вылетают из ствола, а не сбоку от персонажа"],
+      es: ["8 mapas nuevos, 20 en total: Autódromo nocturno, Skatepark, Metro, Fábrica, Templo de la jungla, Desguace, Base lunar, Casino", "Todos los mapas son ahora de noche, como Night Docks: suelo oscuro, farolas y neón brillando", "Arreglado: las balas y trazadoras (también neón) salen del cañón, no del costado"],
+      fr: ["8 nouvelles cartes, 20 au total : Circuit de nuit, Skatepark, Métro, Usine, Temple de la jungle, Casse auto, Base lunaire, Casino", "Toutes les cartes sont maintenant de nuit, comme Night Docks : sol sombre, lampes et néons qui brillent", "Corrigé : balles et traçantes (néon aussi) sortent du canon, pas du flanc"],
+      pt: ["8 mapas novos, 20 no total: Autódromo noturno, Skatepark, Metrô, Fábrica, Templo da selva, Ferro-velho, Base lunar, Cassino", "Todos os mapas agora são noturnos, como Night Docks: chão escuro, luzes e neon brilhando", "Corrigido: balas e traçantes (neon também) saem do cano, não da lateral"],
+      tr: ["8 yeni harita, toplam 20: Gece Pisti, Kaykay Parkı, Metro, Fabrika, Orman Tapınağı, Hurdalık, Ay Üssü, Kumarhane", "Tüm haritalar artık Night Docks gibi gece: karanlık zemin, karanlıkta parlayan lambalar ve neon", "Düzeltildi: mermiler ve izli mermiler (neon da) artık namludan çıkıyor, karakterin yanından değil"],
+      zh: ["8 张新地图，共 20 张：夜间赛车场、滑板公园、地铁、工厂、丛林神庙、废车场、月球基地、赌场", "所有地图现在都是夜晚风格，像 Night Docks：黑暗的地面，灯光和霓虹透过黑暗发光", "修复：子弹和曳光（包括霓虹）现在从枪口射出，而不是从角色侧面"],
+      hi: ["8 नए मैप, कुल 20: रात का रेसवे, स्केटपार्क, मेट्रो, फ़ैक्टरी, जंगल का मंदिर, कबाड़खाना, चाँद का अड्डा, कसीनो", "अब हर मैप रात का है, Night Docks जैसा: अंधेरी ज़मीन, अंधेरे में चमकते लैंप और नियॉन", "ठीक किया: गोलियाँ और ट्रेसर (नियॉन भी) अब बंदूक की नली से निकलते हैं, किनारे से नहीं"],
+      ar: ["8 خرائط جديدة، 20 في المجموع: حلبة السباق الليلية، حديقة التزلج، المترو، المصنع، معبد الأدغال، ساحة الخردة، القاعدة القمرية، الكازينو", "كل الخرائط الآن ليلية مثل Night Docks: أرض داكنة ومصابيح ونيون يتوهج في الظلام", "إصلاح: الرصاص والرصاص الخطاط (والنيون أيضًا) يخرج الآن من فوهة السلاح وليس من جانب الشخصية"],
+      sw: ["Ramani 8 mpya, jumla 20: Uwanja wa Mbio Usiku, Bustani ya Skate, Treni ya Chini, Kiwanda, Hekalu la Msituni, Yadi ya Vyuma Chakavu, Kituo cha Mwezi, Kasino", "Kila ramani sasa ni ya usiku, kama Night Docks: ardhi yenye giza, taa na neon zinang'aa gizani", "Imerekebishwa: risasi na mistari ya risasi (hata neon) sasa zinatoka mdomoni mwa bunduki, si ubavuni mwa mkimbiaji"],
+    },
+  },
+  {
     id: '2026-10-12a',
     at: '2026-10-12T12:00:00+03:00',
     items: {
