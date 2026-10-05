@@ -40,7 +40,10 @@ const BOTS = false;
 // server at MAIN_URL; it keeps no money and no records of its own. The main server lists its
 // match servers in REGIONS=us=https://…,asia=https://…; both share REGION_SECRET.
 const EDGE = process.env.ROLE === 'region';
-const REGION_SECRET = process.env.REGION_SECRET || '';
+// Trimmed, and surrounding quotes dropped: a space or newline pasted into the Railway variable makes
+// the secrets differ while they look the same. The fingerprint in the log lets you compare them.
+const REGION_SECRET = String(process.env.REGION_SECRET || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
+const REGION_FP = REGION_SECRET ? crypto.createHash('sha256').update(REGION_SECRET).digest('hex').slice(0, 8) : '-';
 if (EDGE && (REGION_SECRET.length < 32 || !process.env.MAIN_URL)) {
   console.error('ROLE=region needs MAIN_URL and REGION_SECRET (32+ characters, the same as on the main server).');
   process.exit(1);
@@ -344,7 +347,7 @@ const regionList = parseRegions(process.env.REGIONS);
 const regionMain = !EDGE && REGION_SECRET.length >= 32 && regionList.length ? createRegionMain({ lobby, secret: REGION_SECRET, regions: regionList, self: process.env.REGION || 'eu', file: DATA ? `${DATA}/${NET}-regions.json` : '' }) : null;
 if (!EDGE && regionList.length && !regionMain) console.warn('REGIONS is set but REGION_SECRET is missing or shorter than 32 characters: regional tables are off');
 if (regionMain) {
-  console.log(`regions: main (${regionMain.self}) with ${regionList.map((r) => `${r.id} ${r.url}`).join(', ')}`);
+  console.log(`regions: main (${regionMain.self}) with ${regionList.map((r) => `${r.id} ${r.url}`).join(', ')}; REGION_SECRET fingerprint ${REGION_FP}`);
   lobby.regionList = () => regionMain.list();
   // a broken match server drops out of the list the browsers get, with the reason in the log
   const recheck = () => regionMain.checkAll().catch((e) => console.error('regions check failed', e));
@@ -369,7 +372,7 @@ if (regionMain) {
   };
 }
 const regionEdge = EDGE ? createRegionEdge({ lobby, secret: REGION_SECRET, region: process.env.REGION || 'region', mainUrl: process.env.MAIN_URL.replace(/\/+$/, ''), journal, file: OUTBOX_FILE }) : null;
-if (regionEdge) console.log(`regions: match server ${process.env.REGION || 'region'} for ${process.env.MAIN_URL}`);
+if (regionEdge) console.log(`regions: match server ${process.env.REGION || 'region'} for ${process.env.MAIN_URL}; REGION_SECRET fingerprint ${REGION_FP} (must match the main server's)`);
 
 const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain });
 
