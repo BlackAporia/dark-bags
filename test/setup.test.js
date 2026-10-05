@@ -40,3 +40,11 @@ test('without VAULT_AUTO nothing changes', async () => {
   const { cfg, provider, account } = base(dir);
   assert.equal(await setupBefore({ cfg, account, provider, env: {}, log: quiet }), cfg);
 });
+
+test('PRIVATE_AUTO makes the viewing key but deploys no vault', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'db-setup-'));
+  const { cfg, provider, account } = base(dir);
+  const r = await setupBefore({ cfg: { ...cfg, network: 'mainnet', vault: null }, account, provider, env: { PRIVATE_AUTO: '1' }, log: quiet });
+  assert.match(r.strk20.viewingKey, /^0x[0-9a-f]+$/);
+  assert.equal(r.vault, null);
+});

@@ -1,4 +1,6 @@
-// Self-setup of the private side on first start (VAULT_AUTO=1), so nobody has to run scripts by hand:
+// Self-setup of the private side on first start, so nobody has to run scripts by hand.
+// PRIVATE_AUTO=1 does steps 1 and 3 (private deposits and cash-outs through the house notes, no
+// contract); VAULT_AUTO=1 does all three:
 //
 //   1. a viewing key for the house: generated once, kept in a 0600 file next to CASHIER_FILE
 //   2. the DARK BAGS vault: declared and deployed from the house account (contracts/build/)
@@ -95,14 +97,16 @@ async function deployVault({ cfg, provider, house, pool, env, log }) {
 }
 
 // Before the chain is built: viewing key and vault address. Returns the updated cfg.
+const autoOn = (env) => env.VAULT_AUTO === '1' || env.PRIVATE_AUTO === '1';
+
 export async function setupBefore({ cfg, account, provider, env = process.env, log = console }) {
-  if (env.VAULT_AUTO !== '1') return cfg;
+  if (!autoOn(env)) return cfg;
   if (!account) {
-    log.warn('setup: VAULT_AUTO needs HOUSE_PRIVATE_KEY');
+    log.warn('setup: PRIVATE_AUTO / VAULT_AUTO needs HOUSE_PRIVATE_KEY');
     return cfg;
   }
   if (!cfg.file) {
-    log.warn('setup: VAULT_AUTO needs CASHIER_FILE on a persistent volume (the setup is saved next to it)');
+    log.warn('setup: PRIVATE_AUTO / VAULT_AUTO needs CASHIER_FILE on a persistent volume (the setup is saved next to it)');
     return cfg;
   }
   const file = setupFile(cfg);
@@ -128,7 +132,8 @@ export async function setupBefore({ cfg, account, provider, env = process.env, l
     }
   }
 
-  // 2. the vault
+  // 2. the vault (VAULT_AUTO only)
+  if (env.VAULT_AUTO !== '1') return { ...cfg, strk20, vault };
   if (!vault && s.vault) vault = { address: s.vault, fromBlock: s.vaultFromBlock ?? 0 };
   if (!vault && pool) {
     try {
@@ -146,7 +151,7 @@ export async function setupBefore({ cfg, account, provider, env = process.env, l
 
 // After the chain is built: register the house in the pool once (needs the prover).
 export async function setupAfter({ cfg, chain, provider, env = process.env, log = console }) {
-  if (env.VAULT_AUTO !== '1' || !cfg.file || !chain.strk20 || !cfg.strk20.pool) return;
+  if (!autoOn(env) || !cfg.file || !chain.strk20 || !cfg.strk20.pool) return;
   const file = setupFile(cfg);
   const s = load(file, cfg.network);
   if (s.registered) return;
