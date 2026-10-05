@@ -2895,3 +2895,9 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 }
 /* phones held sideways in a match: the track name would sit on the clock; it shows in the menus and the pause menu instead */
 @media (max-height: 500px) { body:has(#hud:not([hidden])) .now-playing { display: none; } }
+
+/* cashier: send by hand when a wallet will not load */
+.dep-manual { margin-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 10px; }
+.dep-manual summary { cursor: pointer; color: var(--muted, #9aa3b5); font-size: 0.9rem; }
+.dep-manual .addr { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 0.78rem; padding: 8px; background: rgba(255, 255, 255, 0.04); border-radius: 6px; }
+.dep-manual input { flex: 1; min-width: 0; }

@@ -439,6 +439,12 @@
       <div id="dep-route" class="route" role="radiogroup" aria-label="How"></div>
       <p id="dep-hint" class="fine"></p>
       <button type="button" id="dep-go" class="cta" data-i18n="cx.tDeposit">Deposit</button>
+      <details id="dep-manual" class="dep-manual">
+        <summary data-i18n="cx.manual">Wallet not loading? Send it by hand</summary>
+        <p class="fine" data-i18n="cx.manualHow">From the address you signed in with, send the coin to the house address below. Then paste the transaction hash here.</p>
+        <div class="row"><code id="dep-house" class="addr"></code><button type="button" id="dep-house-copy" class="link" data-i18n="cx.copy">Copy</button></div>
+        <div class="row"><input id="dep-tx" placeholder="0x… transaction hash" aria-label="Transaction hash" spellcheck="false" autocomplete="off"><button type="button" id="dep-tx-go" class="ghost" data-i18n="cx.check">Check</button></div>
+      </details>
     </section>
     <section data-pane="withdraw" class="pane" hidden>
       <div class="row"><select id="wd-token" aria-label="Token"></select><input id="wd-amount" inputmode="decimal" placeholder="Amount" data-i18n-ph="cx.amount" aria-label="Amount"><button type="button" id="wd-max" class="link">Max</button></div>

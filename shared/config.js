@@ -14,6 +14,7 @@ export const CFG = {
   INTERMISSION: 8,        // results screen between raids
   PREP_SECONDS: 20,       // ready-room countdown, starts at the first Ready
   PREP_ALL_READY: 5,      // countdown drops to this once every human in the room is ready
+  PREP_AUTO_START: 30,    // online waiting room: everyone there is ready (2+): it starts by itself after this, unless someone presses Start first
   BOT_REVEAL: 5,          // bots light up in the ready room during the last N seconds
 
   // map
