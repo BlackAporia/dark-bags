@@ -79,11 +79,11 @@ export function readConfig(env = process.env) {
     rpcUrl: env.RPC_URL || null,
     rpcFallbacks: [...list(env.RPC_FALLBACKS), ...RPC_SPARES[network]],
     clientRpcUrl: env.CLIENT_RPC_URL || null,
-    house: env.HOUSE_ADDRESS || null,
-    houseKey: env.HOUSE_PRIVATE_KEY || null,
-    privateHouse: env.PRIVATE_HOUSE_ADDRESS && env.PRIVATE_HOUSE_PRIVATE_KEY ? { address: env.PRIVATE_HOUSE_ADDRESS, key: env.PRIVATE_HOUSE_PRIVATE_KEY } : null,
+    house: clean(env.HOUSE_ADDRESS) || null,
+    houseKey: clean(env.HOUSE_PRIVATE_KEY) || null,
+    privateHouse: clean(env.PRIVATE_HOUSE_ADDRESS) && clean(env.PRIVATE_HOUSE_PRIVATE_KEY) ? { address: clean(env.PRIVATE_HOUSE_ADDRESS), key: clean(env.PRIVATE_HOUSE_PRIVATE_KEY) } : null,
     // the fortune wheel's own wallet: jackpots are sent from it on chain (else credited in game)
-    fortune: env.FORTUNE_ADDRESS && env.FORTUNE_PRIVATE_KEY ? { address: env.FORTUNE_ADDRESS, key: env.FORTUNE_PRIVATE_KEY } : null,
+    fortune: clean(env.FORTUNE_ADDRESS) && clean(env.FORTUNE_PRIVATE_KEY) ? { address: clean(env.FORTUNE_ADDRESS), key: clean(env.FORTUNE_PRIVATE_KEY) } : null,
     tokens: list(env.TOKENS || 'STRK,ETH,USDC,USDT,WBTC').map((s) => s.toUpperCase()),
     extraTokens,
     fixedPrices,
@@ -134,4 +134,9 @@ export function resolveTokens(cfg, presets, norm) {
   }
   const seen = new Set();
   return out.filter((t) => t.id && !seen.has(t.id) && seen.add(t.id));
+}
+
+// A key or address pasted into a Railway variable: spaces, line breaks and surrounding quotes dropped.
+function clean(v) {
+  return String(v ?? '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
 }

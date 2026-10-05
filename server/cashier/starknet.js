@@ -1,6 +1,6 @@
 // Starknet side of the cashier, built on Starkzap (wallets, tokens, transfers,
 // swap quotes, paymaster) with the STRK20 pool from ./strk20.js.
-import { Account, hash, num } from 'starknet';
+import { Account, ec, hash, num } from 'starknet';
 import { normAddr } from './cashier.js';
 import { resolveTokens } from './config.js';
 import { createStrk20 } from './strk20.js';
@@ -56,7 +56,10 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
   // registered the house address in the pool with a viewing key the server does not have
   const privHouse = cfg.privateHouse ? normAddr(cfg.privateHouse.address) : house;
   const privAccount = cfg.privateHouse ? new Account({ provider, address: privHouse, signer: cfg.privateHouse.key }) : account;
-  if (cfg.privateHouse) log.log?.(`cashier: private side runs from ${privHouse}`);
+  if (cfg.privateHouse) {
+    log.log?.(`cashier: private side runs from ${privHouse}`);
+    await checkKey({ provider, address: privHouse, key: cfg.privateHouse.key, name: 'PRIVATE_HOUSE', log });
+  }
   // PRIVATE_AUTO / VAULT_AUTO: make the viewing key (and deploy the vault) on first start (./setup.js)
   const setupCfg = cfg.privateHouse ? { ...cfg, houseKey: cfg.privateHouse.key } : cfg;
   cfg = await setupBefore({ cfg: setupCfg, account: privAccount, provider, log })
@@ -243,3 +246,31 @@ export async function pickNode(nodes, chainId, log = console, fetchImpl = fetch)
   log.error('cashier: no Starknet node answered; trying the first one anyway');
   return null;
 }
+
+// Does the key sign for the account? Compares the key's public key with the owner the account keeps
+// on chain (Argent: get_owner, OpenZeppelin: get_public_key) and warns about a guardian, so a wrong
+// key shows up in the start log instead of as 'invalid owner sig' on the first transaction.
+export async function checkKey({ provider, address, key, name, log = console }) {
+  let mine;
+  try {
+    mine = BigInt(ec.starkCurve.getStarkKey(key));
+  } catch (e) {
+    log.error(`${name}_PRIVATE_KEY is not a valid Starknet private key (${e?.message ?? e})`);
+    return false;
+  }
+  const call = (entrypoint) => provider.callContract({ contractAddress: address, entrypoint, calldata: [] }).then((r) => r.map(BigInt), () => null);
+  const owner = (await call('get_owner')) ?? (await call('get_public_key')) ?? (await call('getPublicKey'));
+  const guardian = await call('get_guardian');
+  if (guardian?.[0]) log.warn(`${name}: account ${address} has a guardian (Argent Shield); the server cannot co-sign, turn it off in the wallet`);
+  if (!owner?.length) {
+    log.warn(`${name}: could not read the owner key of ${address} (not deployed, or an account type without get_owner); key ${hex(mine)} not checked`);
+    return null;
+  }
+  if (owner.includes(mine)) {
+    log.log?.(`${name}: key matches the owner of ${address}`);
+    return true;
+  }
+  log.error(`${name}_PRIVATE_KEY does not belong to ${address}: the key's public key is ${hex(mine)}, the account's owner is ${hex(owner[0])}. Export the private key of exactly this account.`);
+  return false;
+}
+const hex = (n) => '0x' + n.toString(16);
