@@ -1,6 +1,6 @@
 // Starknet side of the cashier, built on Starkzap (wallets, tokens, transfers,
 // swap quotes, paymaster) with the STRK20 pool from ./strk20.js.
-import { hash, num } from 'starknet';
+import { Account, hash, num } from 'starknet';
 import { normAddr } from './cashier.js';
 import { resolveTokens } from './config.js';
 import { createStrk20 } from './strk20.js';
@@ -52,12 +52,20 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
   }
 
   const account = wallet?.getAccount();
-  // VAULT_AUTO=1: make the viewing key and deploy the vault on first start (./setup.js)
-  cfg = await setupBefore({ cfg, account, provider, log }).catch((e) => {
-    log.error('setup failed', e?.message ?? e);
-    return cfg;
-  });
-  const strk20 = await createStrk20({ cfg, account: account ?? { address: house }, provider, log }).catch((e) => {
+  // the STRK20 side may run from its own account (PRIVATE_HOUSE_*), e.g. when a wallet already
+  // registered the house address in the pool with a viewing key the server does not have
+  const privHouse = cfg.privateHouse ? normAddr(cfg.privateHouse.address) : house;
+  const privAccount = cfg.privateHouse ? new Account({ provider, address: privHouse, signer: cfg.privateHouse.key }) : account;
+  if (cfg.privateHouse) log.log?.(`cashier: private side runs from ${privHouse}`);
+  // PRIVATE_AUTO / VAULT_AUTO: make the viewing key (and deploy the vault) on first start (./setup.js)
+  const setupCfg = cfg.privateHouse ? { ...cfg, houseKey: cfg.privateHouse.key } : cfg;
+  cfg = await setupBefore({ cfg: setupCfg, account: privAccount, provider, log })
+    .then((c) => ({ ...c, houseKey: cfg.houseKey }))
+    .catch((e) => {
+      log.error('setup failed', e?.message ?? e);
+      return cfg;
+    });
+  const strk20 = await createStrk20({ cfg, account: privAccount ?? { address: privHouse }, provider, log }).catch((e) => {
     log.error('STRK20 setup failed', e?.message ?? e);
     return null;
   });
@@ -90,6 +98,8 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       rpcUrl: cfg.clientRpcUrl || networks[cfg.network].rpcUrl,
       rpcUrls: [...new Set([cfg.clientRpcUrl || networks[cfg.network].rpcUrl, ...(cfg.rpcFallbacks ?? [])])],
       house,
+      // where private transfers go (the same as house unless PRIVATE_HOUSE_* is set)
+      privateHouse: privHouse,
       pool: strk20?.pool ?? cfg.strk20.pool ?? null,
       vault: viaVault ? vault.address : null,
       routes,

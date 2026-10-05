@@ -518,7 +518,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         }
         if (cs.depRoute === 'private') {
           if (!f.depositPrivate) throw new Error(tr('cx.noPrivate'));
-          return f.depositPrivate(t, units, cs.chain.house);
+          return f.depositPrivate(t, units, cs.chain.privateHouse ?? cs.chain.house);
         }
         return f.depositPublic(t, units, cs.chain.house);
       });

@@ -123,7 +123,7 @@ export async function setupBefore({ cfg, account, provider, env = process.env, l
       if (onPool && onPool !== BigInt(ec.starkCurve.getStarkKey(s.viewingKey))) log.error('setup: the house is registered in the pool with another viewing key; set STRK20_VIEWING_KEY to that one');
       else strk20 = { ...strk20, viewingKey: s.viewingKey };
     } else if (onPool) {
-      log.error('setup: the house address is already registered in the STRK20 pool (a wallet did it). Export that viewing key and set STRK20_VIEWING_KEY, or use a fresh house account.');
+      log.error('setup: the house address is already registered in the STRK20 pool (a wallet did it). Export that viewing key and set STRK20_VIEWING_KEY, or set PRIVATE_HOUSE_ADDRESS and PRIVATE_HOUSE_PRIVATE_KEY to a fresh account for the private side.');
     } else {
       s.viewingKey = newViewingKey();
       save(file, s);
@@ -155,7 +155,7 @@ export async function setupAfter({ cfg, chain, provider, env = process.env, log 
   const file = setupFile(cfg);
   const s = load(file, cfg.network);
   if (s.registered) return;
-  const onPool = await poolKeyOf(provider, cfg.strk20.pool, chain.info().house).catch(() => null);
+  const onPool = await poolKeyOf(provider, cfg.strk20.pool, chain.info().privateHouse ?? chain.info().house).catch(() => null);
   if (onPool) {
     s.registered = true;
     save(file, s);

@@ -7,6 +7,9 @@
 // CLIENT_RPC_URL        RPC the browser uses for Starkzap wallets (default: same preset)
 // HOUSE_ADDRESS         the house account (receives deposits, pays withdrawals)
 // HOUSE_PRIVATE_KEY     its Stark key; without it the cashier takes deposits but cannot pay out
+// PRIVATE_HOUSE_ADDRESS + PRIVATE_HOUSE_PRIVATE_KEY
+//                       a separate account for the STRK20 side (private deposits and cash-outs), for
+//                       when the house address is already registered in the pool by a wallet
 // TOKENS                comma list of preset symbols (default STRK,ETH,USDC,USDT,WBTC)
 // EXTRA_TOKENS          SYMBOL:0xaddress:decimals[:btc],... for tokens missing from the presets (e.g. strkBTC)
 // FIXED_PRICES          SYMBOL=usdPerToken,... (e.g. STRK=0.15) overrides the swap-quote feed (handy on Sepolia)
@@ -78,6 +81,7 @@ export function readConfig(env = process.env) {
     clientRpcUrl: env.CLIENT_RPC_URL || null,
     house: env.HOUSE_ADDRESS || null,
     houseKey: env.HOUSE_PRIVATE_KEY || null,
+    privateHouse: env.PRIVATE_HOUSE_ADDRESS && env.PRIVATE_HOUSE_PRIVATE_KEY ? { address: env.PRIVATE_HOUSE_ADDRESS, key: env.PRIVATE_HOUSE_PRIVATE_KEY } : null,
     // the fortune wheel's own wallet: jackpots are sent from it on chain (else credited in game)
     fortune: env.FORTUNE_ADDRESS && env.FORTUNE_PRIVATE_KEY ? { address: env.FORTUNE_ADDRESS, key: env.FORTUNE_PRIVATE_KEY } : null,
     tokens: list(env.TOKENS || 'STRK,ETH,USDC,USDT,WBTC').map((s) => s.toUpperCase()),
