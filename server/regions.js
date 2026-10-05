@@ -28,18 +28,32 @@ export function makeTicket(secret, payload) {
 }
 
 export function readTicket(secret, ticket, now = Date.now()) {
-  if (typeof ticket !== 'string' || ticket.length > 200_000) return null;
+  return checkTicket(secret, ticket, now).ticket;
+}
+
+// the ticket, or why not: 'missing' | 'signature' (REGION_SECRET differs) | 'malformed' | 'expired'
+export function checkTicket(secret, ticket, now = Date.now()) {
+  if (typeof ticket !== 'string' || !ticket || ticket.length > 200_000) return { ticket: null, why: 'missing' };
   const [body, sig] = ticket.split('.');
-  if (!body || !sig || !safeEq(sig, sign(secret, body))) return null;
+  if (!body || !sig || !safeEq(sig, sign(secret, body))) return { ticket: null, why: 'signature' };
   let p;
   try {
     p = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
   } catch {
-    return null;
+    return { ticket: null, why: 'malformed' };
   }
-  if (!p || typeof p !== 'object' || !(p.exp > now)) return null;
-  return p;
+  if (!p || typeof p !== 'object') return { ticket: null, why: 'malformed' };
+  if (!(p.exp > now)) return { ticket: null, why: 'expired' };
+  return { ticket: p, why: null };
 }
+
+// What a failed check means for whoever runs the servers.
+export const TICKET_FIX = {
+  missing: 'the browser sent no ticket',
+  signature: 'REGION_SECRET on this match server is not the one on the main server',
+  malformed: 'the ticket is damaged',
+  expired: 'the ticket expired (the player waited too long); a reload fixes it',
+};
 
 // REGIONS="us=https://dark-bags-us.up.railway.app,asia=https://dark-bags-asia.up.railway.app"
 export function parseRegions(s = '') {
@@ -203,12 +217,43 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
     reply(200, apply(report));
   }
 
+  // At start: is every match server reachable, on the same REGION_SECRET and named as in REGIONS?
+  // The answer goes to the log (and to /api/stats for the team) in plain words.
+  const health = {};
+  async function checkAll(fetchImpl = fetch) {
+    await Promise.all(
+      regions.map(async (r) => {
+        const body = JSON.stringify({ region: r.id, at: now() });
+        let state;
+        try {
+          const res = await fetchImpl(`${r.url}/api/region/check`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-region-sig': sign(secret, body) }, body, signal: AbortSignal.timeout(8000) });
+          const j = await res.json().catch(() => ({}));
+          if (res.status === 403) state = `REGION_SECRET differs: set the same REGION_SECRET on ${r.url} as on this server`;
+          else if (res.status === 404) state = `${r.url} is not a match server (set ROLE=region there, or redeploy it with this version)`;
+          else if (!res.ok) state = `HTTP ${res.status}`;
+          else if (j.region !== r.id) state = `that server has REGION=${j.region}; set REGION=${r.id} there (it is "${r.id}" in REGIONS here)`;
+          else state = 'ok';
+        } catch (e) {
+          state = `unreachable (${e?.message ?? e})`;
+        }
+        health[r.id] = state;
+        if (state === 'ok') log.log?.(`regions: ${r.id} ok`);
+        else log.error(`regions: ${r.id} (${r.url}) is broken: ${state}. Players are kept on this server until it is fixed.`);
+      }),
+    );
+    return health;
+  }
+
   const timer = setInterval(sweep, 60_000);
   timer.unref?.();
   return {
+    checkAll,
+    health: () => health,
+    // regions the browser may send players to: only ones that answered the check correctly
+    healthy: () => regions.filter((r) => health[r.id] === 'ok' || health[r.id] === undefined),
     regions,
     self,
-    list: () => [{ id: self, url: null }, ...regions],
+    list: () => [{ id: self, url: null }, ...regions.filter((r) => health[r.id] === 'ok' || health[r.id] === undefined)],
     url: (id) => byId.get(id)?.url ?? null,
     entryTicket,
     stakeTicket,
@@ -272,9 +317,12 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
   // hello with an entry ticket: the session plays as that account
   function admit(cid, msg) {
     const s = lobby.sessions.get(cid);
-    const tk = readTicket(secret, msg.ticket, now());
-    if (!s || !tk || tk.k !== 'entry' || tk.region !== region) {
-      lobby.send(cid, { t: 'err', code: 'edge_ticket', msg: 'This match server only takes players coming from the game. Reload the game.' });
+    const { ticket: tk, why } = checkTicket(secret, msg.ticket, now());
+    const wrongRegion = tk && tk.region !== region;
+    if (!s || !tk || tk.k !== 'entry' || wrongRegion) {
+      const reason = wrongRegion ? `the main server sent a ticket for region "${tk.region}" but this server has REGION=${region}: set REGION=${tk.region} here` : TICKET_FIX[why] ?? 'not an entry ticket';
+      log.warn(`region ${region}: refused a player: ${reason}`);
+      lobby.send(cid, { t: 'err', code: 'edge_ticket', why: wrongRegion ? 'region' : why, msg: 'This match server only takes players coming from the game. Reload the game.' });
       return;
     }
     s.token = tk.key;
@@ -358,7 +406,20 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
     }
   }
 
+  // POST /api/region/check from the main server: proves both share REGION_SECRET and names this region
+  async function check(req, res) {
+    const reply = (code, body) => res.writeHead(code, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+    let raw = '';
+    for await (const c of req) {
+      raw += c;
+      if (raw.length > 10_000) return reply(413, { error: 'too large' });
+    }
+    const sig = String(req.headers['x-region-sig'] ?? '');
+    if (!sig || !safeEq(sig, sign(secret, raw))) return reply(403, { error: 'bad signature', region });
+    reply(200, { ok: true, region });
+  }
+
   const timer = setInterval(() => flush().catch(() => {}), 2000);
   timer.unref?.();
-  return { admit, ready, flush, send, locked, outbox: () => outbox };
+  return { admit, ready, flush, send, locked, check, outbox: () => outbox };
 }

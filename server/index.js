@@ -346,6 +346,10 @@ if (!EDGE && regionList.length && !regionMain) console.warn('REGIONS is set but 
 if (regionMain) {
   console.log(`regions: main (${regionMain.self}) with ${regionList.map((r) => `${r.id} ${r.url}`).join(', ')}`);
   lobby.regionList = () => regionMain.list();
+  // a broken match server drops out of the list the browsers get, with the reason in the log
+  const recheck = () => regionMain.checkAll().catch((e) => console.error('regions check failed', e));
+  setTimeout(recheck, 3000);
+  setInterval(recheck, 5 * 60_000).unref?.();
   lobby.regionOp = (cid, s, msg) => {
     const key = lobby.key(s);
     const err = (m) => send(cid, { t: 'err', code: 'region', msg: m });
@@ -505,6 +509,11 @@ const server = http.createServer((req, res) => {
     return;
   }
   // a match server's report (regions)
+  if (pathOnly === '/api/region/check' && req.method === 'POST') {
+    if (!regionEdge) return void res.writeHead(404).end();
+    regionEdge.check(req, res).catch(() => res.writeHead(500).end());
+    return;
+  }
   if (pathOnly === '/api/region/report' && req.method === 'POST') {
     if (!regionMain) return void res.writeHead(404).end();
     regionMain.handle(req, res).catch((e) => {
