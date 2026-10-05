@@ -3,7 +3,7 @@
 // server runs with CHAIN set and a player opens the cashier, so practice mode and the
 // single-file build stay small. Run by `npm run build:wallets` (and in the Dockerfile).
 import { build } from 'esbuild';
-import { stat } from 'node:fs/promises';
+import { stat, readFile } from 'node:fs/promises';
 
 const out = 'client/vendor/wallets.js';
 await build({
@@ -24,6 +24,22 @@ await build({
   // bundled: the swap screen uses it
   external: ['node:*', 'fs', 'path', 'crypto', 'os', 'module', 'url', 'worker_threads', 'child_process', '@hyperlane-xyz/*'],
   logLevel: 'warning',
+  plugins: [
+    {
+      // Starkzap gives the Cartridge keychain iframe 10 s to load, then fails with "Cartridge
+      // Controller failed to initialize". On a busy browser (many extensions, slow network) it
+      // needs longer: give it 45 s.
+      name: 'cartridge-wait',
+      setup(b) {
+        b.onLoad({ filter: /starkzap[\\/]dist[\\/]src[\\/]wallet[\\/]cartridge\.js$/ }, async (args) => {
+          const src = await readFile(args.path, 'utf8');
+          const out = src.replace('const MAX_CONTROLLER_WAIT_MS = 10000;', 'const MAX_CONTROLLER_WAIT_MS = 45000;');
+          if (out === src) console.warn('build-wallets: Starkzap changed, the Cartridge wait patch did not apply');
+          return { contents: out, loader: 'js' };
+        });
+      },
+    },
+  ],
 });
 const { size } = await stat(out);
 console.log(`${out} ${(size / 1024 / 1024).toFixed(2)} MB`);

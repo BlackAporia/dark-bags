@@ -162,6 +162,13 @@ export function createTour({ app, go, touch = () => false, sfx = null, game = nu
       return;
     }
     const card0 = card.getBoundingClientRect();
+    // a step that waits for a tap: if the target went out of view (the player scrolled away),
+    // bring it back, or they are asked to tap something they cannot see
+    if (s.wait && s.scrolled === n) {
+      const rr = n.getBoundingClientRect();
+      const scTop = n.closest('.pages')?.getBoundingClientRect().top ?? 0;
+      if (rr.bottom < scTop + 4 || rr.top > card0.top - 4) s.scrolled = null;
+    }
     if (s.scrolled !== n) {
       s.scrolled = n;
       // bring the target to the top of the page, so the card at the bottom covers none of it

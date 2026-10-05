@@ -702,6 +702,21 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   for (const b of document.querySelectorAll('#dlg-cashier [data-tab]')) b.addEventListener('click', () => setTab(b.dataset.tab));
   for (const b of document.querySelectorAll('.dlg [data-close]')) b.addEventListener('click', () => b.closest('dialog').close());
   $('dep-go').addEventListener('click', deposit);
+  // by hand: any wallet can send to the house; the hash tells the server whose deposit it is
+  $('dep-manual').addEventListener('toggle', () => {
+    if ($('dep-manual').open) $('dep-house').textContent = cs.chain?.house ?? '';
+  });
+  $('dep-house-copy').addEventListener('click', () => {
+    const a = cs.chain?.house;
+    if (a) navigator.clipboard?.writeText(a).then(() => toast(tr('cx.copied')), () => {});
+  });
+  $('dep-tx-go').addEventListener('click', () => {
+    const tx = $('dep-tx').value.trim();
+    if (!/^0x[0-9a-fA-F]{1,64}$/.test(tx)) return setStatus('cash-status', tr('cx.badTx'), true);
+    setStatus('cash-status', tr('cx.sentWait', { tx: short(tx) }));
+    send({ t: 'deposit', route: 'public', tx });
+    store.set('darkbags.lastDeposit', { tx, at: Date.now() });
+  });
   $('dep-max').addEventListener('click', depositMax);
   $('dep-token').addEventListener('change', refreshWalletBal);
   $('wd-go').addEventListener('click', withdraw);

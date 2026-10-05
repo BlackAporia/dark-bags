@@ -354,3 +354,22 @@ test('a restart mid-raid gives every unpaid stake back; the ready room too', () 
   for (const [i, x] of [a, b, c].entries()) assert.equal(wallet.balance(x.token, 'USDC'), before[i], 'every stake back');
   assert.equal(a.last('err').code, 'restart');
 });
+
+test('online waiting room: when everyone sitting there is ready, it starts by itself', () => {
+  const { lobby, client, ticks } = setup({ waitForStart: true, bots: false, minPlayers: 2 });
+  const a = client('a', 'alice');
+  const b = client('b', 'bob');
+  for (const x of ['a', 'b']) lobby.handle(x, { t: 'join', stake: 1000, mode: 'raid' });
+  lobby.handle('a', { t: 'ready', asset: 'USDC' });
+  const room = lobby.rooms.get('raid:1000');
+  assert.equal(room.countT, null, 'one of two ready: keep waiting');
+  lobby.handle('b', { t: 'ready', asset: 'USDC' });
+  assert.equal(room.countT, CFG.PREP_AUTO_START, 'both ready: a countdown nobody had to press');
+  assert.equal(b.last('prep').soon, true);
+  // Start still cuts it short
+  lobby.handle('a', { t: 'start' });
+  assert.equal(room.countT, CFG.PREP_ALL_READY);
+  ticks(CFG.PREP_ALL_READY + 0.5);
+  assert.equal(room.state, 'live');
+  assert.ok(a);
+});

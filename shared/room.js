@@ -151,7 +151,7 @@ export class RoomCore {
         // any ready player may stop waiting: a short countdown, then bots (practice) take the empty seats
         if (c.ready && this.state === 'prep' && this.readyList().length < this.minPlayers) {
           this.send(cid, { t: 'err', msg: `Waiting for more players: a raid needs at least ${this.minPlayers}.` });
-        } else if (c.ready && this.state === 'prep' && this.countT === null) {
+        } else if (c.ready && this.state === 'prep' && (this.countT === null || this.countT > CFG.PREP_ALL_READY)) {
           this.countT = CFG.PREP_ALL_READY;
           this.broadcastPrep();
         }
@@ -257,7 +257,15 @@ export class RoomCore {
     if (this.state !== 'prep') return;
     // waiting rooms start by themselves once every seat is taken by a ready human
     if (this.waitForStart && this.readyList().length >= this.botFill) this.countT = Math.min(this.countT ?? CFG.PREP_ALL_READY, CFG.PREP_ALL_READY);
+    // a waiting room where everyone sitting there is ready (two or more): nobody has to be the one
+    // who presses Start, it goes by itself after a while (friends still have time to sit down)
+    if (this.waitForStart && this.countT === null) {
+      const all = [...this.clients.values()];
+      const n = all.filter((c) => c.ready).length;
+      if (n >= Math.max(2, this.minPlayers) && n === all.length) this.countT = CFG.PREP_AUTO_START;
+    }
     if (this.countT === null) return;
+    if (this.waitForStart && this.readyList().length < this.botFill) return; // the 30 s stay: more may join
     const all = [...this.clients.values()];
     const ready = all.filter((c) => c.ready);
     if (ready.length >= 2 && ready.length === all.length) this.countT = Math.min(this.countT, CFG.PREP_ALL_READY);
@@ -459,6 +467,7 @@ export class RoomCore {
       slotsTotal: Math.max(this.botFill, ready.length),
       min: this.minPlayers,
       waiting: this.waitForStart && this.state === 'prep' && this.countT === null, // no timer: start when you like
+      soon: this.waitForStart && this.state === 'prep' && this.countT !== null && this.countT > CFG.PREP_ALL_READY, // starting by itself, Start still cuts it short
       bots,
       votes: this.mapVotes(),
       // the whole pool: every ready stake together (and the bots'), never who put in what

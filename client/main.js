@@ -270,15 +270,18 @@ const tour = createTour({
 document.addEventListener('darkbags:tour', () => tour.start());
 // the first visit: a runner name and a region, then the tour
 const welcome = createWelcome({ app, regions, sfx, onDone: () => tour.start() });
-// a new player's language: the one of their country (by IP), English when it does not answer
-const geoReady = langChosen() || !SERVER
+// a new player's language: the one of their country (by IP); when the country is unknown (VPN,
+// no server), the browser's own language if we have it; English otherwise
+const browserLang = () => (navigator.languages ?? [navigator.language]).map((x) => String(x ?? '').slice(0, 2).toLowerCase()).find((x) => LANGS.some((l) => l.id === x)) ?? null;
+const geoReady = langChosen()
   ? Promise.resolve()
-  : fetch(`${SERVER.replace(/^ws/, 'http').replace(/\/ws\/?$/, '')}/api/geo`, { signal: AbortSignal.timeout(2500) })
-      .then((r) => r.json())
+  : (SERVER ? fetch(`${SERVER.replace(/^ws/, 'http').replace(/\/ws\/?$/, '')}/api/geo`, { signal: AbortSignal.timeout(2500) }).then((r) => r.json()) : Promise.resolve(null))
+      .catch(() => null)
       .then((j) => {
-        if (!langChosen() && j?.lang && LANGS.some((l) => l.id === j.lang)) setLang(j.lang);
-      })
-      .catch(() => {});
+        if (langChosen()) return;
+        const pick = j?.country && j?.lang && LANGS.some((l) => l.id === j.lang) ? j.lang : browserLang();
+        if (pick && pick !== 'en') setLang(pick);
+      });
 
 // ------------------------------------------------------------------ pages
 // friends, messages, profiles, guilds and room invites
@@ -1172,7 +1175,7 @@ function renderPrep() {
       sfx.play('beep', { f: 880, dur: 0.06 });
     },
   });
-  $('prep-start').hidden = !(p.waiting && p.me?.ready);
+  $('prep-start').hidden = !((p.waiting || p.soon) && p.me?.ready);
   $('prep-start').disabled = p.slots.length < (p.min ?? 1); // online needs two players or more
   $('prep-invite').hidden = !(app.mode === 'online' && p.state === 'prep');
   const ready = $('ready');
