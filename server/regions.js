@@ -20,6 +20,7 @@ const TICKET_TTL = 10 * 60 * 1000;
 const VOID_AFTER = 30 * 60 * 1000; // a stake ticket nobody redeemed by then goes back to its owner
 
 export const sign = (secret, body) => crypto.createHmac('sha256', secret).update(body).digest('hex');
+export const fingerprint = (secret) => crypto.createHash('sha256').update(String(secret)).digest('hex').slice(0, 8);
 const safeEq = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 export function makeTicket(secret, payload) {
@@ -228,7 +229,7 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
         try {
           const res = await fetchImpl(`${r.url}/api/region/check`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-region-sig': sign(secret, body) }, body, signal: AbortSignal.timeout(8000) });
           const j = await res.json().catch(() => ({}));
-          if (res.status === 403) state = `REGION_SECRET differs: set the same REGION_SECRET on ${r.url} as on this server`;
+          if (res.status === 403) state = `REGION_SECRET differs: set the same REGION_SECRET on ${r.url} as on this server (here its fingerprint is ${fingerprint(secret)}; that server logs its own at start)`;
           else if (res.status === 404) state = `${r.url} is not a match server (set ROLE=region there, or redeploy it with this version)`;
           else if (!res.ok) state = `HTTP ${res.status}`;
           else if (j.region !== r.id) state = `that server has REGION=${j.region}; set REGION=${r.id} there (it is "${r.id}" in REGIONS here)`;
