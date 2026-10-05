@@ -22,6 +22,7 @@ export default {
   "net.open": "Umeunganishwa. Uvamizi wa mtandaoni ni wachezaji halisi tu.",
   "reg.title": "Seva",
   "reg.auto": "Iliyo karibu zaidi",
+  "reg.fallback": "Seva hiyo haipokei wachezaji sasa hivi. Unacheza kwenye {r}.",
   "reg.eu": "Ulaya",
   "reg.us": "Amerika",
   "reg.asia": "Asia",

@@ -21,6 +21,7 @@ export default {
   'net.open': '已连接。在线模式只有真人玩家。',
   'reg.title': "服务器",
   'reg.auto': "最近的",
+  'reg.fallback': "该服务器暂时不接受玩家。你正在 {r} 上游戏。",
   'reg.eu': "欧洲",
   'reg.us': "美洲",
   'reg.asia': "亚洲",

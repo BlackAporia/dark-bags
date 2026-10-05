@@ -21,6 +21,7 @@ export default {
   'net.open': 'Conectado. Online, só jogadores reais.',
   'reg.title': "Servidor",
   'reg.auto': "Mais próximo",
+  'reg.fallback': "Esse servidor não está aceitando jogadores agora. Você está jogando em {r}.",
   'reg.eu': "Europa",
   'reg.us': "Américas",
   'reg.asia': "Ásia",
