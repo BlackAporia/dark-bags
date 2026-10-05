@@ -18,28 +18,48 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     pick: store.get('darkbags.region', null), // null: the closest
     ping: {}, // id -> ms
     online: {}, // id -> players
+    tables: {}, // id -> that server's tables (from /api/stats): who is waiting where
     edge: null, // { region, url, transport, ok, queue: [] }
     readyMsg: null, // a Ready waiting for its stake ticket
     probing: false,
     broken: new Set(), // regions that refused us this session: play on the main server instead
   };
-  // a match server near you is worth it only with people to play with: below this many online
-  // there, "Closest" keeps you on the main server, where everyone meets
-  const MIN_THERE = 4;
+  // a table abroad is worth joining for company only while the ping stays playable
+  const MAX_MS = 320;
   const here = () => st.list?.[0]?.id ?? 'eu';
   const current = () => {
     if (!st.list || st.list.length < 2) return here();
     if (st.pick && !st.broken.has(st.pick) && st.list.some((r) => r.id === st.pick)) return st.pick;
-    // "Closest": the main server, unless a closer one already has players (one community, not three)
+    // the closest one we have a ping for
     let best = here();
     let bestMs = st.ping[best] ?? Infinity;
     for (const r of st.list) {
-      if (r.id === here() || st.broken.has(r.id) || (st.online[r.id] ?? 0) < MIN_THERE) continue;
+      if (st.broken.has(r.id)) continue;
       if ((st.ping[r.id] ?? Infinity) < bestMs - 15) (best = r.id), (bestMs = st.ping[r.id]);
     }
     return best;
   };
-  const remote = () => app.mode === 'online' && current() !== here();
+  // One community across servers: a match lives on one server, so sit where people already wait
+  // for this table (mode + stake band), as long as the ping is playable there. Nobody anywhere:
+  // your own server, and the next players come to you. A server you picked by hand always wins.
+  const people = (tb) => (tb && tb.state === 'prep' ? Math.max(tb.watching ?? 0, tb.ready ?? 0) : 0);
+  const tableOn = (id, mode, band) => (id === here() ? app.tables : st.tables[id])?.find((x) => x.stake === band && (x.mode ?? 'raid') === mode) ?? null;
+  function placeFor(mode, band) {
+    const mine = current();
+    if (!st.list || (st.pick && !st.broken.has(st.pick))) return { region: mine, tb: tableOn(mine, mode, band) };
+    let best = { region: mine, tb: tableOn(mine, mode, band), n: people(tableOn(mine, mode, band)) };
+    for (const r of st.list) {
+      if (r.id === mine || st.broken.has(r.id)) continue;
+      const ms = st.ping[r.id];
+      if (ms == null || ms > MAX_MS) continue;
+      const tb = tableOn(r.id, mode, band);
+      const n = people(tb);
+      if (n > best.n) best = { region: r.id, tb, n };
+    }
+    return best;
+  }
+  let joinRegion = null; // where the table you sit at is played
+  const remote = () => app.mode === 'online' && (joinRegion ?? current()) !== here();
   const statsUrl = (r) => (r.url ? `${r.url}/api/stats` : '/api/stats');
   const wsUrl = (url) => `${url.replace(/^http/, 'ws')}/ws`;
 
@@ -59,6 +79,7 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
               if (res.ok) {
                 const j = await res.json().catch(() => null);
                 if (j?.online != null) st.online[r.id] = j.online;
+                if (Array.isArray(j?.tables)) st.tables[r.id] = j.tables;
                 best = Math.min(best, ms);
               }
             } catch {
@@ -159,6 +180,7 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
       closeEdge();
       render();
       toast(t('reg.fallback', { r: `${FLAG[here()] ?? '🌐'} ${t(`reg.${here()}`)}` }));
+      joinRegion = null;
       if (join) mainSend(join);
       return;
     }
@@ -181,11 +203,12 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
   function route(m) {
     if (!ROOM_MSGS.has(m.t)) return false;
     if (m.t === 'join') {
+      joinRegion = st.list && app.mode === 'online' ? placeFor(m.mode ?? 'raid', m.band ?? m.stake).region : null;
       if (!remote()) {
         closeEdge();
         return false;
       }
-      const region = current();
+      const region = joinRegion;
       const r = st.list.find((x) => x.id === region);
       if (!st.edge || st.edge.region !== region) {
         openEdge(region, r.url, null);
@@ -203,7 +226,10 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
       return true;
     }
     edgeSend(m);
-    if (m.t === 'leave') setTimeout(() => !app.inRoom && closeEdge(), 400);
+    if (m.t === 'leave') {
+      joinRegion = null;
+      setTimeout(() => !app.inRoom && closeEdge(), 400);
+    }
     return true;
   }
 
@@ -238,7 +264,7 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     return `${t('reg.table', { r: name(id) })}${ms != null ? ` · <b class="${ms < 90 ? 'good' : ms < 180 ? 'ok' : 'bad'}">${ms} ms</b>` : ''}${hint ? `<br><span class="fine">${hint}</span>` : ''}`;
   }
 
-  setInterval(() => app.mode === 'online' && !app.inRoom && !document.hidden && probe(), 30_000);
+  setInterval(() => app.mode === 'online' && !app.inRoom && !document.hidden && probe(), 12_000);
   // for the first-run welcome: every region with its ping and players, and picking one
   const info = () => ({
     list: (st.list ?? []).map((r) => ({ id: r.id, flag: FLAG[r.id] ?? '🌐', name: t(`reg.${r.id}`) === `reg.${r.id}` ? r.id.toUpperCase() : t(`reg.${r.id}`), ping: st.ping[r.id], online: st.online[r.id] ?? null })),
@@ -255,5 +281,10 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     listeners.add(f);
     return () => listeners.delete(f);
   };
-  return { route, onMain, render, remote, current, closeEdge, probe, prepLine, info, choose, onChange, inEdge: () => !!st.edge };
+  // the lobby's view of a table: where it would be played and who is there
+  const where = (mode, band) => {
+    const p = placeFor(mode, band);
+    return { ...p, flag: FLAG[p.region] ?? '🌐', away: p.region !== current(), name: t(`reg.${p.region}`) === `reg.${p.region}` ? p.region.toUpperCase() : t(`reg.${p.region}`) };
+  };
+  return { route, onMain, render, remote, current, where, closeEdge, probe, prepLine, info, choose, onChange, inEdge: () => !!st.edge };
 }

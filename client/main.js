@@ -827,7 +827,9 @@ function renderLobby() {
   const typing = list.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
   if (!typing) list.replaceChildren(
     ...(fixed ? [fixed] : CFG.TIERS).map((stake) => {
-      const tb = tableInfo(stake);
+      // one community across servers: the table where people wait, whichever server holds it
+      const w = app.mode === 'online' ? regions.where(app.gameMode, fixed ?? bandOf(stake)) : null;
+      const tb = w?.tb ?? tableInfo(stake);
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'table-btn';
@@ -850,6 +852,7 @@ function renderLobby() {
         cls = 'gold';
       } else if (!state && tb?.jackpot > 0) state = t('tb.jackpot', { v: money(tb.jackpot) });
       if (fixed && !state) state = t(MODE[app.gameMode].kind === 'zombie' ? 'tb.zFee' : 'tb.goldFee');
+      if (w?.away && w.n > 0) state = `${state} · ${w.flag} ${w.name}`;
       b.innerHTML = `<span class="stake">${money(stake)}</span>${state ? `<span class="state ${cls}">${esc(state)}</span>` : ''}`;
       b.addEventListener('click', () => {
         app.stake = stake;
@@ -1584,7 +1587,8 @@ function goToTable() {
   sfx.unlock();
   app.name = $('name').value.trim();
   store.set('darkbags.name', app.name);
-  send({ t: 'join', stake: app.stake, mode: app.gameMode, name: app.name || 'runner', skin: app.skin });
+  // band: which table this stake sits at, so the regions can seat you where people already wait
+  send({ t: 'join', stake: app.stake, band: MODE[app.gameMode]?.fixed ?? bandOf(app.stake), mode: app.gameMode, name: app.name || 'runner', skin: app.skin });
   app.inRoom = true;
   showScreen('prep');
 }
@@ -1765,7 +1769,7 @@ function loop(now) {
 }
 
 // handle for automated smoke tests and console poking
-globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, go, share: shareMoment };
+globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, regions, go, share: shareMoment };
 
 attract.start();
 showScreen('lobby');
