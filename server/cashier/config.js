@@ -102,6 +102,9 @@ export function readConfig(env = process.env) {
       cacheDir: env.STRK20_CACHE_DIR || '.strk20-cache',
     },
     vault: env.VAULT_ADDRESS ? { address: env.VAULT_ADDRESS, fromBlock: Number(env.VAULT_FROM_BLOCK || 0) } : null,
+    // private deposits and cash-outs through the vault contract need the pool to screen the vault's
+    // address first; until then (default) they go player <-> house notes, which needs no screening
+    vaultPayouts: env.VAULT_PAYOUTS === '1',
     paymaster: env.PAYMASTER_API_KEY ? { url: env.PAYMASTER_URL || AVNU_PAYMASTER[network], apiKey: env.PAYMASTER_API_KEY } : null,
     privy: env.PRIVY_APP_ID && env.PRIVY_APP_SECRET ? { appId: env.PRIVY_APP_ID, appSecret: env.PRIVY_APP_SECRET, clientId: env.PRIVY_CLIENT_ID || null } : null,
     cartridge: env.CARTRIDGE !== '0',

@@ -86,8 +86,9 @@ Before mainnet:
    chain), and a contract that fills open notes is a screened subject too: by default the pool
    needs an attestation for the vault's own address. The route to screening access is Starkscan;
    ask them, or the STRK20 team, to screen the vault or set its policy (`Exempt` or `Delegated`).
-   Without it private cash-outs revert. Private deposits are not affected (they are withdrawals
-   from the pool, which are not screened).
+   Without it private cash-outs revert, so the server keeps private money off the vault until you
+   set `VAULT_PAYOUTS=1`: by default players send private transfers to the house and are paid from
+   the house's own notes, which needs no contract screening. Match pots use the vault either way.
 2. **Audit.** Get the vault reviewed before it holds real money, and keep the beta caps on.
 3. Private cash-outs also need `STRK20_VIEWING_KEY` and `STRK20_PROVER_URL` (the house registers
    in the pool once with `npm run house -- register`).
