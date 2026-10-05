@@ -34,7 +34,22 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
     cacheDirectory: s.cacheDir,
     rpcUrl: cfg.rpcUrl ?? undefined,
   });
-  await discovery.ready;
+  // The first sync downloads and verifies the pool state: minutes on a cold volume. It runs in the
+  // background so the server answers its health check; every pool operation waits for it.
+  let synced = false;
+  const ready = discovery.ready.then(
+    () => {
+      synced = true;
+      log.log?.('STRK20: pool state verified and in sync');
+    },
+    (e) => {
+      log.error(`STRK20: pool sync failed: ${e?.message ?? e}`);
+      throw e;
+    },
+  );
+  ready.catch(() => {});
+  // a payout that cannot start because the pool is not in sync sent nothing: the player gets it back
+  const inSync = () => ready.catch((e) => Promise.reject(Object.assign(new Error(`STRK20 pool not in sync: ${e?.message ?? e}`), { notSent: true })));
   // the SDK wants the viewing key as a bigint: a hex string silently derives the wrong channel keys
   const viewingKey = BigInt(s.viewingKey);
   const mine = discovery.forAccount({ address: account.address, viewingKey });
@@ -74,6 +89,7 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
 
     // every note the house holds, as deposits; the cashier skips ids it has seen
     async scan() {
+      await ready;
       const { notes } = await mine.discoverNotes();
       const out = [];
       for (const [token, list] of entriesOf(notes)) {
@@ -87,6 +103,7 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
     },
 
     async pay({ token, to, amount }) {
+      await inSync();
       if (!transfers) throw Object.assign(new Error('private cash-outs are not configured'), { notSent: true });
       let res;
       try {
@@ -104,7 +121,11 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
     // of `contract`, whose returned deposit fills that note. `calldata({ noteId })` builds the
     // invoke's calldata once the note id is known (the vault's payout is signed over it).
     canInvoke: !!transfers,
+    get synced() {
+      return synced;
+    },
     async invokeWithOpenNote({ token, to, contract, calldata }) {
+      await inSync();
       if (!transfers) throw Object.assign(new Error('private cash-outs are not configured'), { notSent: true });
       let res;
       try {
@@ -125,6 +146,7 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
 
     // one-time: publish the house viewing key so players can open channels to it
     async register() {
+      await ready;
       if (!transfers) throw new Error('needs HOUSE_PRIVATE_KEY and STRK20_PROVER_URL');
       const res = await transfers.build().register().execute({ provingBlockId: await provingBlock() });
       return submit(res.callAndProof);
