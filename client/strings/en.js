@@ -22,6 +22,7 @@ export default {
   'net.open': 'Connected. Online raids are real players only.',
   'reg.title': "Server",
   'reg.auto': "Closest",
+  'reg.fallback': "That server is not taking players right now. You are playing on {r}.",
   'reg.eu': "Europe",
   'reg.us': "Americas",
   'reg.asia': "Asia",

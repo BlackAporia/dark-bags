@@ -21,15 +21,22 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     edge: null, // { region, url, transport, ok, queue: [] }
     readyMsg: null, // a Ready waiting for its stake ticket
     probing: false,
+    broken: new Set(), // regions that refused us this session: play on the main server instead
   };
+  // a match server near you is worth it only with people to play with: below this many online
+  // there, "Closest" keeps you on the main server, where everyone meets
+  const MIN_THERE = 4;
   const here = () => st.list?.[0]?.id ?? 'eu';
   const current = () => {
     if (!st.list || st.list.length < 2) return here();
-    if (st.pick && st.list.some((r) => r.id === st.pick)) return st.pick;
-    // the closest one we have a ping for
+    if (st.pick && !st.broken.has(st.pick) && st.list.some((r) => r.id === st.pick)) return st.pick;
+    // "Closest": the main server, unless a closer one already has players (one community, not three)
     let best = here();
     let bestMs = st.ping[best] ?? Infinity;
-    for (const r of st.list) if ((st.ping[r.id] ?? Infinity) < bestMs - 15) (best = r.id), (bestMs = st.ping[r.id]);
+    for (const r of st.list) {
+      if (r.id === here() || st.broken.has(r.id) || (st.online[r.id] ?? 0) < MIN_THERE) continue;
+      if ((st.ping[r.id] ?? Infinity) < bestMs - 15) (best = r.id), (bestMs = st.ping[r.id]);
+    }
     return best;
   };
   const remote = () => app.mode === 'online' && current() !== here();
@@ -146,8 +153,13 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     }
     if (m.t === 'welcome' || m.t === 'tables' || m.t === 'chain' || m.t === 'balance') return; // the main server owns these
     if (m.t === 'err' && m.code === 'edge_ticket') {
-      toast(m.msg);
+      // that match server will not take us: play on the main server instead, without a dead end
+      st.broken.add(e.region);
+      const join = e.join;
       closeEdge();
+      render();
+      toast(t('reg.fallback', { r: `${FLAG[here()] ?? '🌐'} ${t(`reg.${here()}`)}` }));
+      if (join) mainSend(join);
       return;
     }
     // balances on a match server are only the stake: the real ones come from the main server
@@ -179,6 +191,7 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
         openEdge(region, r.url, null);
         // the socket opens, asks the main server for an entry ticket, then says hello
       }
+      st.edge.join = m; // to sit at the same table on the main server if this one refuses us
       edgeSend(m);
       return true;
     }

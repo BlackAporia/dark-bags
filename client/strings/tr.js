@@ -21,6 +21,7 @@ export default {
   'net.open': 'Bağlandı. Çevrimiçi yalnızca gerçek oyuncular.',
   'reg.title': "Sunucu",
   'reg.auto': "En yakın",
+  'reg.fallback': "Bu sunucu şu an oyuncu almıyor. {r} üzerinde oynuyorsun.",
   'reg.eu': "Avrupa",
   'reg.us': "Amerika",
   'reg.asia': "Asya",
