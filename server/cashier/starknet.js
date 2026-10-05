@@ -64,7 +64,10 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
 
   // the DARK BAGS vault: private deposits, cash-outs and match pots at the contract level
   const vault = createVault({ cfg, account, provider, strk20, log });
-  if (vault) log.log?.(`vault: ${vault.address} (cash-outs ${vault.canPay ? 'on' : 'off'}, match pots ${vault.canRecord ? 'on' : 'off'})`);
+  // private money moves through the vault only once its address is screened (VAULT_PAYOUTS=1);
+  // otherwise players send private transfers to the house and get paid from the house's notes
+  const viaVault = !!(vault && cfg.vaultPayouts);
+  if (vault) log.log?.(`vault: ${vault.address} (private money ${viaVault ? 'through the vault' : 'through the house notes; set VAULT_PAYOUTS=1 once the vault is screened'}, match pots ${vault.canRecord ? 'on' : 'off'})`);
 
   // private is an extra: public deposits and cash-outs always stay open
   const routes = [];
@@ -88,9 +91,9 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       rpcUrls: [...new Set([cfg.clientRpcUrl || networks[cfg.network].rpcUrl, ...(cfg.rpcFallbacks ?? [])])],
       house,
       pool: strk20?.pool ?? cfg.strk20.pool ?? null,
-      vault: vault?.address ?? null,
+      vault: viaVault ? vault.address : null,
       routes,
-      cashOut: { private: !!(vault?.canPay || strk20?.canPay), public: !!wallet },
+      cashOut: { private: !!(viaVault ? vault.canPay : strk20?.canPay), public: !!wallet },
       paymaster: !!cfg.paymaster,
       explorer: mainnet ? 'https://voyager.online' : 'https://sepolia.voyager.online',
       tokens: tokens.map(({ id, symbol, decimals, color, name }) => ({ id, symbol, decimals, color, name })),
@@ -127,7 +130,7 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
 
     // private transfers to the house's notes (pool scan; only without the vault, it is heavy)
     async scanPrivateDeposits() {
-      return strk20 && !vault ? strk20.scan() : [];
+      return strk20 && !viaVault ? strk20.scan() : [];
     },
 
     // private deposits into the vault: its Deposited events, cheap to read
@@ -175,7 +178,7 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       : {}),
 
     async payPrivate(a) {
-      if (vault?.canPay) return vault.pay({ ...a, payoutId: a.payoutId });
+      if (viaVault && vault.canPay) return vault.pay({ ...a, payoutId: a.payoutId });
       if (!strk20) throw Object.assign(new Error('private pool off'), { notSent: true });
       return strk20.pay(a);
     },

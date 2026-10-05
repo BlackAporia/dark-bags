@@ -735,7 +735,7 @@ export class Lobby {
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
         let r;
-        if (msg.route === 'private' && c.chain.vault) r = { status: 'ok', credited: (await c.scanVault()).filter((x) => x.account === s.account) };
+        if (msg.route === 'private' && c.chain.info?.().vault) r = { status: 'ok', credited: (await c.scanVault()).filter((x) => x.account === s.account) };
         else if (msg.route === 'private') r = { status: 'ok', credited: (await c.scanPrivate()).filter((x) => x.account === s.account) };
         else r = await c.depositPublic(s.account, msg.tx);
         if (r.credited.some((x) => !x.held && !x.unsupported)) this.welcome(s.account); // the first deposit earns the welcome bonus

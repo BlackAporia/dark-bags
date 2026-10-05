@@ -119,3 +119,11 @@ test('a staked match puts only its pot per coin on chain, then the capped cut', 
   // practice / no real coins: nothing goes on chain
   assert.equal(rec.start('x', [{ account: ALICE, asset: 'not-a-coin', units: 5n }]), null);
 });
+
+test('pool transactions carry fixed bounds instead of a fee estimate that drops the proof', async () => {
+  const { proofBounds } = await import('../server/cashier/strk20.js');
+  const b = await proofBounds({ getBlockWithTxHashes: async () => ({ l1_gas_price: { price_in_fri: '0x10' }, l2_gas_price: { price_in_fri: '0x5' }, l1_data_gas_price: {} }) });
+  assert.equal(b.l2_gas.max_price_per_unit, 10n);
+  assert.ok(b.l2_gas.max_amount > 0n && b.l1_data_gas.max_amount > 0n);
+  assert.ok(b.l1_data_gas.max_price_per_unit > 0n); // a missing price falls back to a floor, never 0
+});

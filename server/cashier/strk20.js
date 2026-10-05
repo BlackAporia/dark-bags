@@ -71,9 +71,12 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
   const provingBlock = async () => Math.max(0, (await provider.getBlockNumber()) - 10);
   // tip is required for v3; proof keys only when there are proof facts (empty ones make an
   // invalid transaction). After a failed submission the cached pool nonce is stale.
+  // A transaction with proof facts gets fixed resource bounds instead of a fee estimate: public
+  // nodes drop proof_facts from starknet_estimateFee, so the pool reverts the estimate with
+  // EMPTY_PROOF_FACTS (the SDK's own devnet helper skips the estimate the same way).
   async function submit(callAndProof) {
     const { call, proof } = callAndProof;
-    const extra = proof?.proofFacts?.length ? { proof: proof.data, proofFacts: proof.proofFacts } : {};
+    const extra = proof?.proofFacts?.length ? { proof: proof.data, proofFacts: proof.proofFacts, resourceBounds: await proofBounds(provider) } : {};
     try {
       return await account.execute(call, { tip: 0n, ...extra });
     } catch (e) {
@@ -170,6 +173,22 @@ export async function loadPoolClient() {
       throw new Error(`strk20-discovery did not load on Node ${process.versions.node}: ${String(why?.message ?? why).slice(0, 300)}`);
     }
   }
+}
+
+// Resource bounds for a pool transaction: twice the current gas prices, and amounts that cover a
+// register, a transfer or an invoke with room to spare (the fee charged is what was used).
+export const PROOF_TX_GAS = { l1_gas: 0n, l2_gas: 200_000_000n, l1_data_gas: 30_000n };
+export async function proofBounds(provider) {
+  const b = await provider.getBlockWithTxHashes('latest');
+  const price = (p, floor) => {
+    const v = BigInt(p?.price_in_fri ?? 0);
+    return (v > 0n ? v : floor) * 2n;
+  };
+  return {
+    l1_gas: { max_amount: PROOF_TX_GAS.l1_gas, max_price_per_unit: price(b.l1_gas_price, 10n ** 14n) },
+    l2_gas: { max_amount: PROOF_TX_GAS.l2_gas, max_price_per_unit: price(b.l2_gas_price, 10n ** 10n) },
+    l1_data_gas: { max_amount: PROOF_TX_GAS.l1_data_gas, max_price_per_unit: price(b.l1_data_gas_price, 10n ** 12n) },
+  };
 }
 
 // AddressMap from the SDK iterates as [key, value]; plain objects too
