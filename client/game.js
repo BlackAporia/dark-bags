@@ -125,6 +125,8 @@ export class GameClient {
 
   begin(start, skin, gore, look = null) {
     this.active = true;
+    // how the match ran on this device and link (sent home once it ends, for the server's log)
+    this.net = { t0: performance.now(), frames: 0, slow: 0, worst: 0, gapMax: 0, gaps: 0, lastSnap: 0, pingSum: 0, pingN: 0, pingMax: 0, pingAt: 0 };
     this.outfit = start.look ?? look ?? { outfit: null, body: 'm' }; // cosmetics (this.look is the camera offset)
     this.myNf = this.outfit.nf ?? null; // a name effect (style)
     this.gore = gore;
@@ -222,9 +224,27 @@ export class GameClient {
     this.sfx.setStorm(0);
   }
 
+  // the match on this device in numbers: frames, snapshot gaps, ping
+  netReport() {
+    const n = this.net;
+    if (!n) return null;
+    const secs = (performance.now() - n.t0) / 1000;
+    return { mode: this.mode, secs: Math.round(secs), fps: Math.round(n.frames / Math.max(1, secs)), slow: n.slow, worst: Math.round(n.worst), gapMax: Math.round(n.gapMax), gaps: n.gaps, ping: n.pingN ? Math.round(n.pingSum / n.pingN) : null, pingMax: n.pingMax, q: this.renderer.quality ?? null, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, touch: !!this.input.touchOn };
+  }
+
   // ------------------------------------------------------------ network in
 
   onSnap(s) {
+    const n = this.net;
+    if (n) {
+      const now = performance.now();
+      if (n.lastSnap) {
+        const gap = now - n.lastSnap;
+        n.gapMax = Math.max(n.gapMax, gap);
+        if (gap > 250) n.gaps++;
+      }
+      n.lastSnap = now;
+    }
     if (s.sb) this.board = s.sb; // the Tab table
     const now = performance.now();
     this.snapAt = now;
@@ -898,6 +918,11 @@ export class GameClient {
 
   frame(now, dt) {
     if (!this.active) return;
+    if (this.net) {
+      this.net.frames++;
+      if (dt > 0.05) this.net.slow++;
+      this.net.worst = Math.max(this.net.worst, dt * 1000);
+    }
     this.acc = Math.min(this.acc + dt, 0.2);
     while (this.acc >= DT) {
       this.acc -= DT;
@@ -1212,6 +1237,12 @@ export class GameClient {
     if (last) el.alive.textContent = t('hud.alive', { n: last.alive });
     // your round trip to the server (online only; practice runs in this tab)
     const ms = this.ping?.();
+    if (ms != null && this.net && now - this.net.pingAt > 1000) {
+      this.net.pingAt = now;
+      this.net.pingSum += ms;
+      this.net.pingN++;
+      this.net.pingMax = Math.max(this.net.pingMax, ms);
+    }
     el.ping.hidden = ms == null;
     if (ms != null) {
       el.ping.textContent = `${ms} ms`;

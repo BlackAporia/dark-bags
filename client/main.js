@@ -1441,6 +1441,12 @@ function handleMessage(m) {
       if (game.active) game.onEvents(m.l);
       break;
     case 'result':
+      // how the match ran here goes to the server's log (online only)
+      if (app.mode === 'online' && game.net && !game.net.sent) {
+        game.net.sent = true;
+        const r = game.netReport();
+        if (r) send({ t: 'netlog', ...r });
+      }
       tour.onResult(m);
       pass.onResult(m);
       app.balances = m.balances ?? app.balances;
