@@ -5,7 +5,7 @@
 import { t } from './i18n.js';
 import { store } from './store.js';
 import { WEAPONS } from '../shared/weapons.js';
-import { DIFFS, DIFF_IDS, CLASSES, CLASS_IDS, PISTOLS, GEAR, FLOORS, MILESTONE, CHAPTERS, BOSSES, bossOf, objectiveOf, chapterOf, milestoneItems, priceFor, TICKET_PACKS, CAMP_SECONDS } from '../shared/descent.js';
+import { DIFFS, DIFF_IDS, CLASSES, CLASS_IDS, PISTOLS, GEAR, FLOORS, MILESTONE, CHAPTERS, BOSSES, bossOf, objectiveOf, chapterOf, milestoneItems, runItems, priceFor, TICKET_PACKS, CAMP_SECONDS } from '../shared/descent.js';
 import { OUTFIT, WSKIN, RARITIES } from '../shared/cosmetics.js';
 import { STYLE } from '../shared/style.js';
 
@@ -397,7 +397,7 @@ export class DescentHud {
       <div class="dx-bossbar" hidden><b></b><div><i></i></div><small></small></div>
       <div class="dx-gear"><span class="dx-coins"><i>⛁</i><b>0</b></span><div class="dx-gear-row"></div><button type="button" class="dx-swap" title="E"><span></span><kbd>E</kbd></button></div>
       <div class="dx-camp" hidden><div class="dx-camp-in">
-        <p class="eyebrow dx-camp-k"></p><h2 class="dx-camp-h"></h2><p class="dx-camp-next"></p><p class="dx-camp-ms" hidden></p>
+        <p class="eyebrow dx-camp-k"></p><h2 class="dx-camp-h"></h2><p class="dx-camp-next"></p><p class="dx-camp-ms" hidden></p><ul class="dx-camp-loot" hidden></ul>
         <div class="dx-camp-shop"></div>
         <div class="dx-camp-go"><button type="button" class="cta dx-go"></button><button type="button" class="ghost dx-out"></button></div>
         <p class="dx-camp-wait"></p></div></div>`;
@@ -528,10 +528,25 @@ export class DescentHud {
       const banked = Math.floor(you.zw / MILESTONE) * MILESTONE;
       ms.hidden = banked < MILESTONE;
       if (!ms.hidden) ms.textContent = t('dx.msHeld', { n: banked / MILESTONE });
+      // what getting out now would bring up, item by item (they are only kept on the way out)
+      const loot = this.q('.dx-camp-loot');
+      const items = banked >= MILESTONE ? runItems(this.diff, banked, you.cls ?? 'assault', you.pz ?? 'pistol') : [];
+      const lootKey = `${this.diff}|${banked}|${you.cls}|${you.pz}`;
+      loot.hidden = !items.length;
+      if (loot.dataset.key !== lootKey) {
+        loot.dataset.key = lootKey;
+        loot.innerHTML = items
+          .map((it) => {
+            const x = itemOf(it);
+            const r = x?.rarity ?? 'rare';
+            return `<li style="--rc:${RARITIES[r]?.color ?? '#fff'}"><b>${esc(x?.name ?? it.id)}</b><small>${esc(itemKind(it))} · ${esc(t(`r.${r}`))}</small></li>`;
+          })
+          .join('');
+      }
       const go = this.q('.dx-go');
       const out = this.q('.dx-out');
       go.textContent = `${t('dx.go')} · ${you.dt}s`;
-      out.textContent = t('dx.out');
+      out.textContent = items.length ? t('dx.outN', { n: items.length }) : t('dx.out');
       go.classList.toggle('on', you.ch === 'go');
       out.classList.toggle('on', you.ch === 'out');
       go.disabled = you.st !== 'alive';

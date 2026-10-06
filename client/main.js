@@ -1,6 +1,7 @@
 import './polyfills.js'; // first: older phone browsers need it before anything draws
-import './epoch.js'; // second: a new data epoch wipes old progress before anything reads it
-import { canvasMode } from './canvasmode.js'; // third: GPU or CPU canvases, before any canvas exists
+import './move.js'; // second: the profile carried over from the old address, before anything reads it
+import './epoch.js'; // third: a new data epoch wipes old progress before anything reads it
+import { canvasMode } from './canvasmode.js'; // fourth: GPU or CPU canvases, before any canvas exists
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
 import { bandOf } from '../shared/stakes.js';
@@ -68,7 +69,7 @@ function normalizeServer(u) {
 
 // the public game server the GitHub Pages build plays on (override with ?server=…).
 // Only list domains the project owns: an address listed here gets every player's session.
-const DEFAULT_SERVER = 'wss://dark-bags-production.up.railway.app/ws';
+const DEFAULT_SERVER = 'wss://dark-bags.com/ws';
 const FALLBACK_SERVERS = [];
 
 function onlineUrl() {
@@ -1884,7 +1885,7 @@ let lastFrame = performance.now();
 // The next frame is booked first: whatever goes wrong in this one, the loop (input, HUD,
 // drawing) keeps running. A frame error is reported once, not a frozen black screen.
 let loopErr = false;
-let attractSkip = false;
+let attractLast = 0;
 // nobody sees the live map behind a full-screen dialog or show: skip drawing it (that
 // time goes to the locker, the case reel and the rank-up instead)
 const backdropHidden = () => !!document.querySelector('dialog[open]') || !$('opening').hidden || !$('rankup').hidden || app.screen === 'result';
@@ -1895,9 +1896,12 @@ function loop(now) {
   try {
     if (game.active) game.frame(now, dt);
     else if (!backdropHidden()) {
-      // the live map behind the menus: full rate on a desktop, every other frame on a phone
-      attractSkip = !attractSkip;
-      if (!input.touchOn || attractSkip) attract.frame(now, input.touchOn ? dt * 2 : dt);
+      // the live map behind the menus is decoration: 30 frames a second is plenty (it ran at the
+      // screen's full rate, up to 165 a second, with a match of bots simulated under the menu)
+      if (now - attractLast >= 32) {
+        attract.frame(now, Math.min(0.1, (now - attractLast) / 1000));
+        attractLast = now;
+      }
     }
   } catch (e) {
     if (!loopErr) {

@@ -481,17 +481,19 @@ export function pickItem(catalog, rarity, owned, rnd, { tier = 1, minted = {} } 
 export const pickOutfit = (rarity, owned, rnd, opts) => pickItem(OUTFITS, rarity, owned, rnd, opts);
 
 // believable looks for bots: mostly basic and common, now and then something shiny
+// Bots wear plain outfits only: colours and headgear, but no auras, glows, capes or animated
+// effects, no name or kill effects, no weapon finishes with effects. Every effect is drawing
+// work in every player's frame, and a table of bots in sparkly skins cost real players fps.
+const PLAIN = (x) => !x.limited && !x.fx && !x.fx2 && !x.cape && !x.armor;
 export function botLook(rnd) {
   const r = rnd();
-  const rarity = r < 0.55 ? null : r < 0.8 ? 'common' : r < 0.93 ? 'rare' : r < 0.985 ? 'epic' : 'legendary';
-  const o = rarity ? pickItem(OUTFITS.filter((x) => !x.limited), rarity, new Set(), rnd) : OUTFITS[Math.floor(rnd() * BASIC.length)];
-  const look = { outfit: o.id, body: rnd() < 0.5 ? 'm' : 'f' };
+  const rarity = r < 0.55 ? null : r < 0.8 ? 'common' : r < 0.93 ? 'rare' : 'epic';
+  const o = rarity ? pickItem(OUTFITS.filter(PLAIN), rarity, new Set(), rnd) : OUTFITS[Math.floor(rnd() * BASIC.length)];
+  const look = { outfit: PLAIN(o) ? o.id : OUTFITS[0].id, body: rnd() < 0.5 ? 'm' : 'f' };
   if (rnd() < 0.35) {
-    const f = FINISHES.filter((x) => rank(x.rarity) <= 2);
+    const f = FINISHES.filter((x) => rank(x.rarity) <= 2 && !x.fx);
     look.ws = { [WEAPONS[Math.floor(rnd() * WEAPONS.length)].id]: f[Math.floor(rnd() * f.length)].id };
   }
-  if (rnd() < 0.12) look.nf = STYLE_ITEMS.filter((x) => !x.excl && x.kind === 'namefx' && rank(x.rarity) <= 2)[Math.floor(rnd() * 6)]?.id;
-  if (rnd() < 0.1) look.kf = STYLE_ITEMS.filter((x) => !x.excl && x.kind === 'killfx' && rank(x.rarity) <= 1)[Math.floor(rnd() * 4)]?.id;
   return look;
 }
 

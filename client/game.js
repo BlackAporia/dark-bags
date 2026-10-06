@@ -366,7 +366,8 @@ export class GameClient {
       return;
     }
     this.fx.muzzle(p.muzzle.x, a.y + FEET, a.y + FEET - p.muzzle.y, p.aim, !!wp.heavy, now, tint);
-    this.fx.casing(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.facing);
+    // casings only from your own gun: everyone else's (bots fire a lot) were particles for nothing
+    if (mine) this.fx.casing(p.grip.x, a.y + FEET, a.y + FEET - p.grip.y, a.facing);
     if (mine) this.shake = Math.max(this.shake, wp.snd === 'sniper' ? 9 : wp.heavy ? 7 : 2.5);
   }
 

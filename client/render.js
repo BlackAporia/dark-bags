@@ -216,7 +216,7 @@ export class Renderer {
       }
     }
     for (const f of v.figures) if (inView(f.a.x, f.a.y, 80)) items.push({ y: f.a.y + FEET, draw: () => this.drawRunner(f, t, v.gore) });
-    for (const z of v.zombies ?? []) if (inView(z.a.x, z.a.y, 120)) items.push({ y: z.a.y + FEET, draw: () => drawZombie(ctx, z, t, v.gore) });
+    for (const z of v.zombies ?? []) if (inView(z.a.x, z.a.y, 120)) items.push({ y: z.a.y + FEET, draw: () => drawZombie(ctx, z, t, v.gore, this.quality < 2) });
     for (const g of v.fx.graveItems(t, v.gore)) items.push(g);
     for (const o of v.turrets ?? []) if (inView(o.x, o.y, 60)) items.push({ y: o.y, draw: () => this.drawTurret(o, t) });
     items.sort((a, b) => a.y - b.y);
