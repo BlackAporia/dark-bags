@@ -43,6 +43,12 @@ export const RPC_SPARES = {
   mainnet: ['https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10'],
   sepolia: [],
 };
+// nodes for transactions that carry a STRK20 proof, tried in turn: a node that does not know
+// proof_facts checks the account signature against a hash without them ('invalid owner sig')
+export const PROOF_NODES = {
+  mainnet: ['https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10', 'https://starknet-rpc.publicnode.com', 'https://rpc.starknet.lava.build'],
+  sepolia: ['https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_10', 'https://starknet-sepolia-rpc.publicnode.com'],
+};
 export const AVNU_PAYMASTER = {
   mainnet: 'https://starknet.paymaster.avnu.fi',
   sepolia: 'https://sepolia.paymaster.avnu.fi',
@@ -78,6 +84,7 @@ export function readConfig(env = process.env) {
     chainId: network === 'mainnet' ? 'SN_MAIN' : 'SN_SEPOLIA',
     rpcUrl: env.RPC_URL || null,
     rpcFallbacks: [...list(env.RPC_FALLBACKS), ...RPC_SPARES[network]],
+    proofRpcUrls: [...list(env.PROOF_RPC_URL), ...PROOF_NODES[network]],
     clientRpcUrl: env.CLIENT_RPC_URL || null,
     house: clean(env.HOUSE_ADDRESS) || null,
     houseKey: clean(env.HOUSE_PRIVATE_KEY) || null,

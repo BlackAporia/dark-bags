@@ -12,6 +12,7 @@
 // official @starkware-libs/starknet-privacy-sdk and verifies the pool state it
 // downloads against the chain before trusting it).
 
+import { Account, RpcProvider } from 'starknet';
 import { normAddr } from './cashier.js';
 
 export async function createStrk20({ cfg, account, provider, log = console }) {
@@ -76,9 +77,10 @@ export async function createStrk20({ cfg, account, provider, log = console }) {
   // EMPTY_PROOF_FACTS (the SDK's own devnet helper skips the estimate the same way).
   async function submit(callAndProof) {
     const { call, proof } = callAndProof;
-    const extra = proof?.proofFacts?.length ? { proof: proof.data, proofFacts: proof.proofFacts, resourceBounds: await proofBounds(provider) } : {};
     try {
-      return await account.execute(call, { tip: 0n, ...extra });
+      if (!proof?.proofFacts?.length) return await account.execute(call, { tip: 0n });
+      const details = { tip: 0n, proof: proof.data, proofFacts: proof.proofFacts, resourceBounds: await proofBounds(provider) };
+      return await submitProof({ account, call, details, nodes: proofNodes(cfg), log });
     } catch (e) {
       transfers?.invalidateProofNonceCache?.();
       throw e;
@@ -173,6 +175,36 @@ export async function loadPoolClient() {
       throw new Error(`strk20-discovery did not load on Node ${process.versions.node}: ${String(why?.message ?? why).slice(0, 300)}`);
     }
   }
+}
+
+// Nodes for a proof transaction: PROOF_RPC_URL, the built-in ones, then the server's own node.
+export function proofNodes(cfg) {
+  return [...new Set([...(cfg.proofRpcUrls ?? []), cfg.rpcUrl].filter(Boolean))];
+}
+
+// Send a transaction with proof facts through each node in turn until one takes it. A node that
+// does not know proof_facts validates the account signature against a hash without them and
+// rejects it ('invalid owner sig'). Every try signs the same nonce, so at most one can land.
+export async function submitProof({ account, call, details, nodes, log = console, makeAccount = defaultAccount }) {
+  let last;
+  for (const url of nodes) {
+    try {
+      const res = await makeAccount(account, url).execute(call, details);
+      log.log?.(`STRK20: proof transaction ${res?.transaction_hash ?? ''} sent through ${url}`);
+      return res;
+    } catch (e) {
+      last = e;
+      log.warn?.(`STRK20: ${url} did not take the proof transaction: ${shortError(e)}`);
+    }
+  }
+  throw last ?? new Error('STRK20: no node for proof transactions');
+}
+const defaultAccount = (account, nodeUrl) => new Account({ provider: new RpcProvider({ nodeUrl }), address: account.address, signer: account.signer });
+// RPC errors repeat the whole request (the proof is megabytes): keep the node's answer
+export function shortError(e) {
+  const m = String(e?.message ?? e);
+  const tail = m.slice(m.lastIndexOf('\n}') + 2).trim();
+  return (tail || m).replace(/\s+/g, ' ').slice(0, 300);
 }
 
 // Resource bounds for a pool transaction: twice the current gas prices, and amounts that cover a
