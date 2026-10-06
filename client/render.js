@@ -240,7 +240,7 @@ export class Renderer {
     // 7. the storm glows through the dark, the weather drifts over it
     worldTf();
     if (v.zone) this.drawStorm(v.zone, t, vb);
-    if (this.weather?.kind) {
+    if (this.weather?.kind && this.quality >= 2) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this.weather.draw(ctx, this.w, this.h, this.cam, t, this.reduced, this.quality);
       worldTf();
@@ -265,7 +265,11 @@ export class Renderer {
     if (v.showArrows) this.drawExitArrows(v.eye, v.exitStates);
     if (v.storm && v.zone) this.drawSafeArrow(v.eye, v.zone, t);
     this.drawVignette(v.hurt, v.storm, t);
-    this.drawMini(v.eye, t, v.meAlive, v.zone, v.exitStates, v.radar);
+    // the minimap changes slowly: ten redraws a second are plenty
+    if (!(t - (this.miniT ?? -1e9) < 100)) {
+      this.miniT = t;
+      this.drawMini(v.eye, t, v.meAlive, v.zone, v.exitStates, v.radar);
+    }
   }
 
   // ------------------------------------------------------------- pieces

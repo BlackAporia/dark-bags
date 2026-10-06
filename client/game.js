@@ -246,7 +246,7 @@ export class GameClient {
     const n = this.net;
     if (!n) return null;
     const secs = (performance.now() - n.t0) / 1000;
-    return { mode: this.mode, secs: Math.round(secs), fps: Math.round(n.frames / Math.max(1, secs)), slow: n.slow, hangs: n.hangs, worst: Math.round(n.worst), gpu: gpuName(), gapMax: Math.round(n.gapMax), gaps: n.gaps, ping: n.pingN ? Math.round(n.pingSum / n.pingN) : null, pingMax: n.pingMax, q: this.renderer.quality ?? null, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, touch: !!this.input.touchOn };
+    return { mode: this.mode, secs: Math.round(secs), fps: Math.round(n.frames / Math.max(1, secs)), slow: n.slow, hangs: n.hangs, worst: Math.round(n.worst), gpu: gpuName(), gapMax: Math.round(n.gapMax), gaps: n.gaps, ping: n.pingN ? Math.round(n.pingSum / n.pingN) : null, pingMax: n.pingMax, q: this.renderer.quality ?? null, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, touch: !!this.input.touchOn, canvas: this.canvasMode ?? null };
   }
 
   // ------------------------------------------------------------ network in
@@ -945,11 +945,10 @@ export class GameClient {
       if (gap > 250) n.hangs++;
       n.worst = Math.max(n.worst, gap);
     }
-    // frames per second for the corner counter, over the last half second
-    this.fpsN = (this.fpsN ?? 0) + 1;
+    // frames per second for the corner counter (frames drawn), over the last half second
     if (!this.fpsT) this.fpsT = now;
     if (now - this.fpsT >= 500) {
-      this.fps = Math.round((this.fpsN * 1000) / (now - this.fpsT));
+      this.fps = Math.round(((this.fpsN ?? 0) * 1000) / (now - this.fpsT));
       this.fpsN = 0;
       this.fpsT = now;
     }
@@ -968,7 +967,15 @@ export class GameClient {
     // one bad frame must never freeze the raid: log it once and keep the game (and HUD) running
     try {
       // the Descent's story scene covers the screen: no need to draw the world under it
-      if (view && !this.dx?.story.covering) this.renderer.draw(view);
+      // on 120-165 Hz screens a frame is drawn at most ~90 times a second: the rest only
+      // samples input (drawing every refresh doubled the work for frames nobody can tell apart)
+      const due = now - (this.lastDraw ?? 0) >= 10.5;
+      if (due) {
+        this.drawGap = this.lastDraw ? now - this.lastDraw : 16;
+        this.lastDraw = now;
+        this.fpsN = (this.fpsN ?? 0) + 1;
+      }
+      if (due && view && !this.dx?.story.covering) this.renderer.draw(view);
     } catch (e) {
       const key = String(e?.message ?? e);
       this.drawErrs ??= new Set();
@@ -979,7 +986,8 @@ export class GameClient {
       }
       this.fx.clear();
     }
-    this.renderer.measure(dt * 1000);
+    // the adaptive quality judges the time between drawn frames, not between refreshes
+    if (this.lastDraw === now) this.renderer.measure(Math.min(100, this.drawGap ?? dt * 1000));
     this.fx.setQuality(this.renderer.quality);
     if (now - this.lastHud > 90) {
       this.lastHud = now;

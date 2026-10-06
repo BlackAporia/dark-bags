@@ -1,5 +1,6 @@
 import './polyfills.js'; // first: older phone browsers need it before anything draws
 import './epoch.js'; // second: a new data epoch wipes old progress before anything reads it
+import { canvasMode } from './canvasmode.js'; // third: GPU or CPU canvases, before any canvas exists
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
 import { bandOf } from '../shared/stakes.js';
@@ -187,6 +188,7 @@ globalThis.__darkbagsSend = send;
 addEventListener('error', (e) => reportError('script', e.error ?? e.message));
 addEventListener('unhandledrejection', (e) => reportError('promise', e.reason));
 const game = new GameClient({ renderer, input, sfx, send, el });
+game.canvasMode = `${canvasMode.mode}${canvasMode.gpuMs ? ` gpu${canvasMode.gpuMs}/cpu${canvasMode.cpuMs}ms` : ''}`;
 const scoreboard = createScoreboard({ game, app });
 const voice = createVoice({ send, app, game, toast: (m) => toast(m) });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only

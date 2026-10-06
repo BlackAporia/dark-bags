@@ -17,11 +17,11 @@ export class Fx {
     this.graves = [];
     this.lights = [];
     this.floaters = [];
-    this.max = 520;
+    this.max = 400;
   }
 
   setQuality(q) {
-    this.max = [160, 320, 520][q] ?? 520;
+    this.max = [120, 240, 400][q] ?? 400;
   }
 
   clear() {
@@ -239,56 +239,92 @@ export class Fx {
       }
     }
     ctx.globalAlpha = 1;
-    for (const p of this.parts) if (p.rest && p.kind === 'casing') drawCasing(ctx, p);
+    drawCasings(ctx, this.parts.filter((p) => p.rest && p.kind === 'casing'), false);
   }
 
+  // The small stuff (blood drops, sparks, chips, dirt, dust, casings) is drawn in batches: one
+  // path per colour and fade step instead of one per particle. A fight has hundreds of them, and
+  // every separate path is a separate draw on a GPU canvas.
   drawAir(ctx, now) {
+    const blood = [];
+    const dirt = [];
+    const chips = [];
+    const casings = [];
+    const sparks = new Map(); // colour|alpha -> particles
+    const dust = new Map();
+    const step = (a) => Math.max(0, Math.ceil(a * 4) / 4); // four fade steps
     for (const p of this.parts) {
       if (p.rest && p.kind === 'casing') continue;
       const a = 1 - p.age / p.life;
       const sy = p.y - p.z;
+      if (p.kind === 'blood') blood.push(p.x, sy, p.size);
+      else if (p.kind === 'dirt') dirt.push(p.x, sy, p.size);
+      else if (p.kind === 'chip') chips.push(p.x, sy, p.size, p.rot);
+      else if (p.kind === 'casing') casings.push({ x: p.x, y: sy, rot: p.rot });
+      else if (p.kind === 'spark') {
+        const k = `${p.color}|${step(a)}`;
+        if (!sparks.has(k)) sparks.set(k, []);
+        sparks.get(k).push(p.x, sy, p.x - p.vx * 0.03, sy - (p.vy * 0.03 - p.vz * 0.03));
+      } else if (p.kind === 'dust') {
+        const k = `${p.color}|${step(a * 0.8)}`;
+        if (!dust.has(k)) dust.set(k, []);
+        dust.get(k).push(p.x, sy, p.size * (1 + p.age * 2));
+      }
+    }
+    const discs = (list, color) => {
+      if (!list.length) return;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let i = 0; i < list.length; i += 3) {
+        ctx.moveTo(list[i] + list[i + 2], list[i + 1]);
+        ctx.arc(list[i], list[i + 1], list[i + 2], 0, TAU);
+      }
+      ctx.fill();
+    };
+    discs(blood, '#b3121f');
+    discs(dirt, '#4a3520');
+    for (const [k, list] of dust) {
+      ctx.globalAlpha = Number(k.split('|')[1]);
+      discs(list, k.split('|')[0]);
+    }
+    ctx.globalAlpha = 1;
+    if (chips.length) {
+      ctx.fillStyle = '#9aa3b5';
+      ctx.beginPath();
+      for (let i = 0; i < chips.length; i += 4) {
+        const [x, y, s, r] = [chips[i], chips[i + 1], chips[i + 2] / 2, chips[i + 3]];
+        const c = Math.cos(r) * s;
+        const n = Math.sin(r) * s;
+        ctx.moveTo(x - c + n, y - n - c);
+        ctx.lineTo(x + c + n, y + n - c);
+        ctx.lineTo(x + c - n, y + n + c);
+        ctx.lineTo(x - c - n, y - n + c);
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
+    if (sparks.size) {
+      ctx.lineWidth = 1.6;
+      for (const [k, list] of sparks) {
+        const [color, al] = k.split('|');
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = Number(al);
+        ctx.beginPath();
+        for (let i = 0; i < list.length; i += 4) {
+          ctx.moveTo(list[i], list[i + 1]);
+          ctx.lineTo(list[i + 2], list[i + 3]);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    drawCasings(ctx, casings, true);
+    for (const p of this.parts) {
+      if (p.rest && p.kind === 'casing') continue;
+      if (p.kind === 'blood' || p.kind === 'dirt' || p.kind === 'chip' || p.kind === 'casing' || p.kind === 'spark' || p.kind === 'dust') continue;
+      const a = 1 - p.age / p.life;
+      const sy = p.y - p.z;
       switch (p.kind) {
-        case 'blood':
-          ctx.fillStyle = '#b3121f';
-          ctx.beginPath();
-          ctx.arc(p.x, sy, p.size, 0, TAU);
-          ctx.fill();
-          break;
-        case 'spark':
-          ctx.strokeStyle = p.color;
-          ctx.globalAlpha = Math.max(0, a);
-          ctx.lineWidth = 1.6;
-          ctx.beginPath();
-          ctx.moveTo(p.x, sy);
-          ctx.lineTo(p.x - p.vx * 0.03, sy - (p.vy * 0.03 - p.vz * 0.03));
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-          break;
-        case 'chip':
-          ctx.fillStyle = '#9aa3b5';
-          ctx.save();
-          ctx.translate(p.x, sy);
-          ctx.rotate(p.rot);
-          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-          ctx.restore();
-          break;
-        case 'dirt':
-          ctx.fillStyle = '#4a3520';
-          ctx.beginPath();
-          ctx.arc(p.x, sy, p.size, 0, TAU);
-          ctx.fill();
-          break;
-        case 'dust':
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = Math.max(0, a) * 0.8;
-          ctx.beginPath();
-          ctx.arc(p.x, sy, p.size * (1 + p.age * 2), 0, TAU);
-          ctx.fill();
-          ctx.globalAlpha = 1;
-          break;
-        case 'casing':
-          drawCasing(ctx, { ...p, y: sy });
-          break;
         case 'boom': {
           const k = p.age / p.life;
           const r = 24 + k * 90;
@@ -405,17 +441,19 @@ export class Fx {
   }
 }
 
-function drawCasing(ctx, p) {
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(p.rot);
+// shell casings: short brass strokes, all of them in one path
+function drawCasings(ctx, list) {
+  if (!list.length) return;
   ctx.strokeStyle = '#d4a93c';
   ctx.lineWidth = 1.8;
   ctx.beginPath();
-  ctx.moveTo(-2, 0);
-  ctx.lineTo(2, 0);
+  for (const p of list) {
+    const c = Math.cos(p.rot) * 2;
+    const s = Math.sin(p.rot) * 2;
+    ctx.moveTo(p.x - c, p.y - s);
+    ctx.lineTo(p.x + c, p.y + s);
+  }
   ctx.stroke();
-  ctx.restore();
 }
 
 function drawLimb(ctx, x, y, z, rot, pts, color, onGround) {
