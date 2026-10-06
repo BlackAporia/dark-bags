@@ -449,13 +449,15 @@ export class Renderer {
       ctx.moveTo(bx - ux * len, y - uy * len);
       ctx.lineTo(bx, y);
       ctx.stroke();
+      // a soft halo drawn as a wider disc, not shadowBlur (a blur per drop is costly on phones)
+      ctx.fillStyle = 'rgba(163, 230, 53, 0.3)';
+      ctx.beginPath();
+      ctx.arc(bx, y, 8, 0, TAU);
+      ctx.fill();
       ctx.fillStyle = '#c6ff3d';
-      ctx.shadowColor = '#a3e635';
-      ctx.shadowBlur = this.reduced ? 0 : 10;
       ctx.beginPath();
       ctx.arc(bx, y, 4.5, 0, TAU);
       ctx.fill();
-      ctx.shadowBlur = 0;
       return;
     }
     if (b.k === 'c') {
