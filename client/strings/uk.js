@@ -4,6 +4,7 @@ export default {
   'lobby.locker': 'Шафка · скіни · сумки',
   'lobby.refill': 'Поповнити тестові монети',
   'lobby.online': 'Онлайн',
+  'lobby.pve': "PvE",
   'lobby.practice': 'Практика з ботами',
   'lobby.stakePer': 'Ставка на рейд',
   'lobby.stakeWith': 'Ставка в <span class="fine">будь-якій монеті · показано в $ · виграш повертається в тій самій монеті</span>',

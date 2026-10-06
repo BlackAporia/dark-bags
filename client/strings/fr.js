@@ -4,6 +4,7 @@ export default {
   'lobby.locker': 'Casier · skins · sacs',
   'lobby.refill': 'Recharger les pièces de test',
   'lobby.online': 'En ligne',
+  'lobby.pve': "PvE",
   'lobby.practice': 'Entraînement contre bots',
   'lobby.stakePer': 'Mise par raid',
   'lobby.stakeWith': 'Misez avec <span class="fine">n’importe quelle crypto · affiché en $ · les gains reviennent dans la même crypto</span>',

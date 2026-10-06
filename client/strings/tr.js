@@ -4,6 +4,7 @@ export default {
   'lobby.locker': 'Dolap · skinler · çantalar',
   'lobby.refill': 'Test coinlerini doldur',
   'lobby.online': 'Çevrimiçi',
+  'lobby.pve': "PvE",
   'lobby.practice': 'Botlara karşı antrenman',
   'lobby.stakePer': 'Baskın başına bahis',
   'lobby.stakeWith': 'Bahis coin’i <span class="fine">herhangi bir coin · $ olarak gösterilir · kazanç aynı coin ile döner</span>',

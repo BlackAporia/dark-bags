@@ -151,6 +151,7 @@ const app = {
   skin: SKINS.includes(store.get('darkbags.skin', '')) ? store.get('darkbags.skin') : SKINS[Math.floor(Math.random() * SKINS.length)],
   gore: settings.gore,
   gameMode: store.get('darkbags.gmode', 'raid'),
+  pve: store.get('darkbags.pve', false), // the PvE tab (online co-op modes) is open
   page: 'play',
   screen: 'lobby',
   prep: null,
@@ -645,7 +646,10 @@ function tableInfo(stake) {
 const MODE_ICON = { 'dx-easy': '⬇', 'dx-hard': '⬇', 'dx-hc': '⬇', zombies: '🧟', gold: '💰', ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
 // the mode picker: categories, cards (what it is, how many, how long, who is in it), and the
 // chosen mode explained underneath (how you win, a tip, what it pays)
-const MODE_CAT = { 'dx-easy': 'pve', 'dx-hard': 'pve', 'dx-hc': 'pve', raid: 'classic', br: 'classic', duel: 'classic', dm: 'classic', gl: 'classic', hardcore: 'classic', knives: 'weapons', pistols: 'weapons', shotguns: 'weapons', rifles: 'weapons', snipers: 'weapons', team2: 'teams', team4: 'teams', team8: 'teams', ranked: 'events', zombies: 'events', gold: 'events' };
+const MODE_CAT = { 'dx-easy': 'pve', 'dx-hard': 'pve', 'dx-hc': 'pve', raid: 'classic', br: 'classic', duel: 'classic', dm: 'classic', gl: 'classic', hardcore: 'classic', knives: 'weapons', pistols: 'weapons', shotguns: 'weapons', rifles: 'weapons', snipers: 'weapons', team2: 'teams', team4: 'teams', team8: 'teams', ranked: 'events', zombies: 'pve', gold: 'events' };
+// the PvE tab: online, but only the co-op modes against the dark
+const isPve = (id) => MODE_CAT[id] === 'pve';
+const pveTab = () => app.mode === 'online' && app.pve;
 const MODE_COLOR = { 'dx-easy': '#34d399', 'dx-hard': '#f97316', 'dx-hc': '#a855f7', raid: '#f59e0b', br: '#ffd166', duel: '#fb7185', dm: '#ef4444', gl: '#22d3ee', hardcore: '#e11d48', knives: '#cbd5e1', pistols: '#94a3b8', shotguns: '#fb923c', rifles: '#4ade80', snipers: '#60a5fa', team2: '#38bdf8', team4: '#3b82f6', team8: '#6366f1', ranked: '#ff2dd4', zombies: '#84cc16', gold: '#fbbf24' };
 const modeKey = (m) => (m.weapon ? 'weapon' : m.kind === 'team' ? 'team' : m.kind === 'descent' ? 'descent' : m.id);
 // the Descent's difficulty last picked (its card stands for all three)
@@ -665,12 +669,21 @@ function renderModes() {
   // ranked is online only: practice never shows it
   const practice = app.mode === 'practice';
   if (practice && MODE[app.gameMode]?.ranked) app.gameMode = 'raid';
-  const all = MODES.filter((m) => !(practice && m.ranked));
+  // a mode picked elsewhere (an invite, the tour) opens the tab it lives on
+  if (!practice && isPve(app.gameMode) !== !!app.pve) {
+    app.pve = isPve(app.gameMode);
+    store.set('darkbags.pve', app.pve);
+    $('mode-online').setAttribute('aria-selected', String(!app.pve));
+    $('mode-pve').setAttribute('aria-selected', String(app.pve));
+  }
+  // PvE tab: only the co-op modes; Online: everything else; practice: all of them
+  const all = MODES.filter((m) => !(practice && m.ranked) && (practice || isPve(m.id) === !!app.pve));
   // the Descent shows as one card (its difficulty is picked underneath)
   const cards = all.filter((m) => !(m.kind === 'descent' && m.id !== 'dx-easy'));
   const hot = all.map((m) => [m.id, modeFacts(m).waiting + modeFacts(m).live]).sort((a, b) => b[1] - a[1])[0];
   // categories
-  const cats = ['all', 'pve', 'classic', 'weapons', 'teams', 'events'];
+  const cats = pveTab() ? [] : ['all', ...(practice ? ['pve'] : []), 'classic', 'weapons', 'teams', 'events'];
+  $('mode-cats').hidden = !cats.length;
   if (!cats.includes(modeCat)) modeCat = 'all';
   $('mode-cats').replaceChildren(
     ...cats.map((c) => {
@@ -689,7 +702,7 @@ function renderModes() {
       return b;
     }),
   );
-  const shown = cards.filter((m) => modeCat === 'all' || MODE_CAT[m.id] === modeCat || m.id === app.gameMode || (m.kind === 'descent' && isDx(app.gameMode)));
+  const shown = cards.filter((m) => !cats.length || modeCat === 'all' || MODE_CAT[m.id] === modeCat || m.id === app.gameMode || (m.kind === 'descent' && isDx(app.gameMode)));
   box.replaceChildren(
     ...shown.map((m) => {
       const b = document.createElement('button');
@@ -834,7 +847,9 @@ function renderLobby() {
   const onlineBtn = $('mode-online');
   onlineBtn.disabled = !SERVER;
   onlineBtn.title = SERVER ? '' : 'No game server configured for this build';
-  onlineBtn.setAttribute('aria-selected', String(app.mode === 'online'));
+  onlineBtn.setAttribute('aria-selected', String(app.mode === 'online' && !app.pve));
+  $('mode-pve').disabled = !SERVER;
+  $('mode-pve').setAttribute('aria-selected', String(pveTab()));
   $('mode-practice').setAttribute('aria-selected', String(app.mode === 'practice'));
 
   const st = $('net-status');
@@ -1710,7 +1725,19 @@ function applySetting(k) {
 onSetting(applySetting);
 for (const k of ['quality', 'sound', 'music', 'track', 'voice', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
 $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
-$('mode-online').addEventListener('click', () => app.mode !== 'online' && setMode('online'));
+// Online and PvE share the server: the tab only picks which modes are on the board
+function pickTab(pve) {
+  if (app.inRoom) return;
+  app.pve = pve;
+  store.set('darkbags.pve', pve);
+  // keep the picked mode on the board this tab shows
+  if (isPve(app.gameMode) !== pve) app.gameMode = pve ? dxPicked() : 'raid';
+  store.set('darkbags.gmode', app.gameMode);
+  if (app.mode !== 'online') setMode('online');
+  else renderLobby();
+}
+$('mode-online').addEventListener('click', () => pickTab(false));
+$('mode-pve').addEventListener('click', () => pickTab(true));
 $('mode-practice').addEventListener('click', () => app.mode !== 'practice' && setMode('practice'));
 $('ready').addEventListener('click', toggleReady);
 $('prep-invite').addEventListener('click', () => social.openInvite());

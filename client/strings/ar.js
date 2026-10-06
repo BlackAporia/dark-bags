@@ -4,6 +4,7 @@ export default {
   'lobby.locker': 'الخزانة · الأزياء · الحقائب',
   'lobby.refill': 'إعادة تعبئة عملات الاختبار',
   'lobby.online': 'أونلاين',
+  'lobby.pve': "PvE",
   'lobby.practice': 'تدريب ضد البوتات',
   'lobby.stakePer': 'الرهان لكل غارة',
   'lobby.stakeWith': 'راهن بـ <span class="fine">أي عملة · معروضة بالدولار · الأرباح تعود بالعملة نفسها</span>',

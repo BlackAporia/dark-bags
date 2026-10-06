@@ -5,6 +5,7 @@ export default {
   'lobby.locker': 'Locker · skins · bags',
   'lobby.refill': 'Refill test coins',
   'lobby.online': 'Online',
+  'lobby.pve': "PvE",
   'lobby.practice': 'Practice vs bots',
   'lobby.stakePer': 'Stake per raid',
   'lobby.stakeWith': 'Stake with <span class="fine">any coin · shown in $ · winnings come back in the same coin</span>',

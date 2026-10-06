@@ -5,6 +5,7 @@ export default {
   "lobby.locker": "Kabati · skini · mabegi",
   "lobby.refill": "Jaza sarafu za majaribio",
   "lobby.online": "Mtandaoni",
+  "lobby.pve": "PvE",
   "lobby.practice": "Mazoezi dhidi ya roboti",
   "lobby.stakePer": "Dau kwa uvamizi",
   "lobby.stakeWith": "Weka dau kwa <span class=\"fine\">sarafu yoyote · inaonyeshwa kwa $ · ushindi unarudi kwa sarafu ileile</span>",

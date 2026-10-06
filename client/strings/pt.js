@@ -4,6 +4,7 @@ export default {
   'lobby.locker': 'Armário · skins · bolsas',
   'lobby.refill': 'Recarregar moedas de teste',
   'lobby.online': 'Online',
+  'lobby.pve': "PvE",
   'lobby.practice': 'Treino contra bots',
   'lobby.stakePer': 'Aposta por incursão',
   'lobby.stakeWith': 'Aposte com <span class="fine">qualquer moeda · mostrado em $ · os ganhos voltam na mesma moeda</span>',

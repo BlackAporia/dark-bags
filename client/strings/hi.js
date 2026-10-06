@@ -4,6 +4,7 @@ export default {
   'lobby.locker': 'लॉकर · स्किन · बैग',
   'lobby.refill': 'टेस्ट कॉइन भरें',
   'lobby.online': 'ऑनलाइन',
+  'lobby.pve': "PvE",
   'lobby.practice': 'बॉट्स के साथ अभ्यास',
   'lobby.stakePer': 'हर रेड का दांव',
   'lobby.stakeWith': 'दांव लगाओ <span class="fine">किसी भी कॉइन से · $ में दिखता है · जीत उसी कॉइन में लौटती है</span>',
