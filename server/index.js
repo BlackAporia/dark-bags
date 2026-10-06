@@ -419,9 +419,9 @@ const MIME = {
   '.xml': 'application/xml',
 };
 
-// One service, two sites: the landing page on the bare domain, the game everywhere else (the
-// play. subdomain, the railway.app address). SITE_HOSTS lists the landing page's hosts; its Play
-// buttons link to play/, which goes to PLAY_URL (default: the play. subdomain of the same domain).
+// One domain, two sites: on the landing page's hosts (SITE_HOSTS) the page itself is at / and
+// the game at /play/; everywhere else (the railway.app address) the game is at /. PLAY_URL, when
+// set, sends play/ to another address instead (a play. subdomain, say).
 const SITE_HOSTS = new Set((process.env.SITE_HOSTS ?? 'dark-bags.com,www.dark-bags.com').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean));
 const hostOf = (req) => String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
 
@@ -429,14 +429,14 @@ async function serveStatic(req, res) {
   const url = new URL(req.url, 'http://x');
   let rel = decodeURIComponent(url.pathname);
   let base = path.join(ROOT, 'client');
-  const host = hostOf(req);
-  if (SITE_HOSTS.has(host)) {
-    if (rel === '/play' || rel.startsWith('/play/') || rel === '/client' || rel.startsWith('/client/')) {
-      const to = process.env.PLAY_URL || `https://play.${host.replace(/^www\./, '')}/`;
-      res.writeHead(302, { location: `${to}${url.search}` }).end();
+  if (SITE_HOSTS.has(hostOf(req))) {
+    const game = rel === '/play' || rel.startsWith('/play/');
+    if (rel === '/client' || rel.startsWith('/client/') || rel === '/play' || (game && process.env.PLAY_URL)) {
+      res.writeHead(302, { location: `${process.env.PLAY_URL || '/play/'}${url.search}` }).end();
       return;
     }
-    base = path.join(ROOT, 'site');
+    if (game) rel = rel.slice('/play'.length) || '/';
+    else if (!rel.startsWith('/shared/')) base = path.join(ROOT, 'site');
   } else if (rel === '/play' || rel.startsWith('/play/')) {
     // the game's own host: an old play/ link lands on the game itself
     res.writeHead(302, { location: `/${url.search}` }).end();
