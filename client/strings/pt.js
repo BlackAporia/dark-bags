@@ -1838,4 +1838,5 @@ export default {
   'rki.how.daily': "Recompensas e tarefas diárias dão XP",
   'rki.how.ach': "Conquistas pagam XP uma vez",
   'rki.ladder': "Todas as {n} patentes",
+  'perf.noGpu': "Seu navegador desenha o jogo sem a placa de vídeo, então pode travar. Ative a aceleração de hardware nas configurações do navegador (Sistema → Usar aceleração gráfica) e reinicie-o.",
 };

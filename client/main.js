@@ -7,7 +7,7 @@ import { WEAPONS } from '../shared/weapons.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
 import { Sfx } from './sfx.js';
-import { GameClient, Attract, fmt, mmss, esc, reportError } from './game.js';
+import { GameClient, Attract, fmt, mmss, esc, reportError, softwareGpu } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { createRegions } from './region.js';
 import { store } from './store.js';
@@ -88,6 +88,13 @@ function onlineUrl() {
 
 // ------------------------------------------------------------------ setup
 const renderer = new Renderer($('game'), $('minimap'));
+// no GPU (the browser's hardware acceleration is off): start at the lowest quality at once
+// instead of stuttering down to it, and say once how to get the smooth game back
+const noGpu = softwareGpu();
+if (noGpu && renderer.quality > 0) {
+  renderer.quality = 0;
+  renderer.resize();
+}
 const input = new Input($('game'));
 const sfx = new Sfx();
 const el = {
@@ -1937,5 +1944,9 @@ for (const s of ['fonts', 'world', 'connect', 'profile']) intro.need(s);
 requestAnimationFrame(() => requestAnimationFrame(() => intro.mark('world')));
 globalThis.__darkbags.intro = intro;
 
+if (noGpu && !store.get('darkbags.gpuTip', false)) {
+  store.set('darkbags.gpuTip', true);
+  setTimeout(() => toast(t('perf.noGpu')), 4000);
+}
 setMode(SERVER && store.get('darkbags.mode', 'online') === 'online' ? 'online' : 'practice');
 requestAnimationFrame(loop);

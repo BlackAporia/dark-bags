@@ -1838,4 +1838,5 @@ export default {
   'rki.how.daily': "Günlük ödüller ve görevler XP verir",
   'rki.how.ach': "Başarımlar bir kez XP verir",
   'rki.ladder': "Tüm {n} rütbe",
+  'perf.noGpu': "Tarayıcınız oyunu ekran kartı olmadan çiziyor, bu yüzden takılabilir. Tarayıcı ayarlarında donanım hızlandırmayı açın (Sistem → Grafik hızlandırmayı kullan) ve yeniden başlatın.",
 };

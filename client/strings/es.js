@@ -1838,4 +1838,5 @@ export default {
   'rki.how.daily': "Las recompensas y tareas diarias dan XP",
   'rki.how.ach': "Los logros dan XP una vez",
   'rki.ladder': "Los {n} rangos",
+  'perf.noGpu': "Tu navegador dibuja el juego sin la tarjeta gráfica y puede ir a tirones. Activa la aceleración por hardware en los ajustes del navegador (Sistema → Usar aceleración gráfica) y reinícialo.",
 };

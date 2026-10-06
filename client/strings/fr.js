@@ -1838,4 +1838,5 @@ export default {
   'rki.how.daily': "Les récompenses et tâches quotidiennes donnent de l'XP",
   'rki.how.ach': "Les succès rapportent de l'XP une fois",
   'rki.ladder': "Les {n} rangs",
+  'perf.noGpu': "Votre navigateur affiche le jeu sans la carte graphique : il peut saccader. Activez l'accélération matérielle dans ses paramètres (Système → Utiliser l'accélération graphique) puis redémarrez-le.",
 };

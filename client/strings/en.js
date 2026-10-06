@@ -1846,4 +1846,5 @@ export default {
   'rki.how.daily': "Daily rewards and tasks give XP",
   'rki.how.ach': "Achievements pay XP once each",
   'rki.ladder': "All {n} ranks",
+  'perf.noGpu': "Your browser draws the game without the graphics card, so it may stutter. Turn on hardware acceleration in the browser settings (System → Use graphics acceleration) and restart it.",
 };

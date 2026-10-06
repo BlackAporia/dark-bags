@@ -1839,4 +1839,5 @@ export default {
   'rki.how.daily': "Zawadi na kazi za kila siku hutoa XP",
   'rki.how.ach': "Mafanikio hutoa XP mara moja",
   'rki.ladder': "Vyeo vyote {n}",
+  'perf.noGpu': "Kivinjari chako kinachora mchezo bila kadi ya michoro, hivyo unaweza kukwama. Washa uharakishaji wa maunzi kwenye mipangilio ya kivinjari (Mfumo → Tumia uharakishaji wa michoro) kisha kianzishe upya.",
 };

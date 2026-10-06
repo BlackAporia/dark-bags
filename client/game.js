@@ -58,6 +58,23 @@ export function reportError(where, e) {
   } catch {}
 }
 
+// what draws the game: a real GPU, or a software rasterizer (SwiftShader, llvmpipe) when the
+// browser's hardware acceleration is off, which makes every frame several times slower
+let gpuCache;
+export const softwareGpu = () => /swiftshader|llvmpipe|softpipe|software|basic render/i.test(gpuName());
+export function gpuName() {
+  if (gpuCache !== undefined) return gpuCache;
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+    gpuCache = String((ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || (gl ? gl.getParameter(gl.RENDERER) : 'no webgl')).slice(0, 80);
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  } catch {
+    gpuCache = '?';
+  }
+  return gpuCache;
+}
+
 export class AnimBook {
   constructor() {
     this.map = new Map();
@@ -126,7 +143,7 @@ export class GameClient {
   begin(start, skin, gore, look = null) {
     this.active = true;
     // how the match ran on this device and link (sent home once it ends, for the server's log)
-    this.net = { t0: performance.now(), frames: 0, slow: 0, worst: 0, gapMax: 0, gaps: 0, lastSnap: 0, pingSum: 0, pingN: 0, pingMax: 0, pingAt: 0 };
+    this.net = { t0: performance.now(), frames: 0, slow: 0, hangs: 0, worst: 0, lastFrame: 0, gapMax: 0, gaps: 0, lastSnap: 0, pingSum: 0, pingN: 0, pingMax: 0, pingAt: 0 };
     this.outfit = start.look ?? look ?? { outfit: null, body: 'm' }; // cosmetics (this.look is the camera offset)
     this.myNf = this.outfit.nf ?? null; // a name effect (style)
     this.gore = gore;
@@ -229,7 +246,7 @@ export class GameClient {
     const n = this.net;
     if (!n) return null;
     const secs = (performance.now() - n.t0) / 1000;
-    return { mode: this.mode, secs: Math.round(secs), fps: Math.round(n.frames / Math.max(1, secs)), slow: n.slow, worst: Math.round(n.worst), gapMax: Math.round(n.gapMax), gaps: n.gaps, ping: n.pingN ? Math.round(n.pingSum / n.pingN) : null, pingMax: n.pingMax, q: this.renderer.quality ?? null, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, touch: !!this.input.touchOn };
+    return { mode: this.mode, secs: Math.round(secs), fps: Math.round(n.frames / Math.max(1, secs)), slow: n.slow, hangs: n.hangs, worst: Math.round(n.worst), gpu: gpuName(), gapMax: Math.round(n.gapMax), gaps: n.gaps, ping: n.pingN ? Math.round(n.pingSum / n.pingN) : null, pingMax: n.pingMax, q: this.renderer.quality ?? null, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, touch: !!this.input.touchOn };
   }
 
   // ------------------------------------------------------------ network in
@@ -919,9 +936,14 @@ export class GameClient {
   frame(now, dt) {
     if (!this.active) return;
     if (this.net) {
-      this.net.frames++;
-      if (dt > 0.05) this.net.slow++;
-      this.net.worst = Math.max(this.net.worst, dt * 1000);
+      // the real time between frames (dt itself is capped at 100 ms by the loop)
+      const n = this.net;
+      const gap = n.lastFrame ? now - n.lastFrame : 0;
+      n.lastFrame = now;
+      n.frames++;
+      if (gap > 50) n.slow++;
+      if (gap > 250) n.hangs++;
+      n.worst = Math.max(n.worst, gap);
     }
     this.acc = Math.min(this.acc + dt, 0.2);
     while (this.acc >= DT) {
