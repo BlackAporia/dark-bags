@@ -1858,7 +1858,7 @@ export class World {
         ...(this.goldRush ? this.goldView(me) : {}),
         ...(this.rounds ? this.roundView(me) : {}),
         ...(this.horde ? { ...this.horde.view(me), zk: me.zk } : {}),
-        ...(this.descent ? { cls: me.dClass, w2: me.w2, a2: me.ammo2, gg: me.dGun, ga: me.dArmor, gp: me.dAp, sm: Math.max(0, r1((me.stimUntil ?? 0) - this.time)), df: me.dFloors } : {}),
+        ...(this.descent ? { cls: me.dClass, pz: me.dPistol, w2: me.w2, a2: me.ammo2, gg: me.dGun, ga: me.dArmor, gp: me.dAp, sm: Math.max(0, r1((me.stimUntil ?? 0) - this.time)), df: me.dFloors } : {}),
         ...(this.shop ? { cr: me.cr } : {}),
       },
       players,

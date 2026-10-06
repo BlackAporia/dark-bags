@@ -3085,3 +3085,10 @@ body.touch-on .dx-g kbd, body.touch-on .dx-swap kbd { display: none; }
 .fps-chip.bad { color: #ff6b6b; }
 body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--safe-t)); right: calc(16px + var(--safe-r)); }
 @media (max-width: 720px) { body.touch-on .fps-chip { right: calc(16px + 96px + 8px + var(--safe-r)); } }
+
+/* the camp: the items getting out now would bring up */
+.dx-camp-loot { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 100%; }
+.dx-camp-loot[hidden] { display: none; }
+.dx-camp-loot li { --rc: #fff; display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--rc) 60%, transparent); background: color-mix(in srgb, var(--rc) 12%, transparent); text-align: start; }
+.dx-camp-loot b { color: var(--rc); font-size: 12.5px; }
+.dx-camp-loot small { font-size: 10.5px; color: var(--dust); }
