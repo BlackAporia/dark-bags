@@ -7,13 +7,14 @@ import { WEAPONS } from '../shared/weapons.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
 import { Sfx } from './sfx.js';
-import { GameClient, Attract, fmt, mmss, esc, reportError } from './game.js';
+import { GameClient, Attract, fmt, mmss, esc, reportError, softwareGpu } from './game.js';
 import { WsTransport, LocalTransport } from './net.js';
 import { createRegions } from './region.js';
 import { store } from './store.js';
 import { PriceBook, formatUnits, usdText } from '../shared/assets.js';
 import { createCashierUi } from './cashier.js';
 import { rankBadgeSvg } from './rankbadge.js';
+import { createRankInfo } from './rankinfo.js';
 import { createLocker, gunStill } from './locker.js';
 import { figureStill } from './stickman.js';
 import { openShare, wireShare } from './sharecard.js';
@@ -87,6 +88,13 @@ function onlineUrl() {
 
 // ------------------------------------------------------------------ setup
 const renderer = new Renderer($('game'), $('minimap'));
+// no GPU (the browser's hardware acceleration is off): start at the lowest quality at once
+// instead of stuttering down to it, and say once how to get the smooth game back
+const noGpu = softwareGpu();
+if (noGpu && renderer.quality > 0) {
+  renderer.quality = 0;
+  renderer.resize();
+}
 const input = new Input($('game'));
 const sfx = new Sfx();
 const el = {
@@ -211,6 +219,7 @@ function shareMoment(kind, data = {}) {
 wireShare();
 
 // real-token mode (server started with CHAIN=…): sign-in, deposits, cash-outs
+const rankInfo = createRankInfo({ app });
 const cashier = createCashierUi({ app, send, toast: (m) => toast(m), onChange: () => renderLobby(), base: SERVER ? SERVER.replace(/^ws/, 'http').replace(/\/ws$/, '/') : location.href });
 // the menu pages
 const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: () => go('shop') });
@@ -444,7 +453,7 @@ const NAV_COLOR = { starknet: '#ec796b', play: '#f7931a', ranked: '#ff2dd4', pas
   me.type = 'button';
   me.className = 'nav-me';
   me.id = 'nav-me';
-  me.addEventListener('click', () => go('play'));
+  me.addEventListener('click', () => rankInfo.open()); // your rank: the whole ladder and what pays XP
   nav.append(me);
 })();
 const hmsLeft = (ms) => {
@@ -993,6 +1002,7 @@ function renderRankCard() {
   const vl = vip?.lv ? VIP_LEVELS.find((l) => l.lv === vip.lv) : null;
   el.innerHTML = `${rankBadgeSvg(r.rank, 34)}<div class="rk-body"><p class="rk-title"><b>${esc(r.name)}</b>${vl ? ` <span class="vip-badge" style="--v:${vl.color}">VIP ${vl.lv}</span>` : ''}<span class="rk-xp">${r.max ? t('rk.max') : t('rk.toNext', { x: fmt(r.toNext), r: r.rank + 1 })}</span></p><div class="rk-bar"><i style="width:${pct(r)}%"></i></div></div>`;
   el.title = t('rk.of', { r: r.rank });
+  rankInfo.refresh();
 }
 
 // XP line labels come from the server in English; translate the known ones
@@ -1709,6 +1719,9 @@ function toggleReady() {
   else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote, cls: store.get('darkbags.dxClass', 'assault'), pistol: store.get('darkbags.dxPistol', 'pistol') });
 }
 
+// the rank card opens the ranks window too
+$('rank-card').addEventListener('click', () => rankInfo.open());
+$('rank-card').addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), rankInfo.open()));
 $('name').value = app.name;
 $('name').addEventListener('change', () => store.set('darkbags.name', $('name').value.trim()));
 $('name').addEventListener('keydown', (e) => e.key === 'Enter' && !$('play').disabled && goToTable());
@@ -1931,5 +1944,9 @@ for (const s of ['fonts', 'world', 'connect', 'profile']) intro.need(s);
 requestAnimationFrame(() => requestAnimationFrame(() => intro.mark('world')));
 globalThis.__darkbags.intro = intro;
 
+if (noGpu && !store.get('darkbags.gpuTip', false)) {
+  store.set('darkbags.gpuTip', true);
+  setTimeout(() => toast(t('perf.noGpu')), 4000);
+}
 setMode(SERVER && store.get('darkbags.mode', 'online') === 'online' ? 'online' : 'practice');
 requestAnimationFrame(loop);

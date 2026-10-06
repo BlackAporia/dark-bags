@@ -229,7 +229,7 @@ export class Lobby {
         if (s.netlogs > 20 || this.practice) break;
         const n = (v, max = 1e6) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(max, Math.round(Number(v)))) : '?');
         const mode = String(msg.mode ?? '?').replace(/[^a-z0-9-]/g, '').slice(0, 16);
-        console.log(`net ${mode} ${String(s.name ?? 'runner').replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 16)}: ${n(msg.secs)}s, ${n(msg.fps, 500)} fps, ${n(msg.slow)} slow frames (worst ${n(msg.worst)} ms), snapshot gaps >250ms ${n(msg.gaps)} (worst ${n(msg.gapMax)} ms), ping avg ${n(msg.ping, 99999)} max ${n(msg.pingMax, 99999)} ms, ${msg.touch ? 'touch' : 'mouse'} ${n(msg.w, 10000)}x${n(msg.h, 10000)}@${Number(msg.dpr) > 0 ? Number(msg.dpr).toFixed(1) : '?'} q=${String(msg.q ?? '?').slice(0, 10)}`);
+        console.log(`net ${mode} ${String(s.name ?? 'runner').replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 16)}: ${n(msg.secs)}s, ${n(msg.fps, 500)} fps, ${n(msg.slow)} slow frames, ${n(msg.hangs)} hangs >250ms (worst ${n(msg.worst, 1e7)} ms), snapshot gaps >250ms ${n(msg.gaps)} (worst ${n(msg.gapMax)} ms), ping avg ${n(msg.ping, 99999)} max ${n(msg.pingMax, 99999)} ms, ${msg.touch ? 'touch' : 'mouse'} ${n(msg.w, 10000)}x${n(msg.h, 10000)}@${Number(msg.dpr) > 0 ? Number(msg.dpr).toFixed(1) : '?'} q=${String(msg.q ?? '?').slice(0, 10)} gpu=${String(msg.gpu ?? '?').replace(/[^\w .,()/+-]/g, '').slice(0, 80)}`);
         break;
       }
       case 'tables':
