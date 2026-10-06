@@ -184,7 +184,8 @@ export class RoomCore {
       case 'upgrade':
         if (c.pid && this.world && this.state === 'live') this.world.upgrade(c.pid);
         break;
-      case 'swap':
+      case 'wswap':
+        // the Descent: class gun ↔ pistol ('swap' is the lobby's coin swap)
         if (c.pid && this.world && this.state === 'live') this.world.swapWeapon(c.pid);
         break;
       case 'descend':

@@ -9,7 +9,7 @@ import { store } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 // what a table is made of: these go to the match server while you sit at one there
-const ROOM_MSGS = new Set(['join', 'ready', 'unready', 'start', 'leave', 'in', 'watch', 'buy', 'upgrade', 'bluff', 'pick', 'vote', 'vc', 'swap', 'descend']);
+const ROOM_MSGS = new Set(['join', 'ready', 'unready', 'start', 'leave', 'in', 'watch', 'buy', 'upgrade', 'bluff', 'pick', 'vote', 'vc', 'wswap', 'descend']);
 const FLAG = { eu: '🇪🇺', us: '🇺🇸', asia: '🌏' };
 
 export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
