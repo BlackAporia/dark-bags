@@ -178,6 +178,7 @@ export class Story {
     void this.el.offsetWidth;
     this.el.classList.add('in');
     const t0 = performance.now();
+    this.t0 = t0;
     const dur = secs * 1000;
     // particles of the chapter: spores, embers, snow, motes of void, gold dust
     const P = Array.from({ length: reduced ? 0 : 90 }, (_, i) => ({ x: Math.random(), y: Math.random(), s: 0.4 + Math.random() * 1.6, v: 0.02 + Math.random() * 0.06, p: i }));
@@ -185,8 +186,10 @@ export class Story {
       const k = (now - t0) / dur;
       if (k >= 1 || this.el.hidden) return this.stop();
       const c = this.cv;
-      const w = (c.width = innerWidth * Math.min(2, devicePixelRatio || 1));
-      const h = (c.height = innerHeight * Math.min(2, devicePixelRatio || 1));
+      // resize only when the window did: setting a canvas size reallocates it every frame
+      const w = Math.round(innerWidth * Math.min(2, devicePixelRatio || 1));
+      const h = Math.round(innerHeight * Math.min(2, devicePixelRatio || 1));
+      if (c.width !== w || c.height !== h) [c.width, c.height] = [w, h];
       const x = c.getContext('2d');
       drawScene(x, w, h, { ch, k, boss, P, now, floor });
       // the narrator types
@@ -196,6 +199,11 @@ export class Story {
     };
     cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(draw);
+  }
+
+  // fully on screen (not fading in or out): the game under it need not be drawn
+  get covering() {
+    return !this.el.hidden && !this.el.classList.contains('out') && performance.now() - this.t0 > 400;
   }
 
   stop() {
@@ -430,7 +438,7 @@ export class DescentHud {
 
   swap() {
     if (this.g.you?.st !== 'alive') return;
-    this.g.send({ t: 'swap' });
+    this.g.send({ t: 'wswap' }); // not 'swap': that is the lobby's coin swap
   }
 
   // hotkeys: 1–6 for the gear bar in its order

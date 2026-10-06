@@ -912,7 +912,8 @@ export class GameClient {
     const view = this.buildView(now, dt);
     // one bad frame must never freeze the raid: log it once and keep the game (and HUD) running
     try {
-      if (view) this.renderer.draw(view);
+      // the Descent's story scene covers the screen: no need to draw the world under it
+      if (view && !this.dx?.story.covering) this.renderer.draw(view);
     } catch (e) {
       const key = String(e?.message ?? e);
       this.drawErrs ??= new Set();
