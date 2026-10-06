@@ -151,14 +151,18 @@ export function drawZombie(ctx, z, t, gore) {
   // lit eyes: the thing you see first in the dark
   const blink = Math.sin(t / 900 + a.id * 3) > 0.97;
   if (!blink) {
+    // the glow is a soft disc, not shadowBlur: a blur per zombie per frame is a separate
+    // offscreen pass on a GPU canvas, and a crowded floor ran at 20 fps on a fast card
     ctx.fillStyle = k.eye;
-    ctx.shadowColor = k.eye;
-    ctx.shadowBlur = 8;
+    ctx.globalAlpha = 0.28;
+    ctx.beginPath();
+    ctx.arc(head.x + 3.4, head.y - 0.8, 4.2, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.beginPath();
     ctx.arc(head.x + 2.2, head.y - 1, 1.3, 0, TAU);
     ctx.arc(head.x + 4.6, head.y - 0.6, 1.1, 0, TAU);
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
   // the spitter's sac, glowing when it is about to spit
   if (z.type === 'spitter') {
