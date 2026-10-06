@@ -1440,6 +1440,11 @@ function handleMessage(m) {
     case 'ev':
       if (game.active) game.onEvents(m.l);
       break;
+    case 'rank':
+      // XP outside a match (daily gifts, achievements, the welcome bonus): the card follows
+      app.rank = m.rank ?? app.rank;
+      if (app.screen === 'lobby') renderRankCard();
+      break;
     case 'result':
       // how the match ran here goes to the server's log (online only)
       if (app.mode === 'online' && game.net && !game.net.sent) {

@@ -569,6 +569,7 @@ export class Lobby {
   // rank-up rewards), XP boosts. Returns the rank-up rewards it paid.
   grant(key, gifts) {
     const rewards = [];
+    let xpGiven = false;
     for (const g of gifts ?? []) {
       // boxes from free rewards are gifts: they roll up to Epic (Legendary+ is for paid boxes, ranked and the pass)
       if (g.k === 'box') this.inventory.give(key, { ...g, cap: 1 });
@@ -582,8 +583,10 @@ export class Lobby {
           rewards.push(...this.inventory.rankUp(key, before.rank, after.rank));
           this.ranks.progress(key, { rank: after.rank });
         }
+        xpGiven = true;
       }
     }
+    if (xpGiven) this.pushRank(key);
     return { rewards };
   }
 
@@ -594,6 +597,7 @@ export class Lobby {
     const done = this.ranks.progress(key, { deposits: 1 });
     if (done.some((a) => a.id === 'founder') && !this.ranks.title(key)) this.ranks.setTitle(key, 'founder');
     if (done.length) this.ranks.add(key, done.reduce((n, a) => n + (a.xp ?? 0), 0));
+    this.pushRank(key);
     this.mail.send({ key, kind: 'gift', title: 'Welcome bonus', body: 'Thanks for your first top-up!', i18n: 'welcome', gift: { k: 'spin', n: 1 } });
     for (const cid of this.sessionsOf(key)) {
       this.send(cid, { t: 'mailbox', unread: this.mail.unread(key), news: { k: 'welcome' } });
@@ -611,7 +615,10 @@ export class Lobby {
     if (!this.ranks.rec(key).done?.founder) {
       const done = this.ranks.progress(key, { deposits: 1 });
       if (done.some((a) => a.id === 'founder') && !this.ranks.title(key)) this.ranks.setTitle(key, 'founder');
-      if (done.length) this.ranks.add(key, done.reduce((n, a) => n + (a.xp ?? 0), 0));
+      if (done.length) {
+        this.ranks.add(key, done.reduce((n, a) => n + (a.xp ?? 0), 0));
+        this.pushRank(key);
+      }
     }
   }
 
@@ -768,8 +775,9 @@ export class Lobby {
         this.social.touch(account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
         this.stats?.seen(account, { wallet: true });
-        reply({ t: 'authed', account, admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
+        // the welcome catch-up may add XP (the Founder title): before the reply, so its rank is right
         this.catchUpWelcome(account);
+        reply({ t: 'authed', account, admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
@@ -779,8 +787,8 @@ export class Lobby {
         this.social.touch(r.account, s.name);
         reply({ t: 'social', ...this.socialSummary(s) });
         this.stats?.seen(r.account, { wallet: true });
-        reply({ t: 'authed', account: r.account, admin: this.isAdmin(r.account), privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
         this.catchUpWelcome(r.account);
+        reply({ t: 'authed', account: r.account, admin: this.isAdmin(r.account), privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
         let r;
@@ -810,6 +818,14 @@ export class Lobby {
   }
 
   // ------------------------------------------------------------- social
+
+  // rank XP given outside a match (daily gifts, achievements, the welcome bonus): every open tab
+  // of the account gets its new rank, or the profile card shows the old one until a reload
+  pushRank(key) {
+    if (!key) return;
+    const rank = this.ranks.get(key);
+    for (const cid of this.sessionsOf(key)) this.send(cid, { t: 'rank', rank });
+  }
 
   sessionsOf(key) {
     const out = [];
