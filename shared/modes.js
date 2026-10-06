@@ -51,9 +51,17 @@ export const MODES = [
   // zombies: no clock (two hours is only a safety net) and the Guns + Lasers buy menu
   { id: 'zombies', kind: 'zombie', size: 4, seconds: 7200, fixed: 100, solo: true, pick: true, shop: true },
   { id: 'gold', kind: 'gold', size: 8, seconds: 150, fixed: 100 },
+  // the Descent (descent.js): fifty floors of co-op PvE, one squad of up to four, a class each.
+  // The entry is tickets, not a stake (fixed: what those tickets cost, for the books only).
+  { id: 'dx-easy', kind: 'descent', diff: 'easy', size: 4, seconds: 6 * 3600, fixed: 100, solo: true, shop: true, tickets: 1 },
+  { id: 'dx-hard', kind: 'descent', diff: 'hard', size: 4, seconds: 6 * 3600, fixed: 300, solo: true, shop: true, tickets: 3 },
+  { id: 'dx-hc', kind: 'descent', diff: 'hardcore', size: 4, seconds: 6 * 3600, fixed: 500, solo: true, shop: true, tickets: 5 },
 ];
 export const MODE = Object.fromEntries(MODES.map((m) => [m.id, m]));
 export const isPotMode = (m) => !!m && m.kind !== 'raid';
+// modes played on tickets instead of a stake
+export const isTicketMode = (m) => !!m?.tickets;
+export const DESCENT_MODES = MODES.filter((m) => m.kind === 'descent').map((m) => m.id);
 
 // weapons a zombie hunter may take in (everything with a magazine, and the knife for the brave)
 export const ZOMBIE_WEAPONS = ['knife', 'pistol', 'deagle', 'shotgun', 'autoshotgun', 'smg', 'pdw', 'rifle', 'carbine', 'scout', 'lmg', 'magnum', 'sniper'];

@@ -16,6 +16,7 @@ import { Inventory } from '../shared/cosmetics.js';
 import { SocialBook } from '../shared/social.js';
 import { ReferralBook } from '../shared/referrals.js';
 import { DailyBook } from '../shared/daily.js';
+import { DescentBook } from '../shared/descent.js';
 import { Guard } from '../shared/guard.js';
 import { createBridge } from './bridge.js';
 import { MailBook, cleanGift } from '../shared/mail.js';
@@ -60,6 +61,7 @@ const MAIL_FILE = process.env.MAIL_FILE || (DATA ? `${DATA}/${NET}-mail.json` : 
 const DAILY_FILE = process.env.DAILY_FILE || (DATA ? `${DATA}/${NET}-daily.json` : '');
 const FORTUNE_FILE = process.env.FORTUNE_FILE || (DATA ? `${DATA}/${NET}-fortune.json` : '');
 const SOCIAL_FILE = process.env.SOCIAL_FILE || (DATA ? `${DATA}/${NET}-social.json` : '');
+const DESCENT_FILE = process.env.DESCENT_FILE || (DATA ? `${DATA}/${NET}-descent.json` : '');
 const STATS_FILE = process.env.STATS_FILE || (DATA ? `${DATA}/${NET}-stats.json` : '');
 // Ranks and players used to be one file for every network, so Sepolia test wallets showed up in the
 // mainnet leaderboard and player list. Each network has its own files now; the old shared ones move
@@ -73,8 +75,8 @@ if (DATA) {
     console.warn(`ranks and players are kept per network now: the old shared files (test data included) moved to ${dir}`);
   }
 }
-if (NET === 'mainnet' && (!LOCKER_FILE || !REFERRAL_FILE)) {
-  console.error('On mainnet the locker (shop $ and skins bought with real money) and the referral book must live on a persistent disk: mount /data or set LOCKER_FILE and REFERRAL_FILE.');
+if (NET === 'mainnet' && (!LOCKER_FILE || !REFERRAL_FILE || !DESCENT_FILE)) {
+  console.error('On mainnet the locker (shop $ and skins bought with real money), the referral book and the Descent tickets must live on a persistent disk: mount /data or set LOCKER_FILE, REFERRAL_FILE and DESCENT_FILE.');
   process.exit(1);
 }
 
@@ -255,6 +257,20 @@ const daily = new DailyBook({
   },
 });
 
+// ----------------------------------------------------------------- descent
+// the Descent's tickets (bought with real money on mainnet: kept like the locker) and depth records
+let descentTimer = null;
+const descentBook = new DescentBook({
+  data: DESCENT_FILE && existsSync(DESCENT_FILE) ? JSON.parse(readFileSync(DESCENT_FILE, 'utf8')) : {},
+  onChange: (db) => {
+    if (!DESCENT_FILE || descentTimer) return;
+    descentTimer = setTimeout(async () => {
+      descentTimer = null;
+      await saveJSON(DESCENT_FILE, db.toJSON()).catch((e) => console.error('descent save failed', e));
+    }, SAVE_SOON);
+  },
+});
+
 // ----------------------------------------------------------------- fortune
 // the wheel's bank survives restarts and data epochs (it is money players have put in)
 let fortuneTimer = null;
@@ -324,6 +340,7 @@ const lobby = new Lobby({
   mail,
   fortune,
   daily: J('daily', daily),
+  descent: J('descent', descentBook),
   coins: real ? { list: () => real.catalog.list(), import: (a) => real.importToken(a) } : null,
   send,
   bots: BOTS,
@@ -366,6 +383,12 @@ if (regionMain) {
     const mills = m.fixed ?? Number(msg.stake);
     if (!Number.isInteger(mills) || mills < CUSTOM_MIN || mills > CUSTOM_MAX || mills % 10) return err('That stake is not available.');
     if (s.busy) return err('One moment.');
+    if (m.tickets) {
+      // the Descent: tickets, not coins
+      const r = regionMain.ticketTicket(key, region, { tickets: m.tickets, mills, gate: lobby.dxGate(s) });
+      if (r.error) return send(cid, { t: 'err', code: 'dx_tickets', msg: r.error });
+      return send(cid, { t: 'stake_ticket', region, ticket: r.ticket, balances: lobby.balances(s), dx: lobby.descent.view(key, lobby.dxGate(s)) });
+    }
     const r = regionMain.stakeTicket(key, region, { asset: String(msg.asset ?? ''), mills });
     if (r.error) return err(r.error);
     send(cid, { t: 'stake_ticket', region, ticket: r.ticket, balances: lobby.balances(s) });
@@ -661,6 +684,7 @@ const shutdown = async () => {
   if (GUARD_FILE) await saveGuard(guard).catch(() => {});
   if (MAIL_FILE) await saveJSON(MAIL_FILE, mail.toJSON()).catch(() => {});
   if (FORTUNE_FILE) await saveJSON(FORTUNE_FILE, fortune.toJSON()).catch(() => {});
+  if (DESCENT_FILE) await saveJSON(DESCENT_FILE, descentBook.toJSON()).catch(() => {});
   if (STATS_FILE) await saveJSON(STATS_FILE, stats.toJSON()).catch(() => {});
   if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, social.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});

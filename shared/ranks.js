@@ -1,4 +1,5 @@
 import { applyStats, achievementView } from './achievements.js';
+import { runXp } from './descent.js';
 import { START_RP, rpDelta, divisionOf, seasonTitle, seasonTitleId, DIVISIONS } from './ranked.js';
 import { seasonAt } from './season.js';
 // Career ranks: 1 (Lance Corporal) to 90 (Legend). Every raid pays rank XP, win or lose.
@@ -58,11 +59,19 @@ export function rankOf(xp) {
 // What a raid is worth. p is the world's player record at the end of their raid.
 // kind: the mode's kind. Zombies pay by the wave (each one worth more than the last), the
 // gold rush by the bag.
-export function raidXp(p, { practice = false, kind = 'raid' } = {}) {
+export function raidXp(p, { practice = false, kind = 'raid', diff = 'easy' } = {}) {
   const parts = [];
   const add = (label, xp) => xp > 0 && parts.push({ label, xp: Math.round(xp) });
   const secs = Math.max(0, (p.endedAt ?? 0) - (p.joinedAt ?? 0));
   add('Raid', 40);
+  if (kind === 'descent') {
+    // the floors cleared, in full when you got out with them, half when the dark kept you
+    const banked = p.status === 'extracted';
+    add(banked ? 'Floors cleared' : 'Floors cleared (lost below)', runXp(p.dFloors ?? 0, diff, banked));
+    add('The dead', Math.min(800, (p.zk ?? 0) * 2));
+    if (p.dFull) add('Full clear', 1000);
+    return finish(parts, practice);
+  }
   if (kind === 'zombie') {
     const waves = Math.min(19, p.zWave ?? 0);
     let wx = 0;

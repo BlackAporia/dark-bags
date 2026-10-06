@@ -192,7 +192,7 @@ export class Horde {
     if (z.type === 'boss') this.bossMoves(z, tgt, d, dt);
     if (d <= reach) {
       if (z.cd <= 0) {
-        z.cd = ZTYPES[z.type].cd;
+        z.cd = z.cdMax ?? ZTYPES[z.type].cd;
         z.fc = (z.fc + 1) % 1000;
         w.damage(tgt, null, z.dmg, z.type === 'boss' ? 'boss' : 'zombie');
       }

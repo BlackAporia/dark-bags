@@ -716,6 +716,32 @@ export function generateArena(seed, theme) {
     }
     // low cemetery walls around the plaza, broken in four places
     for (const [x, y, w, h] of [[cx - 260, cy - 300, 170, 24], [cx + 90, cy - 300, 170, 24], [cx - 260, cy + 276, 170, 24], [cx + 90, cy + 276, 170, 24]]) add({ x, y, w, h }, 10);
+  } else if (theme === 'dungeon') {
+    // the Descent: halls of square pillars, the broken walls of old chambers, and an open
+    // altar in the middle where the squad comes down the stairs
+    const S = 46;
+    for (let i = 0, t = 0; i < 26 && t < 600; t++) {
+      const s = S + Math.floor(rnd() * 3) * 10;
+      if (add({ x: Math.floor(150 + rnd() * (W - 300 - s)), y: Math.floor(150 + rnd() * (H - 300 - s)), w: s, h: s }, 110, 330)) i++;
+    }
+    // chamber walls: long and thin, broken into pieces with gaps to slip through
+    for (let i = 0, t = 0; i < 14 && t < 600; t++) {
+      const vert = rnd() < 0.5;
+      const len = 180 + Math.floor(rnd() * 220);
+      const th = 30;
+      const x = Math.floor(160 + rnd() * (W - 320 - (vert ? th : len)));
+      const y = Math.floor(160 + rnd() * (H - 320 - (vert ? len : th)));
+      const gap = 70 + Math.floor(rnd() * 30);
+      const cut = Math.floor(len * (0.3 + rnd() * 0.4));
+      const a = vert ? { x, y, w: th, h: cut } : { x, y, w: cut, h: th };
+      const b = vert ? { x, y: y + cut + gap, w: th, h: len - cut - gap } : { x: x + cut + gap, y, w: len - cut - gap, h: th };
+      if (add(a, 80, 330)) {
+        i++;
+        if ((vert ? b.h : b.w) > 40) add(b, 20, 330);
+      }
+    }
+    // four pillars around the altar: cover right where the squad stands
+    for (const [dx, dy] of [[-170, -170], [140, -170], [-170, 140], [140, 140]]) add({ x: cx + dx, y: cy + dy, w: 30, h: 30 }, 10);
   } else {
     // rock piles, ore carts and sheds of every size
     for (let i = 0, t = 0; i < 34 && t < 900; t++) {

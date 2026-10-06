@@ -7,11 +7,16 @@ import { PriceBook, unitsAtEntryRate } from './assets.js';
 import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
 import { MODE, ZOMBIE_WEAPONS } from './modes.js';
+import { CLASSES, PISTOLS, DUP_XP, runItems } from './descent.js';
+import { STYLE } from './style.js';
 import { WAVES } from './horde.js';
-import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, seasonAt } from './cosmetics.js';
+import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, WSKIN, seasonAt } from './cosmetics.js';
 import { spinChance, rollLottery, titleBonus, DIVISIONS, DIV_PRIZES } from './ranked.js';
 import { pickStyle } from './style.js';
 import { bandMax } from './stakes.js';
+
+// in a Descent squad, a runner who dealt less than this share of the damage was carried
+const CARRIED_SHARE = 0.08;
 
 /**
  * A table at one stake level.
@@ -28,7 +33,7 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ pots = null, edge = false, stats = null, guard = null, referrals = null, daily = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
+  constructor({ descent = null, pots = null, edge = false, stats = null, guard = null, referrals = null, daily = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
@@ -37,7 +42,10 @@ export class RoomCore {
     this.stake = m.fixed ?? stake; // the band's lowest stake (shared/stakes.js); zombies and the gold rush: one flat entry
     this.stakeMax = m.fixed ?? bandMax(this.stake); // the band's highest: each player picks their own stake in between
     if (m.solo) this.minPlayers = 1; // zombies: you may go in alone
-    this.noBots = m.kind === 'zombie'; // the squad is humans only
+    this.noBots = m.kind === 'zombie' || m.kind === 'descent'; // the squad is humans only
+    // the Descent: entry is tickets (descent.js DescentBook), not a stake
+    this.tickets = m.kind === 'descent' ? m.tickets : 0;
+    this.descent = descent;
     if (m.seconds) roundSeconds = m.seconds;
     this.ranks = ranks;
     this.inventory = inventory;
@@ -45,7 +53,7 @@ export class RoomCore {
     this.daily = daily; // tasks, the XP boost, the first win of the day
     this.guard = guard;
     this.stats = stats; // the team's analytics (online only)
-    this.pots = practice ? null : pots; // the on-chain vault: each staked match's pot per coin (server/cashier/vault.js)
+    this.pots = practice || m.kind === 'descent' ? null : pots; // tickets put nothing on chain // the on-chain vault: each staked match's pot per coin (server/cashier/vault.js)
     this.potKey = null;
     this.receipts = new Map(); // account → this match's stake receipt (salt + leaf under the on-chain root)
     this.edge = edge; // a regional match server: stakes arrive already taken by the main server
@@ -80,8 +88,10 @@ export class RoomCore {
     return Number.isInteger(n) && n >= this.stake && n <= this.stakeMax && n % 10 === 0 ? n : this.stake;
   }
 
-  addClient(cid, { token, name, skin, stake }) {
-    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle', vote: null, stake: this.ownStake(stake) });
+  // gate: the network and device this client plays from (today's free Descent ticket is counted
+  // per network and device too, so a stack of fresh accounts on one phone gets one, not a stack)
+  addClient(cid, { token, name, skin, stake, gate = null }) {
+    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle', vote: null, stake: this.ownStake(stake), cls: 'assault', pistol: 'pistol', gate: gate ?? {} });
     if (this.state === 'idle') this.openPrep();
     this.broadcastPrep();
   }
@@ -130,6 +140,9 @@ export class RoomCore {
       case 'pick':
         // zombies: the weapon you take in (changeable until the run starts)
         if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
+        // the Descent: your class and your pistol
+        if (CLASSES[msg.cls]) c.cls = msg.cls;
+        if (PISTOLS.includes(msg.pistol)) c.pistol = msg.pistol;
         this.broadcastPrep();
         break;
       case 'vote':
@@ -142,7 +155,10 @@ export class RoomCore {
         if (msg.name) c.name = cleanName(msg.name);
         if (msg.skin) c.skin = this.pickSkin(msg.skin);
         if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
-        this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'USDC', this.edge ? msg._units : null);
+        if (CLASSES[msg.cls]) c.cls = msg.cls;
+        if (PISTOLS.includes(msg.pistol)) c.pistol = msg.pistol;
+        if (this.tickets) this.readyTickets(c, this.edge ? msg._tickets ?? null : null);
+        else this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'USDC', this.edge ? msg._units : null);
         break;
       case 'unready':
         this.unready(c);
@@ -167,6 +183,13 @@ export class RoomCore {
         break;
       case 'upgrade':
         if (c.pid && this.world && this.state === 'live') this.world.upgrade(c.pid);
+        break;
+      case 'swap':
+        if (c.pid && this.world && this.state === 'live') this.world.swapWeapon(c.pid);
+        break;
+      case 'descend':
+        // the Descent's camp: go deeper ('go') or get out with what the run earned ('out')
+        if (c.pid && this.world && this.state === 'live') this.world.descend(c.pid, msg.v === 'out' ? 'out' : 'go');
         break;
       case 'bluff':
         if (c.pid && this.world && this.state === 'live') this.world.setBluff(c.pid, msg.v);
@@ -207,6 +230,36 @@ export class RoomCore {
     this.broadcastPrep();
   }
 
+  // The Descent: Ready takes the difficulty's tickets (today's free one first). pre: tickets the
+  // main server already took for a regional table (edge only); they are held here, then spent.
+  readyTickets(c, pre = null) {
+    if (c.ready || this.inRaid(c)) return;
+    if (this.practice) {
+      // practice is free play: no tickets, and nothing the run earns is kept
+      c.ready = true;
+      c.escrow = { tickets: 0, took: null, mills: 0 };
+    } else {
+      if (!this.descent) return this.send(c.cid, { t: 'err', msg: 'The Descent is not open on this server.' });
+      let took;
+      if (pre) {
+        const n = (pre.free | 0) + (pre.bought | 0);
+        if (n !== this.tickets) return this.send(c.cid, { t: 'err', msg: 'Those tickets are for another difficulty.' });
+        this.descent.hold(c.token, n);
+        took = this.descent.spend(c.token, n, { ok: false }) && pre; // refunds go back exactly as the main server took them
+      } else took = this.descent.spend(c.token, this.tickets, c.gate);
+      if (!took) {
+        this.send(c.cid, { t: 'err', code: 'dx_tickets', msg: `This difficulty takes ${this.tickets} ${this.tickets === 1 ? 'ticket' : 'tickets'}. Buy tickets or come back tomorrow for the free one.` });
+        return;
+      }
+      c.ready = true;
+      c.escrow = { tickets: this.tickets, took, mills: 0 };
+    }
+    if (this.state === 'idle') this.openPrep();
+    if (this.state === 'prep' && this.countT === null && !this.waitForStart) this.countT = this.prepSeconds;
+    this.hurry();
+    this.broadcastPrep();
+  }
+
   unready(c) {
     if (!c.ready) return;
     this.refund(c);
@@ -215,7 +268,9 @@ export class RoomCore {
   }
 
   refund(c) {
-    if (c.escrow) this.wallet.credit(c.token, c.escrow.asset, c.escrow.units);
+    if (c.escrow?.tickets != null) {
+      if (c.escrow.took) this.descent?.refund(c.token, c.escrow.took);
+    } else if (c.escrow) this.wallet.credit(c.token, c.escrow.asset, c.escrow.units);
     c.escrow = null;
     c.ready = false;
   }
@@ -228,7 +283,7 @@ export class RoomCore {
     const out = [];
     for (const c of this.clients.values()) {
       if (c.escrow) {
-        out.push({ token: c.token, asset: c.escrow.asset, units: String(c.escrow.units) });
+        out.push(c.escrow.tickets != null ? { token: c.token, tickets: c.escrow.tickets } : { token: c.token, asset: c.escrow.asset, units: String(c.escrow.units) });
         this.refund(c);
       }
     }
@@ -236,6 +291,12 @@ export class RoomCore {
     if (w && this.state === 'live') {
       for (const [pid, acc] of this.accounts) {
         const p = w.players.get(pid);
+        // the Descent: a run the server cut short gives its tickets back
+        if (acc?.took && p && !p.isBot && p.status === 'alive') {
+          this.descent?.refund(acc.token, acc.took);
+          out.push({ token: acc.token, tickets: acc.tickets });
+          continue;
+        }
         if (!acc?.units || !p || p.isBot) continue;
         if (acc.paidUnits != null || acc.credit != null || p.status === 'extracted') continue; // paid out already
         this.wallet.credit(acc.token, acc.asset, BigInt(acc.units));
@@ -311,7 +372,7 @@ export class RoomCore {
     const bonus = this.goldenBonus(this.roundNo);
     this.jackpot -= bonus;
     const w = new World({
-      stake: this.stake,
+      stake: this.tickets ? 0 : this.stake, // the Descent's tickets were paid for when bought
       roundNo: this.roundNo,
       rolloverIn: this.rollover,
       bonus,
@@ -336,16 +397,16 @@ export class RoomCore {
     for (const c of ready) {
       const look = this.inventory.look(c.token);
       const stake = c.escrow.mills; // this runner's own, private stake
-      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), neon: this.ranks.neon(c.token), weapon: c.weapon, stake, ...look });
+      const p = w.addPlayer({ name: c.name, skin: OUTFIT[look.outfit].color, rank: this.ranks.get(c.token).rank, title: this.ranks.title(c.token), neon: this.ranks.neon(c.token), weapon: c.weapon, stake, cls: c.cls, pistol: c.pistol, ...look });
       this.accounts.set(p.id, { token: c.token, ...c.escrow });
-      this.book(c.escrow.asset, 'in', c.escrow.units);
+      if (!this.tickets) this.book(c.escrow.asset, 'in', c.escrow.units);
       c.pid = p.id;
       c.ready = false;
       c.escrow = null; // the stake is in the raid's ledger now
       c.reported = false;
       this.totals.stakesIn += stake;
       // the inviter's share of the house cut on this stake, as shop $ (real matches only)
-      if (!this.practice && !this.guard?.flagged(c.token)) {
+      if (!this.practice && !this.tickets && !this.guard?.flagged(c.token)) {
         const rake = MODE[this.mode].kind === 'zombie' ? stake : Math.floor(stake * CFG.RAKE);
         const paid = this.referrals?.onStake(c.token, rake);
         if (paid) this.inventory.give(paid.to, { k: 'credit', v: paid.cents });
@@ -480,9 +541,9 @@ export class RoomCore {
         slots: ready.map((r) => {
           const look = this.inventory.look(r.token);
           const tt = this.ranks.title(r.token);
-          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(look.fr ? { fr: look.fr } : {}), ...(look.nf ? { nf: look.nf } : {}), ...(tt ? { tt } : {}), ...(this.noBots ? { wp: r.weapon } : {}), me: r === c ? 1 : 0 };
+          return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(look.fr ? { fr: look.fr } : {}), ...(look.nf ? { nf: look.nf } : {}), ...(tt ? { tt } : {}), ...(this.noBots && !this.tickets ? { wp: r.weapon } : {}), ...(this.tickets ? { cls: r.cls, pz: r.pistol } : {}), me: r === c ? 1 : 0 };
         }),
-        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, vote: c.vote, stake: c.escrow?.mills ?? c.stake, escrow: c.escrow && { asset: c.escrow.asset, units: c.escrow.units.toString() } },
+        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, cls: c.cls, pistol: c.pistol, ...(this.tickets && this.descent && !this.edge && !this.practice ? { tk: this.descent.view(c.token, c.gate) } : {}), vote: c.vote, stake: c.escrow?.mills ?? c.stake, escrow: c.escrow && c.escrow.units != null ? { asset: c.escrow.asset, units: c.escrow.units.toString() } : null },
         balances: this.wallet.balances(c.token),
       });
     }
@@ -603,6 +664,40 @@ export class RoomCore {
     return { k: 'box', id: bx.id };
   }
 
+  // The Descent's end for one runner: the milestones' items for the floors cleared, if they got
+  // out with them (or cleared all fifty). Fair play: a flagged account, and in a squad a runner who
+  // barely fought (carried), get the XP and nothing else. Items already owned pay rank XP.
+  descentRewards(c, p, earned) {
+    const w = this.world;
+    const diff = MODE[this.mode].diff;
+    const floors = p.dFloors ?? 0;
+    const banked = p.status === 'extracted';
+    const out = { diff, floors, banked, full: !!p.dFull, cls: p.dClass, items: [], dupXp: 0, carried: false, flagged: false };
+    if (this.practice) return { ...out, practice: true };
+    const humans = [...w.players.values()].filter((q) => !q.isBot);
+    const total = humans.reduce((n, q) => n + (q.zDmg ?? 0), 0);
+    out.carried = humans.length > 1 && total > 0 && (p.zDmg ?? 0) / total < CARRIED_SHARE;
+    out.flagged = !!this.guard?.flagged(c.token);
+    this.descent?.record(c.token, { diff, floors, full: !!p.dFull });
+    if (!banked || out.carried || out.flagged) return out;
+    const lv = this.inventory.view(c.token);
+    for (const it of runItems(diff, floors, p.dClass, p.dPistol)) {
+      const owned = it.k === 'outfit' ? lv.owned.includes(it.id) : it.k === 'wskin' ? lv.wowned.includes(it.id) : (lv.sowned ?? []).includes(it.id);
+      const rarity = (it.k === 'outfit' ? OUTFIT[it.id] : it.k === 'wskin' ? WSKIN[it.id] : STYLE[it.id])?.rarity ?? 'rare';
+      if (owned) {
+        out.dupXp += DUP_XP[rarity] ?? 0;
+        continue;
+      }
+      this.inventory.give(c.token, { k: it.k, id: it.id });
+      out.items.push({ ...it, rarity });
+    }
+    if (out.dupXp) {
+      earned.parts.push({ label: 'Descent duplicates', xp: out.dupXp });
+      earned.total += out.dupXp;
+    }
+    return out;
+  }
+
   reportEnds() {
     const w = this.world;
     for (const c of this.clients.values()) {
@@ -622,7 +717,9 @@ export class RoomCore {
       }
       // career rank: every raid pays, win or lose
       // practice pays nothing: no XP, ranks, achievements, pass or bags (it is free, so it must not farm)
-      const earned = this.practice ? { total: 0, parts: [] } : raidXp(p, { kind: MODE[this.mode].kind });
+      const earned = this.practice ? { total: 0, parts: [] } : raidXp(p, { kind: MODE[this.mode].kind, diff: MODE[this.mode].diff });
+      // the Descent: what the run hands out (only to those who got out with it)
+      const descent = w.descent ? this.descentRewards(c, p, earned) : null;
       // achievements: career counters, each completed one pays its XP once
       const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit, mode: MODE[this.mode], squad: w.players.size, mvp: w.zombie && p.won && [...w.players.values()].every((q) => q === p || (q.zk ?? 0) < (p.zk ?? 0)), goldWin: w.goldRush && !!p.won });
       // ranked: the finish moves the season rating, and may earn a bonus spin
@@ -685,7 +782,8 @@ export class RoomCore {
         stake: p.stake,
         kills: p.kills,
         ...(w.dm ? { deaths: p.deaths, place: w.standings().indexOf(p) + 1, top: w.standings()[0]?.kills ?? 0 } : {}),
-        ...(w.zombie ? { zWave: p.zWave ?? 0, zk: p.zk ?? 0, waves: WAVES, squad: w.players.size } : {}),
+        ...(w.zombie && !w.descent ? { zWave: p.zWave ?? 0, zk: p.zk ?? 0, waves: WAVES, squad: w.players.size } : {}),
+        ...(descent ? { descent } : {}),
         ...(w.goldRush ? { gb: p.gb, place: w.goldOrder().indexOf(p) + 1, top: w.goldOrder()[0]?.gb ?? 0, deaths: p.deaths, credit: this.accounts.get(p.id)?.credit ?? 0 } : {}),
         secs: Math.round((p.endedAt ?? w.time) - p.joinedAt),
         killer: p.killerName,

@@ -62,6 +62,7 @@
 | `LOCKER_FILE` | `/data/sepolia-locker.json` | `/data/mainnet-locker.json` | скіни й магазинні $ (куплені за USDC) |
 | `RANKS_FILE` | `/data/ranks.json` | `/data/ranks.json` | ранги й досягнення |
 | `REFERRAL_FILE` | `/data/sepolia-referrals.json` | `/data/mainnet-referrals.json` | реферальна книга (хто кого запросив, нарахування) |
+| `DESCENT_FILE` | `/data/sepolia-descent.json` | `/data/mainnet-descent.json` | The Descent: куплені квитки (за реальні монети), щоденні безкоштовні, рекорди глибини |
 | `GUARD_FILE` | `/data/sepolia-guard.json` | `/data/mainnet-guard.json` | античіт: хеші мереж і пристроїв, статистика прицілу, акаунти на перевірці |
 | `ALLOWLIST` | твої адреси через кому | твої адреси й адреси друзів | закрита бета: хто може увійти й вносити |
 | `MAX_BALANCE_USD` | не діє | `20` | депозит понад $20 на гравця не зараховується |
@@ -70,9 +71,9 @@
 | `SEPOLIA_CAPS` | `1`, лише щоб перевірити ліміти | не потрібна | на Sepolia ліміти депозиту вимкнені; `1` вмикає їх для репетиції |
 | `FIXED_PRICES` | `STRK=0.15,ETH=3500` | не задавати | на Sepolia немає реальних пулів для цін |
 
-Якщо диск змонтовано в `/data`, `LOCKER_FILE`, `REFERRAL_FILE`, `GUARD_FILE` і `RANKS_FILE` можна
+Якщо диск змонтовано в `/data`, `LOCKER_FILE`, `REFERRAL_FILE`, `DESCENT_FILE`, `GUARD_FILE` і `RANKS_FILE` можна
 не задавати: сервер сам кладе їх туди з назвою мережі. На мейнеті без диска (і без цих змінних)
-сервер не запуститься, щоб куплені скіни, магазинні $ і реферали не зникли після перезапуску.
+сервер не запуститься, щоб куплені скіни, магазинні $, квитки Descent і реферали не зникли після перезапуску.
 Усі файли пишуться атомарно (спершу `.tmp`, потім перейменування).
 
 Чесна гра (необов'язкові змінні):
@@ -138,7 +139,7 @@
 
 1. Новий гаманець казино в мейнеті (крок 2, але в мейнеті), поповни на трохи STRK для газу.
 2. У Railway → Variables зміни `CHAIN=mainnet`, нові `HOUSE_ADDRESS`, `HOUSE_PRIVATE_KEY`,
-   `CASHIER_FILE`, `LOCKER_FILE`, `REFERRAL_FILE` і `GUARD_FILE` за таблицею. `FIXED_PRICES` прибери.
+   `CASHIER_FILE`, `LOCKER_FILE`, `REFERRAL_FILE`, `DESCENT_FILE` і `GUARD_FILE` за таблицею. `FIXED_PRICES` прибери.
    Ключ вставляй лише в Railway Variables, ніколи в чат, код чи git.
 3. `ALLOWLIST` лише з людей, яких ти знаєш; ліміти лишаються $20 / $200.
 4. Перший тиждень: щодня `status` і `held`; повертай затримані депозити вручну з гаманця
