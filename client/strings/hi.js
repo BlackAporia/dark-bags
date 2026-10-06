@@ -3,7 +3,7 @@ export default {
   'lobby.namePh': 'तुम्हारे रनर का नाम',
   'lobby.locker': 'लॉकर · स्किन · बैग',
   'lobby.refill': 'टेस्ट कॉइन भरें',
-  'lobby.online': 'ऑनलाइन',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': 'बॉट्स के साथ अभ्यास',
   'lobby.stakePer': 'हर रेड का दांव',

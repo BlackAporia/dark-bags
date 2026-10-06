@@ -3,7 +3,7 @@ export default {
   'lobby.namePh': 'Nombre de tu corredor',
   'lobby.locker': 'Taquilla · skins · bolsas',
   'lobby.refill': 'Recargar monedas de prueba',
-  'lobby.online': 'En línea',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': 'Práctica contra bots',
   'lobby.stakePer': 'Apuesta por incursión',

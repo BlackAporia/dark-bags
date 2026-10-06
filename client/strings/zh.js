@@ -3,7 +3,7 @@ export default {
   'lobby.namePh': '你的跑者名字',
   'lobby.locker': '储物柜 · 皮肤 · 福袋',
   'lobby.refill': '补充测试币',
-  'lobby.online': '在线',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': '人机练习',
   'lobby.stakePer': '每局下注',

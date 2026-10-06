@@ -4,7 +4,7 @@ export default {
   "lobby.namePh": "Jina la mkimbiaji wako",
   "lobby.locker": "Kabati · skini · mabegi",
   "lobby.refill": "Jaza sarafu za majaribio",
-  "lobby.online": "Mtandaoni",
+  "lobby.online": 'PvP',
   "lobby.pve": "PvE",
   "lobby.practice": "Mazoezi dhidi ya roboti",
   "lobby.stakePer": "Dau kwa uvamizi",

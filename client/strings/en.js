@@ -4,7 +4,7 @@ export default {
   'lobby.namePh': 'Your runner name',
   'lobby.locker': 'Locker · skins · bags',
   'lobby.refill': 'Refill test coins',
-  'lobby.online': 'Online',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': 'Practice vs bots',
   'lobby.stakePer': 'Stake per raid',

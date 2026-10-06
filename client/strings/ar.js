@@ -3,7 +3,7 @@ export default {
   'lobby.namePh': 'اسم عدّائك',
   'lobby.locker': 'الخزانة · الأزياء · الحقائب',
   'lobby.refill': 'إعادة تعبئة عملات الاختبار',
-  'lobby.online': 'أونلاين',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': 'تدريب ضد البوتات',
   'lobby.stakePer': 'الرهان لكل غارة',

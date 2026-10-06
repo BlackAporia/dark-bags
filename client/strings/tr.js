@@ -3,7 +3,7 @@ export default {
   'lobby.namePh': 'Koşucunun adı',
   'lobby.locker': 'Dolap · skinler · çantalar',
   'lobby.refill': 'Test coinlerini doldur',
-  'lobby.online': 'Çevrimiçi',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': 'Botlara karşı antrenman',
   'lobby.stakePer': 'Baskın başına bahis',

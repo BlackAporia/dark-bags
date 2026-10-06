@@ -3,7 +3,7 @@ export default {
   'lobby.namePh': 'Ник твоего бойца',
   'lobby.locker': 'Шкафчик · скины · сумки',
   'lobby.refill': 'Пополнить тестовые монеты',
-  'lobby.online': 'Онлайн',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': 'Практика с ботами',
   'lobby.stakePer': 'Ставка на рейд',

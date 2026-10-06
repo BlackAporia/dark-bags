@@ -3,7 +3,7 @@ export default {
   'lobby.namePh': 'Nom de votre coureur',
   'lobby.locker': 'Casier · skins · sacs',
   'lobby.refill': 'Recharger les pièces de test',
-  'lobby.online': 'En ligne',
+  'lobby.online': 'PvP',
   'lobby.pve': "PvE",
   'lobby.practice': 'Entraînement contre bots',
   'lobby.stakePer': 'Mise par raid',
