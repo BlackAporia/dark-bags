@@ -3076,3 +3076,12 @@ body.touch-on .dx-g kbd, body.touch-on .dx-swap kbd { display: none; }
   .rki-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .rki-me h3 { font-size: 20px; }
 }
+
+/* frames per second, in a corner of the match (bottom right; on phones over the minimap) */
+.fps-chip { position: absolute; right: calc(14px + var(--safe-r)); bottom: calc(10px + var(--safe-b)); font: 700 11px/1 var(--f-num); letter-spacing: 0.04em; padding: 3px 6px; border-radius: 6px; background: rgba(7, 9, 15, 0.55); color: var(--dust); pointer-events: none; }
+.fps-chip:empty { display: none; }
+.fps-chip.good { color: #3ddc97; }
+.fps-chip.ok { color: #ffd166; }
+.fps-chip.bad { color: #ff6b6b; }
+body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--safe-t)); right: calc(16px + var(--safe-r)); }
+@media (max-width: 720px) { body.touch-on .fps-chip { right: calc(16px + 96px + 8px + var(--safe-r)); } }

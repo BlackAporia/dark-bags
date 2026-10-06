@@ -945,6 +945,14 @@ export class GameClient {
       if (gap > 250) n.hangs++;
       n.worst = Math.max(n.worst, gap);
     }
+    // frames per second for the corner counter, over the last half second
+    this.fpsN = (this.fpsN ?? 0) + 1;
+    if (!this.fpsT) this.fpsT = now;
+    if (now - this.fpsT >= 500) {
+      this.fps = Math.round((this.fpsN * 1000) / (now - this.fpsT));
+      this.fpsN = 0;
+      this.fpsT = now;
+    }
     this.acc = Math.min(this.acc + dt, 0.2);
     while (this.acc >= DT) {
       this.acc -= DT;
@@ -1258,6 +1266,13 @@ export class GameClient {
     const last = this.snaps[this.snaps.length - 1];
     if (last) el.alive.textContent = t('hud.alive', { n: last.alive });
     // your round trip to the server (online only; practice runs in this tab)
+    if (el.fps && this.fps != null) {
+      const v = `${this.fps} FPS`;
+      if (el.fps.textContent !== v) {
+        el.fps.textContent = v;
+        el.fps.className = `fps-chip ${this.fps >= 55 ? 'good' : this.fps >= 30 ? 'ok' : 'bad'}`;
+      }
+    }
     const ms = this.ping?.();
     if (ms != null && this.net && now - this.net.pingAt > 1000) {
       this.net.pingAt = now;
