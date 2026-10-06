@@ -16,13 +16,15 @@ const KIND = {
   spitter: { s: 0.95, lean: 0.5, skin: '#9ad14b', rag: '#3b3b1a', eye: '#c6ff3d', w: 0.95 },
 };
 
-export function drawZombie(ctx, z, t, gore) {
+// lite (medium and low quality): limbs in one stroke instead of outline + colour, no rags,
+// no eye halo, no charge after-images: half the draw calls per zombie
+export function drawZombie(ctx, z, t, gore, lite = false) {
   if (z.type === 'nest') return drawNest(ctx, z, t);
   const a = z.a;
   // the Descent's bosses each wear their own colours and eyes; stone skin turns them grey
   const base = KIND[z.type] ?? KIND.walker;
   const k = z.boss ? { ...base, skin: z.stone ? '#8b8f98' : z.boss.color, eye: z.stone ? '#e5e7eb' : z.boss.eye, rag: z.stone ? '#4b4f58' : base.rag } : base;
-  if (z.charge && !z.stone) {
+  if (z.charge && !z.stone && !lite) {
     // a rush: smeared after-images behind it
     ctx.save();
     ctx.globalAlpha = 0.18;
@@ -95,7 +97,7 @@ export function drawZombie(ctx, z, t, gore) {
   }
   const flash = z.flash;
   const skin = flash ? '#ffffff' : k.skin;
-  for (const [style, w] of [[OUTLINE, 5.2], [skin, 2.6]]) {
+  for (const [style, w] of lite ? [[skin, 3.6]] : [[OUTLINE, 5.2], [skin, 2.6]]) {
     ctx.strokeStyle = style;
     ctx.lineWidth = w * k.w;
     ctx.beginPath();
@@ -115,7 +117,7 @@ export function drawZombie(ctx, z, t, gore) {
   }
   ctx.shadowBlur = 0;
   // rags over the torso
-  if (!flash) {
+  if (!flash && !lite) {
     ctx.strokeStyle = k.rag;
     ctx.lineWidth = 4.2 * k.w;
     ctx.beginPath();
@@ -154,11 +156,13 @@ export function drawZombie(ctx, z, t, gore) {
     // the glow is a soft disc, not shadowBlur: a blur per zombie per frame is a separate
     // offscreen pass on a GPU canvas, and a crowded floor ran at 20 fps on a fast card
     ctx.fillStyle = k.eye;
-    ctx.globalAlpha = 0.28;
-    ctx.beginPath();
-    ctx.arc(head.x + 3.4, head.y - 0.8, 4.2, 0, TAU);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    if (!lite) {
+      ctx.globalAlpha = 0.28;
+      ctx.beginPath();
+      ctx.arc(head.x + 3.4, head.y - 0.8, 4.2, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     ctx.beginPath();
     ctx.arc(head.x + 2.2, head.y - 1, 1.3, 0, TAU);
     ctx.arc(head.x + 4.6, head.y - 0.6, 1.1, 0, TAU);

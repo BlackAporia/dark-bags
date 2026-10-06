@@ -82,13 +82,14 @@ export class Fx {
   }
 
   casing(x, y, z, f) {
-    this.add({ kind: 'casing', x, y, z, vx: -f * rand(40, 110), vy: rand(-20, 20), vz: rand(90, 170), life: 5, spin: rand(-20, 20) });
+    this.add({ kind: 'casing', x, y, z, vx: -f * rand(40, 110), vy: rand(-20, 20), vz: rand(90, 170), life: 2, spin: rand(-20, 20) });
   }
 
   // color: a weapon skin tints its flash and swing (null = the plain warm flash)
   muzzle(x, y, z, aim, big, now, color = null) {
     this.add({ kind: 'flash', x, y, z, aim, life: 0.06, size: big ? 16 : 10, float: true, color });
-    this.lights.push({ x, y, r: big ? 150 : 100, t0: now, life: 70 });
+    // at most six flashes light the dark at once (each is a gradient over the darkness layer)
+    if (this.lights.length < 6) this.lights.push({ x, y, r: big ? 150 : 100, t0: now, life: 70 });
   }
 
   // a swing: an arc around the runner exactly as wide and as far as the blade hits (r, arc)

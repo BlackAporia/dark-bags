@@ -1884,7 +1884,7 @@ let lastFrame = performance.now();
 // The next frame is booked first: whatever goes wrong in this one, the loop (input, HUD,
 // drawing) keeps running. A frame error is reported once, not a frozen black screen.
 let loopErr = false;
-let attractSkip = false;
+let attractLast = 0;
 // nobody sees the live map behind a full-screen dialog or show: skip drawing it (that
 // time goes to the locker, the case reel and the rank-up instead)
 const backdropHidden = () => !!document.querySelector('dialog[open]') || !$('opening').hidden || !$('rankup').hidden || app.screen === 'result';
@@ -1895,9 +1895,12 @@ function loop(now) {
   try {
     if (game.active) game.frame(now, dt);
     else if (!backdropHidden()) {
-      // the live map behind the menus: full rate on a desktop, every other frame on a phone
-      attractSkip = !attractSkip;
-      if (!input.touchOn || attractSkip) attract.frame(now, input.touchOn ? dt * 2 : dt);
+      // the live map behind the menus is decoration: 30 frames a second is plenty (it ran at the
+      // screen's full rate, up to 165 a second, with a match of bots simulated under the menu)
+      if (now - attractLast >= 32) {
+        attract.frame(now, Math.min(0.1, (now - attractLast) / 1000));
+        attractLast = now;
+      }
     }
   } catch (e) {
     if (!loopErr) {
