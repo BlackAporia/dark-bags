@@ -3,16 +3,10 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const STATS = 'https://dark-bags-production.up.railway.app/api/stats';
+  const STATS = 'https://dark-bags.com/api/stats';
 
-  // old links to the game (it used to live at the site root) still land in the game
-  if (/[?&]server=/.test(location.search) || /^#(online|practice|play)/.test(location.hash)) {
-    location.replace(`play/${location.search}${location.hash}`);
-    return;
-  }
-
-  // served from the repo as-is (site/ next to client/), the game is ../client/
-  if (/\/site\/(index\.html)?$/.test(location.pathname)) for (const a of document.querySelectorAll('a[href="play/"]')) a.href = '../client/';
+  // the game lives at the root of the address, the page itself under /site/
+  for (const a of document.querySelectorAll('a[href="play/"]')) a.href = '/';
 
   // ------------------------------------------------------------ language
   // English is written in the page; these replace it by data-t key.

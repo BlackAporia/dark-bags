@@ -419,28 +419,23 @@ const MIME = {
   '.xml': 'application/xml',
 };
 
-// One domain, two sites: on the landing page's hosts (SITE_HOSTS) the page itself is at / and
-// the game at /play/; everywhere else (the railway.app address) the game is at /. PLAY_URL, when
-// set, sends play/ to another address instead (a play. subdomain, say).
-const SITE_HOSTS = new Set((process.env.SITE_HOSTS ?? 'dark-bags.com,www.dark-bags.com').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean));
-const hostOf = (req) => String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
-
+// One address for everything: the game at the root of every host (dark-bags.com), the landing
+// page under /site/. An old play/ link lands on the game itself.
 async function serveStatic(req, res) {
   const url = new URL(req.url, 'http://x');
   let rel = decodeURIComponent(url.pathname);
   let base = path.join(ROOT, 'client');
-  if (SITE_HOSTS.has(hostOf(req))) {
-    const game = rel === '/play' || rel.startsWith('/play/');
-    if (rel === '/client' || rel.startsWith('/client/') || rel === '/play' || (game && process.env.PLAY_URL)) {
-      res.writeHead(302, { location: `${process.env.PLAY_URL || '/play/'}${url.search}` }).end();
-      return;
-    }
-    if (game) rel = rel.slice('/play'.length) || '/';
-    else if (!rel.startsWith('/shared/')) base = path.join(ROOT, 'site');
-  } else if (rel === '/play' || rel.startsWith('/play/')) {
-    // the game's own host: an old play/ link lands on the game itself
+  if (rel === '/play' || rel.startsWith('/play/')) {
     res.writeHead(302, { location: `/${url.search}` }).end();
     return;
+  }
+  if (rel === '/site') {
+    res.writeHead(302, { location: `/site/${url.search}` }).end();
+    return;
+  }
+  if (rel.startsWith('/site/')) {
+    base = path.join(ROOT, 'site');
+    rel = rel.slice('/site'.length);
   }
   if (rel.startsWith('/shared/')) {
     base = path.join(ROOT, 'shared');

@@ -1,6 +1,7 @@
 import './polyfills.js'; // first: older phone browsers need it before anything draws
-import './epoch.js'; // second: a new data epoch wipes old progress before anything reads it
-import { canvasMode } from './canvasmode.js'; // third: GPU or CPU canvases, before any canvas exists
+import './move.js'; // second: the profile carried over from the old address, before anything reads it
+import './epoch.js'; // third: a new data epoch wipes old progress before anything reads it
+import { canvasMode } from './canvasmode.js'; // fourth: GPU or CPU canvases, before any canvas exists
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
 import { bandOf } from '../shared/stakes.js';
@@ -68,7 +69,7 @@ function normalizeServer(u) {
 
 // the public game server the GitHub Pages build plays on (override with ?server=…).
 // Only list domains the project owns: an address listed here gets every player's session.
-const DEFAULT_SERVER = 'wss://dark-bags-production.up.railway.app/ws';
+const DEFAULT_SERVER = 'wss://dark-bags.com/ws';
 const FALLBACK_SERVERS = [];
 
 function onlineUrl() {
