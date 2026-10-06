@@ -188,7 +188,7 @@ globalThis.__darkbagsSend = send;
 addEventListener('error', (e) => reportError('script', e.error ?? e.message));
 addEventListener('unhandledrejection', (e) => reportError('promise', e.reason));
 const game = new GameClient({ renderer, input, sfx, send, el });
-game.canvasMode = `${canvasMode.mode}${canvasMode.gpuMs ? ` gpu${canvasMode.gpuMs}/cpu${canvasMode.cpuMs}ms` : ''}`;
+game.canvasMode = canvasMode.mode;
 const scoreboard = createScoreboard({ game, app });
 const voice = createVoice({ send, app, game, toast: (m) => toast(m) });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
