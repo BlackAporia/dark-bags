@@ -411,12 +411,37 @@ const MIME = {
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
   '.wasm': 'application/wasm',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml',
 };
+
+// One service, two sites: the landing page on the bare domain, the game everywhere else (the
+// play. subdomain, the railway.app address). SITE_HOSTS lists the landing page's hosts; its Play
+// buttons link to play/, which goes to PLAY_URL (default: the play. subdomain of the same domain).
+const SITE_HOSTS = new Set((process.env.SITE_HOSTS ?? 'dark-bags.com,www.dark-bags.com').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean));
+const hostOf = (req) => String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
 
 async function serveStatic(req, res) {
   const url = new URL(req.url, 'http://x');
   let rel = decodeURIComponent(url.pathname);
   let base = path.join(ROOT, 'client');
+  const host = hostOf(req);
+  if (SITE_HOSTS.has(host)) {
+    if (rel === '/play' || rel.startsWith('/play/') || rel === '/client' || rel.startsWith('/client/')) {
+      const to = process.env.PLAY_URL || `https://play.${host.replace(/^www\./, '')}/`;
+      res.writeHead(302, { location: `${to}${url.search}` }).end();
+      return;
+    }
+    base = path.join(ROOT, 'site');
+  } else if (rel === '/play' || rel.startsWith('/play/')) {
+    // the game's own host: an old play/ link lands on the game itself
+    res.writeHead(302, { location: `/${url.search}` }).end();
+    return;
+  }
   if (rel.startsWith('/shared/')) {
     base = path.join(ROOT, 'shared');
     rel = rel.slice('/shared'.length);
