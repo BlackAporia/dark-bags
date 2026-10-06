@@ -75,6 +75,7 @@ export const REPLAY = {
   guard: ['aim'],
   stats: ['raid'],
   daily: ['raid', 'bonusXp'],
+  descent: ['refund', 'record'], // the Descent's tickets back, and its depth records
 };
 
 // ------------------------------------------------------------------ main side
@@ -127,6 +128,17 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
     return { ticket: makeTicket(secret, { k: 'stake', id, key, region, asset, units: units.toString(), mills, seeds: seeds(key), exp: now() + TICKET_TTL }) };
   }
 
+  // the Descent: take the difficulty's tickets on the main server (today's free one first) and
+  // sign what was taken; the match server holds exactly that
+  function ticketTicket(key, region, { tickets, mills, gate }) {
+    const took = lobby.descent.spend(key, tickets, gate);
+    if (!took) return { error: `This difficulty takes ${tickets} ${tickets === 1 ? 'ticket' : 'tickets'}. Buy tickets or come back tomorrow for the free one.` };
+    const id = crypto.randomUUID();
+    st.tickets[id] = { key, region, took, at: now(), redeemed: false };
+    save();
+    return { ticket: makeTicket(secret, { k: 'stake', id, key, region, tickets: took, mills, seeds: seeds(key), exp: now() + TICKET_TTL }) };
+  }
+
   // stake tickets that never reached a table go back
   function sweep() {
     const t = now();
@@ -136,6 +148,14 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
         continue;
       }
       if (t - x.at < VOID_AFTER) continue;
+      if (x.took) {
+        // Descent tickets that never reached a table
+        lobby.descent.refund(x.key, x.took);
+        x.redeemed = 'void';
+        log.warn(`region ${x.region}: Descent ticket ${id} never redeemed, tickets back to ${x.key}`);
+        save();
+        continue;
+      }
       const units = BigInt(x.units);
       lobby.wallet.credit(x.key, x.asset, units);
       setPot(x.region, x.asset, pot(x.region, x.asset) - units);
@@ -155,7 +175,10 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
     for (const id of report.redeemed ?? []) {
       const x = st.tickets[id];
       if (!x || x.region !== region) continue;
-      if (x.redeemed === 'void') {
+      if (x.redeemed === 'void' && x.took) {
+        // Descent tickets refunded already, but the run was played: take them back if they are there
+        if (!lobby.descent.spend(x.key, (x.took.free | 0) + (x.took.bought | 0), { ok: false })) log.error(`region ${region}: Descent ticket ${id} was voided and also played; ${x.key} no longer holds the tickets`);
+      } else if (x.redeemed === 'void') {
         // refunded already (the match server was out of reach): take it back if the balance allows
         const units = BigInt(x.units);
         if (lobby.wallet.debit(x.key, x.asset, units)) setPot(region, x.asset, pot(region, x.asset) + units);
@@ -181,7 +204,7 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
       lobby.wallet.credit(c.key, c.asset, units);
       touched.add(c.key);
     }
-    const books = { ranks: lobby.ranks, inventory: lobby.inventory, referrals: lobby.referrals, guard: lobby.guard, stats: lobby.stats, daily: lobby.daily };
+    const books = { ranks: lobby.ranks, inventory: lobby.inventory, referrals: lobby.referrals, guard: lobby.guard, stats: lobby.stats, daily: lobby.daily, descent: lobby.descent };
     for (const j of report.journal ?? []) {
       const [book, method, args] = j;
       if (!REPLAY[book]?.includes(method) || !books[book] || !Array.isArray(args)) continue;
@@ -258,6 +281,7 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
     url: (id) => byId.get(id)?.url ?? null,
     entryTicket,
     stakeTicket,
+    ticketTicket,
     apply,
     handle,
     sweep,
@@ -351,9 +375,13 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
     c.stake = tk.mills;
     used.add(tk.id);
     redeemed.push(tk.id);
-    const room = s.room;
     // records may have moved on the main server since the entry ticket
     seed(tk.key, tk.seeds);
+    if (tk.tickets) {
+      // the Descent: the tickets the main server took, held here for this run
+      lobby.handle(cid, { ...msg, t: 'ready', _tickets: tk.tickets, ticket: undefined });
+      return;
+    }
     lobby.wallet.credit(tk.key, tk.asset, BigInt(tk.units));
     lobby.handle(cid, { ...msg, t: 'ready', asset: tk.asset, _units: tk.units, ticket: undefined });
   }

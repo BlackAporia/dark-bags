@@ -12,6 +12,7 @@ import { Guard, GUARD } from './guard.js';
 import { MailBook } from './mail.js';
 import { FortuneBook, FORTUNE } from './fortune.js';
 import { DailyBook } from './daily.js';
+import { DescentBook, TICKET_PACKS, packOf, DIFF_IDS } from './descent.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -24,7 +25,7 @@ import { DailyBook } from './daily.js';
  *   auth_privy {token} → authed {account, privy: {walletId, publicKey}}
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
-const PAUSABLE = new Set(['ready', 'stake_ticket', 'box', 'topup', 'swap']);
+const PAUSABLE = new Set(['ready', 'stake_ticket', 'box', 'topup', 'swap', 'dx_buy']);
 const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite', 'guild_invite']);
 
 export { STAKE_MIN as CUSTOM_MIN, STAKE_MAX as CUSTOM_MAX } from './stakes.js';
@@ -33,7 +34,7 @@ export { STAKE_MIN as CUSTOM_MIN, STAKE_MAX as CUSTOM_MAX } from './stakes.js';
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ descent = new DescentBook(), pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
@@ -68,7 +69,8 @@ export class Lobby {
     this.fortune = fortune;
     this.daily = daily; // the login calendar, the daily and weekly tasks, achievement rewards
     this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
-    this.roomArgs = { pots, edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    this.descent = descent; // the Descent's tickets and depth records (shared/descent.js)
+    this.roomArgs = { descent, pots, edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
@@ -163,6 +165,7 @@ export class Lobby {
         rank: this.key(s) ? this.ranks.get(this.key(s)) : null,
         career: this.key(s) ? this.ranks.career(this.key(s)) : null,
         locker: this.key(s) ? this.inventory.view(this.key(s)) : null,
+        descent: this.key(s) ? this.descent.view(this.key(s), this.dxGate(s)) : null,
         catalog: { outfits: OUTFITS, finishes: FINISHES, boxes: BOXES, rarities: RARITIES, pity: PITY, packs: PACKS, maxOpen: MAX_OPEN },
         practice: this.practice,
         swap: this.swapOn ? { fee: CFG.SWAP_FEE } : null,
@@ -324,6 +327,11 @@ export class Lobby {
       case 'fortune_spin':
         this.fortuneSpin(cid, s, msg);
         return;
+      case 'dx_info':
+      case 'dx_buy':
+      case 'dx_board':
+        this.descentOp(cid, s, msg);
+        return;
       case 'daily':
       case 'daily_claim':
         this.dailyMsg(cid, s, msg);
@@ -378,7 +386,7 @@ export class Lobby {
         if (!s.room) {
           // fair play: one person, one seat at a staked table (no feeding a second account)
           if (!room.practice && !this.seatOk(s, room)) return this.send(cid, { t: 'err', code: 'guard_seat', msg: 'Another account from your network or device is already at this table.' });
-          room.addClient(cid, { token: this.key(s), name: msg.name || s.name, skin: msg.skin, stake: Number(msg.stake) });
+          room.addClient(cid, { token: this.key(s), name: msg.name || s.name, skin: msg.skin, stake: Number(msg.stake), gate: this.dxGate(s) });
           s.room = room;
         } else room.handle(cid, msg);
         return;
@@ -391,6 +399,38 @@ export class Lobby {
       default:
         if (s.room) s.room.handle(cid, msg);
     }
+  }
+
+  // where this session plays from, for today's free Descent ticket (counted per network and device)
+  dxGate(s) {
+    return { net: s.net ?? null, dev: s.dev ?? null, ok: !this.guard.flagged(this.key(s)) };
+  }
+
+  // The Descent's tickets: what you hold, buying a pack (in any coin you hold, at the feed price),
+  // and the deepest runners per difficulty.
+  descentOp(cid, s, msg) {
+    const key = this.key(s);
+    const view = () => ({ t: 'dx', view: this.descent.view(key, this.dxGate(s)), packs: TICKET_PACKS });
+    if (msg.t === 'dx_board') {
+      const diff = DIFF_IDS.includes(msg.diff) ? msg.diff : 'easy';
+      const rows = this.descent.board(diff, 50).map((r, i) => ({ pos: i + 1, n: this.social.get(r.key)?.name ?? 'runner', rk: this.ranks.get(r.key).rank, best: r.best, clears: r.clears, me: r.key === key }));
+      return this.send(cid, { t: 'dx_board', diff, rows });
+    }
+    if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
+    if (msg.t === 'dx_info') return this.send(cid, view());
+    // buying: online only (practice is free play and needs no tickets)
+    if (this.practice) return this.send(cid, { t: 'err', code: 'online_only', msg: 'Practice runs need no tickets: tickets are for online play.' });
+    if (s.busy) return this.send(cid, { t: 'err', msg: 'One moment.' });
+    const pack = packOf(Number(msg.n));
+    if (!pack) return this.send(cid, { t: 'err', msg: 'That pack is not sold.' });
+    if (!this.descent.canBuy(key, pack.n)) return this.send(cid, { t: 'err', code: 'dx_cap', msg: 'That is more tickets than one account may hold or buy in a day.' });
+    const asset = String(msg.asset ?? '');
+    const units = this.prices.quote(asset, pack.mills);
+    if (units === null) return this.send(cid, { t: 'err', msg: 'That coin has no price right now.' });
+    if (!this.wallet.debit(key, asset, units)) return this.send(cid, { t: 'err', code: 'dx_funds', msg: `Not enough ${this.prices.get(asset)?.symbol ?? 'coins'} for ${pack.n === 1 ? 'a ticket' : `${pack.n} tickets`}.` });
+    this.descent.add(key, pack.n);
+    this.stats?.buy('descent', pack.mills / 10, String(pack.n));
+    this.send(cid, { ...view(), bought: pack.n, balances: this.balances(s) });
   }
 
   // Swap one coin you hold for another at the feed price, minus the fee (the house's spread).

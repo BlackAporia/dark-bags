@@ -6,6 +6,8 @@
 // They come from the Style cases in the shop, the daily calendar, tasks and achievements.
 // c: the colours the drawing uses; fx: which animation (client/flair.js and style.css).
 
+import { DESCENT_STYLE } from './descent-items.js';
+
 export const STYLE_KINDS = ['frame', 'banner', 'killfx', 'namefx'];
 
 const S = (kind, id, name, rarity, c, fx = id) => ({ kind, id: `${kind[0]}-${id}`, name, rarity, c, fx });
@@ -65,6 +67,8 @@ export const STYLE_ITEMS = [
   S('namefx', 'galaxy', 'Galaxy', 'mythic', ['#c4b5fd', '#7c3aed']),
   S('namefx', 'prism', 'Holo Prism', 'exotic', ['#ffffff', '#3ce6ff']),
 ];
+// the Descent's style (shared/descent-items.js): excl, so no case or reward ever drops it
+STYLE_ITEMS.push(...DESCENT_STYLE);
 export const STYLE = Object.fromEntries(STYLE_ITEMS.map((x) => [x.id, x]));
 
 // the cases (shop): all four kinds in each, better odds the dearer it is

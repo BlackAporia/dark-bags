@@ -117,6 +117,15 @@ export const ACHIEVEMENTS = [
   { id: 'taskmaster', stat: 'tasksDone', goal: 500, xp: 5000 },
   // premium: the welcome bonus of a first top-up or deposit, worn in animated gold
   { id: 'founder', stat: 'deposits', goal: 1, xp: 500, premium: true },
+  // the Descent: go down, bring it back up, break its bosses, and clear all fifty floors
+  { id: 'dx_first_steps', stat: 'dxRuns', goal: 1, xp: 80 },
+  { id: 'dx_deep_dive', stat: 'dxBest', goal: 10, xp: 400 },
+  { id: 'dx_abyss_gazer', stat: 'dxBest', goal: 25, xp: 1500 },
+  { id: 'dx_boss_breaker', stat: 'dxBosses', goal: 10, xp: 1500 },
+  { id: 'dx_nest_burner', stat: 'dxNests', goal: 50, xp: 800 },
+  { id: 'dx_warden', stat: 'dxEasy', goal: 50, xp: 3000 },
+  { id: 'dx_emberlord', stat: 'dxHard', goal: 50, xp: 6000 },
+  { id: 'dx_abyss_king', stat: 'dxHc', goal: 50, xp: 12000 },
   // secret: hidden until you earn them
   { id: 'by_a_thread', stat: 'clutch', goal: 1, xp: 700, secret: true },
   { id: 'untouchable', stat: 'flawless', goal: 1, xp: 900, secret: true },
@@ -138,7 +147,7 @@ export function titleTier(id) {
 export const ACHIEVEMENT = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 
 // counters that keep the best value instead of adding up
-const MAX_STATS = new Set(['streak', 'bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles', 'bestWave', 'bestGold']);
+const MAX_STATS = new Set(['streak', 'bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles', 'bestWave', 'bestGold', 'dxBest', 'dxEasy', 'dxHard', 'dxHc']);
 
 // What one finished raid adds to the career counters. p is the world's player record.
 // squad: runners in the match; mvp: topped the squad's zombie kills on a clear
@@ -147,7 +156,8 @@ export function raidStats(p, { golden = false, lastExit = false, mode = null, sq
   const won = !!p.won;
   const zed = mode?.kind === 'zombie';
   const gold = mode?.kind === 'gold';
-  const side = zed || gold; // the side modes have their own achievements, not the raid ones
+  const dx = mode?.kind === 'descent';
+  const side = zed || gold || dx; // the side modes have their own achievements, not the raid ones
   const wk = p.wk ?? {};
   const secs = Math.max(0, Math.round((p.endedAt ?? 0) - (p.joinedAt ?? 0)));
   return {
@@ -185,9 +195,9 @@ export function raidStats(p, { golden = false, lastExit = false, mode = null, sq
     kills: p.kills ?? 0,
     bestKills: p.kills ?? 0,
     // PvP only (zombies are not players): kills, deaths and matches for the K/D ratio
-    pvpKills: zed ? 0 : p.kills ?? 0,
-    pvpDeaths: zed ? 0 : p.deaths ?? (p.status === 'dead' ? 1 : 0),
-    pvpGames: zed ? 0 : 1,
+    pvpKills: zed || dx ? 0 : p.kills ?? 0,
+    pvpDeaths: zed || dx ? 0 : p.deaths ?? (p.status === 'dead' ? 1 : 0),
+    pvpGames: zed || dx ? 0 : 1,
     bestMulti: p.bestMulti ?? 0,
     prestige: p.prestige ?? 0,
     firstBloods: p.firstBlood ? 1 : 0,
@@ -196,6 +206,14 @@ export function raidStats(p, { golden = false, lastExit = false, mode = null, sq
     golden: out && golden ? 1 : 0,
     lastExit: out && lastExit ? 1 : 0,
     pacifist: out && !side && !p.kills ? 1 : 0,
+    // the Descent: floors cleared per difficulty (fifty is the full clear and its title)
+    dxRuns: dx ? 1 : 0,
+    dxBest: dx ? p.dFloors ?? 0 : 0,
+    dxEasy: dx && mode.diff === 'easy' ? p.dFloors ?? 0 : 0,
+    dxHard: dx && mode.diff === 'hard' ? p.dFloors ?? 0 : 0,
+    dxHc: dx && mode.diff === 'hardcore' ? p.dFloors ?? 0 : 0,
+    dxBosses: dx ? p.dBosses ?? 0 : 0,
+    dxNests: dx ? p.nests ?? 0 : 0,
   };
 }
 

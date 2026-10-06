@@ -48,6 +48,8 @@ import { createCoinImport } from './coins.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
+import { renderDxPanel, renderDxBoard, renderDxPick, dxResult, isDx, DX_MODE, diffOfMode } from './descent.js';
+import { DIFFS } from '../shared/descent.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS, langChosen } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -614,7 +616,8 @@ function renderAssets() {
   );
   coinImport.attach(list); // + import any coin from the AVNU / Ekubo lists (real tokens)
   const info = assetInfo(app.asset);
-  $('paywith').hidden = app.balances === null || !ids.length;
+  // the Descent takes tickets: the coin list only matters online, to buy them with
+  $('paywith').hidden = app.balances === null || !ids.length || (isDx(app.gameMode) && app.mode === 'practice');
   // one short line under Play: what the stake costs, or what's wrong
   const q = quote();
   const qEl = $('quote');
@@ -639,18 +642,20 @@ function tableInfo(stake) {
 }
 
 // the mode picker: a card per mode with what it is and how the money works
-const MODE_ICON = { zombies: '🧟', gold: '💰', ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
+const MODE_ICON = { 'dx-easy': '⬇', 'dx-hard': '⬇', 'dx-hc': '⬇', zombies: '🧟', gold: '💰', ranked: '🏆', raid: '🎒', br: '👑', duel: '⚔️', dm: '💀', gl: '🛰️', hardcore: '☠️', knives: '🔪', pistols: '🔫', shotguns: '💥', rifles: '🎯', snipers: '🔭', team2: '👥', team4: '🛡️', team8: '🏴' };
 // the mode picker: categories, cards (what it is, how many, how long, who is in it), and the
 // chosen mode explained underneath (how you win, a tip, what it pays)
-const MODE_CAT = { raid: 'classic', br: 'classic', duel: 'classic', dm: 'classic', gl: 'classic', hardcore: 'classic', knives: 'weapons', pistols: 'weapons', shotguns: 'weapons', rifles: 'weapons', snipers: 'weapons', team2: 'teams', team4: 'teams', team8: 'teams', ranked: 'events', zombies: 'events', gold: 'events' };
-const MODE_COLOR = { raid: '#f59e0b', br: '#ffd166', duel: '#fb7185', dm: '#ef4444', gl: '#22d3ee', hardcore: '#e11d48', knives: '#cbd5e1', pistols: '#94a3b8', shotguns: '#fb923c', rifles: '#4ade80', snipers: '#60a5fa', team2: '#38bdf8', team4: '#3b82f6', team8: '#6366f1', ranked: '#ff2dd4', zombies: '#84cc16', gold: '#fbbf24' };
-const modeKey = (m) => (m.weapon ? 'weapon' : m.kind === 'team' ? 'team' : m.id);
+const MODE_CAT = { 'dx-easy': 'pve', 'dx-hard': 'pve', 'dx-hc': 'pve', raid: 'classic', br: 'classic', duel: 'classic', dm: 'classic', gl: 'classic', hardcore: 'classic', knives: 'weapons', pistols: 'weapons', shotguns: 'weapons', rifles: 'weapons', snipers: 'weapons', team2: 'teams', team4: 'teams', team8: 'teams', ranked: 'events', zombies: 'events', gold: 'events' };
+const MODE_COLOR = { 'dx-easy': '#34d399', 'dx-hard': '#f97316', 'dx-hc': '#a855f7', raid: '#f59e0b', br: '#ffd166', duel: '#fb7185', dm: '#ef4444', gl: '#22d3ee', hardcore: '#e11d48', knives: '#cbd5e1', pistols: '#94a3b8', shotguns: '#fb923c', rifles: '#4ade80', snipers: '#60a5fa', team2: '#38bdf8', team4: '#3b82f6', team8: '#6366f1', ranked: '#ff2dd4', zombies: '#84cc16', gold: '#fbbf24' };
+const modeKey = (m) => (m.weapon ? 'weapon' : m.kind === 'team' ? 'team' : m.kind === 'descent' ? 'descent' : m.id);
+// the Descent's difficulty last picked (its card stands for all three)
+const dxPicked = () => DX_MODE[store.get('darkbags.dxDiff', 'easy')] ?? 'dx-easy';
 let modeCat = store.get('darkbags.mcat', 'all');
 function modeFacts(m) {
-  const size = m.kind === 'zombie' ? `1–${m.size}` : m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
+  const size = m.kind === 'zombie' || m.kind === 'descent' ? `1–${m.size}` : m.kind === 'team' ? `${m.teamSize} v ${m.teamSize}` : m.id === 'duel' ? '1 v 1' : app.mode === 'practice' && m.kind !== 'team' ? `${pcfg.runners}` : `${m.size}`;
   const secs = m.kind === 'team' || m.ranked ? m.round : m.kind === 'zombie' ? null : (m.seconds ?? (app.mode === 'practice' ? pcfg.seconds : CFG.ROUND_SECONDS));
-  const time = m.kind === 'zombie' ? t('mi.waves') : m.rounds ? t('mi.rounds', { n: m.rounds * 2 - 1, s: mmss(secs) }) : mmss(secs);
-  const rows = app.tables.filter((x) => x.mode === m.id);
+  const time = m.kind === 'descent' ? t('dx.floors') : m.kind === 'zombie' ? t('mi.waves') : m.rounds ? t('mi.rounds', { n: m.rounds * 2 - 1, s: mmss(secs) }) : mmss(secs);
+  const rows = app.tables.filter((x) => (m.kind === 'descent' ? isDx(x.mode) : x.mode === m.id));
   const waiting = rows.reduce((n, x) => n + (x.state === 'prep' ? x.ready ?? 0 : 0), 0);
   const live = rows.reduce((n, x) => n + (x.humans ?? 0), 0);
   return { size, time, waiting, live };
@@ -661,9 +666,11 @@ function renderModes() {
   const practice = app.mode === 'practice';
   if (practice && MODE[app.gameMode]?.ranked) app.gameMode = 'raid';
   const all = MODES.filter((m) => !(practice && m.ranked));
+  // the Descent shows as one card (its difficulty is picked underneath)
+  const cards = all.filter((m) => !(m.kind === 'descent' && m.id !== 'dx-easy'));
   const hot = all.map((m) => [m.id, modeFacts(m).waiting + modeFacts(m).live]).sort((a, b) => b[1] - a[1])[0];
   // categories
-  const cats = ['all', 'classic', 'weapons', 'teams', 'events'];
+  const cats = ['all', 'pve', 'classic', 'weapons', 'teams', 'events'];
   if (!cats.includes(modeCat)) modeCat = 'all';
   $('mode-cats').replaceChildren(
     ...cats.map((c) => {
@@ -672,7 +679,7 @@ function renderModes() {
       b.className = 'mcat';
       b.setAttribute('role', 'tab');
       b.setAttribute('aria-selected', String(c === modeCat));
-      const n = c === 'all' ? all.length : all.filter((m) => MODE_CAT[m.id] === c).length;
+      const n = c === 'all' ? cards.length : cards.filter((m) => MODE_CAT[m.id] === c).length;
       b.innerHTML = `${esc(t(`mcat.${c}`))} <small>${n}</small>`;
       b.addEventListener('click', () => {
         modeCat = c;
@@ -682,7 +689,7 @@ function renderModes() {
       return b;
     }),
   );
-  const shown = all.filter((m) => modeCat === 'all' || MODE_CAT[m.id] === modeCat || m.id === app.gameMode);
+  const shown = cards.filter((m) => modeCat === 'all' || MODE_CAT[m.id] === modeCat || m.id === app.gameMode || (m.kind === 'descent' && isDx(app.gameMode)));
   box.replaceChildren(
     ...shown.map((m) => {
       const b = document.createElement('button');
@@ -691,16 +698,17 @@ function renderModes() {
       b.dataset.mode = m.id;
       b.style.setProperty('--mc', MODE_COLOR[m.id] ?? '#f59e0b');
       b.setAttribute('role', 'radio');
-      b.setAttribute('aria-checked', String(m.id === app.gameMode));
+      const on = m.kind === 'descent' ? isDx(app.gameMode) : m.id === app.gameMode;
+      b.setAttribute('aria-checked', String(on));
       const f = modeFacts(m);
       const isHot = hot && hot[0] === m.id && hot[1] > 0;
       b.innerHTML = `<span class="mc-art"><span class="mc-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</span>${isHot ? `<i class="mc-hot">🔥 ${esc(t('mc.hot'))}</i>` : m.ranked ? `<i class="mc-hot rk">${esc(t('mc.season'))}</i>` : ''}${f.live ? `<i class="mc-live"><i class="live-dot"></i>${f.live}</i>` : ''}</span>
-        <b class="mc-name">${esc(t(`mode.${m.id}`))}</b><span class="mc-sub">${esc(t(`mode.${m.id}.d`))}</span>
+        <b class="mc-name">${esc(t(m.kind === 'descent' ? 'dx.title' : `mode.${m.id}`))}</b><span class="mc-sub">${esc(t(m.kind === 'descent' ? 'dx.card' : `mode.${m.id}.d`))}</span>
         <span class="mc-chips"><i>👥 ${esc(f.size)}</i><i>⏱ ${esc(f.time)}</i></span>${f.waiting ? `<span class="mc-wait">⏳ ${esc(t('mc.waiting', { n: f.waiting }))}</span>` : ''}`;
       b.addEventListener('click', () => {
         if (document.body.classList.contains('tour-raid-only') && m.id !== 'raid') return; // Nyx's first raid is a Raid
-        app.gameMode = m.id;
-        store.set('darkbags.gmode', m.id);
+        app.gameMode = m.kind === 'descent' ? dxPicked() : m.id;
+        store.set('darkbags.gmode', app.gameMode);
         sfx.play('beep', { f: 1180, dur: 0.03 });
         renderLobby();
       });
@@ -709,15 +717,39 @@ function renderModes() {
   );
   renderModeInfo();
 }
+// the Descent's panel under the card: difficulty, tickets, the reward track, the deepest runners
+function renderDx() {
+  renderDxPanel($('dx-panel'), {
+    mode: app.gameMode,
+    view: app.dx,
+    online: app.mode === 'online' && !!app.token && (!cashier.active || cashier.signedIn),
+    practice: app.mode === 'practice',
+    asset: app.asset,
+    assetLabel: assetInfo(app.asset)?.symbol ?? '',
+    onDiff: (d) => {
+      store.set('darkbags.dxDiff', d);
+      app.gameMode = DX_MODE[d];
+      store.set('darkbags.gmode', app.gameMode);
+      sfx.play('beep', { f: 1180, dur: 0.03 });
+      renderLobby();
+    },
+    onBuy: (n, asset) => {
+      sfx.unlock();
+      send({ t: 'dx_buy', n, asset });
+    },
+    onBoard: (diff) => send({ t: 'dx_board', diff }),
+  });
+}
 function renderModeInfo() {
   const el = $('mode-info');
   const m = MODE[app.gameMode];
+  renderDx();
   if (!el || !m) return;
   const f = modeFacts(m);
   const k = modeKey(m);
   el.style.setProperty('--mc', MODE_COLOR[m.id] ?? '#f59e0b');
   el.innerHTML = `<div class="mi-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</div>
-    <div class="mi-body"><p class="eyebrow">${esc(t(`mcat.${MODE_CAT[m.id] ?? 'classic'}`))} · ${esc(t(`kind.${m.kind}`))}</p><h3>${esc(t(`mode.${m.id}`))}</h3><p class="mi-d">${esc(t(`mode.${m.id}.d`))}</p>
+    <div class="mi-body"><p class="eyebrow">${esc(t(`mcat.${MODE_CAT[m.id] ?? 'classic'}`))} · ${esc(t(`kind.${m.kind}`))}</p><h3>${esc(t(m.kind === 'descent' ? 'dx.title' : `mode.${m.id}`))}</h3><p class="mi-d">${esc(t(`mode.${m.id}.d`))}</p>
       <ul class="mi-facts"><li><b>🏆 ${esc(t('mi.win'))}</b> ${esc(t(`mi.win.${k}`))}</li><li><b>💡 ${esc(t('mi.tip'))}</b> ${esc(t(`mi.tip.${k}`))}</li><li><b>🎁 ${esc(t('mi.pays'))}</b> ${esc(t('mi.rew'))}</li></ul></div>
     <div class="mi-side"><span><small>${esc(t('mi.players'))}</small><b>${esc(f.size)}</b></span><span><small>${esc(t('mi.time'))}</small><b>${esc(f.time)}</b></span><span><small>${esc(t('mi.now'))}</small><b>${f.live ? `<i class="live-dot"></i>${f.live}` : '—'}${f.waiting ? ` · ⏳${f.waiting}` : ''}</b></span></div>`;
 }
@@ -824,6 +856,8 @@ function renderLobby() {
 
   const list = $('tables');
   const fixed = MODE[app.gameMode]?.fixed;
+  const dx = isDx(app.gameMode);
+  $('tables-box').hidden = dx; // the Descent takes tickets, not a stake
   list.classList.toggle('fixed', !!fixed);
   // someone is typing their own stake: leave the row alone (rebuilding it would drop what they
   // typed and put the current stake back in the box)
@@ -884,6 +918,14 @@ function renderLobby() {
   const needSignIn = real && !cashier.signedIn;
   play.disabled = app.status !== 'open' || needSignIn;
   play.textContent = needSignIn ? t('lobby.signIn') : t('lobby.play', { s: money(app.stake) });
+  if (dx && !needSignIn) {
+    const n = DIFFS[diffOfMode(app.gameMode)].tickets;
+    const have = app.mode === 'practice' ? Infinity : (app.dx?.free ?? 0) + (app.dx?.bought ?? 0);
+    play.textContent = app.mode === 'practice' ? t('dx.playFree') : t('dx.play', { n });
+    if (have < n) $('quote').textContent = t('dx.needTickets', { n });
+    else $('quote').textContent = app.mode === 'practice' ? t('dx.practiceFree') : t('dx.quote', { n, h: have });
+    $('quote').classList.toggle('bad', have < n);
+  }
 }
 
 // ------------------------------------------------------- practice settings
@@ -896,7 +938,7 @@ function sendPracticeCfg() {
   if (app.mode === 'practice') send({ t: 'practice_cfg', ...pcfg });
 }
 function renderPracticeCfg() {
-  $('pcfg').hidden = app.mode !== 'practice';
+  $('pcfg').hidden = app.mode !== 'practice' || isDx(app.gameMode);
   for (const b of $('pcfg-diff').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === pcfg.difficulty));
   $('pcfg-runners').value = pcfg.runners;
   $('pcfg-runners-v').textContent = pcfg.runners;
@@ -1098,7 +1140,9 @@ function renderPrep() {
   $('prep-server').hidden = !srv;
   if (srv) $('prep-server').innerHTML = srv;
   const fixedMode = MODE[app.gameMode]?.fixed;
-  $('prep-kicker').textContent = fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: `${money(p.stake)}–${money(p.max ?? p.stake)}` })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
+  const dxDiff = diffOfMode(app.gameMode);
+  const dxTk = dxDiff ? DIFFS[dxDiff].tickets : 0;
+  $('prep-kicker').textContent = dxDiff ? `${t('dx.title')} · ${t(`dx.diff.${dxDiff}`)} · ${t('dx.cost', { n: dxTk })}` : fixedMode ? `${t(`mode.${app.gameMode}`)} · ${t('prep.zFee', { v: money(p.stake) })}` : `${t('prep.raid', { n: p.round, s: `${money(p.stake)}–${money(p.max ?? p.stake)}` })}${p.golden ? ` · ${t('hud.golden')}` : ''}`;
   const count = $('prep-count');
   const status = $('prep-status');
   count.classList.remove('wait');
@@ -1156,16 +1200,18 @@ function renderPrep() {
     );
   }
   const zed = MODE[app.gameMode]?.kind === 'zombie';
-  $('pot').textContent = zed ? t('prep.zFee', { v: money(p.stake) }) : money(p.pot);
-  $('pot-k').textContent = t(zed ? 'prep.zSquad' : MODE[app.gameMode]?.kind === 'gold' ? 'prep.goldPot' : 'prep.pot');
+  $('pot').textContent = dxDiff ? `🎟 ${dxTk}` : zed ? t('prep.zFee', { v: money(p.stake) }) : money(p.pot);
+  $('pot-k').textContent = t(dxDiff ? 'dx.potK' : zed ? 'prep.zSquad' : MODE[app.gameMode]?.kind === 'gold' ? 'prep.goldPot' : 'prep.pot');
   // your stake is yours to know: the table only ever shows the whole pool
   $('pot-mine').hidden = !!fixedMode;
   if (!fixedMode) $('pot-mine').textContent = t('prep.mine', { v: money(p.me?.stake ?? app.stake) });
-  renderZPick(MODE[app.gameMode]?.pick && p.state !== 'live', p.me?.weapon);
+  renderZPick(!dxDiff && MODE[app.gameMode]?.pick && p.state !== 'live', p.me?.weapon);
+  renderDxPick($('dxpick'), { show: !!dxDiff && p.state !== 'live', me: p.me, slots: p.slots, send, sfx });
+  if (p.me?.tk) app.dx = p.me.tk;
   // the map vote: every mode but the ones with arenas of their own (zombies, gold rush)
   const kind = MODE[app.gameMode]?.kind;
   renderMapPick($('mappick'), {
-    show: p.state !== 'live' && kind !== 'zombie' && kind !== 'gold',
+    show: p.state !== 'live' && kind !== 'zombie' && kind !== 'gold' && kind !== 'descent',
     votes: p.votes,
     mine: p.me?.vote !== undefined ? p.me.vote : app.mapVote,
     onVote: (id) => {
@@ -1189,7 +1235,14 @@ function renderPrep() {
     ready.classList.remove('armed');
   }
   ready.disabled = !me.ready && (q === null || units(app.asset) < q);
-  $('prep-balance').textContent = `${assetInfo(app.asset).symbol}: ${coinAndUsd(app.asset, units(app.asset))}`;
+  if (dxDiff) {
+    // tickets, not coins: practice runs are free
+    const have = app.mode === 'practice' ? Infinity : (app.dx?.free ?? 0) + (app.dx?.bought ?? 0);
+    ready.textContent = me.ready ? t('dx.unready') : app.mode === 'practice' ? t('dx.readyFree') : t('dx.ready', { n: dxTk });
+    ready.classList.toggle('armed', !!me.ready);
+    ready.disabled = !me.ready && have < dxTk;
+  }
+  $('prep-balance').textContent = dxDiff ? (app.mode === 'practice' ? '' : t('dx.youHave', { n: (app.dx?.free ?? 0) + (app.dx?.bought ?? 0) })) : `${assetInfo(app.asset).symbol}: ${coinAndUsd(app.asset, units(app.asset))}`;
 }
 
 // zombies: the weapon you take in, picked in the ready room (each with how hard and how
@@ -1310,7 +1363,20 @@ function handleMessage(m) {
       app.online = m.online ?? null;
       app.rank = m.rank ?? null;
       app.chain = m.chain ?? null; // real-token server, or null for play money
+      app.dx = m.descent ?? null;
       renderLobby();
+      break;
+    case 'dx':
+      app.dx = m.view;
+      if (m.balances) app.balances = m.balances;
+      if (m.bought) {
+        toast(t('dx.boughtNow', { n: m.bought }));
+        sfx.play('coin');
+      }
+      renderLobby();
+      break;
+    case 'dx_board':
+      renderDxBoard($('dx-panel'), m);
       break;
     case 'tables':
       app.tables = m.tables;
@@ -1382,6 +1448,9 @@ function handleMessage(m) {
       app.assets = m.assets ?? app.assets;
       app.prices = new PriceBook(app.assets);
       renderLobby();
+      break;
+    case 'stake_ticket':
+      if (m.dx) app.dx = m.dx;
       break;
     case 'err':
       // fair-play refusals carry a code, and read in the player's language
@@ -1518,7 +1587,14 @@ function showResult(m) {
   // the announcer calls the big endings
   if (m.won) sfx.say('victory', 'en');
   else if (m.status === 'extracted') sfx.say('extracted', 'en');
-  if (MODE[m.mode]?.kind === 'zombie') {
+  const dxr = MODE[m.mode]?.kind === 'descent' ? dxResult(m) : null;
+  if (dxr) {
+    k.textContent = dxr.kicker;
+    k.className = `res-kicker ${dxr.win ? 'win' : 'loss'}`;
+    amt.textContent = dxr.amount;
+    amt.className = `res-amount${dxr.win ? ' win' : ''}`;
+    det.innerHTML = `${dxr.detail} ${inside}.${dxr.items}`;
+  } else if (MODE[m.mode]?.kind === 'zombie') {
     const w = m.zWave ?? 0;
     k.textContent = m.won ? t('res.zCleared') : t('res.zFell', { n: Math.min(m.waves ?? 10, w + 1) });
     k.className = `res-kicker ${m.won ? 'win' : 'loss'}`;
@@ -1582,6 +1658,11 @@ function showResult(m) {
   const q = quote(m.stake);
   $('res-again').textContent = q === null ? t('res.again') : `${t('res.again')} · ${money(m.stake)}`;
   $('res-again').disabled = q === null || units(app.asset) < q;
+  if (dxr) {
+    $('res-again').textContent = t('res.again');
+    $('res-again').disabled = false;
+    if (app.mode === 'online') send({ t: 'dx_info' }); // the tickets left
+  }
   showScreen('result');
 }
 
@@ -1599,7 +1680,7 @@ function goToTable() {
 function toggleReady() {
   sfx.unlock();
   if (app.prep?.me?.ready) send({ t: 'unready' });
-  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote });
+  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote, cls: store.get('darkbags.dxClass', 'assault'), pistol: store.get('darkbags.dxPistol', 'pistol') });
 }
 
 $('name').value = app.name;
@@ -1651,7 +1732,7 @@ $('res-share').addEventListener('click', () => {
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
-  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote });
+  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote, cls: store.get('darkbags.dxClass', 'assault'), pistol: store.get('darkbags.dxPistol', 'pistol') });
   showScreen('prep');
 });
 $('res-tables').addEventListener('click', () => {
@@ -1700,6 +1781,8 @@ musicChip.addEventListener('click', toggleMusic);
 syncAudio();
 input.onBluff = () => game.cycleBluff();
 input.onBuy = (item) => game.buy(item);
+input.onDigit = (n) => !!(game.active && game.dxMode && game.dx?.digit(n));
+input.onSwap = () => game.active && game.dxMode && game.dx?.swap();
 input.onSpace = () => game.tryUpgrade();
 for (const b of $('gl-shop').querySelectorAll('[data-buy]')) b.addEventListener('click', () => game.buy(b.dataset.buy));
 for (const b of document.querySelectorAll('#touch [data-buy]'))

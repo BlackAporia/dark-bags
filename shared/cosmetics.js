@@ -25,6 +25,7 @@ import { STYLE, STYLE_ITEMS, STYLE_CASES, STYLE_KINDS, pickStyle } from './style
 import { featured, storeDay, CARD, STARTER, tierCost } from './store.js';
 import { vipOf, VIP_LEVELS } from './vip.js';
 import { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems } from './season.js';
+import { DESCENT_OUTFITS, DESCENT_FINISHES, DESCENT_GUNS } from './descent-items.js';
 export { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems };
 
 export const BODIES = ['m', 'f'];
@@ -152,7 +153,9 @@ export const OUTFITS = [
 ];
 
 // seasonal armour is not in OUTFITS (no box or trial ever drops it); it is still an outfit
-export const OUTFIT = Object.fromEntries([...OUTFITS, ...SEASON_OUTFITS].map((o) => [o.id, o]));
+// the Descent's armours: only its milestones hand them out (shared/descent.js)
+export { DESCENT_OUTFITS, DESCENT_FINISHES };
+export const OUTFIT = Object.fromEntries([...OUTFITS, ...SEASON_OUTFITS, ...DESCENT_OUTFITS].map((o) => [o.id, o]));
 export const DEFAULT_OUTFIT = 'basic-0';
 
 // ------------------------------------------------------------ weapon skins
@@ -209,7 +212,7 @@ export const FINISHES = [
   { id: 'supernova', name: 'Supernova', rarity: 'exotic', color: '#fff7ae', accent: '#f97316', fx: 'rainbow' },
   { id: 'dragonlord', name: 'Dragonlord', rarity: 'exotic', limited: 77, color: '#dc2626', accent: '#fbbf24', pattern: 'dots', fx: 'fire' },
 ];
-export const FINISH = Object.fromEntries([...FINISHES, ...SEASON_FINISHES].map((f) => [f.id, f]));
+export const FINISH = Object.fromEntries([...FINISHES, ...SEASON_FINISHES, ...DESCENT_FINISHES].map((f) => [f.id, f]));
 
 // Each skin is also a model: the rarer the finish, the wilder the weapon. Knife skins
 // become daggers, machetes, axes, katanas, twin blades, scythes, energy swords; guns
@@ -279,7 +282,14 @@ export const SEASON_WSKINS = SEASON_FINISHES.flatMap((f) =>
     return { id: `${w}.${f.id}`, weapon: w, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, season: f.season };
   }),
 );
-export const WSKIN = Object.fromEntries([...WEAPON_SKINS, ...SEASON_WSKINS].map((s) => [s.id, s]));
+// the Descent's finishes, on its six guns
+export const DESCENT_WSKINS = DESCENT_FINISHES.flatMap((f) =>
+  DESCENT_GUNS.map((w) => {
+    const model = modelFor(w, f.id);
+    return { id: `${w}.${f.id}`, weapon: w, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, descent: f.descent };
+  }),
+);
+export const WSKIN = Object.fromEntries([...WEAPON_SKINS, ...SEASON_WSKINS, ...DESCENT_WSKINS].map((s) => [s.id, s]));
 
 // ------------------------------------------------------------------ boxes
 // odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss);
@@ -480,8 +490,8 @@ export function botLook(rnd) {
     const f = FINISHES.filter((x) => rank(x.rarity) <= 2);
     look.ws = { [WEAPONS[Math.floor(rnd() * WEAPONS.length)].id]: f[Math.floor(rnd() * f.length)].id };
   }
-  if (rnd() < 0.12) look.nf = STYLE_ITEMS.filter((x) => x.kind === 'namefx' && rank(x.rarity) <= 2)[Math.floor(rnd() * 6)]?.id;
-  if (rnd() < 0.1) look.kf = STYLE_ITEMS.filter((x) => x.kind === 'killfx' && rank(x.rarity) <= 1)[Math.floor(rnd() * 4)]?.id;
+  if (rnd() < 0.12) look.nf = STYLE_ITEMS.filter((x) => !x.excl && x.kind === 'namefx' && rank(x.rarity) <= 2)[Math.floor(rnd() * 6)]?.id;
+  if (rnd() < 0.1) look.kf = STYLE_ITEMS.filter((x) => !x.excl && x.kind === 'killfx' && rank(x.rarity) <= 1)[Math.floor(rnd() * 4)]?.id;
   return look;
 }
 

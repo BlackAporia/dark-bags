@@ -9,6 +9,7 @@ import { planZone, staticZone, zoneAt, exitState, outsideZone } from './zone.js'
 import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 import { MODE } from './modes.js';
 import { Horde } from './horde.js';
+import { Descent, floorMap, CLASSES, PISTOLS, START_COINS, GEAR, priceFor, dmgK, rofK, armorK } from './descent.js';
 
 const DT = 1 / CFG.TICK_RATE;
 // weapon families, for the mastery achievements
@@ -67,7 +68,8 @@ export class World {
     this.shop = !!m.shop; // guns + lasers: credits buy medkits, turrets and tripmines
     this.maxHp = this.hardcore ? 1 : CFG.HP;
     // side modes on their own arenas: zombies (co-op waves, horde.js) and the gold rush
-    this.zombie = m.kind === 'zombie';
+    this.descent = m.kind === 'descent'; // the Descent: fifty floors of co-op PvE (descent.js)
+    this.zombie = m.kind === 'zombie' || this.descent; // the Descent runs on the zombie machinery
     this.goldRush = m.kind === 'gold';
     this.respawns = this.dm || this.goldRush; // back in a few seconds after you drop
     this.noLadder = this.zombie || this.goldRush || !!m.pick; // you keep the weapon you came with
@@ -102,13 +104,13 @@ export class World {
     this.stake = stake;
     this.seed = seed;
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
-    this.map = this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed, theme);
+    this.map = this.descent ? floorMap(seed, 1) : this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed, theme);
     this.nav = null; // built lazily by the first bot
     this.roundNo = roundNo;
     this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
     this.zonePlan = this.dm || this.zombie || this.goldRush || this.rounds ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);
-    this.horde = this.zombie ? new Horde(this) : null;
+    this.horde = this.descent ? new Descent(this, { diff: m.diff }) : this.zombie ? new Horde(this) : null;
     this.zone = zoneAt(this.zonePlan, 0);
     this.exitStates = this.map.extracts.map((e) => exitState(this.zonePlan, this.zone, e));
     this.time = 0;
@@ -184,7 +186,7 @@ export class World {
   // ---------------------------------------------------------------- entry
 
   // stake: this runner's own (private) stake; the raid's base stake when not given (bots, tests)
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null, nf = null, kf = null, stake = null }) {
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null, nf = null, kf = null, stake = null, cls = null, pistol = null }) {
     if (!this.canJoin()) throw new Error('raid closed');
     stake = Number.isInteger(stake) && stake > 0 ? stake : this.stake;
     const rake = this.feeOnly ? stake : Math.floor(stake * CFG.RAKE);
@@ -209,7 +211,10 @@ export class World {
     const pos = this.zombie ? this.squadSpot(others) : findSpawn(this.map, this.rnd, others, this.zone);
     // the weapon: the mode's, your pick (zombies), a random gun (gold rush), else the knife
     const pick = WEAPONS.findIndex((w) => w.id === weapon);
-    const w0 = this.fixedWeapon >= 0 ? this.fixedWeapon : this.zombie ? (pick >= 0 ? pick : 1) : this.pick ? (pick >= 0 && !isBot ? pick : isBot ? this.randomGun() : 1) : this.goldRush ? this.randomGun() : 0;
+    // the Descent: your class's gun, your pick of pistol on the side
+    const dcls = this.descent ? (CLASSES[cls] ? cls : 'assault') : null;
+    const widx = (id) => WEAPONS.findIndex((w) => w.id === id);
+    const w0 = dcls ? widx(CLASSES[dcls].weapon) : this.fixedWeapon >= 0 ? this.fixedWeapon : this.zombie ? (pick >= 0 ? pick : 1) : this.pick ? (pick >= 0 && !isBot ? pick : isBot ? this.randomGun() : 1) : this.goldRush ? this.randomGun() : 0;
     const p = {
       id: this.nextId++,
       name,
@@ -274,6 +279,19 @@ export class World {
       zk: 0, // zombies killed
       gb: 0, // gold bags held (gold rush)
       gbAt: 0, // when that count was reached (the earlier one wins a tie)
+      ...(dcls
+        ? {
+            dClass: dcls,
+            dPistol: PISTOLS.includes(pistol) ? pistol : 'pistol',
+            w2: widx(PISTOLS.includes(pistol) ? pistol : 'pistol'), // the sidearm (E swaps)
+            ammo2: WEAPONS[widx(PISTOLS.includes(pistol) ? pistol : 'pistol')].mag,
+            dGun: 0, // gear levels bought in the camp
+            dArmor: 0,
+            dAp: 0,
+            dFloors: 0, // floors cleared with the squad
+            cr: START_COINS,
+          }
+        : {}),
     };
     this.arm(p);
     this.players.set(p.id, p);
@@ -502,7 +520,8 @@ export class World {
   fire(p) {
     const wp = WEAPONS[p.w];
     if (!wp.melee && p.ammo <= 0) return this.reload(p);
-    p.fireCd = wp.cd;
+    p.fireCd = this.descent ? wp.cd * rofK(p, this.time) : wp.cd;
+    const dk = this.descent ? dmgK(p, this.time) : 1;
     p.fc = (p.fc + 1) % 1000;
     if (wp.melee) return this.slash(p, wp);
     p.ammo--;
@@ -526,10 +545,11 @@ export class World {
         vy: Math.sin(a) * wp.speed,
         speed: wp.speed,
         range: wp.range,
-        dmg: wp.dmg,
+        dmg: wp.dmg * dk,
         dist: 0,
         skin: p.ws?.[wp.id] ?? null, // the shooter's weapon skin: clients draw its tracer
         cause: 'shot',
+        ...(this.descent && p.dAp && wp.id === 'sniper' ? { pierce: p.dAp } : {}),
         ...(tally ? { ac: snap ? 2 : 1 } : {}),
       };
       this.bullets.set(b.id, b);
@@ -605,6 +625,33 @@ export class World {
       const nx = b.x + b.vx * DT * step;
       const ny = b.y + b.vy * DT * step;
       const tWall = segWalls(b.x, b.y, nx, ny, walls);
+      // the Descent's acid: it flies at the squad, and only the squad
+      if (b.foe) {
+        let tm = tWall >= 0 ? tWall : 1.0001;
+        let hit = null;
+        for (const p of this.players.values()) {
+          if (p.status !== 'alive') continue;
+          const t = segCircle(b.x, b.y, nx, ny, p.x, p.y, CFG.PLAYER_R + 2);
+          if (t >= 0 && t < tm) {
+            tm = t;
+            hit = p;
+          }
+        }
+        if (hit) {
+          this.endBullet(b, tm, nx, ny, 'p');
+          this.damage(hit, null, b.dmg, 'acid');
+          continue;
+        }
+        if (tWall >= 0) {
+          this.endBullet(b, tWall, nx, ny, 'w');
+          continue;
+        }
+        b.x = nx;
+        b.y = ny;
+        b.dist += b.speed * DT * step;
+        if (b.dist >= b.range - 1e-6 || nx < 0 || ny < 0 || nx > this.map.w || ny > this.map.h) this.endBullet(b, 1, nx, ny, 'r');
+        continue;
+      }
       let tMin = tWall >= 0 ? tWall : 1.0001;
       let victim = null;
       for (const p of this.players.values()) {
@@ -621,12 +668,22 @@ export class World {
         victim = null;
         tMin = tWall >= 0 ? tWall : 1.0001;
         for (const z of this.zombies.values()) {
+          if (b.through?.includes(z.id)) continue; // a piercing round already went through it
           const t = segCircle(b.x, b.y, nx, ny, z.x, z.y, z.r + 3);
           if (t >= 0 && t < tMin) {
             tMin = t;
             zed = z;
           }
         }
+      }
+      if (zed && b.pierce > 0) {
+        // armour-piercing (the Descent's sniper): through this one and on to the next
+        b.pierce--;
+        (b.through ??= []).push(zed.id);
+        const hs = this.headshot(b, zed, zed.r / CFG.PLAYER_R);
+        this.horde.hit(zed, this.players.get(b.owner), hs ? b.dmg * CFG.HEADSHOT : b.dmg, hs);
+        if (this.phase !== 'live') return;
+        continue;
       }
       if (zed) {
         if (this.endBullet(b, tMin, nx, ny, 'p')) {
@@ -694,6 +751,7 @@ export class World {
     if (v.shield > 0) return;
     if (shooter && shooter !== v && this.teamSize && shooter.team === v.team) return; // no friendly fire
     if (shooter && this.zombie) return; // zombies: the squad never hurts itself
+    if (this.descent && !shooter && !v.isBot) amount *= armorK(v); // the armour bought in the camp
     if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE[this.difficulty] ?? 0.5 : BOT_DAMAGE;
     if (this.hardcore) amount = Math.max(amount, v.hp); // one hit is enough
     if (shooter && shooter !== v) {
@@ -824,7 +882,12 @@ export class World {
   }
 
   buy(id, item) {
+    if (this.descent && item !== 'turret' && item !== 'mine') return this.descentBuy(id, item);
     const p = this.players.get(id);
+    if (this.descent && p && p.dClass !== GEAR[item]?.cls) {
+      this.emit({ k: 'buyFail', to: [p.id], item, why: 'class' });
+      return false;
+    }
     const it = Object.hasOwn(GL.ITEMS, item) ? GL.ITEMS[item] : null;
     if (!this.shop || !it || !p || p.status !== 'alive' || this.phase !== 'live') return false;
     const no = (why) => {
@@ -873,6 +936,60 @@ export class World {
     p.cr -= it.cost;
     this.emit({ k: 'bought', to: [p.id], item, pid: p.id, x: r1(p.x), y: r1(p.y) });
     return true;
+  }
+
+  // The Descent's camp shop (descent.js GEAR): upgrades, medkits, and each class's own kit
+  descentBuy(id, item) {
+    const p = this.players.get(id);
+    const g = Object.hasOwn(GEAR, item) ? GEAR[item] : null;
+    if (!g || !p || p.status !== 'alive' || this.phase !== 'live') return false;
+    const no = (why) => {
+      this.emit({ k: 'buyFail', to: [p.id], item, why });
+      return false;
+    };
+    if (g.cls && g.cls !== p.dClass) return no('class');
+    const price = priceFor(p, item);
+    if (price == null) return no('max');
+    if (p.cr < price) return no('cash');
+    if (item === 'gun') p.dGun++;
+    else if (item === 'armor') p.dArmor++;
+    else if (item === 'ap') p.dAp++;
+    else if (item === 'medkit') {
+      if (p.hp >= this.maxHp) return no('full');
+      p.hp = Math.min(this.maxHp, p.hp + g.heal);
+    } else if (item === 'stim') p.stimUntil = this.time + g.secs;
+    else if (item === 'aid') {
+      const hurt = [...this.players.values()].filter((q) => q.status === 'alive' && !q.isBot && q.hp < this.maxHp && Math.hypot(q.x - p.x, q.y - p.y) <= g.r);
+      if (!hurt.length) return no('full');
+      for (const q of hurt) q.hp = Math.min(this.maxHp, q.hp + g.heal);
+      this.emit({ k: 'aid', by: p.id, n: hurt.length, x: r1(p.x), y: r1(p.y), r: g.r });
+    } else if (item === 'revive') {
+      const down = [...this.players.values()].filter((q) => q !== p && !q.isBot && q.status === 'dead');
+      if (!down.length) return no('none');
+      for (const q of down) this.respawn(q, true);
+      this.emit({ k: 'revived', by: p.id, name: p.name, n: down.length, x: r1(p.x), y: r1(p.y) });
+    }
+    p.cr -= price;
+    this.emit({ k: 'bought', to: [p.id], item, pid: p.id, x: r1(p.x), y: r1(p.y) });
+    return true;
+  }
+
+  // the Descent: E swaps between the class gun and the pistol (each keeps its own magazine)
+  swapWeapon(id) {
+    const p = this.players.get(id);
+    if (!this.descent || !p || p.status !== 'alive' || p.w2 == null || this.phase !== 'live') return false;
+    [p.w, p.w2] = [p.w2, p.w];
+    [p.ammo, p.ammo2] = [p.ammo2, p.ammo];
+    p.reloadT = 0;
+    p.fireCd = Math.max(p.fireCd, 0.3);
+    this.emit({ k: 'swapped', to: [p.id], w: p.w });
+    return true;
+  }
+
+  // the Descent's camp: go deeper or get out
+  descend(id, v) {
+    const p = this.players.get(id);
+    return !!(this.descent && p && this.horde.choose(p, v));
   }
 
   // the beams of a tripmine: one straight ahead, a fan of two or three once upgraded, each
@@ -1082,7 +1199,7 @@ export class World {
     if (p.isBot) this.ledger.botPaidOut += p.bag;
     else this.ledger.paidOut += p.bag;
     p.bag = 0;
-    this.emit({ k: 'payout', to: [p.id], pid: p.id, amount: p.payout });
+    if (!this.descent) this.emit({ k: 'payout', to: [p.id], pid: p.id, amount: p.payout });
     this.emit({ k: 'extract', name: p.name, pid: p.id });
   }
 
@@ -1459,7 +1576,17 @@ export class World {
 
   end() {
     if (this.phase !== 'live') return;
-    if (this.zombie) {
+    if (this.descent) {
+      // whoever is still down there when it ends: up with everything on a full clear, else lost
+      for (const p of this.players.values()) {
+        if (p.status !== 'alive') continue;
+        p.won = !!p.dFull;
+        p.status = p.dFull ? 'extracted' : 'mia';
+        if (p.dFull) p.place = 1;
+        p.endedAt = this.time;
+      }
+      this.zombies.clear();
+    } else if (this.zombie) {
       // a cleared run is the whole squad's, the fallen included
       const cleared = !!this.horde.bossDown;
       for (const p of this.players.values()) {
@@ -1664,6 +1791,7 @@ export class World {
         ...(p.nf ? { nf: p.nf } : {}),
         ...(this.teamSize ? { tm: p.team } : {}),
         ...(p.ws ? { ws: p.ws } : {}),
+        ...(p.dClass ? { dc: p.dClass } : {}),
         ...(p.ping != null ? { pg: p.ping } : {}),
         o: p.outfit,
         g: p.body,
@@ -1673,7 +1801,7 @@ export class World {
     // a horde you can't see coming through the dark is no fun
     for (const z of this.zombies.values()) {
       if (!near(z.x, z.y, 200)) continue;
-      players.push({ i: z.id, zb: z.type, x: r1(z.x), y: r1(z.y), a: r2(z.a), h: Math.max(1, Math.ceil((z.hp / z.max) * 100)), fc: z.fc, w: 0 });
+      players.push({ i: z.id, zb: z.type, x: r1(z.x), y: r1(z.y), a: r2(z.a), h: Math.max(1, Math.ceil((z.hp / z.max) * 100)), fc: z.fc, w: 0, ...(z.boss ? { bk: z.boss } : {}), ...(z.stoneT > 0 ? { sn: 1 } : {}), ...(z.chargeT > 0 ? { cg: 1 } : {}) });
     }
     const orbs = [];
     for (const o of this.orbs.values()) if (near(o.x, o.y, 40)) orbs.push({ i: o.id, x: r1(o.x), y: r1(o.y), t: o.t });
@@ -1729,7 +1857,8 @@ export class World {
         ...(this.dm ? this.dmView(me) : {}),
         ...(this.goldRush ? this.goldView(me) : {}),
         ...(this.rounds ? this.roundView(me) : {}),
-        ...(this.horde ? { ...this.horde.view(), zk: me.zk } : {}),
+        ...(this.horde ? { ...this.horde.view(me), zk: me.zk } : {}),
+        ...(this.descent ? { cls: me.dClass, w2: me.w2, a2: me.ammo2, gg: me.dGun, ga: me.dArmor, gp: me.dAp, sm: Math.max(0, r1((me.stimUntil ?? 0) - this.time)), df: me.dFloors } : {}),
         ...(this.shop ? { cr: me.cr } : {}),
       },
       players,

@@ -8,7 +8,7 @@ import { pose, drawFigure, FEET, hpColor } from './stickman.js';
 import { textures, canvas } from './textures.js';
 import { FINISH, RARITY_ORDER, TURRET_SKIN } from '../shared/cosmetics.js';
 import { neonText, neonColor } from './ranked.js';
-import { drawZombie, drawZombieTag, drawGoldBag, drawMedkit } from './zombie.js';
+import { drawZombie, drawZombieTag, drawGoldBag, drawMedkit, drawSeal } from './zombie.js';
 import { THEME, glowPoints, Weather } from './themes.js';
 import { KillFx, paintName, resetPaint } from './flair.js';
 
@@ -199,6 +199,7 @@ export class Renderer {
     for (const m of v.mines ?? []) this.drawMineBase(m, t);
     for (const g of v.gold ?? []) if (inView(g.x, g.y, 40)) drawGoldBag(ctx, g, t, this.reduced);
     for (const m of v.packs ?? []) if (inView(m.x, m.y, 40)) drawMedkit(ctx, m, t, this.reduced);
+    if (v.seal && inView(v.seal.x, v.seal.y, v.seal.r + 40)) drawSeal(ctx, v.seal, t, this.reduced);
 
     // 4. runners and graves, sorted by depth
     const items = [];
@@ -437,6 +438,24 @@ export class Renderer {
       ctx.beginPath();
       ctx.arc(bx + ux * 5, y + uy * 5, 2.4, 0, TAU);
       ctx.fill();
+      return;
+    }
+    if (b.k === 'a') {
+      // the Descent's acid: a glob of green with a dripping tail
+      const len = Math.min(26, b.tr ?? 26);
+      ctx.strokeStyle = 'rgba(163, 230, 53, 0.45)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(bx - ux * len, y - uy * len);
+      ctx.lineTo(bx, y);
+      ctx.stroke();
+      ctx.fillStyle = '#c6ff3d';
+      ctx.shadowColor = '#a3e635';
+      ctx.shadowBlur = this.reduced ? 0 : 10;
+      ctx.beginPath();
+      ctx.arc(bx, y, 4.5, 0, TAU);
+      ctx.fill();
+      ctx.shadowBlur = 0;
       return;
     }
     if (b.k === 'c') {

@@ -199,7 +199,8 @@
       <div class="modes-head"><h2 class="sec-h" data-i18n="modes.title">Game mode</h2><div id="mode-cats" class="mode-cats" role="tablist"></div></div>
       <div id="mode-info" class="mode-info"></div>
       <div id="modes" class="modes" role="radiogroup"></div>
-      <fieldset class="tables">
+      <section id="dx-panel" class="dx-panel" hidden></section>
+      <fieldset class="tables" id="tables-box">
         <legend class="eyebrow" data-i18n="lobby.stakePer">Stake per raid</legend>
         <div id="tables" class="table-list"></div>
         <p class="fine stake-priv" data-i18n="stake.private">🔒 Your stake is private: the table shows only the whole pool, never who put in what.</p>
@@ -286,6 +287,7 @@
     </header>
     <div id="lineup" class="lineup" aria-label="Runners in the next raid"></div>
     <div id="zpick" class="zpick" hidden></div>
+    <div id="dxpick" class="dxpick" hidden></div>
     <div id="mappick" class="mappick" hidden></div>
     <p class="pot"><span id="pot-k" class="eyebrow" data-i18n="prep.pot">Pot</span> <b id="pot" class="num">$0</b></p>
     <p class="fine pot-mine" id="pot-mine" hidden></p>

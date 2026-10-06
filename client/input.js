@@ -29,8 +29,13 @@ export class Input {
       if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.dashQueued = true;
       if (e.code === 'KeyR') this.reloadQueued = true; // reload now (it also reloads by itself)
       if (e.code === 'KeyQ') this.onBluff?.();
+      // the Descent's gear bar takes 1–6 (its own order); elsewhere 1–4 buy Guns + Lasers items
+      const digit = /^(Digit|Numpad)[1-6]$/.test(e.code) ? Number(e.code.slice(-1)) : 0;
       const buy = { Digit1: 'medkit', Digit2: 'turret', Digit3: 'mine', Digit4: 'revive', Numpad1: 'medkit', Numpad2: 'turret', Numpad3: 'mine', Numpad4: 'revive' }[e.code];
-      if (buy) this.onBuy?.(buy);
+      if (digit && this.onDigit?.(digit)) {
+        // handled
+      } else if (buy) this.onBuy?.(buy);
+      if (e.code === 'KeyE') this.onSwap?.(); // the Descent: class gun ⇄ pistol
       if (e.code === 'KeyM') this.onMute?.();
       if (e.code === 'KeyN') this.onMusic?.();
     });

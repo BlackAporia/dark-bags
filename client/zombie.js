@@ -12,11 +12,28 @@ const KIND = {
   runner: { s: 0.92, lean: 0.72, skin: '#a7d36f', rag: '#3d4a63', eye: '#ff6b3d', w: 0.9 },
   brute: { s: 1.45, lean: 0.3, skin: '#5e8846', rag: '#4a2f2a', eye: '#ffb02e', w: 1.5 },
   boss: { s: 2.15, lean: 0.24, skin: '#5a476e', rag: '#2a1c2e', eye: '#ff2d55', w: 1.8 },
+  // the Descent's spitter: lean and green, a swollen acid sac at the throat
+  spitter: { s: 0.95, lean: 0.5, skin: '#9ad14b', rag: '#3b3b1a', eye: '#c6ff3d', w: 0.95 },
 };
 
 export function drawZombie(ctx, z, t, gore) {
+  if (z.type === 'nest') return drawNest(ctx, z, t);
   const a = z.a;
-  const k = KIND[z.type] ?? KIND.walker;
+  // the Descent's bosses each wear their own colours and eyes; stone skin turns them grey
+  const base = KIND[z.type] ?? KIND.walker;
+  const k = z.boss ? { ...base, skin: z.stone ? '#8b8f98' : z.boss.color, eye: z.stone ? '#e5e7eb' : z.boss.eye, rag: z.stone ? '#4b4f58' : base.rag } : base;
+  if (z.charge && !z.stone) {
+    // a rush: smeared after-images behind it
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = k.eye;
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(a.x - Math.cos(a.aim) * 18 * i, a.y + FEET - 30 - Math.sin(a.aim) * 18 * i, 26 - i * 4, 40 - i * 6, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   const f = a.facing || 1;
   const gx = a.x;
   const gy = a.y + FEET;
@@ -28,7 +45,7 @@ export function drawZombie(ctx, z, t, gore) {
   ctx.fill();
   if (z.type === 'boss') {
     const g = ctx.createRadialGradient(gx, gy, 4, gx, gy, 70);
-    g.addColorStop(0, 'rgba(255, 45, 85, 0.35)');
+    g.addColorStop(0, z.boss ? `${k.eye}59` : 'rgba(255, 45, 85, 0.35)');
     g.addColorStop(1, 'rgba(255, 45, 85, 0)');
     ctx.fillStyle = g;
     ctx.beginPath();
@@ -73,7 +90,7 @@ export function drawZombie(ctx, z, t, gore) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   if (z.type === 'boss') {
-    ctx.shadowColor = 'rgba(255, 45, 85, 0.85)';
+    ctx.shadowColor = z.boss ? k.eye : 'rgba(255, 45, 85, 0.85)';
     ctx.shadowBlur = 16;
   }
   const flash = z.flash;
@@ -143,6 +160,16 @@ export function drawZombie(ctx, z, t, gore) {
     ctx.fill();
     ctx.shadowBlur = 0;
   }
+  // the spitter's sac, glowing when it is about to spit
+  if (z.type === 'spitter') {
+    ctx.fillStyle = `rgba(198, 255, 61, ${0.55 + 0.35 * Math.max(0, swipe)})`;
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(sh.x + 3, sh.y + 4, 4.2 + swipe * 1.5, 3.4 + swipe, 0.3, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
   // a jaw hanging open
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.4;
@@ -166,7 +193,7 @@ export function drawZombieTag(ctx, z, font) {
   if (z.top == null) return;
   const boss = z.type === 'boss';
   if (!boss && z.hp >= 100) return;
-  const w = boss ? 90 : z.type === 'brute' ? 40 : 28;
+  const w = boss ? 90 : z.type === 'brute' || z.type === 'nest' ? 40 : 28;
   const x = z.a.x - w / 2;
   const y = z.top;
   ctx.fillStyle = 'rgba(4, 6, 10, 0.8)';
@@ -176,9 +203,88 @@ export function drawZombieTag(ctx, z, font) {
   if (boss) {
     ctx.font = `900 12px ${font}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ff2d55';
-    ctx.fillText('☠ BOSS ☠', z.a.x, y - 5);
+    ctx.fillStyle = z.boss?.eye ?? '#ff2d55';
+    ctx.fillText(z.label ? `☠ ${z.label} ☠` : '☠ BOSS ☠', z.a.x, y - 5);
   }
+}
+
+// a nest of the Descent: a pulsing sac of eggs in a pool of slime, veins glowing as it hatches
+function drawNest(ctx, z, t) {
+  const { x, y } = z.a;
+  const gy = y + FEET;
+  const p = 0.5 + 0.5 * Math.sin(t / 260 + z.a.id);
+  const pool = ctx.createRadialGradient(x, gy, 4, x, gy, 70);
+  pool.addColorStop(0, 'rgba(120, 190, 40, 0.45)');
+  pool.addColorStop(1, 'rgba(60, 90, 20, 0)');
+  ctx.fillStyle = pool;
+  ctx.beginPath();
+  ctx.ellipse(x, gy, 70, 30, 0, 0, TAU);
+  ctx.fill();
+  const r = 26 + p * 3;
+  ctx.fillStyle = z.flash ? '#ffffff' : '#3f5f1d';
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(x, gy - r * 0.8, r, r * 0.9, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  // eggs on the sac
+  ctx.fillStyle = `rgba(198, 255, 61, ${0.35 + p * 0.45})`;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + z.a.id;
+    ctx.beginPath();
+    ctx.ellipse(x + Math.cos(a) * r * 0.55, gy - r * 0.8 + Math.sin(a) * r * 0.45, 5, 6, a, 0, TAU);
+    ctx.fill();
+  }
+  // veins
+  ctx.strokeStyle = `rgba(198, 255, 61, ${0.25 + p * 0.5})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * TAU + 0.4;
+    ctx.moveTo(x, gy - r * 0.8);
+    ctx.quadraticCurveTo(x + Math.cos(a) * r * 0.5, gy - r * 0.8 + Math.sin(a) * r * 0.2, x + Math.cos(a) * r * 0.95, gy - r * 0.8 + Math.sin(a) * r * 0.8);
+  }
+  ctx.stroke();
+  z.top = gy - r * 1.8 - 8;
+}
+
+// the seal of a hold mission: a rune circle on the floor that fills as the squad holds it
+export function drawSeal(ctx, s, t, reduced) {
+  const spin = reduced ? 0 : t / 1600;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  const g = ctx.createRadialGradient(0, 0, 10, 0, 0, s.r);
+  g.addColorStop(0, 'rgba(255, 209, 102, 0.16)');
+  g.addColorStop(1, 'rgba(255, 209, 102, 0.02)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, s.r, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 209, 102, 0.35)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, s.r, spin, spin + TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // runes around the rim
+  ctx.fillStyle = 'rgba(255, 209, 102, 0.5)';
+  ctx.font = '700 14px serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU - spin;
+    ctx.fillText('ᚱᛟᚨᛖᛞᚾᛉᛏᛒᛗᛚᛜ'[i], Math.cos(a) * (s.r - 14), Math.sin(a) * (s.r - 14) + 5);
+  }
+  // how far it has closed
+  ctx.strokeStyle = '#ffd166';
+  ctx.lineWidth = 6;
+  ctx.shadowColor = '#ffd166';
+  ctx.shadowBlur = reduced ? 0 : 14;
+  ctx.beginPath();
+  ctx.arc(0, 0, s.r - 30, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(0, Math.min(1, s.p)));
+  ctx.stroke();
+  ctx.restore();
 }
 
 // a bag of gold: a fat sack with a $ stamped on it, glinting; spills and big bags are bigger

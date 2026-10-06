@@ -89,6 +89,20 @@ Controls: `WASD` move · mouse aim · click attack · `Space` dash · `Q` bag lo
 
 **18+ mode** (lobby checkbox, off by default): as health drops a runner loses one leg, then the other and crawls; the head pops on death; blood stays on the floor. Off, hits throw sparks and armour chips instead. Either way the dead are dragged into a grave that cracks open under them.
 
+## The Descent (PvE)
+
+A co-op dungeon for 1–4 runners, played on any region (ping matters less against the dark than against people). 50 floors, each a mission: **clear** the floor, burn the **nests**, **hold** the seal, **survive** the clock, and a **boss** every 5th floor (ten of them, with slams, charges, acid volleys, summons and stone skin). Every floor opens with an animated story scene drawn in the engine; chapters change every 10 floors (Crypt, Ember Halls, Frozen Deep, Void, Throne).
+
+| | |
+|---|---|
+| **Classes** | Assault (carbine, stims), Engineer (SMG, turrets, mines), Medic (shotgun, field aid, revive), Sniper (sniper rifle, piercing rounds). Each class is locked to its weapon type, plus a pistol of your choice (`E` swaps). |
+| **Coins and gear** | Kills pay dungeon coins. Keys `1`–`6` buy gun upgrades (+15% a level), armour (−8% damage a level), medkits and the class gear. |
+| **Camp** | 45 s between floors: buy gear, then vote *go deeper* or *extract with the rewards*. No answer extracts you. |
+| **Rewards** | Every 5 floors a milestone: weapon skins, banners, kill effects, frames, name effects and three armour outfits per difficulty. A full clear brings the crown frame, crown name effect and a title. All of it exists only here: never in cases, the shop or trials. Kept only by those who extract (or clear all 50); a squad that falls below keeps nothing. Duplicates become XP. |
+| **Difficulty** | Easy 1 ticket, Hard 3, Hardcore 5 (one life). Higher difficulties hit harder, pay more coins and drop rarer items. |
+| **Tickets** | One free ticket a UTC day per account (it does not stack: unused, it is gone at midnight). More are bought with any coin you hold at $0.10 each (packs of 10, 50, 100 are cheaper). Practice runs are free and keep nothing. |
+| **Fair play** | The free ticket is capped per network (3 a day) and per device (1 a day), and flagged accounts get none. Purchases are capped per day and in total. The server runs the whole fight; a runner who did under 8% of the squad's damage keeps no items (no carrying alts), and accounts under review keep none until cleared. Tickets taken for a run that never started, or a server that went down mid-run, come back. |
+
 ## Locker, shop and boxes
 
 Your runner is **him or her** in one of **80 outfits** across six rarities (Common, Rare, Epic, Legendary, Mythic, Exotic): crypto memes, comic heroes, cartoon animals, sci-fi and multiverse gods, all original names. Headgear (caps, helmets, hoods, visors, ears, wizard hats, viking horns, astronaut domes, pumpkin and skull masks, frog eyes, a floating diamond, …), capes, auras (glow, pulse, spectral, liquid gold, hologram, glitch, fire, prismatic, laser eyes) and particles (lightning, galaxy, sparks, frost, money rain, code rain, shadow smoke). **144 weapon skins**: 24 finishes on every weapon (camo, tiger, carbon, digital, neon, gold, chrome, glacier, inferno, galaxy, plasma, diamond, prism, void, …), and the rarer the finish, the wilder the model: knife skins become daggers, machetes, tantos, cleavers, axes, katanas, twin blades, scythes, energy swords and a war hammer; guns become revolvers, hand cannons, blasters, double barrels, drum shotguns, machine pistols, vector SMGs, assault rifles, bullpups, plasma rifles, bolt snipers and railguns (same stats, looks only). Energy models glow. From Rare up a skin also paints its **neon tracers**, muzzle flash, blade arc and laser sight: longer trails as rarity climbs, sparks on Legendary, a plasma orb on Mythic, a spectrum-cycling star on Exotic. Everyone in a raid sees them; bots dress up too. Looks only, never stats.
@@ -226,6 +240,9 @@ shared/            runs identically on server and in the browser
   ranks.js         career ranks 1-90, the XP curve, what a raid is worth, titles
   achievements.js  39 achievements over career counters
   cosmetics.js     outfits, weapon skins, 18 boxes (odds, pity, smart drops, limited editions), shop $ packs, rank-up trials
+  horde.js         zombie waves (the Descent builds on it)
+  descent.js       the Descent: floors, missions, bosses, classes, camp shop, rewards, the ticket book
+  descent-items.js the Descent's exclusive outfits, weapon finishes and style items
   zone.js          the storm plan: nested circles collapsing onto the last exit
   movement.js      deterministic movement, shared with client prediction
   bot.js, nav.js   bots (vision-limited, A* on a grid) that farm, fight, flee and extract
@@ -241,7 +258,7 @@ client/            canvas renderer, stick figures, fx (blood, graves, sparks), t
                    synthesized sfx and music, prediction/interpolation, HUD, touch controls,
                    cashier.js (sign-in and cashier UI), rankbadge.js (rank insignia as SVG),
                    intro.js, shop.js (boxes and the opening show), locker.js, inventory.js, swap.js (in-game + AVNU),
-                   chat.js, settings.js + settingsui.js, achievements.js, i18n.js + strings/ (10 languages), sharecard.js
+                   chat.js, descent.js (Descent lobby panel, class pick, HUD, camp, story scenes), settings.js + settingsui.js, achievements.js, i18n.js + strings/ (10 languages), sharecard.js
 client/chain/      wallet layer (get-starknet, Starkzap, Cartridge, Privy) → client/vendor/wallets.js
 test/              node:test suites
 scripts/           headless sim, single-file build, wallet bundle, house console

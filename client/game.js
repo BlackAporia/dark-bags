@@ -17,6 +17,8 @@ import { WEAPONS, XP_PER_LEVEL } from '../shared/weapons.js';
 import { zoneAt, exitState } from '../shared/zone.js';
 import { pose, legPiece, FEET, hpColor } from './stickman.js';
 import { Fx } from './fx.js';
+import { DescentHud } from './descent.js';
+import { BOSSES, HOLD_R } from '../shared/descent.js';
 
 const DT = 1 / CFG.TICK_RATE;
 const INTERP_MS = 110;
@@ -138,18 +140,25 @@ export class GameClient {
     this.dmMode = MODE[this.mode]?.kind === 'dm'; // respawns, most kills wins, no storm
     this.shopMode = !!MODE[this.mode]?.shop; // guns + lasers
     this.hardcore = !!MODE[this.mode]?.hardcore;
-    this.zombieMode = MODE[this.mode]?.kind === 'zombie'; // co-op waves, a boss on the last
+    this.dxMode = MODE[this.mode]?.kind === 'descent'; // the Descent: fifty floors, a class each
+    this.zombieMode = MODE[this.mode]?.kind === 'zombie' || this.dxMode; // co-op waves, a boss on the last
     this.goldMode = MODE[this.mode]?.kind === 'gold'; // grab the most gold bags
     this.respawnMode = this.dmMode || this.goldMode;
     this.roundsMode = !!MODE[this.mode]?.rounds; // teams, ranked: rounds on a clock
-    this.el.glShop.hidden = !this.shopMode;
-    document.body.classList.toggle('gl-on', this.shopMode);
+    this.el.glShop.hidden = !this.shopMode || this.dxMode; // the Descent has its own gear bar
+    document.body.classList.toggle('gl-on', this.shopMode && !this.dxMode);
+    document.body.classList.toggle('dx-on', this.dxMode);
+    this.motion = settings.motion;
+    if (this.dxMode) {
+      this.dx ??= new DescentHud(this);
+      this.dx.begin(start);
+    } else this.dx?.stop();
     document.body.classList.toggle('z-on', this.zombieMode);
     document.body.classList.toggle('gold-on', this.goldMode);
     this.el.spect.classList.toggle('respawn', this.respawnMode);
     this.prevGadgets = new Map();
     const bagLabel = document.querySelector('.hud-bag .eyebrow');
-    if (bagLabel) bagLabel.textContent = t(this.zombieMode ? 'hud.waveK' : this.goldMode ? 'hud.goldK' : this.potMode ? 'hud.pot' : 'hud.bagPrivate');
+    if (bagLabel) bagLabel.textContent = t(this.dxMode ? 'dx.floorK' : this.zombieMode ? 'hud.waveK' : this.goldMode ? 'hud.goldK' : this.potMode ? 'hud.pot' : 'hud.bagPrivate');
     this.renderer.noExits = this.potMode; // last one standing: no exits to draw
     // no bag to bluff about in pot modes; one fixed weapon means no ladder to climb
     this.el.bluffChip.hidden = this.potMode;
@@ -200,12 +209,14 @@ export class GameClient {
     this.updateBluffChip();
     this.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
     if (start.golden) this.banner(t(this.potMode ? 'hud.goldenPot' : 'hud.goldenStart'), 'gold', 3000);
+    else if (this.dxMode) this.banner(t('dx.start'), 'gold', 2600);
     else this.banner(t(this.zombieMode ? 'hud.startZ' : this.goldMode ? 'hud.startGold' : this.shopMode ? 'hud.startGl' : this.dmMode ? 'hud.startDm' : this.hardcore ? 'hud.startHc' : this.teamMode ? 'hud.startTeam' : this.potMode ? 'hud.startPot' : 'hud.start'), 'money', 2600);
   }
 
   stop() {
     this.active = false;
-    document.body.classList.remove('gl-on', 'z-on', 'gold-on');
+    document.body.classList.remove('gl-on', 'z-on', 'gold-on', 'dx-on');
+    this.dx?.stop();
     this.el.hud.hidden = true;
     this.el.streak.hidden = true;
     this.sfx.setStorm(0);
@@ -445,6 +456,7 @@ export class GameClient {
   applyEvents(list) {
     const now = performance.now();
     for (const ev of list) {
+      if (this.dxMode && this.dx?.onEvent(ev, now)) continue; // the Descent's own (descent.js)
       switch (ev.k) {
         case 'pickup':
           this.fx.floater(ev.x, ev.y, `+${this.money(ev.v)}`, this.golden ? '#ffd166' : '#f7931a', 15 + ev.t * 4, 0.9);
@@ -788,6 +800,21 @@ export class GameClient {
     return true;
   }
 
+  // the Descent's stairs: the next floor is a new arena. Everything drawn from the old one goes.
+  newMap(map) {
+    this.map = map;
+    this.renderer.setMap(map);
+    this.snaps = [];
+    this.pending = [];
+    this.pred = null;
+    this.corr = { x: 0, y: 0 };
+    this.prevBullets = new Map();
+    this.anims = new AnimBook();
+    this.meAnim = null;
+    this.fx.clear();
+    this.renderer.prewarm?.(map.w / 2, map.h / 2);
+  }
+
   buy(item) {
     if (!this.active || !this.shopMode || this.you?.st !== 'alive') return;
     this.send({ t: 'buy', item });
@@ -934,7 +961,8 @@ export class GameClient {
       const aim = q ? lerpAngle(q.a, p.a, k) : p.a;
       if (p.zb) {
         const an = this.anims.update(p.i, x, y, aim, dt, now, { w: 0, color: '#7fae5a' });
-        zombies.push({ a: an, type: p.zb, hp: p.h, flash: now - an.hitT < 90 });
+        const B = p.bk ? BOSSES.find((x) => x.id === p.bk) : null;
+        zombies.push({ a: an, type: p.zb, hp: p.h, flash: now - an.hitT < 90, ...(B ? { boss: B, label: t(`dx.boss.${B.id}`) } : {}), stone: !!p.sn, charge: !!p.cg });
         continue;
       }
       const skins = settings.skins === 'all'; // settings: draw others' outfits and weapon skins?
@@ -987,6 +1015,8 @@ export class GameClient {
       zombies,
       gold: last.gold,
       packs: last.packs,
+      // the Descent's seal (a hold mission): where it is and how far it has closed
+      seal: this.dxMode && you.ds === 1 && you.ob === 'hold' && you.hx != null ? { x: you.hx, y: you.hy, r: HOLD_R, p: (you.hd ?? 0) / 100 } : null,
       fx: this.fx,
       time: now,
       golden: last.golden,
@@ -1105,6 +1135,7 @@ export class GameClient {
       this.bagStart ??= you.bag;
       const touch = this.input.touchOn;
       if (you.storm) hint = t('coach.storm');
+      else if (this.dxMode) hint = inside < 14 ? t('coach.dx') : '';
       else if (this.zombieMode) hint = inside < 12 ? t('coach.z') : '';
       else if (this.goldMode) hint = inside < 12 ? t('coach.gold') : '';
       else if (this.shopMode && inside >= 4 && inside < 30) hint = t('coach.gl');
@@ -1127,7 +1158,12 @@ export class GameClient {
     if (lagEl) lagEl.hidden = !(this.snapAt && now - this.snapAt > 1200);
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
-    if (this.zombieMode) {
+    if (this.dxMode) {
+      el.bag.textContent = t('dx.floorN', { n: you.zw ?? 1, of: 50 });
+      el.pnl.textContent = t('dx.hudCoins', { c: you.cr ?? 0, k: you.zk ?? 0 });
+      el.pnl.className = 'pnl';
+      this.dx?.update(you);
+    } else if (this.zombieMode) {
       el.bag.textContent = t('hud.waveN', { n: you.zw ?? 0, of: WAVES });
       el.pnl.textContent = you.zbr ? t('hud.nextWave', { s: you.zbr }) : t('hud.zLeft', { n: you.zl ?? 0, k: you.zk ?? 0 });
       el.pnl.className = 'pnl';
@@ -1236,6 +1272,10 @@ export class GameClient {
     if (this.roundsMode) {
       el.storm.textContent = you.rb ? t('hud.roundNext', { s: you.rb }) : t('hud.roundScore', { n: you.rd ?? 1, of: you.rds ?? 3, a: you.my ?? 0, b: you.foe ?? 0 });
       el.storm.classList.toggle('hot', !you.rb && tl <= 15);
+    } else if (this.dxMode) {
+      // the Descent: the difficulty up here (the floor's mission and the boss bar have their own lines)
+      el.storm.textContent = `${t('dx.title')} · ${t(`dx.diff.${this.dx?.diff ?? 'easy'}`)}`;
+      el.storm.classList.remove('hot');
     } else if (this.zombieMode) {
       el.storm.textContent = you.zb != null ? t('hud.bossHp', { p: you.zb }) : you.zbr ? t('hud.zBreak', { s: you.zbr }) : t('hud.zGoal');
       el.storm.classList.toggle('hot', you.zb != null || tl <= 60);
