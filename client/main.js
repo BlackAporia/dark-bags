@@ -113,6 +113,7 @@ const el = {
   extBar: $('ext-bar'),
   spect: $('spect'),
   ping: $('ping'),
+  fps: $('fps'),
   glShop: $('gl-shop'),
   glCr: $('gl-cr'),
   upHint: $('up-hint'),
