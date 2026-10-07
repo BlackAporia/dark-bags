@@ -1913,7 +1913,7 @@ function loop(now) {
 }
 
 // handle for automated smoke tests and console poking
-globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, regions, go, share: shareMoment };
+globalThis.__darkbags = { app, game, input, renderer, sfx, cashier, regions, go, share: shareMoment, social };
 
 attract.start();
 showScreen('lobby');

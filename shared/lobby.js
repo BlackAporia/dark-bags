@@ -883,7 +883,7 @@ export class Lobby {
         if (!k) return err('No such player.');
         const c = this.ranks.career(k);
         const g = S.guildOf(k);
-        return reply({ t: 'profile', card: this.card(k, key), stats: c.stats, done: c.achievements?.filter?.((a) => a.done).length ?? 0, look: this.inventory.look(k), guild: g ? { id: g.id, name: g.name, tag: g.tag } : null, created: S.get(k).created });
+        return reply({ t: 'profile', card: this.card(k, key), stats: c.stats, done: c.achievements?.filter?.((a) => a.done).length ?? 0, look: this.inventory.look(k), coll: this.inventory.showcase(k), guild: g ? { id: g.id, name: g.name, tag: g.tag } : null, created: S.get(k).created });
       }
       case 'friend': {
         const r = S.addFriend(key, String(msg.id ?? ''));

@@ -1,7 +1,10 @@
 // Friends, players, private messages, profiles, guilds and room invites.
 // Everything here talks to the server by public player id; tokens never show up.
 import { t } from './i18n.js';
-import { nameHtml, frameAttrs, bannerHtml } from './flair.js';
+import { nameHtml, frameAttrs, bannerHtml, styleStill } from './flair.js';
+import { OUTFIT, WSKIN, TURRET_SKIN, RARITIES } from '../shared/cosmetics.js';
+import { STYLE } from '../shared/style.js';
+import { weaponStill } from './locker.js';
 import { esc } from './game.js';
 import { rankBadgeSvg } from './rankbadge.js';
 import { achName, titleHtml } from './achievements.js';
@@ -298,6 +301,43 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
 
   // ------------------------------------------------------------------ profile
 
+  // a turret skin, drawn the way the battle pass draws it
+  const turretSvg = (sk, size) =>
+    `<svg viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true"><g stroke="#05070b" stroke-width="1.2"><path d="M20 24 L9 36 M20 24 L20 37 M20 24 L31 36" stroke="#3a4253" stroke-width="2.4" stroke-linecap="round"/><rect x="20" y="13" width="15" height="3" fill="${sk.trim}"/><rect x="20" y="19" width="15" height="3" fill="${sk.trim}"/><rect x="9" y="9" width="16" height="16" rx="4" fill="${sk.body}" stroke="${sk.trim}"/><circle cx="17" cy="17" r="3.2" fill="${sk.eye}"/></g></svg>`;
+
+  // one item of someone's look or collection: its picture, its name, its rarity's colour
+  function itemTile(kind, id, body) {
+    const it = kind === 'o' ? OUTFIT[id] : kind === 'w' ? WSKIN[id] : kind === 't' ? TURRET_SKIN[id] : STYLE[id];
+    if (!it) return '';
+    const art =
+      kind === 'o' ? `<img alt="" src="${figureStill({ outfit: id, body }, 44, 60)}">` :
+      kind === 'w' ? `<img alt="" src="${weaponStill(id, 72, 42)}">` :
+      kind === 't' ? turretSvg(it, 42) :
+      `<img alt="" src="${styleStill(id, 72, 42)}">`;
+    const col = RARITIES[it.rarity]?.color ?? '#b8bfcc';
+    return `<li class="pf-item" style="--rc:${col}" title="${esc(it.name)} · ${esc(RARITIES[it.rarity]?.name ?? '')}">${art}<span>${esc(it.name)}</span></li>`;
+  }
+
+  // what they wear now, then the best of everything they own
+  function lookHtml(m) {
+    const lk = m.look ?? {};
+    const worn = [
+      itemTile('o', lk.outfit, lk.body),
+      ...Object.entries(lk.ws ?? {}).map(([w, f]) => itemTile('w', `${w}.${f}`)),
+      lk.ts ? itemTile('t', lk.ts) : '',
+      ...['fr', 'bn', 'kf', 'nf'].map((k) => (lk[k] ? itemTile('s', lk[k]) : '')),
+    ].join('');
+    const co = m.coll;
+    const group = (kind, label) => {
+      const g = co?.[kind];
+      if (!g?.n) return '';
+      const more = g.n - g.ids.length;
+      return `<div class="pf-grp"><h4>${t(label)} <small>${g.n}</small></h4><ul class="pf-items">${g.ids.map((id) => itemTile(kind, id, lk.body)).join('')}${more > 0 ? `<li class="pf-item pf-more">+${more}</li>` : ''}</ul></div>`;
+    };
+    const coll = co ? [group('o', 'lk.outfits'), group('w', 'lk.weapons'), group('s', 'pf.style'), group('t', 'pf.turrets')].join('') : '';
+    return `<section class="pf-look-sec"><h3>${t('pf.worn')}</h3><ul class="pf-items">${worn}</ul></section>${coll ? `<section class="pf-look-sec"><h3>${t('pf.coll')}</h3>${coll}</section>` : ''}`;
+  }
+
   function showProfile(m) {
     const c = m.card;
     const s = m.stats ?? {};
@@ -320,6 +360,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
         ${stat('pf.extracts', s.extracts ?? 0)}${stat('pf.best', s.bestKills ?? 0)}${stat('pf.time', `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`)}
         ${stat('pf.ach', m.done ?? 0)}${stat('pf.multi', s.bestMulti ?? 0)}${stat('pf.since', new Date(m.created).toLocaleDateString())}
       </div>
+      ${lookHtml(m)}
       ${c.rel === 'me' ? '' : `<div class="pf-acts">
         ${c.rel === 'friend' ? `<button type="button" class="ghost" data-act="unfriend" data-id="${c.id}">${t('so.remove')}</button>` : c.rel === 'sent' ? `<span class="so-tag">${t('so.sent')}</span>` : `<button type="button" class="cta" data-act="friend" data-id="${c.id}">${c.rel === 'incoming' ? t('so.accept') : t('so.add')}</button>`}
         <button type="button" class="ghost" data-act="msg" data-id="${c.id}">${t('so.message')}</button>
