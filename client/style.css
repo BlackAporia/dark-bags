@@ -1286,8 +1286,8 @@ body.ready #lobby { animation: menu-in 0.6s ease both; }
 .chat-who time { color: var(--dust); font: 500 10px/1 var(--f-num); margin-inline-start: auto; }
 .chat-tt { font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.08em; }
 .chat-text { margin: 2px 0 0; overflow-wrap: anywhere; }
-.chat-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.chat-form input { padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.35); }
+.chat-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.chat-form input { min-width: 0; padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.35); }
 .chat-form .cta { padding: 13px 18px; }
 
 /* ---------- settings */
