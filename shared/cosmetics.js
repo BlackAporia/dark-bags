@@ -622,6 +622,18 @@ export class Inventory {
     return { outfit: this.owns(key, r.outfit) ? r.outfit : DEFAULT_OUTFIT, body: BODIES.includes(r.body) ? r.body : 'm', ws, ...(ts ? { ts } : {}), ...st };
   }
 
+  // What a player's profile shows of their collection: the best of each kind (rarest first), and
+  // how many they own. Trials are not theirs, so they are left out.
+  showcase(key, n = 24) {
+    const r = this.rec(key);
+    const rank = (x) => RARITY_ORDER.indexOf(x?.rarity ?? 'common');
+    const best = (ids, cat) => {
+      const own = [...new Set(ids ?? [])].filter((id) => cat[id]);
+      return { ids: own.sort((a, b) => rank(cat[b]) - rank(cat[a])).slice(0, n), n: own.length };
+    };
+    return { o: best(r.owned, OUTFIT), w: best(r.wowned, WSKIN), s: best(r.sowned, STYLE), t: best(r.towned, TURRET_SKIN) };
+  }
+
   changed() {
     this.onChange?.(this);
   }
