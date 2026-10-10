@@ -1,11 +1,12 @@
 // Bring a coin to the table: a compact picker under the stake coins that searches the AVNU verified
-// list and Ekubo's list and imports one. Once imported it can be deposited, staked and cashed out
-// like any preset coin (the server prices it from Ekubo quotes).
+// list and Ekubo's list and imports one, or takes any Starknet token by its address. Once imported
+// it can be deposited, staked and cashed out like any preset coin (the server prices it from Ekubo
+// quotes). One added by address must have a real pool against USDC, and is stake-only with a cap.
 import { esc } from './game.js';
 import { t } from './i18n.js';
 
 export function createCoinImport({ app, send, toast }) {
-  const st = { open: false, list: null, q: '', busy: null };
+  const st = { open: false, list: null, q: '', addr: '', busy: null };
   const on = () => app.mode === 'online' && !!app.chain;
 
   function attach(listEl) {
@@ -13,7 +14,7 @@ export function createCoinImport({ app, send, toast }) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'asset coin-add';
-    b.innerHTML = `<span class="sym">＋ ${esc(t('coin.import'))}</span><span class="need">AVNU · Ekubo</span>`;
+    b.innerHTML = `<span class="sym">＋ ${esc(t('coin.import'))}</span><span class="need">AVNU · Ekubo · 0x…</span>`;
     b.addEventListener('click', () => {
       st.open = !st.open;
       if (st.open && !st.list) send({ t: 'coin_list' });
@@ -37,7 +38,9 @@ export function createCoinImport({ app, send, toast }) {
     if (!st.open) return;
     const q = st.q.trim().toLowerCase();
     const rows = (st.list ?? []).filter((c) => !q || c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.address.includes(q)).slice(0, 30);
-    pop.innerHTML = `<input id="coin-q" placeholder="${esc(t('coin.search'))}" value="${esc(st.q)}" autocomplete="off" spellcheck="false">
+    pop.innerHTML = `<form class="coin-addr" id="coin-addr-f"><input id="coin-addr" placeholder="${esc(t('coin.addrPh'))}" value="${esc(st.addr)}" autocomplete="off" spellcheck="false" inputmode="text"><button type="submit" class="ghost" ${st.busy ? 'disabled' : ''}>${st.busy === 'addr' ? '…' : t('coin.add')}</button></form>
+      <p class="fine coin-cnote">${esc(t('coin.customNote'))}</p>
+      <input id="coin-q" placeholder="${esc(t('coin.search'))}" value="${esc(st.q)}" autocomplete="off" spellcheck="false">
       <div class="coin-rows">${
         !st.list
           ? `<p class="fine">…</p>`
@@ -60,6 +63,20 @@ export function createCoinImport({ app, send, toast }) {
       again.focus();
       again.setSelectionRange(pos, pos);
     });
+    const addr = document.getElementById('coin-addr');
+    addr.addEventListener('input', () => (st.addr = addr.value));
+    document.getElementById('coin-addr-f').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const a = addr.value.trim();
+      if (!/^0x[0-9a-fA-F]{1,64}$/.test(a)) {
+        toast(t('coin.addrBad'));
+        return;
+      }
+      st.addr = a;
+      st.busy = 'addr';
+      send({ t: 'coin_import', address: a });
+      paint();
+    });
     for (const b of pop.querySelectorAll('[data-addr]'))
       b.addEventListener('click', () => {
         st.busy = b.dataset.addr;
@@ -80,7 +97,9 @@ export function createCoinImport({ app, send, toast }) {
       st.busy = null;
       const c = st.list?.find((x) => x.address === m.imported.id);
       if (c) c.added = true;
-      toast(m.imported.priced ? t('coin.done', { s: m.imported.symbol }) : t('coin.noPrice', { s: m.imported.symbol }));
+      if (m.imported.custom) st.addr = '';
+      const max = `$${((m.imported.maxStake ?? 0) / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+      toast(m.imported.custom ? t('coin.doneCustom', { s: m.imported.symbol, max }) : m.imported.priced ? t('coin.done', { s: m.imported.symbol }) : t('coin.noPrice', { s: m.imported.symbol }));
       app.asset = m.imported.id;
     }
     paint();

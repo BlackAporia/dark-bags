@@ -199,7 +199,7 @@ export class Cashier {
   // a token added to the chain after start (an imported coin)
   addToken(t) {
     this.tokenIds.add(t.id);
-    if (!this.imported.some((x) => x.address === t.id)) this.imported.push({ address: t.id, symbol: t.symbol, name: t.name, decimals: t.decimals });
+    if (!this.imported.some((x) => x.address === t.id)) this.imported.push({ address: t.id, symbol: t.symbol, name: t.name, decimals: t.decimals, ...(t.custom ? { custom: true, maxStake: t.maxStake ?? null } : {}) });
     this.persist();
   }
 

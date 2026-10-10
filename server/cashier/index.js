@@ -28,23 +28,35 @@ export async function createCashier(env = process.env, log = console) {
   const data = cfg.file && existsSync(cfg.file) ? JSON.parse(readFileSync(cfg.file, 'utf8')) : {};
   // coins players imported earlier come back before the price feed starts
   for (const t of data.imported ?? []) chain.addToken(t);
-  const usd = chain.tokens.find((t) => t.symbol.toUpperCase() === 'USDC') ?? null;
+  const usd = chain.tokens.find((t) => !t.custom && t.symbol.toUpperCase() === 'USDC') ?? null;
   const feed = new PriceFeed({ tokens: chain.tokens, prices, quoter: chain.quote, usd, fixed: cfg.fixedPrices, log });
   const catalog = createCatalog({ network: cfg.network, env, log });
   const MAX_TOKENS = Number(env.MAX_TOKENS || 80);
 
-  // bring a coin to the table: it must be on AVNU's verified list or Ekubo's list
+  // Bring a coin to the table: one on AVNU's verified list or Ekubo's list, or (CUSTOM_COINS, on by
+  // default) any Starknet token by its address. A coin added by address is read from the chain and
+  // joins only with a real market behind it (CUSTOM_DEPTH_USD sold into USDC keeps 90% of its
+  // price); it is stake-only, capped at CUSTOM_MAX_STAKE_USD a stake, never a stablecoin.
+  const custom = { on: env.CUSTOM_COINS !== '0', maxStake: Math.round(Number(env.CUSTOM_MAX_STAKE_USD || 5) * 1000), depthUsd: Number(env.CUSTOM_DEPTH_USD || 200) };
+  const userErr = (m) => Object.assign(new Error(m), { user: true });
   async function importToken(address) {
     const had = chain.tokens.find((t) => t.id === normAddr(address));
     if (had) return { token: had, fresh: false };
-    if (chain.tokens.length >= MAX_TOKENS) throw Object.assign(new Error('The table takes no more coins for now.'), { user: true });
-    const entry = await catalog.find(address);
-    if (!entry) throw Object.assign(new Error('That coin is not on the AVNU or Ekubo lists.'), { user: true });
+    if (chain.tokens.length >= MAX_TOKENS) throw userErr('The table takes no more coins for now.');
+    let entry = await catalog.find(address);
+    if (!entry) {
+      if (!custom.on || !chain.readErc20) throw userErr('That coin is not on the AVNU or Ekubo lists.');
+      const meta = await chain.readErc20(address);
+      if (!meta) throw userErr('No token at that address on Starknet.');
+      entry = { ...meta, custom: true, maxStake: custom.maxStake };
+      const d = await feed.depth(chain.asToken(entry), custom.depthUsd);
+      if (!d.ok) throw userErr(`${meta.symbol} has too little liquidity against USDC on Ekubo (${d.why}).`);
+    }
     const t = chain.addToken(entry);
     cashier.addToken(t);
     feed.publish(t, 0);
     const price = await feed.refreshOne(t);
-    log.log(`cashier: imported ${t.symbol} ${t.id}${price ? ` at $${price}` : ' (no price yet)'}`);
+    log.log(`cashier: imported ${t.symbol} ${t.id}${t.custom ? ' (by address)' : ''}${price ? ` at $${price}` : ' (no price yet)'}`);
     return { token: t, fresh: true, price };
   }
   let timer = null;

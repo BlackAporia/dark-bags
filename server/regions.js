@@ -120,6 +120,8 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
   function stakeTicket(key, region, { asset, mills }) {
     const units = lobby.prices.quote(asset, mills);
     if (units === null) return { error: 'That token has no price right now, so it cannot be staked.' };
+    const capped = lobby.prices.stakeError?.(asset, mills);
+    if (capped) return { error: capped };
     if (!lobby.wallet.debit(key, asset, units)) return { error: `Not enough ${lobby.prices.get(asset)?.symbol ?? 'coins'} for this table.` };
     const id = crypto.randomUUID();
     st.tickets[id] = { key, region, asset, units: units.toString(), at: now(), redeemed: false };

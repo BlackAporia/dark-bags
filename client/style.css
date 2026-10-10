@@ -2193,7 +2193,7 @@ body.gold-on #bag { color: #ffd166; }
 .asset.coin-add { border-style: dashed; opacity: 0.9; }
 .coin-pop { display: grid; gap: 8px; margin-top: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(10, 12, 18, 0.95); }
 .coin-pop[hidden] { display: none; }
-.coin-pop input { width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--paper); }
+.coin-pop input { box-sizing: border-box; width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--paper); }
 .coin-rows { display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
 .coin-row { display: grid; grid-template-columns: 22px auto 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .coin-row img, .coin-dot { width: 22px; height: 22px; border-radius: 50%; background: #2a2f3d; }
@@ -3103,3 +3103,8 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .pf-item img { max-width: 100%; height: auto; max-height: 60px; object-fit: contain; }
 .pf-item span { width: 100%; overflow: hidden; font-size: 10px; line-height: 1.15; text-align: center; text-overflow: ellipsis; white-space: nowrap; color: var(--paper); }
 .pf-more { justify-content: center; font: 700 15px/1 var(--f-ui, inherit); color: var(--dust); }
+/* a coin added by its address */
+.coin-addr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; margin: 0; }
+.coin-addr input { min-width: 0; font-family: var(--f-mono, monospace); font-size: 12px; }
+.coin-cnote { margin: -2px 0 2px; }
+.coin-cx { display: inline-block; white-space: nowrap; margin-left: 4px; padding: 0 4px; border-radius: 6px; border: 1px solid rgba(255, 196, 0, 0.5); color: #ffd166; font: 700 8px/1.5 var(--f-ui, inherit); font-style: normal; letter-spacing: 0.02em; text-transform: uppercase; vertical-align: middle; }

@@ -1597,6 +1597,13 @@ export default {
   'coin.note': "Cualquier moneda de Starknet de la lista verificada de AVNU o de Ekubo. Una vez añadida, deposítala y apuesta como con cualquier otra; las ganancias vuelven en ella.",
   'coin.done': "{s} añadida: deposítala y elígela para apostar.",
   'coin.noPrice': "{s} añadida; su precio aparecerá en un minuto.",
+  'coin.addrPh': "O pega la dirección de cualquier token de Starknet (0x…)",
+  'coin.addrBad': "Esa no es una dirección de token de Starknet.",
+  'coin.customNote': "Por dirección: necesita un pool real contra USDC en Ekubo y solo sirve para apostar (con un tope pequeño por partida), no para cambiar ni gastar.",
+  'coin.doneCustom': "{s} añadido por su dirección: apuesta hasta {max} por partida.",
+  'coin.custom': "por dirección",
+  'coin.customTip': "añadido por dirección: solo apuestas, hasta {max} por partida",
+  'coin.capShort': "máx {max}",
   // The Descent
   'mcat.pve': "PvE",
   'kind.descent': "PvE cooperativo · tickets",

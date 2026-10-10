@@ -41,6 +41,18 @@ export class PriceBook {
     return this.assets.has(id) && this.assets.get(id).priceMicro > 0n;
   }
 
+  // A coin added by address (custom) may only be staked, and only up to its cap (maxStake, mills):
+  // its price comes from a pool anyone can move, so it never buys other coins, tickets or spins.
+  stakeError(id, mills) {
+    const a = this.assets.get(id);
+    if (a?.custom && a.maxStake != null && mills > a.maxStake) return `Stakes in ${a.symbol} (a coin added by address) go up to ${usdText(a.maxStake)}.`;
+    return null;
+  }
+
+  spendable(id) {
+    return this.has(id) && !this.assets.get(id).custom;
+  }
+
   get(id) {
     return this.assets.get(id);
   }
@@ -109,4 +121,5 @@ export function usdText(mills) {
   return `${neg ? '−' : ''}$${s}`;
 }
 
-export const isStable = (a) => !!a && (a.stable || /^(USDC|USDT|DAI|USDC\.E)$/i.test(a.symbol));
+// a coin someone added by its address is never a stablecoin, whatever it calls itself
+export const isStable = (a) => !!a && !a.custom && (a.stable || /^(USDC|USDT|DAI|USDC\.E)$/i.test(a.symbol));

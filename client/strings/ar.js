@@ -1597,6 +1597,13 @@ export default {
   'coin.note': "أي عملة على Starknet من قائمة AVNU الموثقة أو قائمة Ekubo. بعد إضافتها أودعها وراهن بها كغيرها؛ وتعود الأرباح بها.",
   'coin.done': "أُضيفت {s}: أودعها واخترها للرهان.",
   'coin.noPrice': "أُضيفت {s}؛ سيظهر سعرها خلال دقيقة.",
+  'coin.addrPh': "أو الصق عنوان أي رمز على Starknet (0x…)",
+  'coin.addrBad': "هذا ليس عنوان رمز على Starknet.",
+  'coin.customNote': "المضاف بالعنوان يحتاج مجمع سيولة حقيقيًا مقابل USDC على Ekubo، ويُستخدم للرهان فقط (بحد صغير لكل مباراة)، لا للتبديل أو الإنفاق.",
+  'coin.doneCustom': "تمت إضافة {s} بعنوانه: راهن حتى {max} في المباراة.",
+  'coin.custom': "بالعنوان",
+  'coin.customTip': "مضاف بالعنوان: للرهان فقط، حتى {max} في المباراة",
+  'coin.capShort': "حد {max}",
   // The Descent
   'mcat.pve': "PvE",
   'kind.descent': "تعاوني PvE · تذاكر",

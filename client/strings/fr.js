@@ -1597,6 +1597,13 @@ export default {
   'coin.note': "N'importe quelle crypto Starknet de la liste vérifiée d'AVNU ou d'Ekubo. Une fois ajoutée, dépose-la et mise avec comme les autres ; les gains reviennent dedans.",
   'coin.done': "{s} ajoutée : dépose-la et choisis-la pour miser.",
   'coin.noPrice': "{s} ajoutée ; son prix apparaît dans une minute.",
+  'coin.addrPh': "Ou collez l'adresse de n'importe quel token Starknet (0x…)",
+  'coin.addrBad': "Ce n'est pas une adresse de token Starknet.",
+  'coin.customNote': "Ajouté par adresse : il faut un vrai pool contre l'USDC sur Ekubo, et il sert seulement à miser (plafond faible par partie), pas à échanger ni dépenser.",
+  'coin.doneCustom': "{s} ajouté par son adresse : mise jusqu'à {max} par partie.",
+  'coin.custom': "par adresse",
+  'coin.customTip': "ajouté par adresse : mises seulement, jusqu'à {max} par partie",
+  'coin.capShort': "max {max}",
   // The Descent
   'mcat.pve': "PvE",
   'kind.descent': "PvE coop · tickets",

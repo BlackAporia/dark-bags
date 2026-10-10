@@ -19,6 +19,7 @@ RUN cd vendor/strk20 && npm ci --omit=dev --no-audit --no-fund
 COPY server ./server
 COPY shared ./shared
 COPY client ./client
+COPY site ./site
 COPY scripts/house.js ./scripts/house.js
 COPY contracts/build ./contracts/build
 COPY --from=build /app/client/vendor ./client/vendor

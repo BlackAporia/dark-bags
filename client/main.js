@@ -595,7 +595,7 @@ function coinAndUsd(a, u) {
 }
 function pickUsableAsset() {
   if (app.prices.has(app.asset) && units(app.asset) >= (quote() ?? 0n) && units(app.asset) > 0n) return;
-  const ok = app.assets.find((a) => app.prices.has(a.id) && units(a.id) >= quote(app.stake, a.id));
+  const ok = app.assets.find((a) => app.prices.has(a.id) && !app.prices.stakeError?.(a.id, app.stake) && units(a.id) >= quote(app.stake, a.id));
   if (ok) app.asset = ok.id;
 }
 
@@ -611,15 +611,17 @@ function renderAssets() {
       const u = units(id);
       const priced = app.prices.has(id);
       const need = priced ? quote(app.stake, id) : null;
-      const short = need !== null && u < need;
+      const capped = app.prices.stakeError?.(id, app.stake); // a coin added by address: stakes up to its cap
+      const short = (need !== null && u < need) || !!capped;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `asset${short ? ' short' : ''}`;
       b.disabled = !priced || u === 0n;
       b.setAttribute('aria-pressed', String(id === app.asset));
       b.title = priced ? `${info.symbol} ≈ ${usdText(app.prices.value(id, 10n ** BigInt(info.decimals)))}` : 'No price for this coin right now';
-      const needText = need === null ? 'no price now' : info.stable ? `stake ${money(app.stake)}` : `stake ${tokenAmount(id, need)}`;
-      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}</span><span class="amt">${priced ? money(app.prices.value(id, u)) : esc(formatUnits(u, info.decimals, 4))}</span><span class="need">${esc(needText)}</span>`;
+      const needText = need === null ? 'no price now' : capped ? t('coin.capShort', { max: money(info.maxStake) }) : info.stable ? `stake ${money(app.stake)}` : `stake ${tokenAmount(id, need)}`;
+      if (info.custom) b.title = `${b.title} · ${t('coin.customTip', { max: money(info.maxStake ?? 0) })}`;
+      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}${info.custom ? ` <i class="coin-cx" aria-label="${esc(t('coin.custom'))}">${esc(t('coin.custom'))}</i>` : ''}</span><span class="amt">${priced ? money(app.prices.value(id, u)) : esc(formatUnits(u, info.decimals, 4))}</span><span class="need">${esc(needText)}</span>`;
       b.addEventListener('click', () => {
         app.asset = id;
         store.set('darkbags.asset', id);
