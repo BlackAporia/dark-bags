@@ -218,6 +218,11 @@ export class RoomCore {
       this.send(c.cid, { t: 'err', msg: 'That token has no price right now, so it cannot be staked.' });
       return;
     }
+    const capped = pre == null && this.prices.stakeError?.(asset, c.stake);
+    if (capped) {
+      this.send(c.cid, { t: 'err', code: 'custom_cap', msg: capped });
+      return;
+    }
     if (!this.wallet.debit(c.token, asset, units)) {
       const sym = this.prices.get(asset)?.symbol ?? 'coins';
       this.send(c.cid, { t: 'err', msg: `Not enough ${sym} for this table.` });

@@ -1597,6 +1597,13 @@ export default {
   'coin.note': "AVNU 认证列表或 Ekubo 列表中的任意 Starknet 代币。添加后即可充值并像其他代币一样下注，奖金以同一代币返还。",
   'coin.done': "已添加 {s}：充值后即可选它下注。",
   'coin.noPrice': "已添加 {s}；价格将在一分钟内显示。",
+  'coin.addrPh': "或粘贴任意 Starknet 代币地址（0x…）",
+  'coin.addrBad': "这不是 Starknet 代币地址。",
+  'coin.customNote': "按地址添加的币需在 Ekubo 上有与 USDC 的真实流动池，只能用于下注（每局有小额上限），不能兑换或消费。",
+  'coin.doneCustom': "已按地址添加 {s}：每局最多下注 {max}。",
+  'coin.custom': "按地址",
+  'coin.customTip': "按地址添加：仅可下注，每局最多 {max}",
+  'coin.capShort': "上限 {max}",
   // The Descent
   'mcat.pve': "PvE",
   'kind.descent': "合作 PvE · 门票",

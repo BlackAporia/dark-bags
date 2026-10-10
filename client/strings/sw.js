@@ -1598,6 +1598,13 @@ export default {
   "coin.note": "Sarafu yoyote ya Starknet kwenye orodha iliyothibitishwa ya AVNU au orodha ya Ekubo. Ikishaongezwa, iweke na uwekee dau kama sarafu nyingine yoyote; ushindi unarudi kwayo.",
   "coin.done": "{s} imeongezwa: iweke na uichague kwa dau lako.",
   "coin.noPrice": "{s} imeongezwa; bei yake inaonekana baada ya dakika moja.",
+  "coin.addrPh": "Au bandika anwani ya tokeni yoyote ya Starknet (0x…)",
+  "coin.addrBad": "Hiyo si anwani ya tokeni ya Starknet.",
+  "coin.customNote": "Iliyoongezwa kwa anwani inahitaji bwawa halisi dhidi ya USDC kwenye Ekubo, na inatumika kuweka dau tu (kikomo kidogo kwa mechi), si kubadilisha wala kutumia.",
+  "coin.doneCustom": "{s} imeongezwa kwa anwani yake: dau hadi {max} kwa mechi.",
+  "coin.custom": "kwa anwani",
+  "coin.customTip": "imeongezwa kwa anwani: dau tu, hadi {max} kwa mechi",
+  "coin.capShort": "juu {max}",
   // The Descent
   'mcat.pve': "PvE",
   'kind.descent': "PvE ya ushirikiano · tiketi",

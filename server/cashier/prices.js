@@ -19,15 +19,29 @@ export class PriceFeed {
     this.log = log;
     this.last = new Map(); // id → { at, usd }
     this.btcUsd = 0; // WBTC's price, the reference for the other BTC wrappers
-    for (const t of tokens) this.publish(t, this.fixed[t.symbol.toUpperCase()] ?? (this.stable(t) ? 1 : 0));
+    for (const t of tokens) this.publish(t, t.custom ? 0 : this.fixed[t.symbol.toUpperCase()] ?? (this.stable(t) ? 1 : 0));
   }
 
+  // a coin added by address is priced only by its pool, never by the peg its name suggests
   stable(t) {
-    return STABLE.has(t.symbol.toUpperCase());
+    return !t.custom && STABLE.has(t.symbol.toUpperCase());
   }
 
   publish(t, usd) {
-    this.prices.set({ id: t.id, symbol: t.symbol, decimals: t.decimals, color: t.color, usd, stable: this.stable(t) });
+    this.prices.set({ id: t.id, symbol: t.symbol, decimals: t.decimals, color: t.color, usd, stable: this.stable(t), ...(t.custom ? { custom: true, maxStake: t.maxStake ?? null } : {}) });
+  }
+
+  // Is there a real market behind this price? Selling `depthUsd` worth into USDC must get at least
+  // `keep` of the small-probe price: a thin pool someone propped up fails, a liquid one passes.
+  async depth(t, depthUsd, keep = 0.9) {
+    if (!this.usdToken) return { ok: false, why: 'no USDC to quote against' };
+    const small = await this.quoteOne(t).catch(() => 0);
+    if (!(small > 0)) return { ok: false, why: 'no pool with USDC' };
+    const human = depthUsd / small;
+    const amountIn = BigInt(Math.floor(human * 10 ** Math.min(t.decimals, 15))) * 10n ** BigInt(Math.max(0, t.decimals - 15));
+    const out = await this.quoter({ tokenIn: t, tokenOut: this.usdToken, amountIn }).catch(() => 0n);
+    const got = Number(out) / 10 ** this.usdToken.decimals;
+    return got >= depthUsd * keep ? { ok: true, usd: small } : { ok: false, why: `selling $${depthUsd} of it returns $${got.toFixed(2)}`, usd: small };
   }
 
   probeUnits(t) {
@@ -38,9 +52,9 @@ export class PriceFeed {
 
   async quoteOne(t) {
     const sym = t.symbol.toUpperCase();
-    if (this.fixed[sym]) return this.fixed[sym];
+    if (this.fixed[sym] && !t.custom) return this.fixed[sym];
     if (t.id === this.usdToken?.id) return 1;
-    const peg = this.stable(t) ? 1 : t.btc && sym !== 'WBTC' ? this.btcUsd : 0;
+    const peg = this.stable(t) ? 1 : t.btc && !t.custom && sym !== 'WBTC' ? this.btcUsd : 0;
     if (!this.usdToken) return peg;
     try {
       const amountIn = this.probeUnits(t);

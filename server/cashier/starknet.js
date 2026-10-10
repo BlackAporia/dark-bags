@@ -1,6 +1,6 @@
 // Starknet side of the cashier, built on Starkzap (wallets, tokens, transfers,
 // swap quotes, paymaster) with the STRK20 pool from ./strk20.js.
-import { Account, ec, hash, num } from 'starknet';
+import { Account, ec, hash, num, shortString, byteArray } from 'starknet';
 import { normAddr } from './cashier.js';
 import { resolveTokens } from './config.js';
 import { createStrk20 } from './strk20.js';
@@ -164,14 +164,30 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
     },
 
     // a coin from the AVNU / Ekubo lists joins the table tokens (deposits, prices, stakes, cash-outs)
-    addToken({ address, symbol, name, decimals }) {
+    // a coin as the cashier holds it, not yet on the table (to quote it before it joins)
+    asToken({ address, symbol, name, decimals, custom = false, maxStake = null }) {
       const id = normAddr(address);
       if (!id) return null;
+      return { name: name || symbol, symbol, decimals, address: fromAddress(id), id, color: '#8d93a6', btc: !custom && /BTC/i.test(symbol), imported: true, ...(custom ? { custom: true, maxStake } : {}) };
+    },
+
+    addToken(entry) {
+      const id = normAddr(entry.address);
+      if (!id) return null;
       if (byId.has(id)) return byId.get(id);
-      const t = { name: name || symbol, symbol, decimals, address: fromAddress(id), id, color: '#8d93a6', btc: /BTC/i.test(symbol), imported: true };
+      const t = this.asToken(entry);
       tokens.push(t);
       byId.set(id, t);
       return t;
+    },
+
+    // an ERC-20's name, symbol and decimals read from the chain (a coin added by its address);
+    // null when the address is not a token
+    async readErc20(address) {
+      const id = normAddr(address);
+      if (!id) return null;
+      const meta = await erc20Meta((entrypoint) => provider.callContract({ contractAddress: id, entrypoint, calldata: [] }).then((r) => r, () => null));
+      return meta && { address: id, ...meta };
     },
 
     // a fortune jackpot straight from the fortune wallet to the winner's address
@@ -250,6 +266,32 @@ export async function pickNode(nodes, chainId, log = console, fetchImpl = fetch)
 // Does the key sign for the account? Compares the key's public key with the owner the account keeps
 // on chain (Argent: get_owner, OpenZeppelin: get_public_key) and warns about a guardian, so a wrong
 // key shows up in the start log instead of as 'invalid owner sig' on the first transaction.
+// An ERC-20's symbol, name and decimals from `call(entrypoint)` (the raw felts, null on failure).
+// Older tokens answer with a short string (one felt), newer ones with a ByteArray.
+export async function erc20Meta(call) {
+  const [sym, nm, dec] = await Promise.all([call('symbol'), call('name'), call('decimals')]);
+  const text = (r) => {
+    if (!r?.length) return '';
+    try {
+      if (r.length === 1) return shortString.decodeShortString(num.toHex(r[0]));
+      const n = Number(BigInt(r[0]));
+      return byteArray.stringFromByteArray({ data: r.slice(1, 1 + n), pending_word: r[1 + n], pending_word_len: Number(BigInt(r[2 + n])) });
+    } catch {
+      return '';
+    }
+  };
+  const clean = (x, max) => x.replace(/[^\x20-\x7e]/g, '').trim().slice(0, max);
+  const symbol = clean(text(sym), 16);
+  let decimals = NaN;
+  try {
+    decimals = dec?.length ? Number(BigInt(dec[0])) : NaN;
+  } catch {
+    /* not a number */
+  }
+  if (!symbol || !(decimals >= 0 && decimals <= 36)) return null;
+  return { symbol, name: clean(text(nm), 40) || symbol, decimals };
+}
+
 export async function checkKey({ provider, address, key, name, log = console }) {
   let mine;
   try {

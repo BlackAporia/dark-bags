@@ -1605,6 +1605,13 @@ export default {
   'coin.note': "Any Starknet coin on AVNU's verified list or Ekubo's list. Once added, deposit it and stake it like any other coin; winnings come back in it.",
   'coin.done': "{s} added: deposit it and pick it for your stake.",
   'coin.noPrice': "{s} added; its price shows up in a minute.",
+  'coin.addrPh': "Or paste any Starknet token address (0x…)",
+  'coin.addrBad': "That is not a Starknet token address.",
+  'coin.customNote': "Added by address: it needs a real pool against USDC on Ekubo, and can only be staked (up to a small cap per match), not swapped or spent.",
+  'coin.doneCustom': "{s} added by its address: stake it up to {max} a match.",
+  'coin.custom': "by address",
+  'coin.customTip': "added by its address: stake-only, up to {max} a match",
+  'coin.capShort': "max {max}",
   // The Descent
   'mcat.pve': "PvE",
   'kind.descent': "co-op PvE · tickets",

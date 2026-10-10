@@ -434,6 +434,7 @@ export class Lobby {
     if (!pack) return this.send(cid, { t: 'err', msg: 'That pack is not sold.' });
     if (!this.descent.canBuy(key, pack.n)) return this.send(cid, { t: 'err', code: 'dx_cap', msg: 'That is more tickets than one account may hold or buy in a day.' });
     const asset = String(msg.asset ?? '');
+    if (this.prices.get(asset)?.custom) return this.send(cid, { t: 'err', code: 'custom_only_stake', msg: 'Coins added by address can only be staked.' });
     const units = this.prices.quote(asset, pack.mills);
     if (units === null) return this.send(cid, { t: 'err', msg: 'That coin has no price right now.' });
     if (!this.wallet.debit(key, asset, units)) return this.send(cid, { t: 'err', code: 'dx_funds', msg: `Not enough ${this.prices.get(asset)?.symbol ?? 'coins'} for ${pack.n === 1 ? 'a ticket' : `${pack.n} tickets`}.` });
@@ -458,6 +459,7 @@ export class Lobby {
       return err('Bad amount.');
     }
     if (from === to || units <= 0n || !this.prices.has(from) || !this.prices.has(to)) return err('Pick two different coins with a price.');
+    if (!this.prices.spendable(from) || !this.prices.spendable(to)) return err('Coins added by address can only be staked, not swapped.');
     const mills = this.prices.value(from, units);
     const net = Math.floor(mills * (1 - CFG.SWAP_FEE));
     const out = this.prices.unitsFor(to, net);
@@ -656,6 +658,7 @@ export class Lobby {
       return this.send(cid, { t: 'fortune', spun: { ...best, free: true, ...(all.length > 1 ? { all } : {}) }, view: this.fortune.view(), locker: this.inventory.view(key) });
     }
     const asset = String(msg.asset ?? '');
+    if (this.prices.get(asset)?.custom) return this.send(cid, { t: 'err', code: 'custom_only_stake', msg: 'Coins added by address can only be staked.' });
     const units = this.prices.quote(asset, FORTUNE.price);
     if (units === null) return this.send(cid, { t: 'err', msg: 'That coin has no price right now.' });
     if (!this.wallet.debit(key, asset, units)) return this.send(cid, { t: 'err', code: 'fortune_funds', msg: `Not enough ${this.prices.get(asset)?.symbol ?? 'coins'} for a spin.` });
@@ -701,7 +704,7 @@ export class Lobby {
       if (r.fresh) {
         for (const [c, x] of this.sessions) if (x.token) this.send(c, info);
       } else this.send(cid, info);
-      this.send(cid, { t: 'coins', imported: { id: r.token.id, symbol: r.token.symbol, priced: this.prices.has(r.token.id) } });
+      this.send(cid, { t: 'coins', imported: { id: r.token.id, symbol: r.token.symbol, priced: this.prices.has(r.token.id), custom: !!r.token.custom, maxStake: r.token.maxStake ?? null } });
     } catch (e) {
       this.send(cid, { t: 'err', msg: e?.user ? e.message : 'Could not import that coin. Try again in a minute.' });
     }
@@ -710,7 +713,7 @@ export class Lobby {
   // the bank in real coins: USDC if priced, else USDT, else STRK
   async payJackpot(key, mills) {
     const list = this.prices.list();
-    const pick = ['USDC', 'USDT', 'STRK'].map((sym) => list.find((a) => a.symbol?.toUpperCase() === sym && this.prices.has(a.id))).find(Boolean) ?? list.find((a) => this.prices.has(a.id));
+    const pick = ['USDC', 'USDT', 'STRK'].map((sym) => list.find((a) => a.symbol?.toUpperCase() === sym && this.prices.has(a.id))).find(Boolean) ?? list.find((a) => this.prices.spendable(a.id));
     if (!pick) return null;
     const units = this.prices.unitsFor(pick.id, mills);
     const out = { mills, asset: pick.id, symbol: pick.symbol, units: units.toString(), onchain: false, tx: null };

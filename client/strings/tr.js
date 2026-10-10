@@ -1597,6 +1597,13 @@ export default {
   'coin.note': "AVNU'nun doğrulanmış listesindeki ya da Ekubo listesindeki her Starknet coini. Ekledikten sonra yatır ve diğerleri gibi bahis yap; kazanç aynı coinle döner.",
   'coin.done': "{s} eklendi: yatır ve bahis için seç.",
   'coin.noPrice': "{s} eklendi; fiyatı bir dakika içinde görünür.",
+  'coin.addrPh': "Ya da herhangi bir Starknet token adresini yapıştır (0x…)",
+  'coin.addrBad': "Bu bir Starknet token adresi değil.",
+  'coin.customNote': "Adresle eklenen coin'in Ekubo'da USDC'ye karşı gerçek bir havuzu olmalı; yalnızca bahis için kullanılır (maç başına küçük bir sınır), takas ya da harcama yapılamaz.",
+  'coin.doneCustom': "{s} adresiyle eklendi: maç başına {max}'a kadar bahis.",
+  'coin.custom': "adresle",
+  'coin.customTip': "adresle eklendi: yalnızca bahis, maç başına {max}'a kadar",
+  'coin.capShort': "en çok {max}",
   // The Descent
   'mcat.pve': "PvE",
   'kind.descent': "ortak PvE · bilet",
