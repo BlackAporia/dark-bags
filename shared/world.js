@@ -106,7 +106,7 @@ export class World {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
     this.map = this.descent ? floorMap(seed, 1) : this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed, theme);
     this.nav = null; // built lazily by the first bot
-    this.roundNo = roundNo;
+    this.raidNo = roundNo; // the room's match count (rounds inside a match are this.roundNo)
     this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
     this.zonePlan = this.dm || this.zombie || this.goldRush || this.rounds ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);

@@ -564,3 +564,15 @@ test('upgrades: walk up to your turret or tripmine and pay for level 2 and 3; ro
   a.x += 300;
   assert.ok(!w2.upgrade(a.id));
 });
+
+test('rounds: later matches in a room start from round 1 too (the match count is not the round)', () => {
+  const w = new World({ stake: 1000, seed: 7, mode: 'ranked', bots: false, roundNo: 3 });
+  w.addPlayer({ name: 'a', skin: '#fff' });
+  w.addPlayer({ name: 'b', skin: '#fff' });
+  w.step();
+  assert.equal(w.roundNo, 1);
+  assert.equal(w.maxRounds, 3);
+  w.time = w.roundEndsAt;
+  w.step();
+  assert.notEqual(w.phase, 'ended', 'a drawn first round is not the last one');
+});

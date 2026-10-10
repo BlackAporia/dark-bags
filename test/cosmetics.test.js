@@ -425,3 +425,16 @@ test('VIP: levels by real money paid (never free shop $), top-up bonus, frames, 
   now += 86400000;
   assert.ok(inv.vipClaim('v').ok);
 });
+
+test('showcase: a profile shows the rarest of what someone owns, and how many, never their trials', () => {
+  const inv = new Inventory();
+  const r = inv.rec('a');
+  const common = OUTFITS.find((o) => o.rarity === 'common' && !o.basic);
+  const mythic = OUTFITS.find((o) => o.rarity === 'mythic');
+  r.owned.push(common.id, mythic.id, common.id);
+  r.trials[OUTFITS.find((o) => o.rarity === 'exotic').id] = Date.now() + 1e6;
+  const s = inv.showcase('a');
+  assert.deepEqual(s.o.ids, [mythic.id, common.id]);
+  assert.equal(s.o.n, 2);
+  assert.equal(s.w.n, 0);
+});
