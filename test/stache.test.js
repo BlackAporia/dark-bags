@@ -82,9 +82,16 @@ test('the first 100 to stake STACHE: the title (+5% XP for good) and two cases, 
   lobby.handle(1, { t: 'unready' });
   lobby.handle(1, { t: 'ready', asset: 'STACHE' });
   assert.equal(promo.stacheLeft(), 1);
+  // the gift waits in the mailbox, one letter with everything, claimed with one button
+  assert.ok(!lobby.ranks.stitleIds(a.token).includes(STACHE_TITLE), 'nothing until it is claimed');
+  const letter = lobby.mail.inbox(a.token).find((m) => m.i18n === 'stache');
+  assert.equal(letter.gift.k, 'bundle');
+  lobby.handle(1, { t: 'mail_claim', id: letter.id });
   assert.ok(lobby.ranks.stitleIds(a.token).includes(STACHE_TITLE));
   assert.equal(lobby.ranks.neon(a.token), STACHE_TITLE, 'worn at once');
   assert.equal(lobby.inventory.rec(a.token).boxes[STACHE_CASE_ID], 2, 'two cases at full odds (not gifts capped at Epic)');
+  lobby.handle(1, { t: 'mail_claim', id: letter.id });
+  assert.equal(lobby.inventory.rec(a.token).boxes[STACHE_CASE_ID], 2, 'claimed once');
   // once per player
   lobby.handle(1, { t: 'unready' });
   lobby.handle(1, { t: 'ready', asset: 'STACHE' });
@@ -97,8 +104,8 @@ test('the first 100 to stake STACHE: the title (+5% XP for good) and two cases, 
   const c = client(3);
   lobby.handle(3, { t: 'join', stake: 100 });
   lobby.handle(3, { t: 'ready', asset: 'STACHE' });
-  assert.ok(!lobby.ranks.stitleIds(c.token).includes(STACHE_TITLE), 'the 101st gets nothing');
-  assert.ok(lobby.ranks.stitleIds(b.token).includes(STACHE_TITLE));
+  assert.ok(!lobby.mail.inbox(c.token).some((m) => m.i18n === 'stache'), 'the 101st gets nothing');
+  assert.ok(lobby.mail.inbox(b.token).some((m) => m.i18n === 'stache'));
   // the bonus never ends, worn or not
   assert.equal(seasonTitle(STACHE_TITLE).forever, true);
   assert.equal(titleBonus(STACHE_TITLE, Date.UTC(2030, 0, 1)), 0.05);

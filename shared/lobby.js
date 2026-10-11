@@ -6,7 +6,7 @@ import { RankBook } from './ranks.js';
 import { validStake, bandOf } from './stakes.js';
 import { MODES, MODE } from './modes.js';
 import { Inventory, OUTFITS, BOXES, BOX, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
-import { isStache, STACHE_GIFT_CASES, STACHE_CASE_ID, STACHE_TITLE } from './stache.js';
+import { isStache, STACHE_GIFT_CASES, STACHE_CASE_ID, STACHE_TITLE, FOREVER_TITLES } from './stache.js';
 import { PromoBook } from './promo.js';
 import { SocialBook, GUILD_RANK } from './social.js';
 import { ReferralBook, cleanCode } from './referrals.js';
@@ -418,8 +418,8 @@ export class Lobby {
     }
   }
 
-  // The STACHE gift, once per player and for the first 100 only: the Moustache Holder title
-  // (+5% XP for good) and two Stache Cases at full odds. Fair play: not for a flagged account,
+  // The STACHE gift, once per player and for the first 100 only: a letter with the Moustache
+  // Holder title (+5% XP for good) and two Stache Cases at full odds, claimed in the mailbox. Fair play: not for a flagged account,
   // nor for one linked (same network or device) to a player who already got it.
   stacheGift(key) {
     // regional match servers leave it to the main server (it hands the gift out with the stake ticket)
@@ -427,14 +427,10 @@ export class Lobby {
     if (this.promo.stache.some((x) => x.key !== key && this.guard?.linked?.(key, x.key))) return null;
     const place = this.promo.claimStache(key);
     if (!place) return null;
-    this.ranks.addForeverTitle(key, STACHE_TITLE);
-    this.inventory.give(key, { k: 'box', id: STACHE_CASE_ID, n: STACHE_GIFT_CASES });
-    this.mail.send({ key, kind: 'news', title: 'STACHE gift', body: `You are STACHE player #${place} of 100.`, i18n: 'stache' });
-    for (const c of this.sessionsOf(key)) {
-      this.send(c, { t: 'mailbox', unread: this.mail.unread(key), news: { k: 'stache', place } });
-      this.send(c, { t: 'career', career: this.ranks.career(key) });
-      this.send(c, { t: 'locker', op: 'sync', locker: this.inventory.view(key) });
-    }
+    // the gift waits in the mailbox: one letter, claimed with one button (the title and the cases)
+    const gift = { k: 'bundle', items: [{ k: 'ntitle', id: STACHE_TITLE }, { k: 'box', id: STACHE_CASE_ID, n: STACHE_GIFT_CASES }] };
+    this.mail.send({ key, kind: 'gift', title: 'STACHE gift', body: `You are STACHE player #${place} of 100.`, i18n: 'stache', gift });
+    for (const c of this.sessionsOf(key)) this.send(c, { t: 'mailbox', unread: this.mail.unread(key), news: { k: 'stache', place } });
     console.log(`stache gift #${place} to ${String(key).slice(0, 10)}…`);
     return place;
   }
@@ -660,9 +656,19 @@ export class Lobby {
     if (msg.t === 'mail_read') this.mail.read(key, String(msg.id ?? ''));
     if (msg.t === 'mail_claim') {
       gift = this.mail.claim(key, String(msg.id ?? ''));
-      if (gift) this.inventory.give(key, gift);
+      if (gift) this.giveMailGift(key, gift);
+      if (gift) this.send(cid, { t: 'career', career: this.ranks.career(key) });
     }
     this.send(cid, { t: 'mailbox', list: this.mail.inbox(key), unread: this.mail.unread(key), ...(gift ? { claimed: gift } : {}), locker: this.inventory.view(key) });
+  }
+
+  // what a letter's gift hands over: a bundle gives each of its items; a neon title (ntitle) only
+  // if it is one of the forever titles (the STACHE gift); the rest goes to the locker
+  giveMailGift(key, g) {
+    if (g.k === 'bundle') for (const x of g.items ?? []) this.giveMailGift(key, x);
+    else if (g.k === 'ntitle') {
+      if (FOREVER_TITLES[g.id]) this.ranks.addForeverTitle(key, g.id);
+    } else this.inventory.give(key, g);
   }
 
   // A paid turn of the shop's fortune wheel ($0.05 in any coin the player holds). The prize lands

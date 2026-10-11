@@ -81,3 +81,33 @@ test('a token read from the chain: short-string and ByteArray names, junk refuse
   assert.equal(await erc20Meta(async () => null), null, 'not a token');
   assert.equal(await erc20Meta(async (e) => (e === 'decimals' ? ['99'] : felt('X'))), null, 'silly decimals');
 });
+
+test('a many-source price (STACHE): Ekubo to USDC and via STRK, DexScreener, GeckoTerminal; outliers dropped', async () => {
+  const { robustMedian } = await import('../server/cashier/prices.js');
+  assert.equal(robustMedian([1, 1.1, 0.9, 5]), 1);
+  assert.equal(robustMedian([]), 0);
+  const usd = { id: '0xusdc', symbol: 'USDC', decimals: 6 };
+  const strk = { id: '0x4718', symbol: 'STRK', decimals: 18 };
+  const st = { id: '0x0101', symbol: 'STACHE', decimals: 18, multi: true };
+  // STRK at $0.12; STACHE is 0.001 STRK ($0.00012); the direct USDC route is a thin pool (way off)
+  const quoter = async ({ tokenIn, tokenOut, amountIn }) => {
+    const n = Number(amountIn) / 1e18;
+    if (tokenIn.id === strk.id && tokenOut.id === usd.id) return BigInt(Math.round(n * 0.12 * 1e6));
+    if (tokenIn.id === st.id && tokenOut.id === strk.id) return BigInt(Math.round(n * 0.001 * 1e18));
+    if (tokenIn.id === st.id && tokenOut.id === usd.id) return BigInt(Math.round(n * 0.0004 * 1e6));
+    return 0n;
+  };
+  const fetchImpl = async (url) => ({
+    ok: true,
+    json: async () =>
+      url.includes('dexscreener')
+        ? { pairs: [{ chainId: 'starknet', baseToken: { address: '0x101' }, priceUsd: '0.000121', liquidity: { usd: 9000 } }, { chainId: 'starknet', baseToken: { address: '0x101' }, priceUsd: '0.5', liquidity: { usd: 3 } }] }
+        : { data: { attributes: { token_prices: { '0x0101': '0.000119' } } } },
+  });
+  const prices = new PriceBook([]);
+  const feed = new PriceFeed({ tokens: [usd, strk, st], prices, quoter, usd, fetchImpl, log: quiet });
+  await feed.refresh();
+  const p = prices.get(st.id).usd;
+  assert.ok(Math.abs(p - 0.00012) / 0.00012 < 0.02, `median of the sources that agree: ${p}`);
+  assert.deepEqual(feed.sources.get(st.id).map(([n]) => n), ['ekubo-usdc', 'ekubo-strk', 'dexscreener', 'geckoterminal']);
+});

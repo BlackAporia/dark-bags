@@ -112,7 +112,8 @@ export async function createCashier(env = process.env, log = console) {
         cashier.persist();
       }
     }
-    Object.assign(t, { color: STACHE_COIN.color, logo: STACHE_COIN.logo });
+    // priced from several sources (its main pool is STACHE/STRK on Ekubo), see PriceFeed.multiQuote
+    Object.assign(t, { color: STACHE_COIN.color, logo: STACHE_COIN.logo, multi: true });
     // STACHE_MAX_STAKE_USD: a cap per stake while its pool is thin (none by default)
     const cap = Number(env.STACHE_MAX_STAKE_USD || 0);
     if (cap > 0) t.maxStake = Math.round(cap * 1000);
