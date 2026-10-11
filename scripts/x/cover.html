@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The cover for the teaser post on X: 1600×900 (16:9, shot at 1.2× = 1920×1080). X crops a
+     single image in the feed to 16:9 and puts its play button and corner labels over the video,
+     so the logo and the line sit left of centre and the runners on the right. The runners and
+     bags are drawn by the game's own renderer. -->
+<link rel="stylesheet" href="../og/fonts/fonts.css">
+<style>
+  html, body { margin: 0; width: 1600px; height: 900px; overflow: hidden; background: #05060a; }
+  .c { position: relative; width: 1600px; height: 900px; overflow: hidden; font-family: 'Chakra Petch', sans-serif; color: #efe9dc;
+    background:
+      radial-gradient(38% 62% at 74% 64%, rgba(255, 170, 40, 0.36), transparent 66%),
+      radial-gradient(30% 50% at 98% 4%, rgba(255, 61, 127, 0.24), transparent 70%),
+      radial-gradient(40% 60% at 0% 100%, rgba(0, 200, 255, 0.14), transparent 70%),
+      #06070c; }
+  .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 56px 56px; mask-image: radial-gradient(70% 90% at 70% 60%, #000 30%, transparent 85%); }
+  .storm { position: absolute; width: 2100px; height: 2100px; left: 520px; top: -1050px; border-radius: 50%; border: 4px dashed rgba(255, 61, 127, 0.35); box-shadow: 0 0 80px rgba(255, 61, 127, 0.2) inset; }
+  .beam { position: absolute; width: 360px; height: 980px; left: 1010px; top: -60px; background: linear-gradient(90deg, transparent, rgba(255, 220, 150, 0.16), transparent); filter: blur(10px); transform: rotate(8deg); }
+  canvas#scene { position: absolute; inset: 0; width: 1600px; height: 900px; }
+  .copy { position: absolute; left: 96px; top: 0; bottom: 0; width: 760px; display: flex; flex-direction: column; justify-content: center; }
+  .kicker { font: 600 22px/1 'IBM Plex Mono', monospace; letter-spacing: 0.3em; color: #ffb443; text-transform: uppercase; display: flex; align-items: center; gap: 16px; }
+  .kicker i { width: 48px; height: 4px; background: #ffb443; display: inline-block; box-shadow: 0 0 12px #ffb443; }
+  h1 { margin: 22px 0 0; font: 900 236px/0.82 'Big Shoulders Stencil Display', sans-serif; text-transform: uppercase; }
+  h1 span { display: block; }
+  h1 .dark { color: #f3eee2; text-shadow: 0 10px 0 rgba(0,0,0,0.6); }
+  h1 .bags { color: #ff9a1f; text-shadow: 0 10px 0 rgba(0,0,0,0.55), 0 0 60px rgba(255, 140, 30, 0.6); }
+  .line { margin: 30px 0 0; white-space: nowrap; font: 700 44px/1.05 'Chakra Petch', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; color: #fff; }
+  .line b { color: #ffb443; }
+  .chips { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+  .chip { font: 700 20px/1 'IBM Plex Mono', monospace; letter-spacing: 0.06em; text-transform: uppercase; padding: 13px 16px; border-radius: 12px; border: 2px solid rgba(255, 180, 67, 0.6); background: rgba(10, 10, 16, 0.82); color: #ffd58a; }
+  .chip.c2 { border-color: rgba(76, 201, 240, 0.65); color: #9fe6ff; }
+  .chip.c3 { border-color: rgba(61, 220, 151, 0.65); color: #8ff0c2; }
+  .beta { position: absolute; right: 64px; top: 56px; display: flex; align-items: center; gap: 12px; font: 700 22px/1 'IBM Plex Mono', monospace; letter-spacing: 0.16em; text-transform: uppercase; color: #3ddc97; padding: 14px 18px; border-radius: 12px; border: 2px solid rgba(61, 220, 151, 0.6); background: rgba(5, 12, 10, 0.8); }
+  .beta i { width: 14px; height: 14px; border-radius: 50%; background: #3ddc97; box-shadow: 0 0 14px #3ddc97; display: inline-block; }
+  .url { position: absolute; right: 64px; bottom: 70px; font: 800 30px/1 'Chakra Petch', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #0b0b0b; background: linear-gradient(180deg, #ffc24d, #ff8a1f); padding: 18px 26px; border-radius: 14px; box-shadow: 0 14px 44px rgba(255, 140, 30, 0.5); }
+  .hazard { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; background: repeating-linear-gradient(135deg, #f4b400 0 24px, #0b0b0b 24px 48px); opacity: 0.9; }
+  .vignette { position: absolute; inset: 0; box-shadow: inset 0 0 220px rgba(0,0,0,0.85); pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="c" id="c">
+  <div class="grid"></div>
+  <div class="storm"></div>
+  <div class="beam"></div>
+  <canvas id="scene" width="3200" height="1800"></canvas>
+  <div class="copy">
+    <div class="kicker"><i></i>Extraction shooter · Starknet</div>
+    <h1><span class="dark">Dark</span><span class="bags">Bags</span></h1>
+    <p class="line">One more raid. <b>Then get out.</b></p>
+    <div class="chips"><span class="chip">17 modes</span><span class="chip c2">Free in your browser</span><span class="chip c3">Stakes from $0.10</span></div>
+  </div>
+  <div class="beta"><i></i>Closed beta live</div>
+  <div class="url">dark-bags.com ▸</div>
+  <div class="hazard"></div>
+  <div class="vignette"></div>
+</div>
+<script type="module">
+  import { drawPreview } from '/client/stickman.js';
+  import { boxArt } from '/client/locker.js';
+  import { BOX } from '/shared/cosmetics.js';
+  await Promise.all(["900 236px 'Big Shoulders Stencil Display'", "700 52px 'Chakra Petch'", "800 30px 'Chakra Petch'", "600 22px 'IBM Plex Mono'"].map((f) => document.fonts.load(f)));
+  const cv = document.getElementById('scene');
+  const ctx = cv.getContext('2d');
+  ctx.scale(2, 2);
+  const floorY = 790;
+  const disc = (x, r, c) => {
+    const g = ctx.createRadialGradient(x, floorY, 4, x, floorY, r);
+    g.addColorStop(0, c);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(x, floorY, r, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  disc(1190, 300, 'rgba(255,190,70,0.6)');
+  disc(980, 190, 'rgba(170,90,255,0.45)');
+  disc(1420, 190, 'rgba(255,61,127,0.45)');
+  // embers
+  let seed = 23;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 120; i++) {
+    const x = 820 + rnd() * 780, y = 40 + rnd() * 760, r = 0.7 + rnd() * 2.6;
+    ctx.fillStyle = rnd() < 0.55 ? 'rgba(255,214,110,0.85)' : 'rgba(255,255,255,0.6)';
+    ctx.shadowColor = '#ffb443';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  const bag = (id, x, y, s, rot = 0) =>
+    new Promise((res) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.shadowColor = 'rgba(255,190,70,0.9)';
+        ctx.shadowBlur = 50;
+        ctx.drawImage(img, -s / 2, -s / 2, s, s);
+        ctx.restore();
+        res();
+      };
+      img.onerror = res;
+      let svg = boxArt(BOX[id], s);
+      if (!svg.includes('xmlns=')) svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    });
+  await bag('genesis', 1430, 230, 170, 0.12);
+  await bag('w-apex', 930, 250, 130, -0.15);
+  await bag('c-stache', 1250, 140, 110, 0.05);
+  const runner = (outfit, ws, w, x, scale, aim, body = 'm') => drawPreview(ctx, { outfit, body, ws }, { x, y: floorY, scale, t: 1400, w, aim, moveK: 0.15, phase: 0.4 });
+  runner('void-emperor', { sniper: 'void' }, 12, 980, 5.4, -0.5);
+  runner('neon-samurai', { knife: 'prism' }, 0, 1420, 5.4, -0.4, 'f');
+  runner('golden-bull', { rifle: 'supernova' }, 7, 1190, 7.2, 0.08);
+  document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
