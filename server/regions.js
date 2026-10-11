@@ -13,6 +13,7 @@
 //
 // Both sides share REGION_SECRET; tickets and reports are HMAC-SHA256 signed.
 import crypto from 'node:crypto';
+import { isStache } from '../shared/stache.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { writeFile, rename } from 'node:fs/promises';
 
@@ -127,6 +128,7 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
     st.tickets[id] = { key, region, asset, units: units.toString(), at: now(), redeemed: false };
     setPot(region, asset, pot(region, asset) + units);
     save();
+    if (isStache(asset)) lobby.stacheGift?.(key); // staking STACHE on a regional table counts too
     return { ticket: makeTicket(secret, { k: 'stake', id, key, region, asset, units: units.toString(), mills, seeds: seeds(key), exp: now() + TICKET_TTL }) };
   }
 

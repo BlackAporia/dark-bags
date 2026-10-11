@@ -17,6 +17,7 @@ import { SocialBook } from '../shared/social.js';
 import { ReferralBook } from '../shared/referrals.js';
 import { DailyBook } from '../shared/daily.js';
 import { DescentBook } from '../shared/descent.js';
+import { PromoBook } from '../shared/promo.js';
 import { Guard } from '../shared/guard.js';
 import { createBridge } from './bridge.js';
 import { MailBook, cleanGift } from '../shared/mail.js';
@@ -61,6 +62,7 @@ const MAIL_FILE = process.env.MAIL_FILE || (DATA ? `${DATA}/${NET}-mail.json` : 
 const DAILY_FILE = process.env.DAILY_FILE || (DATA ? `${DATA}/${NET}-daily.json` : '');
 const FORTUNE_FILE = process.env.FORTUNE_FILE || (DATA ? `${DATA}/${NET}-fortune.json` : '');
 const SOCIAL_FILE = process.env.SOCIAL_FILE || (DATA ? `${DATA}/${NET}-social.json` : '');
+const PROMO_FILE = process.env.PROMO_FILE || (DATA ? `${DATA}/${NET}-promo.json` : '');
 const DESCENT_FILE = process.env.DESCENT_FILE || (DATA ? `${DATA}/${NET}-descent.json` : '');
 const STATS_FILE = process.env.STATS_FILE || (DATA ? `${DATA}/${NET}-stats.json` : '');
 // Ranks and players used to be one file for every network, so Sepolia test wallets showed up in the
@@ -271,6 +273,20 @@ const descentBook = new DescentBook({
   },
 });
 
+// ----------------------------------------------------------------- promo
+// limited gifts (the first 100 STACHE stakers): who got one survives restarts and data epochs
+let promoTimer = null;
+const promo = new PromoBook({
+  data: PROMO_FILE && existsSync(PROMO_FILE) ? JSON.parse(readFileSync(PROMO_FILE, 'utf8')) : {},
+  onChange: (pb) => {
+    if (!PROMO_FILE || promoTimer) return;
+    promoTimer = setTimeout(async () => {
+      promoTimer = null;
+      await saveJSON(PROMO_FILE, pb.toJSON()).catch((e) => console.error('promo save failed', e));
+    }, SAVE_SOON);
+  },
+});
+
 // ----------------------------------------------------------------- fortune
 // the wheel's bank survives restarts and data epochs (it is money players have put in)
 let fortuneTimer = null;
@@ -323,6 +339,7 @@ const J = (name, book) => (EDGE ? journaled(name, book, journal) : book);
 // the vault records each staked match's pot per coin on chain (never who staked what)
 const pots = real?.chain.vault?.canRecord ? createPotRecorder({ vault: real.chain.vault, houseShare: CFG.RAKE * (1 - CFG.JACKPOT_SHARE), rand: crypto.randomBytes }) : null;
 const lobby = new Lobby({
+  promo,
   pots,
   edge: EDGE,
   stats: J('stats', stats),

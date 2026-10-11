@@ -10,6 +10,7 @@ import { PriceFeed } from './prices.js';
 import { createStarknetChain } from './starknet.js';
 import { createPrivy, handlePrivySign } from './privy.js';
 import { createCatalog } from './catalog.js';
+import { STACHE_ADDRESS, STACHE_COIN } from '../../shared/stache.js';
 import { track } from '../stall.js';
 
 const TRANSFER_SELECTOR = normAddr(hash.getSelectorFromName('transfer'));
@@ -88,6 +89,38 @@ export async function createCashier(env = process.env, log = console) {
   cashier = new Cashier({ chain, prices, data, save, flush, privy, minWithdrawUsd: cfg.minWithdrawUsd, allow, maxBalanceUsd: cfg.maxBalanceUsd, maxTotalUsd: cfg.maxTotalUsd, paused: pauseFlag(cfg.pauseFile) });
   if (cfg.network === 'mainnet' && !allow.size && !cfg.maxBalanceUsd) log.warn('cashier: mainnet with no ALLOWLIST and no MAX_BALANCE_USD: anyone can deposit any amount.');
 
+  // The partner coin (shared/stache.js) sits on the mainnet table from the start, like a preset:
+  // its decimals come from the token lists or the chain, so it waits (and retries) until one
+  // answers. STACHE=0 leaves it off.
+  async function ensureStache() {
+    if (cfg.network !== 'mainnet' || env.STACHE === '0') return true;
+    let t = chain.tokens.find((x) => x.id === STACHE_ADDRESS);
+    if (!t) {
+      const entry = (await catalog.find(STACHE_ADDRESS).catch(() => null)) ?? (await chain.readErc20?.(STACHE_ADDRESS).catch(() => null));
+      if (!entry) return false;
+      t = chain.addToken({ ...entry, address: STACHE_ADDRESS });
+      cashier.addToken(t);
+    }
+    // a partner coin, not one a player brought by address: no cap, its logo and colour
+    if (t.custom) {
+      delete t.custom;
+      delete t.maxStake;
+      const rec = cashier.imported.find((x) => x.address === t.id);
+      if (rec) {
+        delete rec.custom;
+        delete rec.maxStake;
+        cashier.persist();
+      }
+    }
+    Object.assign(t, { color: STACHE_COIN.color, logo: STACHE_COIN.logo });
+    // STACHE_MAX_STAKE_USD: a cap per stake while its pool is thin (none by default)
+    const cap = Number(env.STACHE_MAX_STAKE_USD || 0);
+    if (cap > 0) t.maxStake = Math.round(cap * 1000);
+    await feed.refreshOne(t);
+    log.log(`cashier: STACHE on the table (${t.decimals} decimals)`);
+    return true;
+  }
+
   // paymaster proxy budget: sponsored requests per signed-in account per day
   const sponsored = new Map();
   const tokenIds = new Set(chain.tokens.map((t) => t.id));
@@ -135,9 +168,19 @@ export async function createCashier(env = process.env, log = console) {
     feed,
     catalog,
     importToken,
+    ensureStache,
     routes,
     start() {
       feed.start(cfg.priceSeconds);
+      const stache = () =>
+        ensureStache().then(
+          (ok) => ok || setTimeout(stache, 60_000).unref?.(),
+          (e) => {
+            log.warn(`cashier: STACHE not added yet (${e?.message ?? e})`);
+            setTimeout(stache, 60_000).unref?.();
+          },
+        );
+      stache();
       const poll = () => cashier.poll().catch((e) => log.error('cashier poll', e));
       this.poller = setInterval(poll, 20_000);
       this.poller.unref?.();

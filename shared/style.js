@@ -7,6 +7,7 @@
 // c: the colours the drawing uses; fx: which animation (client/flair.js and style.css).
 
 import { DESCENT_STYLE } from './descent-items.js';
+import { STACHE_STYLE } from './stache.js';
 
 export const STYLE_KINDS = ['frame', 'banner', 'killfx', 'namefx'];
 
@@ -69,6 +70,8 @@ export const STYLE_ITEMS = [
 ];
 // the Descent's style (shared/descent-items.js): excl, so no case or reward ever drops it
 STYLE_ITEMS.push(...DESCENT_STYLE);
+// STACHE's style: only the Stache Case drops it (excl keeps it out of the style cases)
+STYLE_ITEMS.push(...STACHE_STYLE);
 export const STYLE = Object.fromEntries(STYLE_ITEMS.map((x) => [x.id, x]));
 
 // the cases (shop): all four kinds in each, better odds the dearer it is

@@ -11,7 +11,7 @@ import { CLASSES, PISTOLS, DUP_XP, runItems } from './descent.js';
 import { STYLE } from './style.js';
 import { WAVES } from './horde.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, WSKIN, seasonAt } from './cosmetics.js';
-import { spinChance, rollLottery, titleBonus, DIVISIONS, DIV_PRIZES } from './ranked.js';
+import { spinChance, rollLottery, titleBonus, foreverBonus, DIVISIONS, DIV_PRIZES } from './ranked.js';
 import { pickStyle } from './style.js';
 import { bandMax } from './stakes.js';
 
@@ -664,7 +664,7 @@ export class RoomCore {
       this.inventory.give(token, { k: 'wskin', id: it.id });
       return { k: 'wskin', id: it.id };
     }
-    const cases = BOXES.filter((b) => b.group !== 'tier' && b.id !== 'c-knife');
+    const cases = BOXES.filter((b) => b.group !== 'tier' && b.group !== 'partner' && b.id !== 'c-knife');
     const bx = cases[Math.floor(Math.random() * cases.length)];
     this.inventory.give(token, { k: 'box', id: bx.id });
     return { k: 'box', id: bx.id };
@@ -747,10 +747,11 @@ export class RoomCore {
       for (const a of done) if (a.xp) earned.parts.push({ label: 'Achievement', ach: a.id, xp: a.xp });
       earned.total += done.reduce((s, a) => s + a.xp, 0);
       // a season title in neon adds its bonus to everything earned, while its season lasts
-      const bonus = this.practice ? 0 : titleBonus(this.ranks.neon(c.token));
+      const worn = this.ranks.neon(c.token);
+      const bonus = this.practice ? 0 : titleBonus(worn) + foreverBonus(this.ranks.stitleIds?.(c.token), worn);
       if (bonus > 0 && earned.total > 0) {
         const extra = Math.round(earned.total * bonus);
-        earned.parts.push({ label: 'Season title', xp: extra });
+        earned.parts.push({ label: 'Title bonus', xp: extra });
         earned.total += extra;
       }
       // the day's bonuses (the first win or extraction, the XP boost) and the tasks it moves

@@ -621,7 +621,7 @@ function renderAssets() {
       b.title = priced ? `${info.symbol} ≈ ${usdText(app.prices.value(id, 10n ** BigInt(info.decimals)))}` : 'No price for this coin right now';
       const needText = need === null ? 'no price now' : capped ? t('coin.capShort', { max: money(info.maxStake) }) : info.stable ? `stake ${money(app.stake)}` : `stake ${tokenAmount(id, need)}`;
       if (info.custom) b.title = `${b.title} · ${t('coin.customTip', { max: money(info.maxStake ?? 0) })}`;
-      b.innerHTML = `<span class="dot" style="background:${info.color}"></span><span class="sym">${esc(info.symbol)}${info.custom ? ` <i class="coin-cx" aria-label="${esc(t('coin.custom'))}">${esc(t('coin.custom'))}</i>` : ''}</span><span class="amt">${priced ? money(app.prices.value(id, u)) : esc(formatUnits(u, info.decimals, 4))}</span><span class="need">${esc(needText)}</span>`;
+      b.innerHTML = `${info.logo && /^coins\/[a-z0-9-]+\.png$/.test(info.logo) ? `<img class="dot coin-logo" alt="" src="${info.logo}">` : `<span class="dot" style="background:${info.color}"></span>`}<span class="sym">${esc(info.symbol)}${info.custom ? ` <i class="coin-cx" aria-label="${esc(t('coin.custom'))}">${esc(t('coin.custom'))}</i>` : ''}</span><span class="amt">${priced ? money(app.prices.value(id, u)) : esc(formatUnits(u, info.decimals, 4))}</span><span class="need">${esc(needText)}</span>`;
       b.addEventListener('click', () => {
         app.asset = id;
         store.set('darkbags.asset', id);
@@ -1390,6 +1390,7 @@ function handleMessage(m) {
       app.assets = m.assets ?? [];
       app.prices = new PriceBook(app.assets);
       app.balances = m.balances ?? {};
+      app.promo = m.promo ?? null; // the STACHE gift: how many of the 100 are left
       app.tables = m.tables;
       app.online = m.online ?? null;
       app.rank = m.rank ?? null;
