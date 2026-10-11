@@ -112,3 +112,18 @@ test('the first 100 to stake STACHE: the title (+5% XP for good) and two cases, 
   assert.equal(foreverBonus([STACHE_TITLE], null), 0.05);
   assert.equal(foreverBonus([STACHE_TITLE], STACHE_TITLE), 0, 'worn: counted once, by the worn title');
 });
+
+test('the early gifts (granted before letters) get their letter once more, with two more cases', () => {
+  const promo = new PromoBook({ data: { stache: [{ key: 'me', at: 1 }, { key: 'friend', at: 2 }, { key: 'third', at: 3 }] } });
+  const { lobby } = setup({ promo });
+  lobby.mail.send({ key: 'third', kind: 'gift', title: 'STACHE gift', i18n: 'stache', gift: { k: 'box', id: STACHE_CASE_ID, n: 2 } }); // got the letter already
+  lobby.ranks.addForeverTitle('me', STACHE_TITLE); // the title was already given to the first
+  assert.equal(lobby.resendStacheGifts(), 2);
+  assert.equal(lobby.resendStacheGifts(), 0, 'once');
+  assert.equal(lobby.mail.inbox('third').filter((m) => m.i18n === 'stache').length, 1, 'no second letter for one who had it');
+  const mine = lobby.mail.inbox('me').find((m) => m.i18n === 'stache').gift;
+  assert.deepEqual(mine.items.map((x) => x.k), ['box'], 'the title is not sent twice');
+  const friend = lobby.mail.inbox('friend').find((m) => m.i18n === 'stache').gift;
+  assert.deepEqual(friend.items.map((x) => x.k), ['ntitle', 'box']);
+  assert.equal(friend.items[1].n, 2);
+});

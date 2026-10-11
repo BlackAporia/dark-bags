@@ -3144,3 +3144,34 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .tt-row.on { border-color: rgba(255, 209, 102, 0.6); background: rgba(255, 209, 102, 0.08); }
 .tt-row small { color: var(--dust); font-size: 11px; }
 .tt-neon { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 13px/1.2 var(--f-ui, inherit); color: var(--n); text-shadow: 0 0 8px var(--n); }
+/* ---- the stake, in two clear steps: 1 the coin, 2 how much */
+.stake-box { display: grid; gap: 14px; margin: 14px 0 6px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)); }
+.stake-box[hidden] { display: none; }
+.stake-step { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.stake-step[hidden] { display: none; }
+.step-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0; font: 700 13px/1.2 var(--f-ui, inherit); letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper); }
+.step-h .fine { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.step-n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--loot); color: #120c02; font: 800 12px/1 var(--f-ui, inherit); letter-spacing: 0; align-self: center; }
+.stake-box .asset-list { grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 6px; }
+.stake-box .asset { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 44px; padding: 8px 10px; }
+.stake-box .asset .dot { grid-row: auto; width: 14px; height: 14px; }
+.stake-box .asset .dot.coin-logo { width: 18px; height: 18px; }
+.stake-box .asset .sym { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.stake-box .asset .amt { font: 600 13px/1 var(--f-num, inherit); color: var(--dust); }
+.stake-box .asset[aria-pressed='true'] .amt { color: var(--paper); }
+.stake-box .asset.empty { opacity: 0.55; }
+.stake-box .asset.short:not([aria-pressed='true']) { opacity: 0.7; }
+.stake-box .asset.coin-more, .stake-box .asset.coin-add { grid-template-columns: 1fr; border-style: dashed; color: var(--dust); }
+.stake-box .asset.coin-add .need { display: none; }
+.stake-box .table-list { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.stake-box .table-btn { min-height: 44px; padding: 8px 10px; justify-content: center; }
+.stake-box .table-btn .stake { font-size: 17px; }
+.stake-box .stake-own { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-color: rgba(255, 196, 0, 0.45); }
+.stake-box .stake-own-k { font-size: 12px; color: var(--dust); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+.stake-box .stake-own-in { display: flex; align-items: center; flex: 1; gap: 2px; font: 700 22px/1 var(--f-num, inherit); }
+.stake-box .stake-own-in input { flex: 1; min-width: 0; width: 100%; font: inherit; background: transparent; border: 0; color: var(--paper); outline: none; }
+.stake-calc { margin: 0; min-height: 1.3em; font-size: 13px; color: var(--dust); }
+.stake-calc b { color: var(--paper); }
+.stake-calc.bad .warn { color: #ff8a8a; font-weight: 700; }
+.stake-calc .link { padding: 0; font-size: 13px; }
+.stake-box .stake-priv { margin: 0; }

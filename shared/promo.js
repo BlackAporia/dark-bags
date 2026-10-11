@@ -5,6 +5,7 @@ import { STACHE_GIFTS } from './stache.js';
 export class PromoBook {
   constructor({ data = {}, onChange = null, now = () => Date.now() } = {}) {
     this.stache = Array.isArray(data.stache) ? data.stache.slice(0, STACHE_GIFTS) : []; // [{ key, at }], in order
+    this.mailed = Array.isArray(data.mailed) ? data.mailed : []; // keys whose STACHE letter went out
     this.onChange = onChange;
     this.now = now;
   }
@@ -21,7 +22,17 @@ export class PromoBook {
     return this.stache.length;
   }
 
+  // who got the gift before it came as a letter (granted on the spot): sent once more by mail
+  unmailed() {
+    return this.stache.map((x) => x.key).filter((k) => !this.mailed.includes(k));
+  }
+
+  markMailed(key) {
+    if (!this.mailed.includes(key)) this.mailed.push(key);
+    this.onChange?.(this);
+  }
+
   toJSON() {
-    return { stache: this.stache };
+    return { stache: this.stache, mailed: this.mailed };
   }
 }

@@ -78,12 +78,15 @@ export class PriceFeed {
     return BigInt(w + f.padEnd(t.decimals, '0').slice(0, t.decimals)) || 1n;
   }
 
+  // A token's $ price. Fixed prices and USDC as they are; stablecoins and the BTC wrappers keep
+  // their peg unless their own quote agrees with it; every other coin is the median of several
+  // sources (multiQuote), so one thin pool or one stale site can't set it.
   async quoteOne(t) {
-    if (t.multi) return this.multiQuote(t);
     const sym = t.symbol.toUpperCase();
     if (this.fixed[sym] && !t.custom) return this.fixed[sym];
     if (t.id === this.usdToken?.id) return 1;
     const peg = this.stable(t) ? 1 : t.btc && !t.custom && sym !== 'WBTC' ? this.btcUsd : 0;
+    if (!peg && !this.plainOnly) return this.multiQuote(t);
     if (!this.usdToken) return peg;
     try {
       const amountIn = this.probeUnits(t);
@@ -100,8 +103,8 @@ export class PriceFeed {
     }
   }
 
-  // A coin priced from several places at once (t.multi: the partner coin, whose main pool is
-  // against STRK): Ekubo straight to USDC, Ekubo to STRK times STRK's price, DexScreener and
+  // A coin priced from several places at once (every coin that is not pegged): Ekubo straight to
+  // USDC, Ekubo to STRK times STRK's price (STACHE's main pool is against STRK), DexScreener and
   // GeckoTerminal. The median of what answers, after dropping any source more than 25% away
   // from it; the probe is about $5 of the coin (by its last price), not one token.
   async multiQuote(t) {
@@ -120,13 +123,10 @@ export class PriceFeed {
       const out = await this.quoter({ tokenIn: t, tokenOut: strk, amountIn }).catch(() => 0n);
       if (out > 0n) got.push(['ekubo-strk', per(out, strk.decimals) * strkUsd]);
     }
-    for (const [name, fn] of [
-      ['dexscreener', () => this.dexscreener(t)],
-      ['geckoterminal', () => this.geckoterminal(t)],
-    ]) {
-      const usd = await fn().catch(() => 0);
-      if (usd > 0) got.push([name, usd]);
-    }
+    // the sites: from this round's batch when there is one, else asked for this coin alone
+    const ext = this.ext?.get(t.id) ?? { dex: await this.dexscreener([t]).then((m) => m.get(t.id)).catch(() => 0), gecko: await this.geckoterminal([t]).then((m) => m.get(t.id)).catch(() => 0) };
+    if (ext.dex > 0) got.push(['dexscreener', ext.dex]);
+    if (ext.gecko > 0) got.push(['geckoterminal', ext.gecko]);
     const usd = robustMedian(got.map(([, v]) => v));
     this.sources.set(t.id, got);
     if (usd > 0) this.log.log?.(`price ${t.symbol}: $${usd.toPrecision(4)} from ${got.map(([n, v]) => `${n} ${v.toPrecision(4)}`).join(', ')}`);
@@ -140,20 +140,31 @@ export class PriceFeed {
     return res.ok ? res.json() : null;
   }
 
-  // DexScreener: the deepest Starknet pair where the coin is the base token
-  async dexscreener(t) {
-    const j = await this.getJson(`https://api.dexscreener.com/latest/dex/tokens/${t.id}`);
-    const pairs = (j?.pairs ?? []).filter((p) => p?.chainId === 'starknet' && sameAddr(p.baseToken?.address, t.id) && Number(p.priceUsd) > 0);
-    pairs.sort((a, b) => (Number(b.liquidity?.usd) || 0) - (Number(a.liquidity?.usd) || 0));
-    return pairs.length ? Number(pairs[0].priceUsd) : 0;
+  // DexScreener, many coins in one call (up to 30): for each, its deepest Starknet pair as base
+  async dexscreener(list) {
+    const out = new Map();
+    for (let i = 0; i < list.length; i += 30) {
+      const part = list.slice(i, i + 30);
+      const j = await this.getJson(`https://api.dexscreener.com/latest/dex/tokens/${part.map((t) => t.id).join(',')}`).catch(() => null);
+      for (const t of part) {
+        const pairs = (j?.pairs ?? []).filter((p) => p?.chainId === 'starknet' && sameAddr(p.baseToken?.address, t.id) && Number(p.priceUsd) > 0);
+        pairs.sort((a, b) => (Number(b.liquidity?.usd) || 0) - (Number(a.liquidity?.usd) || 0));
+        if (pairs.length) out.set(t.id, Number(pairs[0].priceUsd));
+      }
+    }
+    return out;
   }
 
-  // GeckoTerminal: its token price on Starknet (keys may come padded or not)
-  async geckoterminal(t) {
-    const j = await this.getJson(`https://api.geckoterminal.com/api/v2/simple/networks/starknet-alpha/token_price/${t.id}`);
-    const prices = j?.data?.attributes?.token_prices ?? {};
-    for (const [k, v] of Object.entries(prices)) if (sameAddr(k, t.id) && Number(v) > 0) return Number(v);
-    return 0;
+  // GeckoTerminal, many coins in one call (up to 30): its token prices on Starknet
+  async geckoterminal(list) {
+    const out = new Map();
+    for (let i = 0; i < list.length; i += 30) {
+      const part = list.slice(i, i + 30);
+      const j = await this.getJson(`https://api.geckoterminal.com/api/v2/simple/networks/starknet-alpha/token_price/${part.map((t) => t.id).join(',')}`).catch(() => null);
+      const prices = j?.data?.attributes?.token_prices ?? {};
+      for (const t of part) for (const [k, v] of Object.entries(prices)) if (sameAddr(k, t.id) && Number(v) > 0) out.set(t.id, Number(v));
+    }
+    return out;
   }
 
   // price one token now (a freshly imported coin should not wait for the next round)
@@ -173,8 +184,23 @@ export class PriceFeed {
   }
 
   async refresh() {
+    // one call per site for every coin priced by its market this round
+    const market = this.tokens.filter((t) => !this.stable(t) && !(t.btc && !t.custom && t.symbol.toUpperCase() !== 'WBTC') && !(this.fixed[t.symbol.toUpperCase()] && !t.custom) && t.id !== this.usdToken?.id);
+    if (market.length && this.fetch && !this.plainOnly) {
+      const [dex, gecko] = await Promise.all([this.dexscreener(market).catch(() => new Map()), this.geckoterminal(market).catch(() => new Map())]);
+      this.ext = new Map(market.map((t) => [t.id, { dex: dex.get(t.id) ?? 0, gecko: gecko.get(t.id) ?? 0 }]));
+    }
+    try {
+      await this.refreshAll();
+    } finally {
+      this.ext = null;
+    }
+  }
+
+  async refreshAll() {
     // WBTC first: the other BTC wrappers are checked against it
-    const order = [...this.tokens].sort((a, b) => (b.symbol.toUpperCase() === 'WBTC') - (a.symbol.toUpperCase() === 'WBTC') || !!a.multi - !!b.multi);
+    const first = (t) => (t.symbol.toUpperCase() === 'WBTC' ? 2 : t.symbol.toUpperCase() === 'STRK' && !t.custom ? 1 : 0);
+    const order = [...this.tokens].sort((a, b) => first(b) - first(a));
     for (const t of order) {
       try {
         const usd = await this.quoteOne(t);
