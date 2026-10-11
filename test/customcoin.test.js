@@ -109,5 +109,43 @@ test('a many-source price (STACHE): Ekubo to USDC and via STRK, DexScreener, Gec
   await feed.refresh();
   const p = prices.get(st.id).usd;
   assert.ok(Math.abs(p - 0.00012) / 0.00012 < 0.02, `median of the sources that agree: ${p}`);
-  assert.deepEqual(feed.sources.get(st.id).map(([n]) => n), ['ekubo-usdc', 'ekubo-strk', 'dexscreener', 'geckoterminal']);
+  const src = Object.fromEntries(feed.sources.get(st.id).map(([n, v, used]) => [n, used]));
+  assert.deepEqual(src, { dexscreener: true, geckoterminal: true, 'ekubo-usdc': false, 'ekubo-strk': true });
+});
+
+test('the price sites lead: Ekubo routes that agree with each other but not the market are ignored', async () => {
+  // what players saw: STRK at $0.114 on the market, but a thin bridged-USDC pool quoting $0.031;
+  // STACHE at $0.000116, quoted through that same pool at a third of it
+  const usd = { id: '0xusdc', symbol: 'USDC', decimals: 6 };
+  const strk = { id: '0x4718', symbol: 'STRK', decimals: 18 };
+  const st = { id: '0x0101', symbol: 'STACHE', decimals: 18 };
+  const quoter = async ({ tokenIn, tokenOut, amountIn }) => {
+    const n = Number(amountIn) / 1e18;
+    if (tokenIn.id === strk.id && tokenOut.id === usd.id) return BigInt(Math.round(n * 0.031 * 1e6));
+    if (tokenIn.id === st.id && tokenOut.id === usd.id) return BigInt(Math.round(n * 0.0000316 * 1e6));
+    if (tokenIn.id === st.id && tokenOut.id === strk.id) return BigInt(Math.round(n * 0.00102 * 1e18));
+    return 0n;
+  };
+  const fetchImpl = async (url) => ({
+    ok: true,
+    json: async () => {
+      if (url.includes('dexscreener') && url.includes('tokens/v1'))
+        return [
+          { chainId: 'starknet', baseToken: { address: '0x101' }, quoteToken: { address: '0x4718' }, priceUsd: '0.0001164', priceNative: '0.00102', liquidity: { usd: 52000 } },
+          { chainId: 'starknet', baseToken: { address: '0x4718' }, quoteToken: { address: '0xusdc' }, priceUsd: '0.1141', priceNative: '0.1141', liquidity: { usd: 900000 } },
+        ];
+      if (url.includes('llama')) return { coins: { 'starknet:0x4718': { price: 0.114 } } };
+      return {};
+    },
+  });
+  const prices = new PriceBook([]);
+  const feed = new PriceFeed({ tokens: [usd, strk, st], prices, quoter, usd, fetchImpl, log: quiet });
+  await feed.refresh();
+  assert.ok(Math.abs(prices.get(strk.id).usd - 0.114) < 0.002, `STRK ${prices.get(strk.id).usd}`);
+  const p = prices.get(st.id).usd;
+  assert.ok(Math.abs(p / 0.0001164 - 1) < 0.03, `STACHE ${p}`);
+  // and with no site answering at all, the chain is all there is
+  const lone = new PriceFeed({ tokens: [usd, strk], prices: new PriceBook([]), quoter, usd, fetchImpl: null, log: quiet });
+  await lone.refresh();
+  assert.ok(Math.abs(lone.prices.get(strk.id).usd - 0.031) < 0.001);
 });

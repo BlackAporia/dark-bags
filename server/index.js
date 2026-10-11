@@ -520,6 +520,19 @@ const server = http.createServer((req, res) => {
       .catch(() => res.writeHead(500).end('{}'));
     return;
   }
+  if (req.url === '/api/prices') {
+    // every coin's $ price on the table, and what each source said (used: counted in the price)
+    const src = real?.feed?.sources;
+    const body = lobby.prices.list().map((a) => ({
+      symbol: a.symbol,
+      id: a.id,
+      usd: a.usd,
+      ...(a.stable ? { pegged: true } : {}),
+      ...(src?.get(a.id) ? { sources: Object.fromEntries(src.get(a.id).map(([n, v, used]) => [n, { usd: v, used }])) } : {}),
+    }));
+    res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ at: new Date().toISOString(), prices: body }, null, 2));
+    return;
+  }
   if (req.url === '/api/stats') {
     const totals = Object.fromEntries([...lobby.rooms].map(([k, r]) => [k, r.totals]));
     const body = JSON.stringify({ online: sockets.size, tables: lobby.tables(), totals }, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));

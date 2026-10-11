@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The X (Twitter) header: 1500×500, shot at 2× by scripts/make-x.mjs. X lays the profile
+     picture over the bottom-left corner and crops the top and bottom on phones, so everything
+     that matters sits in the middle band, clear of that corner. The runners are the game's own. -->
+<link rel="stylesheet" href="../og/fonts/fonts.css">
+<style>
+  html, body { margin: 0; width: 1500px; height: 500px; overflow: hidden; background: #05060a; }
+  .x { position: relative; width: 1500px; height: 500px; overflow: hidden; font-family: 'Chakra Petch', sans-serif; color: #efe9dc;
+    background:
+      radial-gradient(42% 90% at 74% 62%, rgba(255, 170, 40, 0.32), transparent 64%),
+      radial-gradient(30% 70% at 96% 6%, rgba(255, 61, 127, 0.20), transparent 70%),
+      radial-gradient(40% 80% at 4% 100%, rgba(0, 200, 255, 0.10), transparent 70%),
+      linear-gradient(160deg, #0b0d16 0%, #06070c 55%, #0a0710 100%); }
+  .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size: 46px 46px; mask-image: radial-gradient(70% 100% at 72% 60%, #000 30%, transparent 85%); }
+  .beam { position: absolute; width: 1100px; height: 140px; left: 560px; top: 10px; transform: rotate(-22deg); background: linear-gradient(90deg, transparent, rgba(255, 210, 120, 0.10), transparent); filter: blur(6px); }
+  .storm { position: absolute; width: 1700px; height: 1700px; left: 330px; top: -560px; border-radius: 50%; border: 3px dashed rgba(120, 200, 255, 0.26); box-shadow: 0 0 50px rgba(80, 160, 255, 0.14) inset; }
+  .hazard { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: repeating-linear-gradient(135deg, #f4b400 0 16px, #0b0b0b 16px 32px); opacity: 0.85; }
+  canvas#scene { position: absolute; inset: 0; width: 1500px; height: 500px; }
+  .copy { position: absolute; left: 300px; top: 92px; width: 560px; }
+  .kicker { font: 600 16px/1 'IBM Plex Mono', monospace; letter-spacing: 0.32em; color: #ffb443; text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
+  .kicker i { width: 34px; height: 3px; background: #ffb443; display: inline-block; box-shadow: 0 0 10px #ffb443; }
+  h1 { margin: 12px 0 0; font: 900 132px/0.84 'Big Shoulders Stencil Display', sans-serif; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; }
+  h1 .dark { color: #f3eee2; text-shadow: 0 6px 0 rgba(0,0,0,0.6); }
+  h1 .bags { background: linear-gradient(180deg, #ffd56a 0%, #ff9a1f 55%, #ff5a1f 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 0 rgba(0,0,0,0.55)) drop-shadow(0 0 26px rgba(255, 140, 30, 0.55)); }
+  .tag { margin: 16px 0 0; font: 700 30px/1.1 'Chakra Petch', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
+  .tag b { color: #ffb443; }
+  .chips { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+  .chip { font: 700 13px/1 'IBM Plex Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; padding: 9px 12px; border-radius: 9px; border: 1.5px solid rgba(255, 180, 67, 0.55); background: rgba(10, 10, 16, 0.78); color: #ffd58a; }
+  .chip.c2 { border-color: rgba(76, 201, 240, 0.6); color: #9fe6ff; }
+  .chip.c3 { border-color: rgba(61, 220, 151, 0.6); color: #8ff0c2; }
+  .url { position: absolute; right: 40px; bottom: 34px; font: 800 19px/1 'Chakra Petch', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #0b0b0b; background: linear-gradient(180deg, #ffc24d, #ff8a1f); padding: 12px 18px; border-radius: 11px; box-shadow: 0 10px 30px rgba(255, 140, 30, 0.45); }
+  .vignette { position: absolute; inset: 0; box-shadow: inset 0 0 150px rgba(0,0,0,0.85); pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="x" id="x">
+  <div class="grid"></div>
+  <div class="beam"></div>
+  <div class="storm"></div>
+  <canvas id="scene" width="3000" height="1000"></canvas>
+  <div class="copy">
+    <div class="kicker"><i></i>Extraction shooter · Starknet</div>
+    <h1><span class="dark">Dark </span><span class="bags">Bags</span></h1>
+    <p class="tag">Stake. <b>Loot.</b> Get out.</p>
+    <div class="chips"><span class="chip">17 modes</span><span class="chip c2">Free in your browser</span><span class="chip c3">Real stakes on Starknet</span></div>
+  </div>
+  <div class="url">dark-bags.com ▸</div>
+  <div class="hazard"></div>
+  <div class="vignette"></div>
+</div>
+<script type="module">
+  import { drawPreview } from '/client/stickman.js';
+  import { boxArt } from '/client/locker.js';
+  import { BOX } from '/shared/cosmetics.js';
+  await Promise.all(["900 130px 'Big Shoulders Stencil Display'", "700 30px 'Chakra Petch'", "600 16px 'IBM Plex Mono'"].map((f) => document.fonts.load(f)));
+  const cv = document.getElementById('scene');
+  const ctx = cv.getContext('2d');
+  ctx.scale(2, 2);
+  const floorY = 410;
+  const disc = (x, r, c) => {
+    const g = ctx.createRadialGradient(x, floorY, 4, x, floorY, r);
+    g.addColorStop(0, c);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(x, floorY, r, r * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  disc(1130, 190, 'rgba(255,190,70,0.55)');
+  disc(975, 115, 'rgba(255,61,127,0.4)');
+  disc(1290, 115, 'rgba(76,201,240,0.4)');
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 80; i++) {
+    const x = 880 + rnd() * 600, y = 30 + rnd() * 400, r = 0.6 + rnd() * 2.2;
+    ctx.fillStyle = rnd() < 0.5 ? 'rgba(255,214,110,0.85)' : 'rgba(255,255,255,0.6)';
+    ctx.shadowColor = '#ffb443';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  const bag = (id, x, y, s) =>
+    new Promise((res) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,190,70,0.9)';
+        ctx.shadowBlur = 40;
+        ctx.drawImage(img, x - s / 2, y - s / 2, s, s);
+        ctx.restore();
+        res();
+      };
+      img.onerror = res;
+      let svg = boxArt(BOX[id], s);
+      if (!svg.includes('xmlns=')) svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    });
+  await bag('genesis', 1300, 110, 120);
+  await bag('w-apex', 965, 125, 96);
+  const runner = (outfit, ws, w, x, scale, aim, body = 'm') => drawPreview(ctx, { outfit, body, ws }, { x, y: floorY, scale, t: 1400, w, aim, moveK: 0.15, phase: 0.4 });
+  runner('void-emperor', { sniper: 'void' }, 12, 1290, 3.3, -0.55);
+  runner('neon-samurai', { knife: 'prism' }, 0, 975, 3.3, -0.45, 'f');
+  runner('golden-bull', { rifle: 'supernova' }, 7, 1130, 4.4, 0.1);
+  document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
