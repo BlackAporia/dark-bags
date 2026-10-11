@@ -1,18 +1,21 @@
-// The teaser trailer's soundtrack: renders scripts/trailer/score.html offline in Chromium and
-// writes videos/darkbags-teaser/assets/score.wav (loudness-normalised with ffmpeg when present).
+// A trailer's soundtrack: renders scripts/trailer/<page>.html offline in Chromium and writes
+// videos/<project>/assets/score.wav (loudness-normalised with ffmpeg when present).
 // Needs a static server on the repo root: python3 -m http.server 8123, then
-// node scripts/trailer/make-score.mjs
+//   node scripts/trailer/make-score.mjs                 the teaser (score.html → darkbags-teaser)
+//   node scripts/trailer/make-score.mjs hype            the hype video (hype-score.html → darkbags-hype)
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const base = process.env.OG_BASE ?? 'http://localhost:8123';
-const raw = 'videos/darkbags-teaser/assets/score.raw.wav';
-const out = 'videos/darkbags-teaser/assets/score.wav';
+const which = process.argv[2] ?? 'teaser';
+const [page, project] = which === 'hype' ? ['hype-score', 'darkbags-hype'] : ['score', 'darkbags-teaser'];
+const raw = `videos/${project}/assets/score.raw.wav`;
+const out = `videos/${project}/assets/score.wav`;
 const b = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
 const p = await b.newPage();
 p.on('pageerror', (e) => console.error(e));
-await p.goto(`${base}/scripts/trailer/score.html`);
+await p.goto(`${base}/scripts/trailer/${page}.html`);
 await p.waitForFunction(() => document.body.dataset.ready === '1', null, { timeout: 300000, polling: 500 });
 const { wav, peak } = await p.evaluate(() => ({ wav: window.__wav, peak: window.__peak }));
 await b.close();
