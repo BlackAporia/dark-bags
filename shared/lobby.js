@@ -8,6 +8,7 @@ import { MODES, MODE } from './modes.js';
 import { Inventory, OUTFITS, BOXES, BOX, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
 import { isStache, STACHE_GIFT_CASES, STACHE_CASE_ID, STACHE_TITLE, FOREVER_TITLES } from './stache.js';
 import { PromoBook } from './promo.js';
+import { COMMUNITY_IDS, COMMUNITY_TITLE, COMMUNITY_SPINS } from './community.js';
 import { SocialBook, GUILD_RANK } from './social.js';
 import { ReferralBook, cleanCode } from './referrals.js';
 import { Guard, GUARD } from './guard.js';
@@ -123,6 +124,24 @@ export class Lobby {
     return this.guard.seatOk({ key: this.key(s), net: s.net, dev: s.dev }, others);
   }
 
+  // A session gets its account's profile: the name saved on the server wins over whatever this
+  // device remembers (a phone after a PC is the same runner). A key without a profile yet gets one
+  // under the name the device typed. Returns true when the profile is new.
+  adoptProfile(s) {
+    const key = this.key(s);
+    if (!key) return false;
+    const had = this.social.get(key);
+    if (had) {
+      // a profile still on a default name takes the name this device knows
+      if (/^runner\d*$/.test(had.name) && s.name !== 'runner') this.social.touch(key, s.name);
+      else this.social.touch(key, null);
+      s.name = had.name;
+      return false;
+    }
+    s.name = this.social.touch(key, s.name).name; // a name someone else wears gets a free variant
+    return true;
+  }
+
   // whose balance this session plays with: the session itself (play money) or a signed-in address
   key(s) {
     return this.cashier ? s.account : s.token;
@@ -153,10 +172,10 @@ export class Lobby {
       else if (this.cashier || this.guard.allow('new', s.net, GUARD.newPerIpDay)) s.token = this.newToken();
       else return this.send(cid, { t: 'err', code: 'guard_new', msg: 'Too many new accounts from your network today. Come back tomorrow.' });
       s.name = cleanName(msg.name);
-      this.guard.see(this.key(s), s.net, s.dev);
       if (this.cashier) s.account = this.cashier.accountFor(s.token);
       else this.wallet.ensure(s.token);
-      this.social.touch(this.key(s), s.name);
+      this.guard.see(this.key(s), s.net, s.dev);
+      const fresh = this.adoptProfile(s);
       this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account });
       this.send(cid, {
         t: 'welcome',
@@ -175,6 +194,10 @@ export class Lobby {
         chat: this.chat,
         chain: this.cashier ? this.cashier.info() : null,
         social: this.socialSummary(s),
+        // the account's own name: on a new device the profile comes back, not a new runner
+        name: this.key(s) ? s.name : null,
+        fresh: this.key(s) ? fresh : null,
+        community: this.key(s) ? this.promo.communityOf(this.key(s)) : [],
         mail: this.key(s) ? this.mail.unread(this.key(s)) : 0,
         promo: this.practice ? null : { stacheLeft: this.promo.stacheLeft() },
         account: s.account,
@@ -193,6 +216,8 @@ export class Lobby {
       return;
     }
     if (!s.token) return;
+    // the name on the server is the player's name: a device only names a brand-new runner
+    if (typeof msg.name === 'string' && msg.t !== 'rename' && msg.t !== 'name_check' && this.key(s) && (s.fixedName || this.social.get(this.key(s)))) msg.name = s.name;
     if (SOCIAL.has(msg.t)) return this.socialOp(cid, s, msg);
     // the operator's pause switch (real money): nothing new goes in; cash-outs stay open
     if (this.cashier?.paused() && PAUSABLE.has(msg.t)) {
@@ -379,10 +404,30 @@ export class Lobby {
       case 'history':
         if (this.cashier) this.cashierOp(cid, s, msg);
         return;
+      case 'rename': {
+        const key = this.key(s);
+        const name = cleanName(msg.name);
+        if (!key || !msg.name || name === 'runner') return this.send(cid, { t: 'err', code: 'rename', msg: 'Pick a name of 3–16 letters or digits.' });
+        if (s.room) return this.send(cid, { t: 'err', code: 'rename', msg: 'Leave the table to change your name.' });
+        if (this.social.nameTaken(name, key)) return this.send(cid, { t: 'err', code: 'name_taken', msg: 'That name is taken. Pick another one.' });
+        s.name = this.social.touch(key, name).name;
+        for (const c of this.sessionsOf(key)) {
+          const x = this.sessions.get(c);
+          if (x) x.name = s.name;
+          this.send(c, { t: 'renamed', name: s.name });
+        }
+        return;
+      }
+      case 'name_check': {
+        const name = cleanName(msg.name);
+        return this.send(cid, { t: 'name_check', name, free: name !== 'runner' && !this.social.nameTaken(name, this.key(s)) });
+      }
+      case 'community':
+        return this.claimCommunity(cid, s, String(msg.id ?? ''));
       case 'join': {
-        if (msg.name) {
+        if (msg.name && !this.social.get(this.key(s))) {
           s.name = cleanName(msg.name);
-          this.social.touch(this.key(s), s.name);
+          s.name = this.social.touch(this.key(s), s.name)?.name ?? s.name;
         }
         // ranked is online only
         if (this.practice && MODE[msg.mode]?.ranked) return this.send(cid, { t: 'err', code: 'online_only', msg: 'Ranked works in online play only.' });
@@ -686,6 +731,22 @@ export class Lobby {
     return n;
   }
 
+  // Following one of the game's channels (X, Telegram): a free wheel spin each, and the Community
+  // Member title with the first. Once per account and channel; practice keeps nothing.
+  claimCommunity(cid, s, id) {
+    const key = this.key(s);
+    if (this.practice || !key) return this.send(cid, { t: 'err', code: 'community', msg: 'Sign in to keep your rewards.' });
+    if (!COMMUNITY_IDS.includes(id)) return;
+    if (!this.promo.claimCommunity(key, id)) return this.send(cid, { t: 'community', claimed: this.promo.communityOf(key), got: null });
+    this.inventory.give(key, { k: 'spin', n: COMMUNITY_SPINS });
+    const title = !this.ranks.stitleIds(key).includes(COMMUNITY_TITLE);
+    if (title) this.ranks.addForeverTitle(key, COMMUNITY_TITLE);
+    for (const c of this.sessionsOf(key)) {
+      this.send(c, { t: 'community', claimed: this.promo.communityOf(key), career: this.ranks.career(key), ...(c === cid ? { got: { id, spins: COMMUNITY_SPINS, title: title ? COMMUNITY_TITLE : null } } : {}) });
+      this.send(c, { t: 'locker', op: 'sync', locker: this.inventory.view(key) });
+    }
+  }
+
   // what a letter's gift hands over: a bundle gives each of its items; a neon title (ntitle) only
   // if it is one of the forever titles (the STACHE gift); the rest goes to the locker
   giveMailGift(key, g) {
@@ -846,23 +907,23 @@ export class Lobby {
         if (!alive()) return;
         s.account = account;
         this.guard.see(account, s.net, s.dev);
-        this.social.touch(account, s.name);
+        const fresh = this.adoptProfile(s);
         reply({ t: 'social', ...this.socialSummary(s) });
         this.stats?.seen(account, { wallet: true });
         // the welcome catch-up may add XP (the Founder title): before the reply, so its rank is right
         this.catchUpWelcome(account);
-        reply({ t: 'authed', account, admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
+        reply({ t: 'authed', account, name: s.name, fresh, community: this.promo.communityOf(account), admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
         if (!alive()) return;
         s.account = r.account;
         this.guard.see(r.account, s.net, s.dev);
-        this.social.touch(r.account, s.name);
+        const fresh = this.adoptProfile(s);
         reply({ t: 'social', ...this.socialSummary(s) });
         this.stats?.seen(r.account, { wallet: true });
         this.catchUpWelcome(r.account);
-        reply({ t: 'authed', account: r.account, admin: this.isAdmin(r.account), privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
+        reply({ t: 'authed', account: r.account, name: s.name, fresh, community: this.promo.communityOf(r.account), admin: this.isAdmin(r.account), privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
       } else if (msg.t === 'deposit') {
         reply({ t: 'cashier', op: 'deposit', status: 'checking' });
         let r;

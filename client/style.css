@@ -2780,6 +2780,14 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 .wr-ms.bad { color: #ff6b6b; }
 .wr-pl { grid-area: pl; font-size: 12px; color: var(--dust); text-align: end; }
 .wel-reg.auto { grid-template-areas: 'f n'; grid-template-columns: auto 1fr; }
+.wel-choice { display: grid; gap: 10px; }
+.wel-pick { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); color: var(--paper); text-align: start; cursor: pointer; transition: border-color 0.15s, transform 0.15s, background 0.15s; }
+.wel-pick:hover { transform: translateY(-1px); border-color: var(--loot); background: rgba(247, 147, 26, 0.08); }
+.wel-pick:first-child { border-color: rgba(247, 147, 26, 0.7); box-shadow: 0 0 0 1px rgba(247, 147, 26, 0.35); }
+.wp-ico { font-size: 28px; line-height: 1; }
+.wp-n { display: grid; gap: 4px; }
+.wp-n b { font-size: 17px; }
+.wp-n small { font-size: 13px; line-height: 1.4; color: var(--dust); }
 @media (max-width: 700px) {
   .wel-card { grid-template-columns: minmax(0, 1fr); }
   .wel-t { overflow-wrap: anywhere; font-size: 22px; }
@@ -3175,3 +3183,33 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .stake-calc.bad .warn { color: #ff8a8a; font-weight: 700; }
 .stake-calc .link { padding: 0; font-size: 13px; }
 .stake-box .stake-priv { margin: 0; }
+
+/* ---- Community: X and Telegram, and the reward for following them ---- */
+.cm { display: grid; gap: 12px; max-width: 860px; margin: 0 auto; }
+.cm-hero { padding: 20px; border-radius: 18px; border: 1px solid rgba(60, 230, 255, 0.35); background: radial-gradient(90% 140% at 100% 0%, rgba(42, 171, 238, 0.22), transparent 60%), linear-gradient(135deg, #121a28, #0a0c12); }
+.cm-title { margin: 0 0 6px; font: 900 clamp(24px, 3.6vw, 38px)/1.05 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; color: #e9f8ff; }
+.cm-sub { margin: 0; color: #d9deea; line-height: 1.5; }
+.cm-rewards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.cm-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(0, 0, 0, 0.35); font-weight: 700; }
+.cm-chip small { font-weight: 600; color: var(--dust); }
+.cm-neon { color: var(--n); text-shadow: 0 0 10px var(--n); font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; }
+.cm-list { display: grid; gap: 10px; }
+.cm-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(180deg, rgba(20, 24, 34, 0.92), rgba(10, 12, 18, 0.92)); }
+.cm-card.done { border-color: rgba(61, 220, 151, 0.4); }
+.cm-ico { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; color: var(--cc); background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
+.cm-ico svg { width: 28px; height: 28px; }
+.cm-tg { color: #fff; background: #2aabee; border-color: #2aabee; }
+.cm-x { color: #fff; background: #000; border-color: #333; }
+.cm-txt { display: grid; gap: 2px; min-width: 0; }
+.cm-txt b { font-size: 18px; }
+.cm-txt small { color: var(--dust); font-family: var(--f-num); overflow-wrap: anywhere; }
+.cm-txt p { margin: 4px 0 0; color: #cfd6e4; font-size: 14px; }
+.cm-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.cm-btn { white-space: nowrap; padding: 10px 14px; text-decoration: none; }
+.cm-done { color: #3ddc97; font-weight: 800; white-space: nowrap; }
+.cm-hint { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--dust); }
+@media (max-width: 640px) {
+  .cm-card { grid-template-columns: auto minmax(0, 1fr); }
+  .cm-acts { grid-column: 1 / -1; justify-content: stretch; }
+  .cm-acts > * { flex: 1; text-align: center; justify-content: center; }
+}

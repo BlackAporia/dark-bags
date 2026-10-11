@@ -1,4 +1,4 @@
-// STACHE: a partner coin on the table, with its own things. Pure data, no imports.
+// STACHE: a partner coin on the table, with its own things. Pure data.
 //
 //   the coin:  staked like any other (the cashier adds it at start, shared/stache.js is where the
 //              game learns its address and its logo)
@@ -6,6 +6,8 @@
 //              finishes and style, every rarity. Sold for $0.99 paid in STACHE at the live price.
 //   the gift:  the first 100 players to stake STACHE online get the Moustache Holder title
 //              (+5% XP, for good) and two Stache Cases.
+
+import { COMMUNITY_TITLE, COMMUNITY_TITLE_DEF } from './community.js';
 
 export const STACHE_ADDRESS = '0x010124018202a8174b3e30673ed42bdc14ff91d8ca0c057112fb904e262a30bf';
 // test mode (no chain) plays with symbol ids; the real coin is only ever its address
@@ -67,7 +69,9 @@ export const STACHE_STYLE = [
   STY('namefx', 'stache-gold', 'Royal Whiskers', 'exotic', [GOLD, '#8b6cf0'], 'stache-royal'),
 ];
 
-// the gift title: worn in neon like a season title, and its +5% XP never ends
+// the gift titles: worn in neon like a season title, and their XP bonus never ends (the STACHE
+// gift, +5%; following the game's channels, shared/community.js, +2%)
 export const FOREVER_TITLES = {
   [STACHE_TITLE]: { key: 'moustache', bonus: 0.05, color: GOLD, rarity: 'exotic', forever: true },
+  [COMMUNITY_TITLE]: COMMUNITY_TITLE_DEF,
 };

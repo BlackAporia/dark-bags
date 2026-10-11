@@ -1,11 +1,14 @@
 // Limited gifts that must never be handed out twice or past their count (the STACHE gift:
-// the first 100 players to stake STACHE online). Kept on disk like the locker.
+// the first 100 players to stake STACHE online; the reward for following each of the game's
+// channels, once per account). Kept on disk like the locker.
 import { STACHE_GIFTS } from './stache.js';
+import { COMMUNITY_IDS } from './community.js';
 
 export class PromoBook {
   constructor({ data = {}, onChange = null, now = () => Date.now() } = {}) {
     this.stache = Array.isArray(data.stache) ? data.stache.slice(0, STACHE_GIFTS) : []; // [{ key, at }], in order
     this.mailed = Array.isArray(data.mailed) ? data.mailed : []; // keys whose STACHE letter went out
+    this.community = data.community && typeof data.community === 'object' ? { ...data.community } : {}; // key → [channel ids claimed]
     this.onChange = onChange;
     this.now = now;
   }
@@ -32,7 +35,21 @@ export class PromoBook {
     this.onChange?.(this);
   }
 
+  communityOf(key) {
+    return key ? [...(this.community[key] ?? [])] : [];
+  }
+
+  // the reward for following one channel: true the first time for this account, false after
+  claimCommunity(key, id) {
+    if (!key || !COMMUNITY_IDS.includes(id)) return false;
+    const had = this.community[key] ?? [];
+    if (had.includes(id)) return false;
+    this.community[key] = [...had, id];
+    this.onChange?.(this);
+    return true;
+  }
+
   toJSON() {
-    return { stache: this.stache, mailed: this.mailed };
+    return { stache: this.stache, mailed: this.mailed, community: this.community };
   }
 }

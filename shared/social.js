@@ -43,6 +43,48 @@ export class SocialBook {
     this.guilds = new Map(Object.entries(data.guilds ?? {})); // guild id → { id, name, tag, owner, members, created, desc }
     this.gchat = new Map(Object.entries(data.gchat ?? {})); // guild id → [{ f, text, at }]
     this.lastDm = new Map(); // key → time of their last message (rate limit, not saved)
+    // one name, one player (any case): lower-case name → key
+    this.names = new Map();
+    if (this.dedupeNames()) this.changed();
+  }
+
+  // Names saved before they were unique: the runner who took a name first keeps it, a later
+  // one gets the next free variant (name2, name3, …) and can rename. Returns how many changed.
+  dedupeNames() {
+    let n = 0;
+    this.names.clear();
+    const byAge = [...this.players].sort(([, a], [, b]) => (a.created ?? 0) - (b.created ?? 0));
+    for (const [key, p] of byAge) {
+      const free = this.freeName(p.name || 'runner', key);
+      if (free !== p.name) {
+        p.name = free;
+        n++;
+      }
+      this.names.set(free.toLowerCase(), key);
+    }
+    return n;
+  }
+
+  // is this name someone else's?
+  nameTaken(name, key = null) {
+    const k = this.names.get(String(name ?? '').toLowerCase());
+    return k !== undefined && k !== key;
+  }
+
+  // the name itself when it is free, else the first free variant: name2, name3, …
+  freeName(name, key = null) {
+    const base = clean(name, 16) || 'runner';
+    if (!this.nameTaken(base, key)) return base;
+    for (let i = 2; ; i++) {
+      const v = `${base.slice(0, 16 - String(i).length)}${i}`;
+      if (!this.nameTaken(v, key)) return v;
+    }
+  }
+
+  setName(key, p, name) {
+    if (p.name && this.names.get(p.name.toLowerCase()) === key) this.names.delete(p.name.toLowerCase());
+    p.name = this.freeName(name, key);
+    this.names.set(p.name.toLowerCase(), key);
   }
 
   toJSON() {
@@ -62,12 +104,14 @@ export class SocialBook {
     if (!p) {
       let id = randomId();
       while (this.ids.has(id)) id = randomId();
-      p = { id, name: clean(name, 16) || 'runner', created: this.now(), seen: this.now(), friends: [], out: [], in: [], unread: {}, purchases: 0, guild: null };
+      p = { id, name: '', created: this.now(), seen: this.now(), friends: [], out: [], in: [], unread: {}, purchases: 0, guild: null };
+      this.setName(key, p, name);
       this.players.set(key, p);
       this.ids.set(id, key);
     } else {
+      // a new name that someone else wears becomes the next free variant (see rename for a refusal)
       const n = clean(name, 16);
-      if (n) p.name = n;
+      if (n && n !== p.name) this.setName(key, p, n);
       p.seen = this.now();
     }
     this.changed();

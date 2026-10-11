@@ -39,6 +39,7 @@ import { MILLS } from '../../shared/assets.js';
 const MAX_FELT = 2n ** 251n;
 const LOGIN_TTL_MS = 5 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
+const SESSION_RENEW_MS = 24 * 3600 * 1000;
 const PENDING_TTL_MS = 15 * 60 * 1000;
 const PENDING_PER_ACCOUNT = 5;
 const PENDING_TOTAL = 1000;
@@ -215,6 +216,11 @@ export class Cashier {
     if (this.now() - s.at > SESSION_TTL_MS) {
       this.sessions.delete(session);
       return null;
+    }
+    // a sign-in lasts while it is used: each day the device comes back renews its 30 days
+    if (this.now() - s.at > SESSION_RENEW_MS) {
+      s.at = this.now();
+      this.persist();
     }
     return s.account;
   }

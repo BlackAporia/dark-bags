@@ -296,3 +296,34 @@ test('a journal from one network never loads on another', () => {
   chain.info = () => ({ network: 'mainnet', chainId: 'SN_MAIN', house: HOUSE, routes: ['public'], tokens: chain.tokens });
   assert.throws(() => new Cashier({ chain, prices: new PriceBook([]), data: saved }), /separate file per network/);
 });
+
+test('a second device signs in with the same wallet: the same runner comes back, its name kept', async () => {
+  const { cashier } = setup();
+  const out = [];
+  let n = 0;
+  const lobby = new Lobby({ cashier, send: (cid, m) => out.push({ cid, ...m }), newToken: () => `sess${String(++n).padStart(4, '0')}`, bots: false });
+  const last = (cid, t) => out.filter((m) => m.cid === cid && m.t === t).at(-1);
+  const signInOn = async (cid, name) => {
+    lobby.connect(cid);
+    lobby.handle(cid, { t: 'hello', name });
+    lobby.handle(cid, { t: 'auth_start' });
+    const td = last(cid, 'auth_challenge').typedData;
+    await lobby.cashierOp(cid, lobby.sessions.get(cid), { t: 'auth', address: ALICE, signature: [`signed:${ALICE}:${td.message.nonce}`] });
+    return last(cid, 'authed');
+  };
+  const pc = await signInOn(1, 'Tsubasa');
+  assert.equal(pc.name, 'Tsubasa');
+  assert.equal(pc.fresh, true);
+  lobby.ranks.add(ALICE, 5000);
+  // the phone typed some other name in the welcome before signing in
+  const phone = await signInOn(2, 'NewGuy');
+  assert.equal(phone.name, 'Tsubasa');
+  assert.equal(phone.fresh, false);
+  assert.equal(phone.rank.xp, lobby.ranks.get(ALICE).xp);
+  assert.equal(lobby.social.get(ALICE).name, 'Tsubasa');
+  // a sign-in that is used stays signed in: each day back renews the 30 days
+  const s = cashier.sessions.get('sess0002');
+  s.at -= 29 * 24 * 3600 * 1000;
+  assert.equal(cashier.accountFor('sess0002'), ALICE);
+  assert.ok(Date.now() - cashier.sessions.get('sess0002').at < 1000);
+});
