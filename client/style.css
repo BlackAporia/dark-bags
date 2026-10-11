@@ -3133,3 +3133,14 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .nfx-stache { background: linear-gradient(90deg, var(--c2), #fffbe6, var(--c1), var(--c2)) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nfxSweep 2.8s linear infinite; }
 .nfx-stache-royal { background: linear-gradient(90deg, var(--c1), #fff6d0, var(--c2), var(--c1)) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nfxSweep 2.2s linear infinite; filter: drop-shadow(0 0 4px rgba(139, 108, 240, 0.6)); }
 @media (prefers-reduced-motion: reduce) { .bnr-stache::before, .bnr-stache-gold::before, .bnr-stache-gold::after { animation: none !important; } }
+/* titles from the main menu: the neon one worn, and the picker */
+.pf-neon { margin: -2px 0 0; font: 800 12px/1.2 var(--f-ui, inherit); letter-spacing: 0.06em; color: var(--n); text-shadow: 0 0 8px var(--n); }
+.pf-title-pick { align-self: flex-start; padding: 0; font-size: 12px; color: var(--dust); }
+.pf-title-pick:hover { color: var(--paper); }
+.dlg-titles { width: min(30rem, calc(100vw - 24px)); }
+.dlg-titles section + section { margin-top: 14px; }
+.tt-list { display: grid; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.tt-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
+.tt-row.on { border-color: rgba(255, 209, 102, 0.6); background: rgba(255, 209, 102, 0.08); }
+.tt-row small { color: var(--dust); font-size: 11px; }
+.tt-neon { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 13px/1.2 var(--f-ui, inherit); color: var(--n); text-shadow: 0 0 8px var(--n); }

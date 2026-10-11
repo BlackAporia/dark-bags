@@ -4,6 +4,8 @@
 import { OUTFIT, WSKIN, usd } from '../shared/cosmetics.js';
 import { esc } from './game.js';
 import { t } from './i18n.js';
+import { seasonTitle } from '../shared/ranked.js';
+import { STYLE } from '../shared/style.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,6 +22,9 @@ export function createMail({ app, send, sfx, toast, openBox = () => {}, openWhee
     if (g.k === 'box') return `${t(`box.${g.id}`)}${g.n > 1 ? ` ×${g.n}` : ''}`;
     if (g.k === 'trial') return t('mail.g.trial', { n: OUTFIT[g.id]?.name ?? g.id });
     if (g.k === 'wtrial') return t('mail.g.trial', { n: WSKIN[g.id]?.name ?? g.id });
+    if (g.k === 'ntitle') return `${t(`st.${seasonTitle(g.id)?.key ?? 'moustache'}`)} · ${t('mail.g.title')}`;
+    if (g.k === 'style') return STYLE[g.id]?.name ?? g.id;
+    if (g.k === 'bundle') return (g.items ?? []).map(giftText).filter(Boolean).join(' + ');
     return '';
   }
 
@@ -104,6 +109,7 @@ export function createMail({ app, send, sfx, toast, openBox = () => {}, openWhee
 
   // a claimed bag opens and a claimed spin turns right from the letter
   function useBtn(g) {
+    if (g?.k === 'bundle') return (g.items ?? []).map(useBtn).find(Boolean) ?? '';
     if (g?.k === 'box' && (app.locker?.boxes?.[g.id] || app.locker?.gboxes?.[g.id])) return `<button type="button" class="cta" id="mail-use" data-box="${esc(g.id)}">🎁 ${t('inv.open')}</button>`;
     if (g?.k === 'spin' && st.spins > 0) return `<button type="button" class="cta" id="mail-use">🎡 ${t('dl.spinNow')}</button>`;
     return '';

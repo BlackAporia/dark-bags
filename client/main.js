@@ -26,6 +26,7 @@ import { createPass } from './pass.js';
 import { createNews } from './news.js';
 import { createRanked, neonText, neonColor } from './ranked.js';
 import { createAchievements, achName, titleHtml } from './achievements.js';
+import { createTitles } from './titles.js';
 import { createDaily } from './daily.js';
 import { titleTier } from '../shared/achievements.js';
 import { createShop } from './shop.js';
@@ -230,6 +231,7 @@ const locker = createLocker({ app, send, sfx, toast: (m) => toast(m), openShop: 
 const ach = createAchievements({ app, send, sfx, toast: (m) => toast(m), open: () => go('achievements') });
 const daily = createDaily({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id), openWheel: () => fortune.open() });
 app.renderAch = () => ach.renderList();
+const titles = createTitles({ app, send });
 app.claimAch = (id) => daily.claimAch(id);
 const coinImport = createCoinImport({ app, send, toast: (m) => toast(m) });
 const offers = createOffers({ app, send, sfx, toast: (m) => toast(m) });
@@ -1359,7 +1361,10 @@ function onMessage(m) {
   if (regions.onMain(m)) return;
   if (m.t !== 'locker') handleMessage(m);
   locker.onMessage(m);
-  if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') ach.onMessage(m);
+  if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') {
+    ach.onMessage(m);
+    titles.renderHero();
+  }
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'daily') daily.onMessage(m);
   if ((m.t === 'daily' || m.t === 'locker' || m.t === 'fortune') && app.page === 'play') renderGoals();
   if (m.t === 'vc') voice.onMessage(m);
@@ -1929,6 +1934,7 @@ langSel.addEventListener('change', () => setLang(langSel.value));
 onLang(() => {
   renderLobby();
   ach.renderProfile();
+  titles.renderHero();
   PAGES[app.page]?.render();
   if (app.page === 'achievements') ach.renderList();
   if (app.screen === 'prep') renderPrep();

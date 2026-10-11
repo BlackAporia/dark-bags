@@ -2,13 +2,18 @@
 // trial skins, wheel spins). The team sends mail from the server (POST /api/admin/mail); the game
 // sends some by itself (the welcome bonus). Pure bookkeeping, no I/O: the server persists toJSON().
 const KEEP = 200; // messages kept per player (broadcasts are kept apart)
-const GIFTS = new Set(['credit', 'box', 'spin', 'trial', 'wtrial']);
+const GIFTS = new Set(['credit', 'box', 'spin', 'trial', 'wtrial', 'style', 'ntitle', 'bundle']);
 
 export function cleanGift(g) {
   if (!g || !GIFTS.has(g.k)) return null;
   if (g.k === 'credit') return { k: 'credit', v: Math.max(1, Math.min(10000, Math.round(Number(g.v) || 0))) };
   if (g.k === 'spin') return { k: 'spin', n: Math.max(1, Math.min(10, Math.round(Number(g.n) || 1))) };
   if (g.k === 'box') return { k: 'box', id: String(g.id ?? ''), n: Math.max(1, Math.min(10, Math.round(Number(g.n) || 1))) };
+  // several gifts in one letter (the STACHE gift: a title and two cases), claimed together
+  if (g.k === 'bundle') {
+    const items = (Array.isArray(g.items) ? g.items : []).filter((x) => x?.k !== 'bundle').map(cleanGift).filter(Boolean).slice(0, 10);
+    return items.length ? { k: 'bundle', items } : null;
+  }
   return { k: g.k, id: String(g.id ?? '') };
 }
 
