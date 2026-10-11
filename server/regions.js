@@ -356,6 +356,7 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
     }
     s.token = tk.key;
     s.name = String(tk.name ?? msg.name ?? 'runner').slice(0, 16);
+    s.fixedName = !!tk.name; // the account's name on the main server: the device can't change it here
     s.dev = lobby.guard.dev(msg.dev);
     lobby.guard.see(tk.key, s.net, s.dev);
     seed(tk.key, tk.seeds);

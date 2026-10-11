@@ -162,7 +162,7 @@ const ranks = new RankBook({
     rankTimer = setTimeout(async () => {
       rankTimer = null;
       await saveJSON(RANKS_FILE, r.toJSON()).catch((e) => console.error('ranks save failed', e));
-    }, SAVE_LATER);
+    }, SAVE_SOON);
   },
 });
 
@@ -189,7 +189,7 @@ const social = new SocialBook({
     socialTimer = setTimeout(async () => {
       socialTimer = null;
       await saveJSON(SOCIAL_FILE, sb.toJSON()).catch((e) => console.error('social save failed', e));
-    }, SAVE_LATER);
+    }, SAVE_SOON);
   },
 });
 
@@ -202,7 +202,7 @@ const referrals = new ReferralBook({
     refTimer = setTimeout(async () => {
       refTimer = null;
       await saveJSON(REFERRAL_FILE, rb.toJSON()).catch((e) => console.error('referrals save failed', e));
-    }, SAVE_LATER);
+    }, SAVE_SOON);
   },
 });
 
@@ -241,7 +241,7 @@ const mail = new MailBook({
     mailTimer = setTimeout(async () => {
       mailTimer = null;
       await saveJSON(MAIL_FILE, mb.toJSON()).catch((e) => console.error('mail save failed', e));
-    }, SAVE_LATER);
+    }, SAVE_SOON);
   },
 });
 
@@ -255,7 +255,7 @@ const daily = new DailyBook({
     dailyTimer = setTimeout(async () => {
       dailyTimer = null;
       await saveJSON(DAILY_FILE, db.toJSON()).catch((e) => console.error('daily save failed', e));
-    }, SAVE_LATER);
+    }, SAVE_SOON);
   },
 });
 
@@ -721,7 +721,7 @@ server.listen(PORT, () => {
 });
 
 let shuttingDown = false;
-const shutdown = async () => {
+const shutdown = async (code = 0) => {
   if (shuttingDown) return;
   shuttingDown = true;
   // stakes on the tables come back before anything is saved (the cashier journal is flushed below)
@@ -740,9 +740,16 @@ const shutdown = async () => {
   if (DESCENT_FILE) await saveJSON(DESCENT_FILE, descentBook.toJSON()).catch(() => {});
   if (STATS_FILE) await saveJSON(STATS_FILE, stats.toJSON()).catch(() => {});
   if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, social.toJSON()).catch(() => {});
+  if (PROMO_FILE) await saveJSON(PROMO_FILE, promo.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await saveJSON(WALLET_FILE, wallet.toJSON()).catch(() => {});
-  process.exit(0);
+  process.exit(code);
 };
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => shutdown(0));
+process.on('SIGTERM', () => shutdown(0));
+// a crash still refunds the tables and writes every store before the process goes; the exit
+// code stays an error, so the host restarts the server
+process.on('uncaughtException', (e) => {
+  console.error('uncaught exception, saving and exiting', e);
+  shutdown(1);
+});

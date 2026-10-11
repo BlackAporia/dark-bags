@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;background:transparent">
+<!-- Engine stills for the teaser trailer (videos/darkbags-teaser): runners and cases drawn by the
+     game's own renderer onto transparent canvases. scripts/trailer/make-stills.mjs collects them. -->
+<script type="module">
+  import { drawPreview } from '/client/stickman.js';
+  import { boxArt } from '/client/locker.js';
+  import { BOX } from '/shared/cosmetics.js';
+  const out = {};
+  const runner = (name, look, { w = 0, aim = -0.2, t = 1400, moveK = 0.15, phase = 0.4, attackT = -1e9 } = {}) => {
+    const c = document.createElement('canvas');
+    c.width = 1300; c.height = 1200;
+    const ctx = c.getContext('2d');
+    drawPreview(ctx, look, { x: 450, y: 1120, scale: 14, t, w, aim, moveK, phase, attackT });
+    out[name] = c.toDataURL('image/png');
+  };
+  runner('r-default', { outfit: null, body: 'm' }, { w: 0, aim: 0.15 });
+  runner('r-bull', { outfit: 'golden-bull', body: 'm', ws: { rifle: 'supernova' } }, { w: 7, aim: 0.05 });
+  runner('r-void', { outfit: 'void-emperor', body: 'm', ws: { sniper: 'void' } }, { w: 12, aim: -0.35 });
+  runner('r-samurai', { outfit: 'neon-samurai', body: 'f', ws: { knife: 'prism' } }, { w: 0, aim: -0.3 });
+  runner('r-phoenix', { outfit: 'phoenix', body: 'f', ws: { shotgun: 'inferno' } }, { w: 3, aim: 0.1 });
+  runner('r-thunder', { outfit: 'thunder-god', body: 'm', ws: { smg: 'plasma' } }, { w: 5, aim: -0.1 });
+  runner('r-ghost', { outfit: 'genesis-ghost', body: 'm', ws: { deagle: 'diamond' } }, { w: 2, aim: 0.2 });
+  const bag = (id, s = 640) =>
+    new Promise((res) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = s; c.height = s;
+        c.getContext('2d').drawImage(img, 0, 0, s, s);
+        out[`b-${id}`] = c.toDataURL('image/png');
+        res();
+      };
+      img.onerror = res;
+      let svg = boxArt(BOX[id], s);
+      if (!svg.includes('xmlns=')) svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    });
+  for (const id of ['genesis', 'apex', 'royal', 'diamond', 'w-apex', 'w-genesis', 'c-stache', 'c-neon', 'c-inferno', 'obsidian']) await bag(id);
+  window.__stills = out;
+  document.body.dataset.ready = '1';
+</script>
+</body>
+</html>

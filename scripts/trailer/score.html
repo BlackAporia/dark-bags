@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"></head>
+<body>
+<!-- The teaser trailer's soundtrack (videos/darkbags-teaser), rendered offline in one pass:
+     a synthesized score (pad, braams, 120 BPM combat beat), the room (rain, thunder, keys),
+     the game's own effects and announcer (client/sfx.js, voice-data.js) and a few Pixabay
+     SFX. scripts/trailer/make-score.mjs saves the result as a WAV. The timings match index.html. -->
+<script type="module">
+  import { Sfx } from '/client/sfx.js';
+  import { VOICE } from '/client/voice-data.js';
+
+  const SR = 48000;
+  const LEN = 30;
+  const ctx = new OfflineAudioContext(2, SR * LEN, SR);
+
+  // seeded random: the same score every render
+  let seed = 20261011;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  Math.random = rnd;
+
+  // ----------------------------------------------------------------- buses
+  const master = ctx.createGain();
+  master.gain.value = 0.9;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -16;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.18;
+  const limit = ctx.createDynamicsCompressor();
+  limit.threshold.value = -3;
+  limit.knee.value = 0;
+  limit.ratio.value = 20;
+  limit.attack.value = 0.001;
+  limit.release.value = 0.08;
+  master.connect(comp).connect(limit).connect(ctx.destination);
+
+  const impulse = (secs, decay = 3) => {
+    const len = Math.floor(SR * secs);
+    const buf = ctx.createBuffer(2, len, SR);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (rnd() * 2 - 1) * (1 - i / len) ** decay;
+    }
+    return buf;
+  };
+  const hall = ctx.createConvolver();
+  hall.buffer = impulse(4.2, 2.6);
+  const hallIn = ctx.createGain();
+  hallIn.gain.value = 0.5;
+  hallIn.connect(hall).connect(master);
+
+  // music bus with a sidechain duck driven by the kick
+  const music = ctx.createGain();
+  music.gain.value = 1;
+  const duck = ctx.createGain();
+  music.connect(duck).connect(master);
+  const musicVerb = ctx.createGain();
+  musicVerb.gain.value = 0.35;
+  duck.connect(musicVerb).connect(hallIn);
+
+  // the room: rain, hum, keys. Its lowpass closes as we push into the screen.
+  const room = ctx.createGain();
+  const roomLp = ctx.createBiquadFilter();
+  roomLp.type = 'lowpass';
+  roomLp.frequency.value = 16000;
+  room.connect(roomLp).connect(master);
+
+  const noiseBuf = (secs, brown = false) => {
+    const len = Math.floor(SR * secs);
+    const buf = ctx.createBuffer(2, len, SR);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        const w = rnd() * 2 - 1;
+        if (brown) {
+          last = (last + 0.02 * w) / 1.02;
+          d[i] = last * 3.5;
+        } else d[i] = w;
+      }
+    }
+    return buf;
+  };
+  const WHITE = noiseBuf(4);
+  const BROWN = noiseBuf(4, true);
+
+  // ------------------------------------------------------------- helpers
+  const env = (g, t, { a = 0.005, peak = 1, hold = 0, d = 0.3, from = 0.0001 } = {}) => {
+    g.gain.setValueAtTime(from, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    if (hold) g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + d);
+  };
+  const osc = (dest, t, { type = 'sine', f, to = null, glide = null, a = 0.005, peak = 0.3, hold = 0, d = 0.3, detune = 0 }) => {
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f, t);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t + (glide ?? a + hold + d));
+    o.detune.value = detune;
+    const g = ctx.createGain();
+    env(g, t, { a, peak, hold, d });
+    o.connect(g).connect(dest);
+    o.start(t);
+    o.stop(t + a + hold + d + 0.05);
+    return o;
+  };
+  const noise = (dest, t, { brown = false, type = 'bandpass', f = 1000, to = null, q = 0.8, a = 0.005, peak = 0.3, hold = 0, d = 0.3, loop = false }) => {
+    const src = ctx.createBufferSource();
+    src.buffer = brown ? BROWN : WHITE;
+    src.loop = true;
+    const flt = ctx.createBiquadFilter();
+    flt.type = type;
+    flt.frequency.setValueAtTime(f, t);
+    if (to) flt.frequency.exponentialRampToValueAtTime(to, t + a + hold + d);
+    flt.Q.value = q;
+    const g = ctx.createGain();
+    env(g, t, { a, peak, hold, d });
+    src.connect(flt).connect(g).connect(dest);
+    src.start(t, rnd() * 2);
+    src.stop(t + a + hold + d + 0.05);
+  };
+  const pan = (dest, p) => {
+    const n = ctx.createStereoPanner();
+    n.pan.value = p;
+    n.connect(dest);
+    return n;
+  };
+  const shaper = (amount) => {
+    const ws = ctx.createWaveShaper();
+    const n = 2048;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * amount) / Math.tanh(amount);
+    }
+    ws.curve = curve;
+    ws.oversample = '4x';
+    return ws;
+  };
+  const hz = (m) => 440 * 2 ** ((m - 69) / 12);
+
+  // pixabay files
+  const files = {};
+  for (const n of ['click', 'glitch-1', 'glitch-2', 'glitch-3', 'impact-bass-1', 'impact-bass-2', 'riser', 'whoosh-cinematic', 'whoosh', 'whoosh-short', 'sparkle', 'key-press', 'typing']) {
+    const r = await fetch(`/videos/darkbags-teaser/assets/sfx/${n}.mp3`);
+    files[n] = await ctx.decodeAudioData(await r.arrayBuffer());
+  }
+  const file = (name, t, { vol = 1, dest = master, offset = 0, rate = 1, dur = null, p = 0, lp = null } = {}) => {
+    const s = ctx.createBufferSource();
+    s.buffer = files[name];
+    s.playbackRate.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    let out = s.connect(g);
+    if (lp) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = lp;
+      out = out.connect(f);
+    }
+    out.connect(p ? pan(dest, p) : dest);
+    if (dur) {
+      g.gain.setValueAtTime(vol, t + dur - 0.04);
+      g.gain.linearRampToValueAtTime(0, t + dur);
+    }
+    s.start(Math.max(0, t), offset + Math.max(0, -t));
+    if (dur) s.stop(t + dur + 0.01);
+  };
+
+  // the game's own sound engine, driven on our clock
+  const game = new Sfx();
+  let T = 0;
+  game.ctx = new Proxy(ctx, {
+    get(target, prop) {
+      if (prop === 'currentTime') return T;
+      const v = target[prop];
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  });
+  game.muted = false;
+  const gameBus = ctx.createGain();
+  gameBus.gain.value = 0.9;
+  gameBus.connect(master);
+  game.master = gameBus;
+  game.bus = ctx.createGain();
+  game.bus.gain.value = 0.8;
+  game.bus.connect(gameBus);
+  game.verbIn = ctx.createGain();
+  game.verbIn.gain.value = 0.7;
+  game.verbIn.connect(hallIn);
+  game.white = WHITE;
+  game.brown = BROWN;
+  const play = (t, name, o = {}) => {
+    T = t;
+    game.play(name, o);
+  };
+  const sting = (t, tier) => {
+    T = t;
+    game.sting(tier);
+  };
+  const voices = {};
+  for (const k of ['s2', 'extracted']) {
+    const bin = Uint8Array.from(atob(VOICE.en[k]), (ch) => ch.charCodeAt(0));
+    voices[k] = await ctx.decodeAudioData(bin.buffer);
+  }
+  const say = (t, k, vol = 1.3) => {
+    const n = ctx.createBufferSource();
+    n.buffer = voices[k];
+    const lo = ctx.createBiquadFilter();
+    lo.type = 'lowshelf';
+    lo.frequency.value = 180;
+    lo.gain.value = 5;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.3;
+    n.connect(lo).connect(g).connect(master);
+    g.connect(wet).connect(hallIn);
+    n.start(t);
+  };
+
+  // =============================================================== SCENE 1: the room (0–6)
+  // rain: a wide wash plus droplets on the glass
+  {
+    const rain = ctx.createGain();
+    rain.gain.setValueAtTime(0.0001, 0);
+    rain.gain.exponentialRampToValueAtTime(0.22, 1.2);
+    rain.gain.setValueAtTime(0.22, 7.9);
+    rain.gain.exponentialRampToValueAtTime(0.0001, 8.06);
+    rain.gain.setValueAtTime(0.0001, 26.2);
+    rain.gain.exponentialRampToValueAtTime(0.06, 27.5);
+    rain.gain.setValueAtTime(0.06, 29);
+    rain.gain.linearRampToValueAtTime(0, 30);
+    rain.connect(room);
+    for (const [f, p, v] of [[2600, -0.6, 1], [5200, 0.5, 0.7], [900, 0, 0.6]]) {
+      const s = ctx.createBufferSource();
+      s.buffer = WHITE;
+      s.loop = true;
+      const b = ctx.createBiquadFilter();
+      b.type = 'bandpass';
+      b.frequency.value = f;
+      b.Q.value = 0.5;
+      const g = ctx.createGain();
+      g.gain.value = v;
+      s.connect(b).connect(g).connect(pan(rain, p));
+      s.start(0, p + 1);
+    }
+    // drops on the window, not in the second act
+    for (let i = 0; i < 160; i++) {
+      const t = rnd() * 8;
+      noise(pan(rain, rnd() * 1.6 - 0.8), t, { type: 'bandpass', f: 2500 + rnd() * 4000, q: 6, peak: 0.25 + rnd() * 0.4, d: 0.025 });
+    }
+    for (let i = 0; i < 40; i++) {
+      const t = 26.2 + rnd() * 3.6;
+      noise(pan(rain, rnd() * 1.6 - 0.8), t, { type: 'bandpass', f: 2500 + rnd() * 4000, q: 6, peak: 0.2, d: 0.025 });
+    }
+  }
+  // the PC hum and the room tone
+  {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, 0);
+    g.gain.exponentialRampToValueAtTime(0.05, 1);
+    g.gain.setValueAtTime(0.05, 7.9);
+    g.gain.exponentialRampToValueAtTime(0.0001, 8.05);
+    g.connect(room);
+    for (const [f, v] of [[60, 1], [120, 0.5], [180, 0.25]]) {
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      const og = ctx.createGain();
+      og.gain.value = v;
+      o.connect(og).connect(g);
+      o.start(0);
+      o.stop(8.1);
+    }
+  }
+  // thunder, far away, with the lightning on screen
+  for (const [t, v] of [[2.25, 0.9], [4.95, 0.5]]) {
+    noise(room, t, { brown: true, type: 'lowpass', f: 380, to: 90, q: 0.5, a: 0.25, hold: 0.3, d: 2.4, peak: v });
+    noise(room, t + 0.05, { type: 'lowpass', f: 1600, to: 300, q: 0.4, a: 0.03, d: 0.9, peak: v * 0.25 });
+  }
+  // the keyboard: bursts of keys, a mouse click here and there
+  {
+    let t = 0.7;
+    while (t < 5.6) {
+      const burst = 3 + Math.floor(rnd() * 6);
+      for (let k = 0; k < burst && t < 5.6; k++) {
+        const p = rnd() * 0.5 - 0.1;
+        noise(pan(room, p), t, { type: 'highpass', f: 2500 + rnd() * 1500, q: 0.7, peak: 0.18 + rnd() * 0.12, d: 0.02 });
+        noise(pan(room, p), t + 0.004, { type: 'bandpass', f: 380 + rnd() * 160, q: 2, peak: 0.25, d: 0.05 });
+        t += 0.06 + rnd() * 0.1;
+      }
+      t += 0.25 + rnd() * 0.5;
+    }
+    for (const c of [2.0, 3.35, 4.6]) file('click', c, { vol: 0.25, dest: room, p: 0.35 });
+  }
+  // the game he plays, leaking out of the headphones (thin and far)
+  {
+    const leak = ctx.createGain();
+    leak.gain.value = 0.32;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 700;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3200;
+    leak.connect(hp).connect(lp).connect(room);
+    const saved = game.bus;
+    game.bus = leak;
+    game.verbIn.gain.value = 0;
+    for (const [t, n] of [[1.25, 'pistol'], [1.55, 'pistol'], [2.9, 'smg'], [2.98, 'smg'], [3.06, 'smg'], [3.14, 'smg'], [3.6, 'flesh'], [4.2, 'pistol'], [4.45, 'pistol'], [5.1, 'shotgun']]) play(t, n);
+    game.bus = saved;
+    game.verbIn.gain.value = 0.7;
+  }
+
+  // the score starts under the room: a D minor drone that opens up
+  {
+    const pad = ctx.createGain();
+    pad.gain.setValueAtTime(0.0001, 0.3);
+    pad.gain.exponentialRampToValueAtTime(0.11, 5.5);
+    pad.gain.linearRampToValueAtTime(0.16, 7.9);
+    pad.gain.exponentialRampToValueAtTime(0.0001, 8.04);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(260, 0);
+    lp.frequency.exponentialRampToValueAtTime(1300, 7.9);
+    lp.Q.value = 2;
+    pad.connect(lp).connect(music);
+    for (const m of [38, 45, 50, 53, 57]) {
+      for (const det of [-12, 0, 11]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = hz(m);
+        o.detune.value = det + (m > 50 ? 4 : 0);
+        o.connect(pan(pad, det / 20));
+        o.start(0.3);
+        o.stop(8.1);
+      }
+    }
+  }
+  // the pulse: once we are at the screen, a heartbeat on the beat grid
+  for (let t = 6.0; t < 8.0; t += 0.5) {
+    osc(music, t, { f: 62, to: 38, peak: 0.55, d: 0.32 });
+    noise(music, t + 0.25, { type: 'highpass', f: 6000, peak: 0.05, d: 0.03 });
+  }
+  // a high string tremolo of tension, A5 then Bb5
+  {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, 6.0);
+    g.gain.exponentialRampToValueAtTime(0.05, 7.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, 8.04);
+    const trem = ctx.createOscillator();
+    trem.frequency.value = 12;
+    const tg = ctx.createGain();
+    tg.gain.value = 0.5;
+    const amp = ctx.createGain();
+    amp.gain.value = 0.5;
+    trem.connect(tg).connect(amp.gain);
+    amp.connect(g).connect(music);
+    for (const det of [-6, 6]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz(81), 6.0);
+      o.frequency.setValueAtTime(hz(82), 7.0);
+      o.detune.value = det;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 3500;
+      o.connect(f).connect(amp);
+      o.start(6.0);
+      o.stop(8.1);
+    }
+    trem.start(6.0);
+    trem.stop(8.1);
+  }
+  // cut to the monitor: the room closes in
+  roomLp.frequency.setValueAtTime(16000, 5.95);
+  roomLp.frequency.exponentialRampToValueAtTime(1100, 6.3);
+  file('whoosh-short', 5.86, { vol: 0.35 });
+  // the mouse glides to PLAY
+  noise(pan(master, 0.2), 7.25, { type: 'bandpass', f: 900, to: 2600, q: 1.2, a: 0.25, d: 0.35, peak: 0.08 });
+
+  // =============================================================== SCENE 2: the click (8.0)
+  file('click', 8.0, { vol: 1.2 });
+  osc(master, 8.0, { type: 'square', f: 2100, to: 900, peak: 0.08, d: 0.04 });
+  noise(hallIn, 8.0, { type: 'highpass', f: 2500, peak: 0.4, d: 0.05 });
+  // the electric silence: a ringing in the ears and mains buzz that grows
+  osc(master, 8.06, { f: 7600, a: 0.3, hold: 0.4, d: 0.3, peak: 0.03 });
+  {
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = 50;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 400;
+    f.Q.value = 1;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, 8.1);
+    g.gain.exponentialRampToValueAtTime(0.18, 8.98);
+    g.gain.setValueAtTime(0.0001, 9.0);
+    o.connect(shaper(4)).connect(f).connect(g).connect(master);
+    o.start(8.1);
+    o.stop(9.05);
+  }
+  // reverse swell into the dive
+  noise(master, 8.3, { type: 'highpass', f: 1500, to: 7000, q: 0.5, a: 0.68, d: 0.02, peak: 0.35 });
+  file('glitch-1', 8.55, { vol: 0.45, dur: 0.25 });
+  file('glitch-2', 8.82, { vol: 0.5, dur: 0.2, p: -0.3 });
+
+  // =============================================================== SCENE 3: the teleport (9–11)
+  file('whoosh-cinematic', 9.0, { vol: 0.9, dur: 1.9 });
+  // data scream: crushed noise sweeping up
+  {
+    const src = ctx.createBufferSource();
+    src.buffer = WHITE;
+    src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 5;
+    f.frequency.setValueAtTime(400, 9.0);
+    f.frequency.exponentialRampToValueAtTime(6000, 9.55);
+    const g = ctx.createGain();
+    env(g, 9.0, { a: 0.5, d: 0.08, peak: 0.25 });
+    src.connect(shaper(8)).connect(f).connect(g).connect(master);
+    src.start(9.0);
+    src.stop(9.7);
+  }
+  // the flash
+  file('impact-bass-2', 9.55, { vol: 0.8 });
+  noise(hallIn, 9.55, { type: 'highpass', f: 3000, peak: 0.6, d: 0.5 });
+  // the fall: wind rush and a long descending tone
+  noise(master, 9.6, { type: 'bandpass', f: 500, to: 2400, q: 0.7, a: 0.4, hold: 0.4, d: 0.42, peak: 0.45 });
+  noise(master, 9.6, { brown: true, type: 'lowpass', f: 300, q: 0.5, a: 0.3, hold: 0.6, d: 0.35, peak: 0.5 });
+  osc(music, 9.6, { type: 'triangle', f: 1400, to: 70, glide: 1.25, a: 0.1, hold: 0.9, d: 0.3, peak: 0.12 });
+  osc(music, 9.6, { type: 'triangle', f: 1400 * 1.5, to: 105, glide: 1.25, a: 0.1, hold: 0.9, d: 0.3, peak: 0.06 });
+  file('glitch-3', 10.15, { vol: 0.35, dur: 0.3, p: 0.4 });
+  for (let i = 0; i < 9; i++) osc(pan(master, rnd() * 1.4 - 0.7), 9.7 + i * 0.12, { type: 'square', f: 600 + rnd() * 2400, peak: 0.025, d: 0.04 });
+  // the riser that lands on the drop, then the breath before the hit
+  file('riser', 9.0, { vol: 0.55, offset: 8.15, dur: 1.85 });
+  noise(master, 10.2, { type: 'highpass', f: 800, to: 9000, q: 0.5, a: 0.64, d: 0.02, peak: 0.4 });
+
+  // =============================================================== the drop (11.0) and the beat
+  const braam = (t, big = 1) => {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.32 * big, t + 0.03);
+    g.gain.setValueAtTime(0.32 * big, t + 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6 * big);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 3;
+    lp.frequency.setValueAtTime(200, t);
+    lp.frequency.exponentialRampToValueAtTime(2600, t + 0.12);
+    lp.frequency.exponentialRampToValueAtTime(320, t + 1.8);
+    const sh = shaper(3);
+    sh.connect(lp).connect(g).connect(master);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.6;
+    g.connect(wet).connect(hallIn);
+    for (const m of [26, 38, 45, 50, 53]) {
+      for (const det of [-14, -4, 7, 15]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(hz(m) * 1.03, t);
+        o.frequency.exponentialRampToValueAtTime(hz(m), t + 0.12);
+        o.detune.value = det;
+        o.connect(sh);
+        o.start(t);
+        o.stop(t + 2.8 * big);
+      }
+    }
+    osc(master, t, { f: 110, to: 30, glide: 1.4, a: 0.004, d: 1.6 * big, peak: 0.95 });
+    noise(master, t, { type: 'highpass', f: 2000, peak: 0.6, d: 0.15 });
+    noise(hallIn, t, { brown: true, type: 'lowpass', f: 900, to: 80, q: 0.4, d: 2.2, peak: 0.8 });
+  };
+  braam(11.0);
+  file('impact-bass-1', 11.0, { vol: 0.9 });
+  play(11.0, 'boom', {});
+
+  // drums: 120 BPM, a 2 s bar of 16 steps from 11.0
+  const BEAT = 0.5;
+  const step = (bar, s) => 11.0 + bar * 2 + s * 0.125;
+  const drums = ctx.createGain();
+  drums.gain.value = 1;
+  drums.connect(master);
+  const dVerb = ctx.createGain();
+  dVerb.gain.value = 0.25;
+  drums.connect(dVerb).connect(hallIn);
+  const kick = (t, v = 1) => {
+    osc(drums, t, { f: 150, to: 42, glide: 0.09, a: 0.002, d: 0.38, peak: 0.95 * v });
+    noise(drums, t, { type: 'highpass', f: 3500, peak: 0.18 * v, d: 0.012 });
+    // sidechain
+    duck.gain.setValueAtTime(1, t);
+    duck.gain.linearRampToValueAtTime(0.35, t + 0.01);
+    duck.gain.linearRampToValueAtTime(1, t + 0.22);
+  };
+  const snare = (t, v = 1) => {
+    noise(drums, t, { type: 'bandpass', f: 1800, q: 0.6, peak: 0.55 * v, d: 0.22 });
+    noise(drums, t, { type: 'highpass', f: 5000, peak: 0.25 * v, d: 0.12 });
+    osc(drums, t, { type: 'triangle', f: 210, to: 160, peak: 0.35 * v, d: 0.12 });
+    noise(hallIn, t, { type: 'bandpass', f: 1500, q: 0.6, peak: 0.25 * v, d: 0.35 });
+  };
+  const hat = (t, v = 1, open = false) => noise(pan(drums, 0.25), t, { type: 'highpass', f: 8000, peak: 0.1 * v, d: open ? 0.16 : 0.03 });
+  const tom = (t, f = 90) => osc(drums, t, { f: f * 1.6, to: f, glide: 0.08, d: 0.3, peak: 0.6 });
+
+  // bass: distorted saw + sub on the root, with the kick
+  const bassBus = ctx.createGain();
+  bassBus.gain.value = 0.38;
+  const bassLp = ctx.createBiquadFilter();
+  bassLp.type = 'lowpass';
+  bassLp.frequency.value = 700;
+  bassLp.Q.value = 4;
+  const bassSh = shaper(5);
+  bassSh.connect(bassLp).connect(bassBus).connect(music);
+  const bass = (t, m, d = 0.2) => {
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = hz(m);
+    const g = ctx.createGain();
+    env(g, t, { a: 0.004, hold: d * 0.6, d: d * 0.4, peak: 0.8 });
+    o.connect(g).connect(bassSh);
+    o.start(t);
+    o.stop(t + d + 0.05);
+    osc(music, t, { f: hz(m - 12), a: 0.004, hold: d * 0.6, d: d * 0.4, peak: 0.4 });
+  };
+  // ostinato: a 16th-note arp in D minor, the filter opens bar by bar
+  const ostBus = ctx.createGain();
+  ostBus.gain.value = 0.11;
+  const ostLp = ctx.createBiquadFilter();
+  ostLp.type = 'lowpass';
+  ostLp.Q.value = 5;
+  ostLp.frequency.setValueAtTime(900, 11.0);
+  ostLp.frequency.exponentialRampToValueAtTime(5200, 23.4);
+  ostBus.connect(ostLp).connect(pan(music, -0.15));
+  const ostDelay = ctx.createDelay();
+  ostDelay.delayTime.value = 0.375;
+  const fb = ctx.createGain();
+  fb.gain.value = 0.28;
+  ostLp.connect(ostDelay).connect(fb).connect(ostDelay);
+  fb.connect(pan(music, 0.5));
+  const pluck = (t, m, v = 1) => {
+    for (const det of [-7, 7]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = hz(m);
+      o.detune.value = det;
+      const g = ctx.createGain();
+      env(g, t, { a: 0.003, d: 0.12, peak: v });
+      o.connect(g).connect(ostBus);
+      o.start(t);
+      o.stop(t + 0.16);
+    }
+  };
+  const ARP = [
+    [62, 57, 65, 57, 62, 57, 64, 57, 62, 57, 65, 57, 69, 57, 67, 65],
+    [62, 57, 65, 57, 62, 57, 64, 57, 65, 58, 70, 58, 69, 57, 64, 61],
+  ];
+  const ROOT = [38, 38, 34, 33, 38, 41, 34, 33]; // D D Bb A D F Bb A, one per half-bar... used per bar below
+  // hit chords for the title cards
+  const stab = (t, chord, big = 1) => {
+    const g = ctx.createGain();
+    env(g, t, { a: 0.005, hold: 0.08, d: 1.1, peak: 0.12 * big });
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(5000, t);
+    lp.frequency.exponentialRampToValueAtTime(600, t + 0.8);
+    g.connect(lp).connect(music);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.8;
+    lp.connect(wet).connect(hallIn);
+    for (const m of chord)
+      for (const det of [-10, 0, 10]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = hz(m);
+        o.detune.value = det;
+        o.connect(g);
+        o.start(t);
+        o.stop(t + 1.3);
+      }
+    osc(master, t, { f: 90, to: 32, glide: 0.5, d: 0.7, peak: 0.7 * big });
+    noise(master, t, { type: 'highpass', f: 2500, peak: 0.35, d: 0.08 });
+  };
+
+  for (let bar = 0; bar < 6; bar++) {
+    const intense = bar >= 3;
+    // kicks: 0, 6, 10 (+ 14 in the second half)
+    for (const s of intense ? [0, 6, 10, 14] : [0, 6, 10]) kick(step(bar, s), s === 0 ? 1 : 0.85);
+    for (const s of [4, 12]) snare(step(bar, s), 1);
+    for (let s = 0; s < 16; s++) {
+      if (intense || s % 2 === 0) hat(step(bar, s), s % 4 === 2 ? 1 : 0.55, s === 14 && !intense);
+    }
+    // bass with the kicks
+    const r1 = [38, 38, 34, 33, 38, 41][bar];
+    for (const s of intense ? [0, 6, 10, 14] : [0, 6, 10]) bass(step(bar, s), r1 + (s === 10 && bar % 2 ? 3 : 0), s === 0 ? 0.6 : 0.3);
+    // arp
+    const arp = ARP[bar % 2];
+    for (let s = 0; s < 16; s++) pluck(step(bar, s), arp[s] + (intense && s % 4 === 0 ? 12 : 0), s % 4 === 0 ? 1 : 0.6);
+  }
+  // no beat under the landing's first hit: the braam carries 11.0–11.5
+  // tom fills into each title card
+  for (const t of [14.125, 14.25, 14.375]) tom(t, 100 - (t - 14) * 60);
+  for (const t of [16.625, 16.75, 16.875]) tom(t, 100 - (t - 16.5) * 60);
+  for (const t of [21.125, 21.25, 21.375]) tom(t, 100 - (t - 21) * 60);
+  // title hits: STAKE (14.5), LOOT (17.0), GET OUT (21.5)
+  stab(14.5, [50, 53, 57, 62]);
+  file('impact-bass-2', 14.5, { vol: 0.55 });
+  stab(17.0, [46, 50, 53, 58]);
+  file('impact-bass-1', 17.0, { vol: 0.55 });
+  stab(21.5, [45, 49, 52, 57], 1.2);
+  file('impact-bass-2', 21.5, { vol: 0.7 });
+  for (const t of [14.38, 16.88, 21.36]) file('whoosh', t, { vol: 0.5 });
+
+  // the game on screen in the montage
+  for (const t of [12.62, 13.05]) play(t, 'knife', { x: 0, y: 0 });
+  for (let i = 0; i < 6; i++) play(13.55 + i * 0.07, 'smg', { x: 60, y: 0 });
+  play(13.62, 'flesh', { x: 40, y: 0 });
+  sting(13.68, 2);
+  say(13.8, 's2', 1.25);
+  for (const t of [16.05, 16.16, 16.27, 16.38]) play(t, 'rifle', { x: -40, y: 0 });
+  play(16.45, 'level');
+  play(16.72, 'bag');
+  // the loot card: cases land, coins ring
+  for (let i = 0; i < 6; i++) play(17.15 + i * 0.16, 'coin', { tier: i % 3 });
+  file('sparkle', 17.5, { vol: 0.5 });
+  for (const t of [18.55, 18.85]) play(t, 'pistol', { x: 30, y: 0 });
+  play(19.05, 'level');
+  // skins flip: four swishes
+  for (let i = 0; i < 4; i++) {
+    file('whoosh-short', 19.5 + i * 0.25 - 0.05, { vol: 0.4, rate: 1 + i * 0.08 });
+    play(19.5 + i * 0.25, 'coin', { tier: 2 });
+  }
+  play(20.5, 'storm');
+  play(20.75, 'sniper', { x: -80, y: 0 });
+  // the drum fill into the drop-out: 16ths then 32nds
+  for (let s = 0; s < 8; s++) snare(23.0 - 0.5 + s * 0.0625, 0.35 + s * 0.06);
+  for (let s = 0; s < 8; s++) snare(23.0 + s * 0.0625, 0.8);
+  kick(23.0);
+  file('riser', 20.6, { vol: 0.45, offset: 7.1, dur: 2.9 });
+  // results on screen: the announcer says it, and the music drops out
+  say(23.08, 'extracted', 1.4);
+  play(23.0, 'extract');
+  // reverse swell over the silence, into the logo
+  noise(master, 23.5, { type: 'highpass', f: 1200, to: 8000, q: 0.5, a: 0.48, d: 0.02, peak: 0.3 });
+
+  // =============================================================== END CARD (24–30)
+  braam(24.0, 1.35);
+  file('impact-bass-1', 24.0, { vol: 1 });
+  play(24.0, 'boom', {});
+  // the final chord rings under the logo
+  {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, 24.0);
+    g.gain.exponentialRampToValueAtTime(0.1, 24.4);
+    g.gain.setValueAtTime(0.1, 27.0);
+    g.gain.exponentialRampToValueAtTime(0.0001, 29.9);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(2200, 24.0);
+    lp.frequency.exponentialRampToValueAtTime(500, 29.5);
+    g.connect(lp).connect(music);
+    for (const m of [38, 45, 50, 53, 57, 62])
+      for (const det of [-9, 0, 9]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = hz(m);
+        o.detune.value = det;
+        o.connect(pan(g, det / 18));
+        o.start(24.0);
+        o.stop(30);
+      }
+  }
+  // bells as the lines appear
+  for (const [t, m] of [[24.9, 74], [25.5, 77], [26.15, 81], [26.8, 86]]) {
+    osc(pan(music, 0.3), t, { type: 'triangle', f: hz(m), peak: 0.08, d: 1.4 });
+    osc(pan(hallIn, -0.3), t, { type: 'sine', f: hz(m + 12), peak: 0.04, d: 1.8 });
+  }
+  file('sparkle', 26.7, { vol: 0.35 });
+  // a last low pulse, like a heartbeat, then the rain again
+  for (const t of [27.6, 28.1]) osc(master, t, { f: 58, to: 36, peak: 0.45, d: 0.35 });
+  roomLp.frequency.setValueAtTime(1100, 26.0);
+  roomLp.frequency.exponentialRampToValueAtTime(9000, 28.5);
+  // fade out
+  master.gain.setValueAtTime(0.9, 29.0);
+  master.gain.linearRampToValueAtTime(0.0, 30);
+
+  const buf = await ctx.startRendering();
+  // WAV, 16-bit stereo
+  const n = buf.length;
+  const out = new DataView(new ArrayBuffer(44 + n * 4));
+  const str = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  out.setUint32(4, 36 + n * 4, true);
+  str(8, 'WAVE');
+  str(12, 'fmt ');
+  out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true);
+  out.setUint16(22, 2, true);
+  out.setUint32(24, SR, true);
+  out.setUint32(28, SR * 4, true);
+  out.setUint16(32, 4, true);
+  out.setUint16(34, 16, true);
+  str(36, 'data');
+  out.setUint32(40, n * 4, true);
+  const L = buf.getChannelData(0);
+  const R = buf.getChannelData(1);
+  let peak = 0;
+  for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
+  const k = peak > 0.98 ? 0.98 / peak : 1;
+  for (let i = 0; i < n; i++) {
+    out.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i] * k)) * 32767, true);
+    out.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i] * k)) * 32767, true);
+  }
+  const bytes = new Uint8Array(out.buffer);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  window.__wav = btoa(bin);
+  window.__peak = peak;
+  document.body.dataset.ready = '1';
+</script>
+</body>
+</html>

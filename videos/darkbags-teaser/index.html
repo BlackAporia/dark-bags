@@ -1,0 +1,1614 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <!-- DARK BAGS teaser: a player at his PC at night clicks PLAY and is pulled into the game.
+         0–6 the room · 6–9 the monitor and the click · 9–11 the teleport · 11–24 the raid on a
+         120 BPM grid (beat = 0.5 s) · 24–30 the end card. The soundtrack (assets/score.wav) is
+         rendered by scripts/trailer/make-score.mjs on the same timings. -->
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: 'Big Shoulders Stencil Display';
+        font-weight: 900;
+        src: url(assets/fonts/BigShouldersStencilDisplay-900-latin.woff2) format('woff2');
+      }
+      @font-face {
+        font-family: 'Chakra Petch';
+        font-weight: 500;
+        src: url(assets/fonts/ChakraPetch-500-latin.woff2) format('woff2');
+      }
+      @font-face {
+        font-family: 'Chakra Petch';
+        font-weight: 700;
+        src: url(assets/fonts/ChakraPetch-700-latin.woff2) format('woff2');
+      }
+      @font-face {
+        font-family: 'IBM Plex Mono';
+        font-weight: 600;
+        src: url(assets/fonts/IBMPlexMono-600-latin.woff2) format('woff2');
+      }
+      :root {
+        --night: #05060a;
+        --paper: #efe9dc;
+        --orange: #ff9a1f;
+        --amber: #ffb443;
+        --cyan: #3ce6ff;
+        --storm: #ff3d7f;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--night);
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--night);
+        font-family: 'Chakra Petch', sans-serif;
+        color: var(--paper);
+      }
+      .layer,
+      .scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .scene {
+        display: none;
+        opacity: 0;
+        overflow: hidden;
+      }
+      .abs {
+        position: absolute;
+      }
+      .stencil {
+        font-family: 'Big Shoulders Stencil Display', sans-serif;
+        font-weight: 900;
+        text-transform: uppercase;
+        line-height: 0.84;
+      }
+      .mono {
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: 600;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+      canvas {
+        display: block;
+      }
+
+      /* ---------------------------------------------------------- scene 1: the room */
+      #cam1,
+      #shake1 {
+        position: absolute;
+        inset: 0;
+        transform-origin: 1180px 470px;
+      }
+      #room-svg {
+        position: absolute;
+        inset: 0;
+      }
+      #rain {
+        position: absolute;
+        left: 158px;
+        top: 168px;
+        width: 464px;
+        height: 454px;
+      }
+      #mon-wrap {
+        position: absolute;
+        left: 874px;
+        top: 244px;
+        width: 612px;
+        height: 372px;
+        overflow: hidden;
+        background: #000;
+        box-shadow:
+          0 0 90px 20px rgba(70, 160, 255, 0.22),
+          0 0 220px 60px rgba(255, 154, 31, 0.1);
+      }
+      #v-mon {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: brightness(1.15) saturate(1.2);
+      }
+      #mon-glass {
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px),
+          linear-gradient(125deg, rgba(255, 255, 255, 0.07), transparent 40%);
+      }
+      #person {
+        position: absolute;
+        inset: 0;
+      }
+      #dust {
+        position: absolute;
+        inset: 0;
+      }
+      #lightning {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        background: radial-gradient(60% 80% at 20% 40%, rgba(170, 200, 255, 0.35), transparent 70%);
+        mix-blend-mode: screen;
+      }
+      #flicker {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        background: radial-gradient(45% 55% at 61% 44%, rgba(90, 180, 255, 0.22), transparent 70%);
+        mix-blend-mode: screen;
+      }
+      #thought {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 190px;
+        display: flex;
+        justify-content: center;
+      }
+      #thought span {
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: 600;
+        font-size: 40px;
+        letter-spacing: 0.06em;
+        color: var(--paper);
+        text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
+        white-space: pre;
+      }
+      #clock {
+        position: absolute;
+        left: 120px;
+        bottom: 172px;
+        font-size: 26px;
+        color: rgba(239, 233, 220, 0.82);
+      }
+
+      /* ---------------------------------------------------------- scene 2: the monitor */
+      #cam2 {
+        position: absolute;
+        inset: 0;
+        transform-origin: 1211px 935px;
+      }
+      #s2-bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(55% 60% at 62% 50%, rgba(60, 120, 200, 0.28), transparent 70%),
+          #040509;
+      }
+      #screen {
+        position: absolute;
+        left: 400px;
+        top: 96px;
+        width: 1440px;
+        height: 900px;
+        border-radius: 10px;
+        border: 18px solid #0b0c10;
+        background: #000;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 2px #1a1c24,
+          0 40px 140px rgba(60, 150, 255, 0.28),
+          0 0 300px rgba(255, 154, 31, 0.12);
+      }
+      #screen .shot,
+      #screen .slice {
+        position: absolute;
+        inset: 0;
+        background-image: url(assets/menu.jpg);
+        background-size: 1404px 864px;
+        background-repeat: no-repeat;
+      }
+      #screen .shot.r {
+        filter: url(#only-r);
+        mix-blend-mode: screen;
+        opacity: 0;
+      }
+      #screen .shot.c {
+        filter: url(#only-gb);
+        mix-blend-mode: screen;
+        opacity: 0;
+      }
+      #screen .slice {
+        opacity: 0;
+      }
+      #screen-tex {
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.05) 0 1px, rgba(0, 255, 0, 0.05) 1px 2px, rgba(0, 80, 255, 0.05) 2px 3px),
+          repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px),
+          linear-gradient(118deg, rgba(255, 255, 255, 0.08), transparent 34%);
+      }
+      #play-hi {
+        position: absolute;
+        left: 23.2%;
+        top: 89.7%;
+        width: 68%;
+        height: 6.6%;
+        border-radius: 6px;
+        opacity: 0;
+        box-shadow:
+          0 0 0 3px rgba(255, 230, 170, 0.9),
+          0 0 40px 10px rgba(255, 154, 31, 0.75);
+      }
+      #ripple {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 120px;
+        height: 120px;
+        margin: -60px 0 0 -60px;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 220, 160, 0.9);
+        opacity: 0;
+      }
+      #cursor-pos {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1px;
+        height: 1px;
+      }
+      #cursor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 44px;
+        height: 56px;
+        transform-origin: 4px 4px;
+        filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6));
+      }
+      #head2 {
+        position: absolute;
+        left: -260px;
+        top: 300px;
+        width: 900px;
+        height: 1000px;
+        filter: blur(9px);
+      }
+      #screen-burn {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        background: radial-gradient(40% 40% at 57% 93%, rgba(255, 230, 190, 0.95), rgba(255, 154, 31, 0.5) 40%, transparent 75%);
+        mix-blend-mode: screen;
+      }
+
+      /* ---------------------------------------------------------- scene 3: the teleport */
+      #warp {
+        position: absolute;
+        inset: 0;
+      }
+      #faller {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 260px;
+        margin: -150px 0 0 -100px;
+      }
+
+      /* ---------------------------------------------------------- the raid */
+      .arena {
+        background:
+          radial-gradient(50% 60% at 40% 90%, rgba(255, 154, 31, 0.22), transparent 70%),
+          radial-gradient(40% 50% at 85% 10%, rgba(60, 230, 255, 0.1), transparent 70%),
+          var(--night);
+      }
+      .gridbg {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.05) 2px, transparent 2px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.05) 2px, transparent 2px);
+        background-size: 72px 72px;
+        -webkit-mask-image: radial-gradient(70% 80% at 50% 55%, #000 30%, transparent 85%);
+        mask-image: radial-gradient(70% 80% at 50% 55%, #000 30%, transparent 85%);
+      }
+      #land-cam {
+        position: absolute;
+        inset: 0;
+        transform-origin: 760px 880px;
+      }
+      #floor {
+        position: absolute;
+        left: -600px;
+        right: -600px;
+        top: 760px;
+        height: 900px;
+        transform: perspective(900px) rotateX(68deg);
+        transform-origin: 50% 0;
+        background-image:
+          linear-gradient(rgba(60, 230, 255, 0.22) 3px, transparent 3px),
+          linear-gradient(90deg, rgba(60, 230, 255, 0.22) 3px, transparent 3px);
+        background-size: 120px 120px;
+        -webkit-mask-image: linear-gradient(#000, transparent 80%);
+        mask-image: linear-gradient(#000, transparent 80%);
+      }
+      #beam {
+        position: absolute;
+        left: 610px;
+        top: -100px;
+        width: 300px;
+        height: 1020px;
+        background: linear-gradient(90deg, transparent, rgba(255, 220, 160, 0.55), transparent);
+        filter: blur(14px);
+      }
+      #ring1,
+      #ring2 {
+        position: absolute;
+        left: 460px;
+        top: 840px;
+        width: 600px;
+        height: 120px;
+        border-radius: 50%;
+        border: 6px solid rgba(255, 190, 90, 0.9);
+        box-shadow: 0 0 30px rgba(255, 154, 31, 0.8);
+        opacity: 0;
+      }
+      #me {
+        position: absolute;
+        left: 300px;
+        top: 160px;
+        width: 780px;
+      }
+      #land-copy {
+        position: absolute;
+        right: 120px;
+        top: 0;
+        bottom: 0;
+        width: 860px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 26px;
+      }
+      #land-copy .kick {
+        font-size: 26px;
+        color: var(--amber);
+      }
+      #land-title {
+        font-size: 260px;
+        color: var(--paper);
+        text-shadow: 0 10px 0 rgba(0, 0, 0, 0.55), 0 0 60px rgba(255, 154, 31, 0.35);
+      }
+      #land-sub {
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--paper);
+      }
+      #land-sub b {
+        color: var(--amber);
+      }
+
+      .vwrap {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+      .vwrap video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .vlabel {
+        position: absolute;
+        left: 80px;
+        bottom: 70px;
+        font-size: 24px;
+        padding: 12px 18px;
+        background: rgba(5, 6, 10, 0.8);
+        border: 2px solid rgba(255, 180, 67, 0.6);
+        border-radius: 8px;
+        color: var(--amber);
+      }
+
+      .card-title {
+        font-size: 360px;
+        color: var(--paper);
+        text-shadow: 0 12px 0 rgba(0, 0, 0, 0.55);
+      }
+      .card-title .o {
+        color: var(--orange);
+        text-shadow: 0 12px 0 rgba(0, 0, 0, 0.55), 0 0 70px rgba(255, 154, 31, 0.6);
+      }
+      .card-sub {
+        font-size: 30px;
+        color: var(--paper);
+      }
+
+      #stake-copy {
+        position: absolute;
+        left: 120px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 34px;
+      }
+      #bag {
+        position: absolute;
+        right: 140px;
+        top: 300px;
+        width: 620px;
+        padding: 34px 44px 40px;
+        border-radius: 22px;
+        border: 4px solid rgba(255, 180, 67, 0.85);
+        background: rgba(10, 10, 16, 0.9);
+        box-shadow: 0 0 80px rgba(255, 154, 31, 0.35);
+        text-align: right;
+      }
+      #bag .lbl {
+        font-size: 26px;
+        color: var(--amber);
+      }
+      #bag-num {
+        font-family: 'Chakra Petch', sans-serif;
+        font-weight: 700;
+        font-size: 190px;
+        line-height: 1;
+        color: var(--amber);
+        text-shadow: 0 0 40px rgba(255, 154, 31, 0.6);
+      }
+      #coins {
+        position: absolute;
+        right: 140px;
+        top: 700px;
+        width: 620px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 14px;
+      }
+      .chip {
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: 600;
+        font-size: 26px;
+        letter-spacing: 0.08em;
+        padding: 14px 20px;
+        border-radius: 12px;
+        border: 3px solid rgba(255, 180, 67, 0.6);
+        background: rgba(10, 10, 16, 0.85);
+        color: #ffd58a;
+      }
+      .chip.c2 {
+        border-color: rgba(76, 201, 240, 0.65);
+        color: #9fe6ff;
+      }
+      .chip.c3 {
+        border-color: rgba(61, 220, 151, 0.65);
+        color: #8ff0c2;
+      }
+
+      #loot-copy {
+        position: absolute;
+        right: 120px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-end;
+        gap: 34px;
+        text-align: right;
+      }
+      #rays {
+        position: absolute;
+        left: 120px;
+        top: 40px;
+        width: 1000px;
+        height: 1000px;
+        border-radius: 50%;
+        background: repeating-conic-gradient(rgba(255, 180, 67, 0.16) 0 6deg, transparent 6deg 18deg);
+        -webkit-mask-image: radial-gradient(closest-side, #000 20%, transparent 100%);
+        mask-image: radial-gradient(closest-side, #000 20%, transparent 100%);
+      }
+      .case {
+        position: absolute;
+        width: 380px;
+        height: 380px;
+      }
+
+      .skin {
+        background: var(--night);
+      }
+      .skin .glow {
+        position: absolute;
+        inset: 0;
+      }
+      .skin img {
+        position: absolute;
+        left: 520px;
+        top: 40px;
+        width: 1100px;
+      }
+      .skin .name {
+        position: absolute;
+        left: 120px;
+        bottom: 150px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .skin .name .stencil {
+        font-size: 150px;
+        color: var(--paper);
+      }
+      .skin .name .mono {
+        font-size: 28px;
+      }
+
+      #storm-ring {
+        position: absolute;
+        left: 160px;
+        top: -340px;
+        width: 1760px;
+        height: 1760px;
+        border-radius: 50%;
+        border: 8px dashed rgba(255, 61, 127, 0.75);
+        box-shadow:
+          0 0 80px rgba(255, 61, 127, 0.45),
+          inset 0 0 160px rgba(255, 61, 127, 0.3);
+      }
+      #storm-fog {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(42% 60% at 59% 47%, transparent 60%, rgba(150, 20, 70, 0.55) 100%);
+      }
+      #exit {
+        position: absolute;
+        left: 1300px;
+        top: 360px;
+        width: 360px;
+        height: 360px;
+        border-radius: 50%;
+        border: 10px dashed #f4b400;
+        background: radial-gradient(circle, rgba(244, 180, 0, 0.3), rgba(244, 180, 0, 0.06) 70%);
+        box-shadow: 0 0 60px rgba(244, 180, 0, 0.5);
+      }
+      #exit-lbl {
+        position: absolute;
+        left: 1300px;
+        top: 740px;
+        width: 360px;
+        text-align: center;
+        font-size: 26px;
+        color: #ffd36b;
+      }
+      #getout-copy {
+        position: absolute;
+        left: 120px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 30px;
+      }
+      #timer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 70px;
+        text-align: center;
+        font-family: 'Chakra Petch', sans-serif;
+        font-weight: 700;
+        font-size: 96px;
+        color: #ff5c8f;
+        text-shadow: 0 0 30px rgba(255, 61, 127, 0.7);
+      }
+      #timer small {
+        display: block;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 24px;
+        letter-spacing: 0.2em;
+        color: #ff9cbb;
+      }
+
+      /* ---------------------------------------------------------- end card */
+      #end-bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(40% 70% at 74% 66%, rgba(255, 170, 40, 0.3), transparent 66%),
+          radial-gradient(30% 60% at 96% 6%, rgba(255, 61, 127, 0.2), transparent 70%),
+          radial-gradient(40% 70% at 4% 100%, rgba(0, 200, 255, 0.12), transparent 70%),
+          var(--night);
+      }
+      #end-ring {
+        position: absolute;
+        left: 520px;
+        top: -900px;
+        width: 2200px;
+        height: 2200px;
+        border-radius: 50%;
+        border: 4px dashed rgba(120, 200, 255, 0.28);
+      }
+      #end-cam {
+        position: absolute;
+        inset: 0;
+        transform-origin: 960px 540px;
+      }
+      #end-copy {
+        position: absolute;
+        left: 130px;
+        top: 0;
+        bottom: 0;
+        width: 1000px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0;
+      }
+      #end-kick {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-size: 26px;
+        color: var(--amber);
+        margin-bottom: 22px;
+      }
+      #end-kick i {
+        display: block;
+        width: 54px;
+        height: 4px;
+        background: var(--amber);
+        box-shadow: 0 0 12px var(--amber);
+      }
+      .logo-line {
+        display: block;
+        font-size: 270px;
+        white-space: nowrap;
+      }
+      #logo-dark {
+        color: #f3eee2;
+        text-shadow: 0 10px 0 rgba(0, 0, 0, 0.6);
+      }
+      #logo-bags {
+        color: var(--orange);
+        text-shadow: 0 10px 0 rgba(0, 0, 0, 0.55), 0 0 50px rgba(255, 140, 30, 0.6);
+      }
+      #end-tag {
+        display: flex;
+        gap: 22px;
+        margin-top: 36px;
+        font-weight: 700;
+        font-size: 54px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      #end-tag span {
+        display: block;
+      }
+      #end-tag .b {
+        color: var(--amber);
+      }
+      #end-chips {
+        display: flex;
+        gap: 14px;
+        margin-top: 34px;
+      }
+      #url {
+        position: absolute;
+        right: 120px;
+        bottom: 110px;
+        font-weight: 700;
+        font-size: 44px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #0b0b0b;
+        background: linear-gradient(180deg, #ffc24d, #ff8a1f);
+        padding: 22px 34px;
+        border-radius: 16px;
+        box-shadow: 0 14px 50px rgba(255, 140, 30, 0.5);
+      }
+      #hazard {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 22px;
+        background: repeating-linear-gradient(135deg, #f4b400 0 28px, #0b0b0b 28px 56px);
+        opacity: 0.9;
+      }
+      .runner {
+        position: absolute;
+      }
+      .disc {
+        position: absolute;
+        border-radius: 50%;
+      }
+
+      /* ---------------------------------------------------------- overlays */
+      #fx,
+      #grain {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+        pointer-events: none;
+      }
+      #grain {
+        opacity: 0.09;
+        mix-blend-mode: overlay;
+      }
+      #vignette {
+        position: absolute;
+        inset: 0;
+        box-shadow: inset 0 0 260px rgba(0, 0, 0, 0.85);
+        pointer-events: none;
+      }
+      #flash {
+        position: absolute;
+        inset: 0;
+        background: #fff6e8;
+        opacity: 0;
+      }
+      #black {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        opacity: 0;
+      }
+      .bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 138px;
+        background: #000;
+      }
+      #bar-top {
+        top: 0;
+      }
+      #bar-bot {
+        bottom: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="30" data-width="1920" data-height="1080">
+      <svg width="0" height="0" style="position: absolute">
+        <filter id="only-r"><feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" /></filter>
+        <filter id="only-gb"><feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" /></filter>
+      </svg>
+
+      <audio id="score" src="assets/score.wav" data-start="0" data-duration="30" data-track-index="9" data-volume="1"></audio>
+
+      <div id="shake" class="layer">
+        <!-- ============================================================ 1 · THE ROOM (0–6) -->
+        <div id="s1" class="scene">
+          <div id="cam1">
+            <div id="shake1">
+              <svg id="room-svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+                <defs>
+                  <radialGradient id="g-monglow" cx="1180" cy="440" r="760" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#2a6d9c" stop-opacity="0.55" />
+                    <stop offset="0.35" stop-color="#1b3550" stop-opacity="0.35" />
+                    <stop offset="1" stop-color="#080a12" stop-opacity="0" />
+                  </radialGradient>
+                  <radialGradient id="g-warm" cx="1260" cy="560" r="520" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#ff9a1f" stop-opacity="0.2" />
+                    <stop offset="1" stop-color="#ff9a1f" stop-opacity="0" />
+                  </radialGradient>
+                  <linearGradient id="g-sky" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#0a1222" />
+                    <stop offset="0.7" stop-color="#16203a" />
+                    <stop offset="1" stop-color="#3a2537" />
+                  </linearGradient>
+                  <radialGradient id="g-desk" cx="1180" cy="720" r="620" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#1e3a55" stop-opacity="0.7" />
+                    <stop offset="1" stop-color="#06070b" stop-opacity="0" />
+                  </radialGradient>
+                  <linearGradient id="g-rim" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#9fdcff" stop-opacity="0.85" />
+                    <stop offset="0.35" stop-color="#5fb0ff" stop-opacity="0.35" />
+                    <stop offset="0.7" stop-color="#5fb0ff" stop-opacity="0" />
+                  </linearGradient>
+                  <linearGradient id="g-rgb" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="#ff9a1f" />
+                    <stop offset="0.5" stop-color="#ff3d7f" />
+                    <stop offset="1" stop-color="#3ce6ff" />
+                  </linearGradient>
+                  <filter id="blur6"><feGaussianBlur stdDeviation="6" /></filter>
+                  <filter id="blur18"><feGaussianBlur stdDeviation="18" /></filter>
+                  <filter id="blur3"><feGaussianBlur stdDeviation="2.5" /></filter>
+                  <clipPath id="clip-win"><rect x="158" y="168" width="464" height="454" /></clipPath>
+                </defs>
+                <!-- wall and the monitor's light on it -->
+                <rect width="1920" height="1080" fill="#080a12" />
+                <rect width="1920" height="1080" fill="url(#g-monglow)" />
+                <rect width="1920" height="1080" fill="url(#g-warm)" />
+                <!-- a poster on the wall: the game, of course -->
+                <g opacity="0.55">
+                  <rect x="1610" y="170" width="220" height="300" rx="4" fill="#0d0f17" stroke="#1d2230" stroke-width="3" />
+                  <text data-layout-allow-occlusion x="1720" y="300" text-anchor="middle" font-family="Big Shoulders Stencil Display" font-weight="900" font-size="74" fill="#cfc8b8">DARK</text>
+                  <text data-layout-allow-occlusion x="1720" y="370" text-anchor="middle" font-family="Big Shoulders Stencil Display" font-weight="900" font-size="74" fill="#c77418">BAGS</text>
+                  <rect x="1630" y="430" width="180" height="10" fill="#6b5313" />
+                </g>
+                <!-- the window: a city in the rain -->
+                <g clip-path="url(#clip-win)">
+                  <rect x="158" y="168" width="464" height="454" fill="url(#g-sky)" />
+                  <g id="sky-flash" opacity="0"><rect x="158" y="168" width="464" height="454" fill="#b9cdf5" /></g>
+                  <g id="city"></g>
+                  <g id="bokeh" filter="url(#blur6)"></g>
+                </g>
+                <!-- window frame -->
+                <g fill="#030407">
+                  <rect x="140" y="150" width="500" height="18" />
+                  <rect x="140" y="622" width="500" height="22" />
+                  <rect x="140" y="150" width="18" height="494" />
+                  <rect x="622" y="150" width="18" height="494" />
+                  <rect x="381" y="150" width="12" height="494" />
+                  <rect x="140" y="384" width="500" height="10" />
+                </g>
+                <rect x="132" y="640" width="516" height="16" fill="#0d1018" />
+                <!-- desk -->
+                <path d="M0 742 L1920 712 L1920 1080 L0 1080 Z" fill="#05060a" />
+                <path d="M0 742 L1920 712 L1920 1080 L0 1080 Z" fill="url(#g-desk)" />
+                <path d="M0 742 L1920 712" stroke="#2f4f6e" stroke-width="3" opacity="0.6" />
+                <!-- monitor bezel and stand (the screen itself is the video above) -->
+                <rect x="860" y="230" width="640" height="400" rx="8" fill="#0a0b0f" />
+                <rect x="1150" y="630" width="60" height="78" fill="#0b0c11" />
+                <ellipse cx="1180" cy="712" rx="130" ry="15" fill="#0d0f15" />
+                <!-- can -->
+                <rect x="742" y="640" width="46" height="96" rx="6" fill="#0c0e15" />
+                <rect x="742" y="640" width="6" height="96" fill="#3a6f97" opacity="0.5" />
+                <!-- keyboard with its underglow -->
+                <rect x="985" y="748" width="420" height="34" rx="8" fill="url(#g-rgb)" opacity="0.55" filter="url(#blur18)" id="kb-glow" />
+                <rect x="1000" y="742" width="390" height="30" rx="6" fill="#0b0c12" />
+                <rect x="1450" y="752" width="160" height="40" rx="6" fill="#090a10" />
+                <ellipse cx="1528" cy="760" rx="22" ry="14" fill="#10121a" />
+                <circle cx="1528" cy="753" r="3" fill="#ff9a1f" />
+              </svg>
+              <canvas id="rain" width="464" height="454"></canvas>
+              <div id="mon-wrap">
+                <video id="v-mon" class="clip" src="assets/clips/mon.mp4" muted playsinline data-start="0" data-duration="6" data-track-index="1"></video>
+                <div id="mon-glass"></div>
+              </div>
+              <canvas id="dust" width="1920" height="1080"></canvas>
+              <!-- the player, from behind: hoodie, headset, gaming chair -->
+              <svg id="person" viewBox="0 0 1920 1080" width="1920" height="1080">
+                <g id="body">
+                  <path id="torso" d="M1112 655 C1060 655 1045 690 1040 712 C980 722 920 752 905 820 L880 1080 L1350 1080 L1322 820 C1308 752 1248 722 1186 712 C1180 690 1166 655 1112 655 Z" fill="#020204" />
+                  <path d="M1040 712 C980 722 920 752 905 820 L880 1080" stroke="url(#g-rim)" stroke-width="4" fill="none" filter="url(#blur3)" />
+                  <path d="M1186 712 C1248 722 1308 752 1322 820 L1350 1080" stroke="url(#g-rim)" stroke-width="5" fill="none" filter="url(#blur3)" />
+                  <!-- hood bunched at the neck -->
+                  <path d="M1040 716 C1060 690 1160 690 1188 716 C1170 738 1060 740 1040 716 Z" fill="#06070b" />
+                </g>
+                <g id="head">
+                  <ellipse cx="1112" cy="592" rx="74" ry="86" fill="#020204" />
+                  <path d="M1046 560 C1050 512 1080 500 1112 500 C1146 500 1176 514 1180 560" stroke="url(#g-rim)" stroke-width="5" fill="none" filter="url(#blur3)" />
+                  <!-- headset -->
+                  <path d="M1030 600 C1026 520 1070 486 1112 486 C1156 486 1200 520 1196 600" stroke="#0d0e14" stroke-width="16" fill="none" />
+                  <path d="M1034 560 C1040 510 1076 492 1112 492 C1150 492 1186 512 1192 560" stroke="#6fbfff" stroke-width="2" fill="none" opacity="0.45" />
+                  <rect x="1012" y="570" width="38" height="70" rx="16" fill="#0d0e14" />
+                  <rect x="1176" y="570" width="38" height="70" rx="16" fill="#0d0e14" />
+                  <circle cx="1196" cy="606" r="4" fill="#ff9a1f" id="led" />
+                </g>
+                <!-- the chair back, in front of him -->
+                <path d="M960 1080 L972 820 C976 790 1000 776 1030 774 L1196 774 C1226 776 1250 790 1254 820 L1266 1080 Z" fill="#07080d" />
+                <path d="M992 1080 L1002 830 C1006 806 1020 800 1040 800 L1186 800 C1206 800 1220 806 1224 830 L1234 1080" stroke="#ff9a1f" stroke-width="3" fill="none" opacity="0.5" />
+                <path d="M972 820 C976 790 1000 776 1030 774 L1196 774 C1226 776 1250 790 1254 820" stroke="#6fbfff" stroke-width="3" fill="none" opacity="0.4" />
+              </svg>
+              <div id="flicker"></div>
+              <div id="lightning"></div>
+            </div>
+          </div>
+          <div id="clock" class="mono" data-layout-allow-occlusion>03:12 AM</div>
+          <div id="thought"><span id="thought-t"></span></div>
+        </div>
+
+        <!-- ============================================================ 2 · THE MONITOR (6–9.6) -->
+        <div id="s2" class="scene">
+          <div id="s2-bg"></div>
+          <div id="cam2">
+            <div id="screen">
+              <div class="shot" id="shot"></div>
+              <div class="shot r" id="shot-r"></div>
+              <div class="shot c" id="shot-c"></div>
+              <div class="slice" id="sl0" style="clip-path: inset(8% 0 82% 0)"></div>
+              <div class="slice" id="sl1" style="clip-path: inset(30% 0 62% 0)"></div>
+              <div class="slice" id="sl2" style="clip-path: inset(47% 0 44% 0)"></div>
+              <div class="slice" id="sl3" style="clip-path: inset(66% 0 26% 0)"></div>
+              <div class="slice" id="sl4" style="clip-path: inset(88% 0 3% 0)"></div>
+              <div id="play-hi"></div>
+              <div id="ripple"></div>
+              <div id="cursor-pos">
+                <svg id="cursor" viewBox="0 0 44 56">
+                  <path d="M4 4 L4 46 L15 35 L23 52 L31 48 L23 32 L38 32 Z" fill="#fff" stroke="#000" stroke-width="3" stroke-linejoin="round" />
+                </svg>
+              </div>
+              <div id="screen-tex"></div>
+              <div id="screen-burn"></div>
+            </div>
+          </div>
+          <svg id="head2" viewBox="0 0 900 1000">
+            <ellipse cx="420" cy="430" rx="300" ry="350" fill="#010102" />
+            <path d="M80 470 C70 170 250 40 430 40 C610 40 790 170 780 470" stroke="#0b0c11" stroke-width="56" fill="none" />
+            <rect x="660" y="380" width="150" height="250" rx="60" fill="#0b0c11" />
+            <path d="M700 120 C760 180 790 300 786 470" stroke="#5fb8ff" stroke-width="10" fill="none" opacity="0.5" />
+            <path d="M120 800 C200 760 640 760 720 800 L900 1000 L0 1000 Z" fill="#010102" />
+          </svg>
+        </div>
+
+        <!-- ============================================================ 3 · THE TELEPORT (9.4–11) -->
+        <div id="s3" class="scene">
+          <canvas id="warp" width="1920" height="1080"></canvas>
+          <img id="faller" src="assets/stills/r-default.png" alt="" />
+        </div>
+
+        <!-- ============================================================ 4 · THE RAID (11–24) -->
+        <div id="land" class="scene arena">
+          <div id="land-cam">
+            <div class="gridbg"></div>
+            <div id="floor"></div>
+            <div id="beam"></div>
+            <div id="ring1"></div>
+            <div id="ring2"></div>
+            <img id="me" src="assets/stills/r-default.png" alt="" />
+          </div>
+          <div id="land-copy">
+            <div class="mono kick" id="land-kick">Raid · drop zone</div>
+            <div class="stencil" id="land-title">You're in.</div>
+            <div id="land-sub">Start with a knife. <b>Every kill upgrades your gun.</b></div>
+          </div>
+        </div>
+
+        <div class="vwrap" id="w-c1"><video id="v-c1" class="clip" src="assets/clips/c1.mp4" muted playsinline data-start="12.5" data-duration="1" data-track-index="2"></video></div>
+        <div class="vwrap" id="w-c2"><video id="v-c2" class="clip" src="assets/clips/c2.mp4" muted playsinline data-start="13.5" data-duration="1" data-track-index="2"></video></div>
+
+        <div id="stake" class="scene arena">
+          <div class="gridbg"></div>
+          <div id="stake-copy">
+            <div class="mono card-sub" id="stake-kick">Any coin you hold · from $0.10</div>
+            <div class="stencil card-title" id="stake-title"><span class="o">Stake.</span></div>
+          </div>
+          <div id="bag">
+            <div class="mono lbl">Your bag</div>
+            <div id="bag-num">$0.10</div>
+          </div>
+          <div id="coins">
+            <span class="chip">STRK</span><span class="chip c2">ETH</span><span class="chip c3">USDC</span><span class="chip">STACHE</span>
+          </div>
+        </div>
+
+        <div class="vwrap" id="w-c3"><video id="v-c3" class="clip" src="assets/clips/c3.mp4" muted playsinline data-start="16" data-duration="1" data-track-index="2"></video></div>
+
+        <div id="loot" class="scene arena">
+          <div class="gridbg"></div>
+          <div id="rays"></div>
+          <img class="case" id="case1" src="assets/stills/b-genesis.png" alt="" style="left: 120px; top: 150px" />
+          <img class="case" id="case2" src="assets/stills/b-c-stache.png" alt="" style="left: 470px; top: 90px" />
+          <img class="case" id="case3" src="assets/stills/b-w-apex.png" alt="" style="left: 300px; top: 470px" />
+          <img class="case" id="case4" src="assets/stills/b-royal.png" alt="" style="left: 690px; top: 430px" />
+          <img class="case" id="case5" src="assets/stills/b-c-neon.png" alt="" style="left: -40px; top: 560px" />
+          <div id="loot-copy">
+            <div class="mono card-sub" id="loot-kick">Common → Exotic</div>
+            <div class="stencil card-title" id="loot-title"><span class="o">Loot.</span></div>
+            <div class="mono card-sub" id="loot-sub">Hundreds of skins</div>
+          </div>
+        </div>
+
+        <div class="vwrap" id="w-c4"><video id="v-c4" class="clip" src="assets/clips/c4.mp4" muted playsinline data-start="18.5" data-duration="1" data-track-index="2"></video></div>
+
+        <div id="sk1" class="scene skin">
+          <div class="glow" style="background: radial-gradient(50% 70% at 62% 55%, rgba(255, 190, 60, 0.55), transparent 70%)"></div>
+          <img src="assets/stills/r-bull.png" alt="" />
+          <div class="name"><span class="mono" style="color: #ffd36b">Exotic</span><span class="stencil">Golden Bull</span></div>
+        </div>
+        <div id="sk2" class="scene skin">
+          <div class="glow" style="background: radial-gradient(50% 70% at 62% 55%, rgba(170, 90, 255, 0.55), transparent 70%)"></div>
+          <img src="assets/stills/r-void.png" alt="" />
+          <div class="name"><span class="mono" style="color: #d6b8ff">Exotic</span><span class="stencil">Void Emperor</span></div>
+        </div>
+        <div id="sk3" class="scene skin">
+          <div class="glow" style="background: radial-gradient(50% 70% at 62% 55%, rgba(255, 61, 127, 0.5), transparent 70%)"></div>
+          <img src="assets/stills/r-samurai.png" alt="" />
+          <div class="name"><span class="mono" style="color: #ffb3cf">Exotic</span><span class="stencil">Neon Samurai</span></div>
+        </div>
+        <div id="sk4" class="scene skin">
+          <div class="glow" style="background: radial-gradient(50% 70% at 62% 55%, rgba(255, 120, 30, 0.55), transparent 70%)"></div>
+          <img src="assets/stills/r-phoenix.png" alt="" />
+          <div class="name"><span class="mono" style="color: #ffc28a">Exotic</span><span class="stencil">Phoenix</span></div>
+        </div>
+
+        <div class="vwrap" id="w-c5"><video id="v-c5" class="clip" src="assets/clips/c5.mp4" muted playsinline data-start="20.5" data-duration="1" data-track-index="2"></video></div>
+
+        <div id="getout" class="scene arena">
+          <div class="gridbg"></div>
+          <div id="storm-fog"></div>
+          <div id="storm-ring"></div>
+          <div id="exit"></div>
+          <div id="exit-lbl" class="mono">Last exit · north gate</div>
+          <div id="timer"><span id="timer-n">0:29</span><small>Storm closing</small></div>
+          <div id="getout-copy">
+            <div class="stencil card-title" id="getout-title"><span class="o">Get out.</span></div>
+            <div class="mono card-sub" id="getout-sub">Before the storm seals the raid</div>
+          </div>
+        </div>
+
+        <div class="vwrap" id="w-c6"><video id="v-c6" class="clip" src="assets/clips/c6.mp4" muted playsinline data-start="23" data-duration="0.5" data-track-index="2"></video></div>
+
+        <!-- ============================================================ 5 · END CARD (24–30) -->
+        <div id="end" class="scene">
+          <div id="end-bg"></div>
+          <div class="gridbg"></div>
+          <div id="end-ring" data-layout-allow-overflow></div>
+          <div id="end-cam">
+            <div class="disc" id="disc1" style="left: 1150px; top: 870px; width: 640px; height: 120px; background: radial-gradient(closest-side, rgba(255, 190, 70, 0.6), transparent)"></div>
+            <div class="disc" id="disc2" style="left: 1000px; top: 880px; width: 380px; height: 90px; background: radial-gradient(closest-side, rgba(170, 90, 255, 0.5), transparent)"></div>
+            <div class="disc" id="disc3" style="left: 1560px; top: 880px; width: 380px; height: 90px; background: radial-gradient(closest-side, rgba(255, 61, 127, 0.5), transparent)"></div>
+            <img class="runner" id="end-r2" src="assets/stills/r-void.png" alt="" style="left: 830px; top: 300px; width: 720px" />
+            <img class="runner" id="end-r3" src="assets/stills/r-samurai.png" alt="" style="left: 1390px; top: 300px; width: 720px" />
+            <img class="runner" id="end-r1" src="assets/stills/r-bull.png" alt="" style="left: 1000px; top: 130px; width: 940px" />
+            <div id="end-copy">
+              <div id="end-kick" class="mono" data-layout-allow-occlusion><i></i>Extraction shooter · Starknet</div>
+              <span class="stencil logo-line" id="logo-dark" data-layout-allow-occlusion>Dark</span>
+              <span class="stencil logo-line" id="logo-bags" data-layout-allow-occlusion>Bags</span>
+              <div id="end-tag"><span id="tg1" data-layout-allow-occlusion>Stake.</span><span id="tg2" class="b">Loot.</span><span id="tg3">Get out.</span></div>
+              <div id="end-chips"><span class="chip">17 modes</span><span class="chip c2">Free in your browser</span><span class="chip c3">Real stakes on Starknet</span></div>
+            </div>
+            <div id="url">dark-bags.com ▸</div>
+          </div>
+          <div id="hazard"></div>
+        </div>
+      </div>
+
+      <!-- ============================================================ overlays -->
+      <canvas id="fx" width="1920" height="1080" data-layout-allow-occlusion data-layout-allow-overflow></canvas>
+      <canvas id="grain" width="960" height="540" data-layout-allow-occlusion></canvas>
+      <div id="vignette"></div>
+      <div id="bar-top" class="bar"></div>
+      <div id="bar-bot" class="bar"></div>
+      <div id="black"></div>
+      <div id="flash"></div>
+    </div>
+
+    <script>
+      // ------------------------------------------------------------------ seeded random
+      function rng(seed) {
+        return function () {
+          seed |= 0;
+          seed = (seed + 0x6d2b79f5) | 0;
+          let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      const $ = (id) => document.getElementById(id);
+      const SVGNS = 'http://www.w3.org/2000/svg';
+      const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+      const ease = (x) => x * x * (3 - 2 * x);
+
+      // ------------------------------------------------------------------ the city in the window
+      {
+        const r = rng(7);
+        const city = $('city');
+        let x = 150;
+        while (x < 630) {
+          const w = 40 + r() * 70;
+          const h = 90 + r() * 230;
+          const b = document.createElementNS(SVGNS, 'rect');
+          b.setAttribute('x', x);
+          b.setAttribute('y', 622 - h);
+          b.setAttribute('width', w);
+          b.setAttribute('height', h);
+          b.setAttribute('fill', r() < 0.5 ? '#070912' : '#0a0d18');
+          city.append(b);
+          for (let wy = 622 - h + 10; wy < 610; wy += 16)
+            for (let wx = x + 6; wx < x + w - 8; wx += 12) {
+              if (r() < 0.22) {
+                const l = document.createElementNS(SVGNS, 'rect');
+                l.setAttribute('x', wx);
+                l.setAttribute('y', wy);
+                l.setAttribute('width', 6);
+                l.setAttribute('height', 8);
+                l.setAttribute('fill', r() < 0.7 ? '#ffb36b' : '#8fd8ff');
+                l.setAttribute('opacity', (0.25 + r() * 0.5).toFixed(2));
+                city.append(l);
+              }
+            }
+          x += w + 4 + r() * 10;
+        }
+        const bokeh = $('bokeh');
+        for (let i = 0; i < 26; i++) {
+          const c = document.createElementNS(SVGNS, 'circle');
+          c.setAttribute('cx', 160 + r() * 460);
+          c.setAttribute('cy', 520 + r() * 100);
+          c.setAttribute('r', 5 + r() * 12);
+          c.setAttribute('fill', ['#ff5a3c', '#ffb443', '#3ce6ff', '#ff3d7f', '#fff1c9'][Math.floor(r() * 5)]);
+          c.setAttribute('opacity', (0.25 + r() * 0.45).toFixed(2));
+          bokeh.append(c);
+        }
+      }
+
+      // ------------------------------------------------------------------ canvases (drawn from time)
+      const rainCtx = $('rain').getContext('2d');
+      const dustCtx = $('dust').getContext('2d');
+      const warpCtx = $('warp').getContext('2d');
+      const fxCtx = $('fx').getContext('2d');
+      const grainCtx = $('grain').getContext('2d');
+      const grainImg = grainCtx.createImageData(960, 540);
+
+      const R = rng(42);
+      const drops = Array.from({ length: 260 }, () => ({ x: R() * 520 - 40, p: R(), v: 900 + R() * 700, l: 14 + R() * 26, a: 0.15 + R() * 0.35 }));
+      const glass = Array.from({ length: 46 }, () => ({ x: R() * 464, y: R() * 454, r: 1.5 + R() * 3.5, v: R() < 0.3 ? 20 + R() * 60 : 0 }));
+      const motes = Array.from({ length: 90 }, () => ({ x: 880 + R() * 620, y: 220 + R() * 520, s: 0.6 + R() * 1.8, ph: R() * 6.28, sp: 0.2 + R() * 0.6 }));
+      const streaks = Array.from({ length: 520 }, () => ({ a: R() * Math.PI * 2, z: R(), sp: 0.6 + R() * 0.9, c: R() < 0.45 ? '#ff9a1f' : R() < 0.75 ? '#3ce6ff' : '#efe9dc', w: 1 + R() * 2.5 }));
+      const tiles = Array.from({ length: 40 }, () => ({ a: R() * Math.PI * 2, r: 0.35 + R() * 0.6, z: R(), s: 30 + R() * 70, rot: R() * 6, glyph: R() < 0.3 ? '$' : '' }));
+      const pixels = Array.from({ length: 260 }, () => ({ x: R() * 700 - 220, y: 380 + R() * 700, d: R() * 0.6, s: 8 + R() * 22, c: R() < 0.5 ? '#ff9a1f' : R() < 0.7 ? '#3ce6ff' : '#0b0c11' }));
+      const sparks = Array.from({ length: 140 }, () => ({ a: -Math.PI * R(), v: 300 + R() * 1100, s: 2 + R() * 5, life: 0.4 + R() * 0.7, c: R() < 0.7 ? '#ffb443' : '#fff3d6' }));
+      const embers = Array.from({ length: 90 }, () => ({ x: 900 + R() * 1020, y: R() * 1080, s: 1 + R() * 3, sp: 20 + R() * 60, ph: R() * 6.28, c: R() < 0.6 ? '#ffd56a' : '#ffffff' }));
+      const IMPACTS = [
+        [11.0, 26],
+        [14.5, 10],
+        [17.0, 10],
+        [21.5, 14],
+        [24.0, 22],
+      ];
+
+      function drawRain(t) {
+        const c = rainCtx;
+        c.clearRect(0, 0, 464, 454);
+        if (t > 6.3) return;
+        c.lineCap = 'round';
+        for (const d of drops) {
+          const span = 454 + d.l + 60;
+          const y = ((d.p * span + t * d.v) % span) - d.l;
+          const x = d.x + y * 0.12;
+          c.strokeStyle = `rgba(190,215,255,${d.a})`;
+          c.lineWidth = 1.2;
+          c.beginPath();
+          c.moveTo(x, y);
+          c.lineTo(x + d.l * 0.12, y + d.l);
+          c.stroke();
+        }
+        for (const g of glass) {
+          const y = (g.y + t * g.v) % 470;
+          c.fillStyle = 'rgba(200,225,255,0.35)';
+          c.beginPath();
+          c.arc(g.x, y, g.r, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = 'rgba(255,255,255,0.5)';
+          c.beginPath();
+          c.arc(g.x - g.r * 0.3, y - g.r * 0.3, g.r * 0.35, 0, Math.PI * 2);
+          c.fill();
+          if (g.v) {
+            c.strokeStyle = 'rgba(200,225,255,0.12)';
+            c.lineWidth = g.r;
+            c.beginPath();
+            c.moveTo(g.x, y - 60);
+            c.lineTo(g.x, y);
+            c.stroke();
+          }
+        }
+      }
+
+      function drawDust(t) {
+        const c = dustCtx;
+        c.clearRect(0, 0, 1920, 1080);
+        if (t > 6.3) return;
+        for (const m of motes) {
+          const x = m.x + Math.sin(t * m.sp + m.ph) * 22 + t * 6;
+          const y = m.y + Math.cos(t * m.sp * 0.8 + m.ph) * 16 - t * 4;
+          const a = 0.25 + 0.25 * Math.sin(t * 1.3 + m.ph);
+          c.fillStyle = `rgba(190,225,255,${a})`;
+          c.beginPath();
+          c.arc(x, y, m.s, 0, Math.PI * 2);
+          c.fill();
+        }
+      }
+
+      function drawWarp(t) {
+        const c = warpCtx;
+        c.clearRect(0, 0, 1920, 1080);
+        if (t < 9.4 || t > 11.0) return;
+        const k = (t - 9.4) / 1.6; // 0..1 through the fall
+        const cx = 960 + Math.sin(t * 3.1) * 40;
+        const cy = 540 + Math.cos(t * 2.3) * 30;
+        const g = c.createRadialGradient(cx, cy, 10, cx, cy, 1100);
+        g.addColorStop(0, `rgba(255,190,90,${0.35 + 0.3 * Math.sin(k * 9)})`);
+        g.addColorStop(0.25, 'rgba(40,20,60,0.6)');
+        g.addColorStop(1, '#05060a');
+        c.fillStyle = g;
+        c.fillRect(0, 0, 1920, 1080);
+        // the square tunnel of grid lines, rushing at us
+        const speed = 2.2 + k * 4;
+        c.strokeStyle = 'rgba(60,230,255,0.35)';
+        c.lineWidth = 2;
+        for (let i = 0; i < 14; i++) {
+          const z = 1 - ((i / 14 + t * speed * 0.25) % 1);
+          const s = 60 / (z + 0.02);
+          c.globalAlpha = clamp(1 - z) * 0.9;
+          c.strokeRect(cx - s * 1.78, cy - s, s * 3.56, s * 2);
+        }
+        c.globalAlpha = 0.25;
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2 + 0.26;
+          c.beginPath();
+          c.moveTo(cx, cy);
+          c.lineTo(cx + Math.cos(a) * 2400, cy + Math.sin(a) * 2400);
+          c.stroke();
+        }
+        c.globalAlpha = 1;
+        // streaks: a starfield of light
+        for (const s of streaks) {
+          const z = 1 - ((s.z + t * s.sp * (0.6 + k * 1.8)) % 1);
+          const r1 = 40 / (z + 0.03);
+          const r2 = 40 / (z + 0.03 + 0.04 + k * 0.08);
+          const x1 = cx + Math.cos(s.a) * r1;
+          const y1 = cy + Math.sin(s.a) * r1;
+          const x2 = cx + Math.cos(s.a) * r2;
+          const y2 = cy + Math.sin(s.a) * r2;
+          c.strokeStyle = s.c;
+          c.globalAlpha = clamp((1 - z) * 1.4);
+          c.lineWidth = s.w * (1.2 - z);
+          c.beginPath();
+          c.moveTo(x2, y2);
+          c.lineTo(x1, y1);
+          c.stroke();
+        }
+        c.globalAlpha = 1;
+        // pieces of the map and loot flying past
+        for (const p of tiles) {
+          const z = 1 - ((p.z + t * 0.9) % 1);
+          const r = (p.r * 500) / (z + 0.08);
+          const x = cx + Math.cos(p.a) * r;
+          const y = cy + Math.sin(p.a) * r;
+          const s = p.s / (z + 0.15);
+          c.save();
+          c.translate(x, y);
+          c.rotate(p.rot + t * 2);
+          c.globalAlpha = clamp((1 - z) * 1.5) * 0.85;
+          if (p.glyph) {
+            c.fillStyle = '#ffd56a';
+            c.font = `700 ${s}px 'Chakra Petch'`;
+            c.textAlign = 'center';
+            c.textBaseline = 'middle';
+            c.shadowColor = '#ff9a1f';
+            c.shadowBlur = 20;
+            c.fillText('$', 0, 0);
+            c.shadowBlur = 0;
+          } else {
+            c.fillStyle = '#20232e';
+            c.fillRect(-s / 2, -s / 2, s, s);
+            c.strokeStyle = 'rgba(255,180,67,0.6)';
+            c.lineWidth = 2;
+            c.strokeRect(-s / 2, -s / 2, s, s);
+          }
+          c.restore();
+        }
+        // the ground rushing up at the end of the fall
+        if (t > 10.55) {
+          const q = ease(clamp((t - 10.55) / 0.3));
+          const top = 1080 - q * 1080;
+          const gg = c.createLinearGradient(0, top, 0, 1080);
+          gg.addColorStop(0, 'rgba(255,180,90,0.5)');
+          gg.addColorStop(0.05, '#0b0c12');
+          gg.addColorStop(1, '#05060a');
+          c.fillStyle = gg;
+          c.fillRect(0, top, 1920, 1080 - top);
+          c.strokeStyle = 'rgba(60,230,255,0.3)';
+          c.lineWidth = 3;
+          for (let i = -12; i <= 12; i++) {
+            c.beginPath();
+            c.moveTo(960 + i * 30, top);
+            c.lineTo(960 + i * 260, 1080);
+            c.stroke();
+          }
+        }
+      }
+
+      function drawFx(t) {
+        const c = fxCtx;
+        c.clearRect(0, 0, 1920, 1080);
+        // the screen pulls him in: his pixels fly into PLAY
+        if (t > 8.45 && t < 9.5) {
+          for (const p of pixels) {
+            const k = clamp((t - 8.45 - p.d * 0.5) / 0.75);
+            if (k <= 0 || k >= 1) continue;
+            const e = k * k * k;
+            const x = p.x + (1211 - p.x) * e;
+            const y = p.y + (930 - p.y) * e;
+            const s = p.s * (1 - e * 0.8);
+            c.globalAlpha = 1 - e * 0.6;
+            c.fillStyle = p.c;
+            c.fillRect(x - s / 2, y - s / 2, s, s);
+          }
+          c.globalAlpha = 1;
+        }
+        // sparks on every hit
+        for (const [at, amp] of IMPACTS) {
+          const dt = t - at;
+          if (dt < 0 || dt > 1.2) continue;
+          const ox = at === 11.0 ? 760 : at === 24.0 ? 560 : 960;
+          const oy = at === 11.0 ? 900 : at === 24.0 ? 560 : 560;
+          for (const s of sparks) {
+            if (dt > s.life) continue;
+            const k = dt / s.life;
+            const v = s.v * (amp / 20);
+            const x = ox + Math.cos(s.a) * v * dt * 1.2 + (at === 11.0 ? 0 : Math.cos(s.a * 3) * v * dt);
+            const y = oy + Math.sin(s.a) * v * dt + 900 * dt * dt;
+            c.globalAlpha = 1 - k;
+            c.fillStyle = s.c;
+            c.fillRect(x, y, s.s, s.s);
+          }
+        }
+        c.globalAlpha = 1;
+        // embers drifting over the end card
+        if (t > 24.0) {
+          const f = clamp((t - 24.0) / 0.6);
+          for (const e of embers) {
+            const y = (e.y - (t - 24) * e.sp * 3 + 1080) % 1080;
+            const x = e.x + Math.sin(t * 1.2 + e.ph) * 20;
+            c.globalAlpha = f * (0.35 + 0.35 * Math.sin(t * 2 + e.ph));
+            c.fillStyle = e.c;
+            c.beginPath();
+            c.arc(x, y, e.s, 0, Math.PI * 2);
+            c.fill();
+          }
+          c.globalAlpha = 1;
+        }
+      }
+
+      function drawGrain(t) {
+        const f = Math.round(t * 30);
+        const r = rng(1000 + f);
+        const d = grainImg.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const v = (r() * 255) | 0;
+          d[i] = d[i + 1] = d[i + 2] = v;
+          d[i + 3] = 255;
+        }
+        grainCtx.putImageData(grainImg, 0, 0);
+      }
+
+      // camera shake from the hits, a light handheld drift in the room
+      function drawShake(t) {
+        let x = 0;
+        let y = 0;
+        for (const [at, amp] of IMPACTS) {
+          const dt = t - at;
+          if (dt < 0 || dt > 0.6) continue;
+          const a = amp * Math.exp(-dt * 9);
+          x += Math.sin(dt * 90) * a;
+          y += Math.cos(dt * 73) * a * 0.8;
+        }
+        $('shake').style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)`;
+        const hx = Math.sin(t * 0.9) * 4 + Math.sin(t * 2.3) * 1.5;
+        const hy = Math.cos(t * 0.7) * 3 + Math.sin(t * 1.9) * 1.2;
+        $('shake1').style.transform = `translate(${hx.toFixed(2)}px, ${hy.toFixed(2)}px)`;
+        // the monitor's flicker on the room, from the game's light
+        $('flicker').style.opacity = (0.55 + 0.25 * Math.sin(t * 11) * Math.sin(t * 3.7) + 0.2 * Math.sin(t * 23)).toFixed(3);
+      }
+
+      function draw(t) {
+        drawShake(t);
+        drawRain(t);
+        drawDust(t);
+        drawWarp(t);
+        drawFx(t);
+        drawGrain(t);
+      }
+
+      // ------------------------------------------------------------------ the timeline
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.to(clock, { t: 30, duration: 30, ease: 'none', onUpdate: () => draw(clock.t) }, 0);
+
+      // a scene is in the render tree only while it is on screen
+      const show = (id, from, to) => {
+        tl.set('#' + id, { display: 'block', opacity: 1 }, from);
+        if (to !== undefined) tl.set('#' + id, { display: 'none', opacity: 0 }, to);
+      };
+
+      // ============================== 1 · the room
+      show('s1', 0, 6);
+      tl.fromTo('#black', { opacity: 1 }, { opacity: 0, duration: 1.4, ease: 'power1.out' }, 0);
+      tl.fromTo('#cam1', { scale: 1, x: -10 }, { scale: 1.17, x: 8, duration: 6, ease: 'power1.inOut' }, 0);
+      tl.fromTo('#clock', { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0.8);
+      tl.to('#clock', { opacity: 0, duration: 0.5 }, 5.2);
+      // "one more raid." typed out
+      {
+        const text = 'one more raid.';
+        const el = $('thought-t');
+        const o = { n: 0 };
+        tl.to(o, { n: text.length, duration: 1.1, ease: 'none', onUpdate: () => (el.textContent = text.slice(0, Math.round(o.n)) + (o.n < text.length ? '_' : '')) }, 1.7);
+        tl.fromTo('#thought', { opacity: 0 }, { opacity: 1, duration: 0.2 }, 1.65);
+        tl.to('#thought', { opacity: 0, duration: 0.6 }, 4.9);
+      }
+      // lightning, twice
+      for (const [at, k] of [
+        [2.2, 1],
+        [4.9, 0.55],
+      ]) {
+        tl.fromTo('#sky-flash', { opacity: 0 }, { opacity: 0.9 * k, duration: 0.04, immediateRender: at < 3 }, at);
+        tl.to('#sky-flash', { opacity: 0.2 * k, duration: 0.08 }, at + 0.05);
+        tl.to('#sky-flash', { opacity: 0.75 * k, duration: 0.04 }, at + 0.16);
+        tl.to('#sky-flash', { opacity: 0, duration: 0.5 }, at + 0.22);
+        tl.fromTo('#lightning', { opacity: 0 }, { opacity: 1 * k, duration: 0.04, immediateRender: at < 3 }, at);
+        tl.to('#lightning', { opacity: 0.25 * k, duration: 0.08 }, at + 0.05);
+        tl.to('#lightning', { opacity: 0.8 * k, duration: 0.04 }, at + 0.16);
+        tl.to('#lightning', { opacity: 0, duration: 0.5 }, at + 0.22);
+      }
+      // he breathes, leans in a little
+      tl.fromTo('#body', { scaleY: 1, svgOrigin: '1112 1080' }, { scaleY: 1.012, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: 3 }, 0);
+      tl.fromTo('#head', { x: 0, y: 0, rotation: 0, svgOrigin: '1112 660' }, { x: -6, y: 4, rotation: -2.5, duration: 2.2, ease: 'sine.inOut' }, 0.4);
+      tl.to('#head', { x: 4, y: 10, rotation: 1.5, duration: 2.4, ease: 'sine.inOut' }, 2.8);
+      tl.fromTo('#led', { opacity: 1 }, { opacity: 0.3, duration: 0.5, yoyo: true, repeat: 5, ease: 'sine.inOut' }, 0);
+
+      // ============================== 2 · the monitor and the click
+      show('s2', 6, 9.62);
+      tl.fromTo('#cam2', { scale: 1.0, x: 0 }, { scale: 1.07, x: -20, duration: 2.6, ease: 'power1.inOut' }, 6);
+      tl.fromTo('#head2', { x: 0 }, { x: 40, duration: 2.6, ease: 'power1.inOut' }, 6);
+      // the cursor glides to PLAY (screen is 1404×864 inside the bezel)
+      tl.fromTo('#cursor-pos', { x: 640, y: 420 }, { x: 760, y: 560, duration: 0.7, ease: 'sine.inOut' }, 6.1);
+      tl.to('#cursor-pos', { x: 806, y: 808, duration: 0.85, ease: 'power3.inOut' }, 6.95);
+      tl.fromTo('#play-hi', { opacity: 0 }, { opacity: 0.85, duration: 0.15 }, 7.7);
+      tl.to('#play-hi', { opacity: 0.55, duration: 0.07, yoyo: true, repeat: 1 }, 7.85);
+      // click
+      tl.to('#cursor', { scale: 0.82, duration: 0.05 }, 7.98);
+      tl.to('#cursor', { scale: 1, duration: 0.12 }, 8.05);
+      tl.set('#ripple', { left: 806, top: 808 }, 8.0);
+      tl.fromTo('#ripple', { scale: 0.2, opacity: 1 }, { scale: 2.6, opacity: 0, duration: 0.45, ease: 'power2.out' }, 8.0);
+      tl.fromTo('#screen-burn', { opacity: 0 }, { opacity: 0.85, duration: 0.06 }, 8.0);
+      tl.to('#screen-burn', { opacity: 0.15, duration: 0.3 }, 8.08);
+      tl.to('#play-hi', { opacity: 1, duration: 0.05 }, 8.0);
+      // the electric silence: the screen starts to tear
+      tl.fromTo('#shot-r', { opacity: 0, x: 0 }, { opacity: 0.9, x: 26, duration: 0.9, ease: 'power2.in' }, 8.15);
+      tl.fromTo('#shot-c', { opacity: 0, x: 0 }, { opacity: 0.9, x: -26, duration: 0.9, ease: 'power2.in' }, 8.15);
+      {
+        const r = rng(99);
+        for (let i = 0; i < 5; i++) {
+          const id = '#sl' + i;
+          tl.set(id, { opacity: 0 }, 8.0);
+          let at = 8.35 + r() * 0.15;
+          while (at < 9.4) {
+            const dx = (r() - 0.5) * 220 * (0.5 + (at - 8.3));
+            tl.set(id, { opacity: 1, x: dx }, at);
+            at += 0.05 + r() * 0.09;
+            tl.set(id, { opacity: r() < 0.4 ? 0 : 1, x: dx * -0.4 }, at);
+            at += 0.03 + r() * 0.06;
+          }
+        }
+      }
+      tl.to('#screen-burn', { opacity: 1, duration: 0.5, ease: 'power2.in' }, 8.95);
+      // his head breaks into pixels and goes in
+      tl.to('#head2', { opacity: 0, duration: 0.6, ease: 'steps(6)' }, 8.55);
+      // dive into the PLAY button
+      tl.to('#cam2', { scale: 4.2, x: 0, duration: 0.95, ease: 'power3.in' }, 8.62);
+      tl.to('#cursor-pos', { opacity: 0, duration: 0.1 }, 8.6);
+
+      // ============================== 3 · the teleport
+      show('s3', 9.5, 11.0);
+      // the flash; the letterbox opens: we are in the game now
+      tl.fromTo('#flash', { opacity: 0 }, { opacity: 1, duration: 0.05, immediateRender: false }, 9.5);
+      tl.to('#flash', { opacity: 0, duration: 0.45, ease: 'power2.out' }, 9.58);
+      tl.to('#bar-top', { y: -140, duration: 0.25, ease: 'power3.in' }, 9.55);
+      tl.to('#bar-bot', { y: 140, duration: 0.25, ease: 'power3.in' }, 9.55);
+      tl.fromTo('#faller', { scale: 0.2, rotation: -30, opacity: 0 }, { scale: 1.2, rotation: 200, opacity: 1, duration: 1.22, ease: 'power2.in' }, 9.55);
+      tl.to('#faller', { opacity: 0, duration: 0.08 }, 10.78);
+      // the breath before the hit
+      tl.set('#black', { opacity: 1 }, 10.86);
+      tl.set('#black', { opacity: 0 }, 11.0);
+
+      // ============================== 4 · the raid: landing
+      show('land', 11.0, 12.5);
+      tl.fromTo('#me', { y: -120, scaleY: 0.86, transformOrigin: '50% 100%' }, { y: 0, scaleY: 1, duration: 0.18, ease: 'back.out(3)' }, 11.0);
+      tl.fromTo('#beam', { opacity: 1, scaleX: 1.6 }, { opacity: 0, scaleX: 0.3, duration: 0.9, ease: 'power2.out' }, 11.0);
+      tl.fromTo('#ring1', { scale: 0.2, opacity: 1 }, { scale: 2.6, opacity: 0, duration: 0.7, ease: 'power2.out' }, 11.0);
+      tl.fromTo('#ring2', { scale: 0.1, opacity: 0.8 }, { scale: 1.8, opacity: 0, duration: 0.9, ease: 'power2.out' }, 11.08);
+      tl.fromTo('#land-cam', { scale: 1.08 }, { scale: 1.0, duration: 1.5, ease: 'power2.out' }, 11.0);
+      tl.fromTo('#land-kick', { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.3, ease: 'power2.out' }, 11.1);
+      tl.fromTo('#land-title', { opacity: 0, scale: 1.35, transformOrigin: '0% 50%' }, { opacity: 1, scale: 1, duration: 0.22, ease: 'power4.out' }, 11.15);
+      tl.fromTo('#land-sub', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power3.out' }, 11.45);
+      tl.fromTo('#flash', { opacity: 0.85 }, { opacity: 0, duration: 0.3, immediateRender: false }, 11.0);
+
+      // ============================== montage cuts (each video wrapper punches in)
+      const punch = (id, at, dur, from = 1, to = 1.1, xo = 0) => tl.fromTo('#' + id, { scale: from, x: 0 }, { scale: to, x: xo, duration: dur, ease: 'none' }, at);
+      punch('w-c1', 12.5, 1.0, 1.0, 1.1, -30);
+      punch('w-c2', 13.5, 1.0, 1.04, 1.16);
+      tl.fromTo('#w-c2', { filter: 'brightness(2)' }, { filter: 'brightness(1)', duration: 0.25 }, 13.68);
+      punch('w-c3', 16.0, 1.0, 1.0, 1.12, 20);
+      punch('w-c4', 18.5, 1.0, 1.08, 1.0);
+      punch('w-c5', 20.5, 1.0, 1.0, 1.14);
+      punch('w-c6', 23.0, 0.5, 1.0, 1.08);
+      for (const at of [12.5, 13.5, 16.0, 18.5, 20.5, 23.0]) tl.fromTo('#flash', { opacity: 0.35 }, { opacity: 0, duration: 0.12, immediateRender: false }, at);
+
+      // ============================== STAKE (14.5–16.0)
+      show('stake', 14.5, 16.0);
+      tl.fromTo('#stake-title', { opacity: 0, scale: 1.5, transformOrigin: '0% 60%' }, { opacity: 1, scale: 1, duration: 0.2, ease: 'power4.out' }, 14.5);
+      tl.fromTo('#stake-kick', { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 14.62);
+      tl.fromTo('#bag', { opacity: 0, x: 80 }, { opacity: 1, x: 0, duration: 0.3, ease: 'power3.out' }, 14.55);
+      {
+        const o = { v: 0.1 };
+        const el = $('bag-num');
+        tl.to(o, { v: 5.76, duration: 1.1, ease: 'power2.in', onUpdate: () => (el.textContent = '$' + o.v.toFixed(2)) }, 14.7);
+        tl.fromTo('#bag-num', { scale: 1 }, { scale: 1.08, duration: 0.08, yoyo: true, repeat: 1, transformOrigin: '100% 50%' }, 15.8);
+      }
+      tl.fromTo('#coins .chip', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.25, stagger: 0.08, ease: 'back.out(2)' }, 14.85);
+      tl.fromTo('#stake .gridbg', { y: 0 }, { y: -40, duration: 1.5, ease: 'none' }, 14.5);
+
+      // ============================== LOOT (17.0–18.5)
+      show('loot', 17.0, 18.5);
+      tl.fromTo('#loot-title', { opacity: 0, scale: 1.5, transformOrigin: '100% 60%' }, { opacity: 1, scale: 1, duration: 0.2, ease: 'power4.out' }, 17.0);
+      tl.fromTo('#loot-kick', { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.3 }, 17.12);
+      tl.fromTo('#loot-sub', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.3 }, 17.25);
+      tl.fromTo('#rays', { rotation: 0, scale: 0.6, opacity: 0 }, { rotation: 40, scale: 1.1, opacity: 1, duration: 1.5, ease: 'power2.out' }, 17.0);
+      ['#case1', '#case2', '#case3', '#case4', '#case5'].forEach((id, i) => {
+        tl.fromTo(id, { y: 700, rotation: -25 + i * 12, scale: 0.6, opacity: 0 }, { y: 0, rotation: -8 + i * 4, scale: 1, opacity: 1, duration: 0.42, ease: 'back.out(1.6)' }, 17.05 + i * 0.09);
+        tl.to(id, { y: -30 - i * 6, rotation: '+=4', duration: 1.0, ease: 'sine.out' }, 17.5 + i * 0.09);
+      });
+
+      // ============================== SKINS (19.5–20.5): four flips on the 8ths
+      ['sk1', 'sk2', 'sk3', 'sk4'].forEach((id, i) => {
+        const at = 19.5 + i * 0.25;
+        show(id, at, at + 0.25);
+        tl.fromTo(`#${id} img`, { x: 160, scale: 1.12 }, { x: 0, scale: 1, duration: 0.25, ease: 'power3.out' }, at);
+        tl.fromTo(`#${id} .name`, { x: -60 }, { x: 0, duration: 0.25, ease: 'power3.out' }, at);
+      });
+
+      // ============================== GET OUT (21.5–23.0)
+      show('getout', 21.5, 23.0);
+      tl.fromTo('#getout-title', { opacity: 0, scale: 1.5, transformOrigin: '0% 60%' }, { opacity: 1, scale: 1, duration: 0.2, ease: 'power4.out' }, 21.5);
+      tl.fromTo('#getout-sub', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.3 }, 21.7);
+      tl.fromTo('#storm-ring', { scale: 1.5, rotation: 0 }, { scale: 0.62, rotation: 30, duration: 1.5, ease: 'power1.in' }, 21.5);
+      tl.fromTo('#storm-fog', { opacity: 0.4 }, { opacity: 1, duration: 1.5 }, 21.5);
+      tl.fromTo('#exit', { scale: 0.7, rotation: 0 }, { scale: 1, rotation: 90, duration: 1.5, ease: 'power2.out' }, 21.5);
+      tl.fromTo('#exit-lbl', { opacity: 0 }, { opacity: 1, duration: 0.3 }, 21.75);
+      tl.fromTo('#timer', { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.25 }, 21.55);
+      {
+        const el = $('timer-n');
+        const o = { s: 29 };
+        tl.to(o, { s: 27, duration: 1.4, ease: 'none', onUpdate: () => (el.textContent = '0:' + String(Math.ceil(o.s)).padStart(2, '0')) }, 21.6);
+      }
+
+      // ============================== the drop-out before the logo
+      tl.set('#black', { opacity: 1 }, 23.5);
+      tl.set('#black', { opacity: 0 }, 24.0);
+
+      // ============================== END CARD (24–30)
+      show('end', 24.0);
+      tl.fromTo('#flash', { opacity: 1 }, { opacity: 0, duration: 0.5, ease: 'power2.out', immediateRender: false }, 24.0);
+      tl.fromTo('#logo-dark', { opacity: 0, scale: 1.7, transformOrigin: '0% 50%' }, { opacity: 1, scale: 1, duration: 0.24, ease: 'power4.out' }, 24.0);
+      tl.fromTo('#logo-bags', { opacity: 0, scale: 1.7, transformOrigin: '0% 50%' }, { opacity: 1, scale: 1, duration: 0.24, ease: 'power4.out' }, 24.08);
+      tl.fromTo('#end-kick', { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.4, ease: 'power2.out' }, 24.3);
+      tl.fromTo('#end-r1', { opacity: 0, y: 160 }, { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' }, 24.35);
+      tl.fromTo('#end-r2', { opacity: 0, x: 120 }, { opacity: 1, x: 0, duration: 0.7, ease: 'power3.out' }, 24.55);
+      tl.fromTo('#end-r3', { opacity: 0, x: -120 }, { opacity: 1, x: 0, duration: 0.7, ease: 'power3.out' }, 24.65);
+      tl.fromTo('.disc', { opacity: 0, scaleX: 0.3 }, { opacity: 1, scaleX: 1, duration: 0.8, ease: 'power2.out', stagger: 0.1 }, 24.35);
+      tl.fromTo('#tg1', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 24.9);
+      tl.fromTo('#tg2', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 25.5);
+      tl.fromTo('#tg3', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out' }, 26.15);
+      tl.fromTo('#end-chips .chip', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.12, ease: 'back.out(2)' }, 26.6);
+      tl.fromTo('#url', { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(2.2)' }, 26.8);
+      tl.to('#url', { scale: 1.05, duration: 0.5, yoyo: true, repeat: 3, ease: 'sine.inOut' }, 27.3);
+      tl.fromTo('#end-cam', { scale: 1.0 }, { scale: 1.05, duration: 6, ease: 'none' }, 24.0);
+      tl.fromTo('#end-ring', { rotation: 0 }, { rotation: 24, duration: 6, ease: 'none' }, 24.0);
+      tl.to('#black', { opacity: 1, duration: 0.7, ease: 'power1.in' }, 29.3);
+
+      window.__timelines['main'] = tl;
+    </script>
+  </body>
+</html>

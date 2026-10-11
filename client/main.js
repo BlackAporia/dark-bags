@@ -44,6 +44,7 @@ import { createTour } from './tour.js';
 import { createWelcome } from './welcome.js';
 import { createIntro } from './intro.js';
 import { createInvite, captureRef, deviceId } from './invite.js';
+import { createCommunity } from './community.js';
 import { createMail } from './mail.js';
 import { createFortune } from './fortune.js';
 import { createOffers } from './offers.js';
@@ -287,7 +288,37 @@ const tour = createTour({
 });
 document.addEventListener('darkbags:tour', () => tour.start());
 // the first visit: a runner name and a region, then the tour
-const welcome = createWelcome({ app, regions, sfx, onDone: () => tour.start() });
+const welcome = createWelcome({ app, regions, sfx, send: (m) => send(m), online: () => app.mode === 'online' && app.status === 'open', signIn: () => $('connect')?.click(), onDone: () => tour.start() });
+// signed into an account (a wallet on a real-token server; the session itself with play money)
+const hasAccount = () => app.mode === 'online' && !!app.token && (!cashier.active || cashier.signedIn);
+const DEFAULT_NAME = /^runner\d*$/;
+// The account's name and profile come from the server: a phone after a PC is the same runner.
+// A brand-new account still on a default name gets the welcome's name step; a returning one
+// on a new device skips the welcome and Nyx's tour (seen on the first device).
+function adoptAccount(m) {
+  if (!m.name || app.mode !== 'online') return;
+  if (DEFAULT_NAME.test(m.name)) {
+    // no real name on the account yet: one this device picked becomes the account's
+    const mine = (app.name || '').trim();
+    if (mine && !DEFAULT_NAME.test(mine) && hasAccount()) send({ t: 'rename', name: mine });
+    else if (m.t === 'authed' && !welcome.open) welcome.start('name');
+    return;
+  }
+  const before = (app.name || '').trim();
+  const newDevice = !store.get('darkbags.welcome.done', false);
+  app.name = m.name;
+  store.set('darkbags.name', m.name);
+  store.set('darkbags.tour.named', true);
+  if ($('name')) $('name').value = m.name;
+  if (m.fresh === false) {
+    if (newDevice) {
+      store.set('darkbags.tour.done', true);
+      if (m.t === 'authed') toast(t('acct.back', { n: m.name }));
+    }
+    welcome.signedIn();
+  } else if (m.fresh && before && before.toLowerCase() !== m.name.toLowerCase()) toast(t('acct.variant', { n: m.name })); // the name was taken
+  renderLobby();
+}
 // a new player's language: the one of their country (by IP); when the country is unknown (VPN,
 // no server), the browser's own language if we have it; English otherwise
 const browserLang = () => (navigator.languages ?? [navigator.language]).map((x) => String(x ?? '').slice(0, 2).toLowerCase()).find((x) => LANGS.some((l) => l.id === x)) ?? null;
@@ -326,6 +357,15 @@ document.addEventListener('darkbags:news', () => news.open());
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m), openBox: (id) => shop.open(id) });
 const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id), profile: (id) => social.profile(id) });
 const invite = createInvite({ app, send, sfx, toast: (m) => toast(m) });
+// X and Telegram, and the reward for following them
+const community = createCommunity({ app, send, sfx, toast: (m) => toast(m), hasAccount: () => hasAccount(), signIn: () => $('connect')?.click() });
+function communityBadge() {
+  const b = document.querySelector('.nav-btn[data-page="community"] .nav-badge');
+  if (!b) return;
+  const n = community.open();
+  b.hidden = !n;
+  b.textContent = n ? String(n) : '';
+}
 const mail = createMail({
   app,
   send,
@@ -341,7 +381,7 @@ const mail = createMail({
     }
   },
 });
-const PAGES = { starknet, shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite, mail };
+const PAGES = { starknet, shop, inventory, swap, chat, settings: settingsUi, friends: social, guilds: social.guildsPage, pass, ranked, invite, mail, community };
 document.addEventListener('darkbags:mode', () => {
   store.set('darkbags.gmode', app.gameMode);
   renderLobby();
@@ -418,10 +458,10 @@ setInterval(syncMore, 1000);
 const NAV_GROUPS = [
   ['play', ['play', 'ranked', 'pass']],
   ['store', ['starknet', 'shop', 'inventory', 'swap']],
-  ['social', ['chat', 'friends', 'guilds', 'mail', 'invite']],
+  ['social', ['chat', 'friends', 'guilds', 'mail', 'invite', 'community']],
   ['you', ['achievements', 'settings']],
 ];
-const NAV_COLOR = { starknet: '#ec796b', play: '#f7931a', ranked: '#ff2dd4', pass: '#ffd166', shop: '#3ddc97', inventory: '#f59e0b', swap: '#38bdf8', chat: '#a78bfa', friends: '#60a5fa', guilds: '#34d399', mail: '#fb7185', invite: '#22d3ee', achievements: '#fbbf24', settings: '#94a3b8' };
+const NAV_COLOR = { starknet: '#ec796b', play: '#f7931a', ranked: '#ff2dd4', pass: '#ffd166', shop: '#3ddc97', inventory: '#f59e0b', swap: '#38bdf8', chat: '#a78bfa', friends: '#60a5fa', guilds: '#34d399', mail: '#fb7185', invite: '#22d3ee', community: '#2aabee', achievements: '#fbbf24', settings: '#94a3b8' };
 (function buildNav() {
   const nav = $('menu-nav');
   const more = $('nav-more');
@@ -485,13 +525,14 @@ function navSubs() {
     guilds: t('nav.s.guilds'),
     mail: mail.unread ? t('nav.d.mail', { n: mail.unread }) : t('nav.s.mail'),
     invite: t('nav.s.invite'),
+    community: community.open() ? t('nav.d.community', { n: community.open() }) : t('nav.s.community'),
     achievements: online && dv?.ready ? t('nav.d.tasks', { n: dv.ready }) : t('nav.s.achievements'),
     settings: t('nav.s.settings'),
   };
   for (const el of document.querySelectorAll('.nav-sub')) {
     const v = lines[el.dataset.sub] ?? '';
     if (el.textContent !== v) el.textContent = v;
-    el.classList.toggle('hot', ['achievements', 'mail', 'inventory'].includes(el.dataset.sub) && v !== t(`nav.s.${el.dataset.sub}`));
+    el.classList.toggle('hot', ['achievements', 'mail', 'inventory', 'community'].includes(el.dataset.sub) && v !== t(`nav.s.${el.dataset.sub}`));
   }
   for (const h of document.querySelectorAll('.nav-group')) h.textContent = t(h.dataset.i18n);
   // you, at the bottom
@@ -1407,7 +1448,10 @@ function onMessage(m) {
     return;
   }
   if (regions.onMain(m)) return;
+  if (m.t === 'name_check') welcome.onMessage(m);
+  if (m.t === 'err' && m.code === 'name_taken' && $('name')) $('name').value = app.name || '';
   if (m.t !== 'locker') handleMessage(m);
+  if (m.t === 'welcome' || m.t === 'authed' || m.t === 'renamed') adoptAccount(m); // after the cashier knows the account
   locker.onMessage(m);
   if (m.t === 'welcome' || m.t === 'authed' || m.t === 'result' || m.t === 'career') {
     ach.onMessage(m);
@@ -1422,6 +1466,10 @@ function onMessage(m) {
   if (m.t === 'locker') offers.onMessage(m);
   if (m.t === 'leaderboard' || m.t === 'career' || m.t === 'result') ranked.onMessage(m);
   if (m.t === 'ref' || m.t === 'welcome' || m.t === 'authed') invite.onMessage(m);
+  if (m.t === 'community' || m.t === 'welcome' || m.t === 'authed' || m.t === 'err') {
+    community.onMessage(m);
+    communityBadge();
+  }
   if (m.t === 'mailbox' || m.t === 'welcome' || m.t === 'authed' || m.t === 'locker') mail.onMessage(m);
   if (m.t === 'fortune' || m.t === 'err') fortune.onMessage(m);
   if (m.t === 'coins' || m.t === 'err') coinImport.onMessage(m);
@@ -1765,8 +1813,11 @@ function showResult(m) {
 // ------------------------------------------------------------------ wiring
 function goToTable() {
   sfx.unlock();
-  app.name = $('name').value.trim();
-  store.set('darkbags.name', app.name);
+  // with an account the name lives on the server (renamed from the name field); otherwise here
+  if (!hasAccount()) {
+    app.name = $('name').value.trim();
+    store.set('darkbags.name', app.name);
+  }
   // band: which table this stake sits at, so the regions can seat you where people already wait
   send({ t: 'join', stake: app.stake, band: MODE[app.gameMode]?.fixed ?? bandOf(app.stake), mode: app.gameMode, name: app.name || 'runner', skin: app.skin });
   app.inRoom = true;
@@ -1783,7 +1834,12 @@ function toggleReady() {
 $('rank-card').addEventListener('click', () => rankInfo.open());
 $('rank-card').addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), rankInfo.open()));
 $('name').value = app.name;
-$('name').addEventListener('change', () => store.set('darkbags.name', $('name').value.trim()));
+$('name').addEventListener('change', () => {
+  const v = $('name').value.trim();
+  // an account is renamed on the server (names are unique there); its answer updates the name
+  if (hasAccount() && v && v !== app.name) return send({ t: 'rename', name: v });
+  store.set('darkbags.name', v);
+});
 $('name').addEventListener('keydown', (e) => e.key === 'Enter' && !$('play').disabled && goToTable());
 $('play').addEventListener('click', goToTable);
 $('gore').addEventListener('change', (e) => setSetting('gore', e.target.checked));
