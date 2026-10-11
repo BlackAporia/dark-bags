@@ -430,6 +430,7 @@ export class Lobby {
     // the gift waits in the mailbox: one letter, claimed with one button (the title and the cases)
     const gift = { k: 'bundle', items: [{ k: 'ntitle', id: STACHE_TITLE }, { k: 'box', id: STACHE_CASE_ID, n: STACHE_GIFT_CASES }] };
     this.mail.send({ key, kind: 'gift', title: 'STACHE gift', body: `You are STACHE player #${place} of 100.`, i18n: 'stache', gift });
+    this.promo.markMailed(key);
     for (const c of this.sessionsOf(key)) this.send(c, { t: 'mailbox', unread: this.mail.unread(key), news: { k: 'stache', place } });
     console.log(`stache gift #${place} to ${String(key).slice(0, 10)}…`);
     return place;
@@ -660,6 +661,29 @@ export class Lobby {
       if (gift) this.send(cid, { t: 'career', career: this.ranks.career(key) });
     }
     this.send(cid, { t: 'mailbox', list: this.mail.inbox(key), unread: this.mail.unread(key), ...(gift ? { claimed: gift } : {}), locker: this.inventory.view(key) });
+  }
+
+  // The players who got the STACHE gift before it came as a letter (granted at once, with no
+  // letter): each gets the letter now, once, with two more Stache Cases (and the title if it is
+  // not theirs yet). Run at start by the main server.
+  resendStacheGifts() {
+    if (this.practice || this.edge) return 0;
+    let n = 0;
+    for (const key of this.promo.unmailed()) {
+      // a letter with the gift already went out (since gifts came as letters): nothing to resend
+      if (this.mail.inbox(key).some((m) => m.i18n === 'stache' && m.gift)) {
+        this.promo.markMailed(key);
+        continue;
+      }
+      const items = [{ k: 'box', id: STACHE_CASE_ID, n: STACHE_GIFT_CASES }];
+      if (!this.ranks.stitleIds(key).includes(STACHE_TITLE)) items.unshift({ k: 'ntitle', id: STACHE_TITLE });
+      const place = this.promo.stache.findIndex((x) => x.key === key) + 1;
+      this.mail.send({ key, kind: 'gift', title: 'STACHE gift', body: `You are STACHE player #${place} of 100.`, i18n: 'stache', gift: { k: 'bundle', items } });
+      this.promo.markMailed(key);
+      n++;
+    }
+    if (n) console.log(`stache gift letters sent again to ${n} early player${n === 1 ? '' : 's'}`);
+    return n;
   }
 
   // what a letter's gift hands over: a bundle gives each of its items; a neon title (ntitle) only

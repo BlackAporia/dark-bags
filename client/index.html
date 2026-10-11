@@ -208,11 +208,19 @@
       <div id="mode-info" class="mode-info"></div>
       <div id="modes" class="modes" role="radiogroup"></div>
       <section id="dx-panel" class="dx-panel" hidden></section>
-      <fieldset class="tables" id="tables-box">
-        <legend class="eyebrow" data-i18n="lobby.stakePer">Stake per raid</legend>
-        <div id="tables" class="table-list"></div>
+      <!-- the stake, in two steps: the coin you pay with, then how much ($0.10 and up) -->
+      <section class="stake-box" id="stake-box">
+        <div id="paywith" class="stake-step coins">
+          <p class="step-h"><b class="step-n">1</b><span data-i18n="stk.coin">Coin</span><span class="fine" data-i18n="stk.coinNote">winnings come back in the same coin</span></p>
+          <div id="assets" class="asset-list"></div>
+        </div>
+        <div class="stake-step tables" id="tables-box">
+          <p class="step-h"><b class="step-n">2</b><span data-i18n="stk.amount">Stake</span><span class="fine" data-i18n="stk.min">from $0.10</span></p>
+          <div id="tables" class="table-list"></div>
+          <p id="stake-calc" class="stake-calc"></p>
+        </div>
         <p class="fine stake-priv" data-i18n="stake.private">🔒 Your stake is private: the table shows only the whole pool, never who put in what.</p>
-      </fieldset>
+      </section>
       <details id="pcfg" class="pcfg" hidden>
       <summary><span class="eyebrow" data-i18n="pcfg.title">Practice settings</span> <span id="pcfg-sum" class="fine"></span></summary>
       <div class="pcfg-rows">
@@ -224,10 +232,6 @@
           <input id="pcfg-time" type="range" min="60" max="600" step="30"></label>
       </div>
     </details>
-      <fieldset id="paywith" class="coins">
-      <legend class="eyebrow" data-i18n-html="lobby.stakeWith">Stake with <span class="fine">any coin · shown in $ · winnings come back in the same coin</span></legend>
-      <div id="assets" class="asset-list"></div>
-    </fieldset>
       <div id="cashier" class="cashier" hidden>
       <div class="acct">
         <span id="acct-label" class="acct-label">Not signed in</span>

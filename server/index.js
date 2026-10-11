@@ -368,6 +368,8 @@ const lobby = new Lobby({
   waitForStart: process.env.WAIT_FOR_START !== '0',
   newToken: () => crypto.randomBytes(16).toString('hex'),
 });
+// the early STACHE gifts that were granted without a letter: their letter now, once
+lobby.resendStacheGifts();
 
 if (real) {
   real.cashier.liveGame = () => [...lobby.rooms.values()].some((r) => r.state === 'live');

@@ -585,10 +585,15 @@ function walletValue() {
 function quote(stake = app.stake, a = app.asset) {
   return app.prices.quote(a, stake);
 }
-function tokenAmount(a, u) {
+function tokenAmount(a, u, up = true) {
   const info = assetInfo(a);
-  const digits = info.decimals > 8 ? 4 : Math.min(info.decimals, 6);
-  return `${formatUnits(u, info.decimals, digits)} ${info.symbol}`;
+  // as many decimals as the size needs: 25,491 STACHE, 9.0507 STRK, 0.000012 WBTC
+  const whole = BigInt(u) / 10n ** BigInt(info.decimals);
+  const digits = whole >= 1000n ? 0 : whole >= 1n ? 4 : info.decimals > 8 ? 6 : Math.min(info.decimals, 6);
+  // rounded up at the last digit shown: the amount on screen always covers what is taken
+  const step = 10n ** BigInt(Math.max(0, info.decimals - digits));
+  const shown = ((BigInt(u) + (up ? step - 1n : 0n)) / step) * step; // a balance rounds down
+  return `${formatUnits(shown, info.decimals, digits)} ${info.symbol}`;
 }
 // "6.667 STRK ($1)" for coins, just "$1" for stablecoins
 function coinAndUsd(a, u) {
@@ -607,35 +612,47 @@ function renderAssets() {
   const ids = [...new Set([...app.assets.map((a) => a.id), ...Object.keys(app.balances ?? {})])].sort(
     (x, y) => app.prices.value(y, units(y)) - app.prices.value(x, units(x)),
   );
-  list.replaceChildren(
-    ...ids.map((id) => {
-      const info = assetInfo(id);
-      const u = units(id);
-      const priced = app.prices.has(id);
-      const need = priced ? quote(app.stake, id) : null;
-      const capped = app.prices.stakeError?.(id, app.stake); // a coin added by address: stakes up to its cap
-      const short = (need !== null && u < need) || !!capped;
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `asset${short ? ' short' : ''}`;
-      b.disabled = !priced || u === 0n;
-      b.setAttribute('aria-pressed', String(id === app.asset));
-      b.title = priced ? `${info.symbol} ≈ ${usdText(app.prices.value(id, 10n ** BigInt(info.decimals)))}` : 'No price for this coin right now';
-      const needText = need === null ? 'no price now' : capped ? t('coin.capShort', { max: money(info.maxStake) }) : info.stable ? `stake ${money(app.stake)}` : `stake ${tokenAmount(id, need)}`;
-      if (info.custom) b.title = `${b.title} · ${t('coin.customTip', { max: money(info.maxStake ?? 0) })}`;
-      b.innerHTML = `${info.logo && /^coins\/[a-z0-9-]+\.png$/.test(info.logo) ? `<img class="dot coin-logo" alt="" src="${info.logo}">` : `<span class="dot" style="background:${info.color}"></span>`}<span class="sym">${esc(info.symbol)}${info.custom ? ` <i class="coin-cx" aria-label="${esc(t('coin.custom'))}">${esc(t('coin.custom'))}</i>` : ''}</span><span class="amt">${priced ? money(app.prices.value(id, u)) : esc(formatUnits(u, info.decimals, 4))}</span><span class="need">${esc(needText)}</span>`;
-      b.addEventListener('click', () => {
-        app.asset = id;
-        store.set('darkbags.asset', id);
-        renderLobby();
-      });
-      return b;
-    }),
-  );
+  // step 1 shows the coins you hold (and the one picked); the rest wait behind "all coins"
+  const held = ids.filter((id) => units(id) > 0n || id === app.asset);
+  const rest = ids.filter((id) => !held.includes(id));
+  const shown = app.allCoins || !held.length ? ids : held;
+  const coin = (id) => {
+    const info = assetInfo(id);
+    const u = units(id);
+    const priced = app.prices.has(id);
+    const need = priced ? quote(app.stake, id) : null;
+    const capped = app.prices.stakeError?.(id, app.stake); // a coin with a stake cap
+    const short = (need !== null && u < need) || !!capped;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `asset${short ? ' short' : ''}${u === 0n ? ' empty' : ''}`;
+    b.disabled = !priced;
+    b.setAttribute('aria-pressed', String(id === app.asset));
+    b.title = priced ? `1 ${info.symbol} ≈ ${usdText(app.prices.value(id, 10n ** BigInt(info.decimals)))}` : t('stk.noPrice');
+    if (info.custom) b.title = `${b.title} · ${t('coin.customTip', { max: money(info.maxStake ?? 0) })}`;
+    const logo = info.logo && /^coins\/[a-z0-9-]+\.png$/.test(info.logo) ? `<img class="dot coin-logo" alt="" src="${info.logo}">` : `<span class="dot" style="background:${info.color}"></span>`;
+    b.innerHTML = `${logo}<span class="sym">${esc(info.symbol)}${info.custom ? ` <i class="coin-cx">${esc(t('coin.custom'))}</i>` : ''}</span><span class="amt">${priced ? money(app.prices.value(id, u)) : esc(formatUnits(u, info.decimals, 4))}</span>`;
+    b.addEventListener('click', () => {
+      app.asset = id;
+      store.set('darkbags.asset', id);
+      renderLobby();
+    });
+    return b;
+  };
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'asset coin-more';
+  more.innerHTML = `<span class="sym">${esc(t(app.allCoins ? 'stk.fewer' : 'stk.allCoins', { n: rest.length }))}</span>`;
+  more.addEventListener('click', () => {
+    app.allCoins = !app.allCoins;
+    renderLobby();
+  });
+  list.replaceChildren(...shown.map(coin), ...(rest.length && held.length ? [more] : []));
   coinImport.attach(list); // + import any coin from the AVNU / Ekubo lists (real tokens)
   const info = assetInfo(app.asset);
   // the Descent takes tickets: the coin list only matters online, to buy them with
   $('paywith').hidden = app.balances === null || !ids.length || (isDx(app.gameMode) && app.mode === 'practice');
+  renderStakeCalc();
   // one short line under Play: what the stake costs, or what's wrong
   const q = quote();
   const qEl = $('quote');
@@ -650,6 +667,36 @@ function renderAssets() {
   } else {
     qEl.textContent = t('q.coin', { a: tokenAmount(app.asset, q), s: money(app.stake), c: info.symbol });
   }
+}
+
+// step 2's line: the stake in the coin picked, what you hold of it, and what is wrong if anything
+function renderStakeCalc() {
+  const el = $('stake-calc');
+  if (!el) return;
+  const id = app.asset;
+  const info = assetInfo(id);
+  const q = quote();
+  const u = units(id);
+  const capped = app.prices.stakeError?.(id, app.stake);
+  el.className = 'stake-calc';
+  if (app.balances === null) return void (el.textContent = '');
+  if (q === null) {
+    el.textContent = t('stk.noPrice');
+    return el.classList.add('bad');
+  }
+  const have = `${t('stk.have')} ${info.stable ? money(app.prices.value(id, u)) : `${tokenAmount(id, u, false)} · ${money(app.prices.value(id, u))}`}`;
+  const pay = info.stable ? `<b>${money(app.stake)}</b> ${esc(info.symbol)}` : `<b>${esc(tokenAmount(id, q))}</b> ≈ ${money(app.stake)}`;
+  if (capped) {
+    el.innerHTML = `${esc(t('coin.capShort', { max: money(info.maxStake) }))} · ${esc(have)}`;
+    return el.classList.add('bad');
+  }
+  if (u < q) {
+    el.innerHTML = `${t('stk.youStake')} ${pay} · <span class="warn">${esc(t('stk.short'))}</span> ${esc(have)}${cashier.active ? ` <button type="button" class="link" id="stake-topup">${esc(t('stk.topup'))}</button>` : ''}`;
+    el.classList.add('bad');
+    $('stake-topup')?.addEventListener('click', () => $('open-cashier')?.click());
+    return;
+  }
+  el.innerHTML = `${t('stk.youStake')} ${pay} · ${esc(have)}`;
 }
 
 // ------------------------------------------------------------------ lobby
@@ -889,12 +936,13 @@ function renderLobby() {
   const list = $('tables');
   const fixed = MODE[app.gameMode]?.fixed;
   const dx = isDx(app.gameMode);
-  $('tables-box').hidden = dx; // the Descent takes tickets, not a stake
+  $('stake-box').hidden = dx; // the Descent takes tickets, not a stake
   list.classList.toggle('fixed', !!fixed);
   // someone is typing their own stake: leave the row alone (rebuilding it would drop what they
   // typed and put the current stake back in the box)
   const typing = list.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
   if (!typing) list.replaceChildren(
+    ...(fixed ? [] : [customStake()]),
     ...(fixed ? [fixed] : CFG.TIERS).map((stake) => {
       // one community across servers: the table where people wait, whichever server holds it
       const w = app.mode === 'online' ? regions.where(app.gameMode, fixed ?? bandOf(stake)) : null;
@@ -930,7 +978,6 @@ function renderLobby() {
       });
       return b;
     }),
-    ...(fixed ? [] : [customStake()]),
   );
 
   $('gore').checked = app.gore;
@@ -1136,7 +1183,8 @@ function customStake() {
   const wrap = document.createElement('label');
   wrap.className = `table-btn stake-own${own ? ' on' : ''}`;
   wrap.setAttribute('aria-pressed', String(own));
-  wrap.innerHTML = `<span class="stake-own-k">${esc(t('stake.own'))}</span><span class="stake-own-in">$<input type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" maxlength="9" value="${own ? (app.stake / 1000).toFixed(2).replace(/\.00$/, '') : ''}" placeholder="0.10 – 10 000" aria-label="${esc(t('stake.own'))}"></span>`;
+  // the amount is always in the box (a preset fills it too); type any other from $0.10
+  wrap.innerHTML = `<span class="stake-own-k">${esc(t('stake.own'))}</span><span class="stake-own-in">$<input type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" maxlength="9" value="${(app.stake / 1000).toFixed(2).replace(/\.00$/, '')}" placeholder="0.10 – 10 000" aria-label="${esc(t('stake.own'))}"></span>`;
   const input = wrap.querySelector('input');
   const apply = () => {
     if (!input.value) return;
