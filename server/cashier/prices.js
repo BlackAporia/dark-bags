@@ -103,34 +103,47 @@ export class PriceFeed {
     }
   }
 
-  // A coin priced from several places at once (every coin that is not pegged): Ekubo straight to
-  // USDC, Ekubo to STRK times STRK's price (STACHE's main pool is against STRK), DexScreener and
-  // GeckoTerminal. The median of what answers, after dropping any source more than 25% away
-  // from it; the probe is about $5 of the coin (by its last price), not one token.
+  // A coin priced from several places at once (every coin that is not pegged). The price sites
+  // lead: DexScreener, GeckoTerminal, DefiLlama and CoinGecko, each a market-wide price. The
+  // on-chain Ekubo quotes (straight to USDC, and to STRK times STRK's price) only count when they
+  // agree with the sites within 25%: one thin pool (a bridged USDC with little in it) must never
+  // set the price. With no site answering, the Ekubo quotes are all there is. Every source and the
+  // result are kept (this.sources) and shown at /api/prices.
   async multiQuote(t) {
-    const got = [];
     const last = this.last.get(t.id)?.usd ?? t.hintUsd ?? 0;
     const human = last > 0 ? 5 / last : Number(PROBE[t.symbol.toUpperCase()] ?? 1);
     const amountIn = toUnits(human, t.decimals);
     const per = (out, outDec) => Number(out) / 10 ** outDec / (Number(amountIn) / 10 ** t.decimals);
+    const chain = [];
     if (this.usdToken) {
       const out = await this.quoter({ tokenIn: t, tokenOut: this.usdToken, amountIn }).catch(() => 0n);
-      if (out > 0n) got.push(['ekubo-usdc', per(out, this.usdToken.decimals)]);
+      if (out > 0n) chain.push(['ekubo-usdc', per(out, this.usdToken.decimals)]);
     }
     const strk = this.tokens.find((x) => !x.custom && x.symbol.toUpperCase() === 'STRK' && x.id !== t.id);
     const strkUsd = strk ? this.last.get(strk.id)?.usd : 0;
     if (strk && strkUsd > 0) {
       const out = await this.quoter({ tokenIn: t, tokenOut: strk, amountIn }).catch(() => 0n);
-      if (out > 0n) got.push(['ekubo-strk', per(out, strk.decimals) * strkUsd]);
+      if (out > 0n) chain.push(['ekubo-strk', per(out, strk.decimals) * strkUsd]);
     }
     // the sites: from this round's batch when there is one, else asked for this coin alone
-    const ext = this.ext?.get(t.id) ?? { dex: await this.dexscreener([t]).then((m) => m.get(t.id)).catch(() => 0), gecko: await this.geckoterminal([t]).then((m) => m.get(t.id)).catch(() => 0) };
-    if (ext.dex > 0) got.push(['dexscreener', ext.dex]);
-    if (ext.gecko > 0) got.push(['geckoterminal', ext.gecko]);
-    const usd = robustMedian(got.map(([, v]) => v));
-    this.sources.set(t.id, got);
-    if (usd > 0) this.log.log?.(`price ${t.symbol}: $${usd.toPrecision(4)} from ${got.map(([n, v]) => `${n} ${v.toPrecision(4)}`).join(', ')}`);
-    else throw new Error('no source answered');
+    const ext = this.ext?.get(t.id) ?? (await this.sites([t])).get(t.id) ?? {};
+    const sites = Object.entries(ext).filter(([, v]) => v > 0);
+    let usd;
+    let used;
+    if (sites.length) {
+      const anchor = robustMedian(sites.map(([, v]) => v));
+      const agree = chain.filter(([, v]) => Math.abs(v / anchor - 1) <= 0.25);
+      used = [...sites, ...agree];
+      usd = robustMedian(used.map(([, v]) => v));
+    } else {
+      used = chain;
+      usd = robustMedian(chain.map(([, v]) => v));
+    }
+    const all = [...sites, ...chain];
+    this.sources.set(t.id, all.map(([n, v]) => [n, v, used.some(([m]) => m === n)]));
+    if (!(usd > 0)) throw new Error('no source answered');
+    const off = chain.filter(([n]) => !used.some(([m]) => m === n));
+    this.log.log?.(`price ${t.symbol}: $${usd.toPrecision(4)} from ${used.map(([n, v]) => `${n} ${v.toPrecision(4)}`).join(', ')}${off.length ? ` (ignored, off the market: ${off.map(([n, v]) => `${n} ${v.toPrecision(4)}`).join(', ')})` : ''}${sites.length ? '' : ' (no price site answered)'}`);
     return usd;
   }
 
@@ -140,22 +153,38 @@ export class PriceFeed {
     return res.ok ? res.json() : null;
   }
 
-  // DexScreener, many coins in one call (up to 30): for each, its deepest Starknet pair as base
+  // every price site for many coins at once: id → { dexscreener, geckoterminal, defillama, coingecko }
+  async sites(list) {
+    const [dex, gecko, llama, cg] = await Promise.all([this.dexscreener(list), this.geckoterminal(list), this.defillama(list), this.coingecko(list)].map((p) => p.catch(() => new Map())));
+    return new Map(list.map((t) => [t.id, { dexscreener: dex.get(t.id) ?? 0, geckoterminal: gecko.get(t.id) ?? 0, defillama: llama.get(t.id) ?? 0, coingecko: cg.get(t.id) ?? 0 }]));
+  }
+
+  // DexScreener (up to 30 coins a call): the deepest Starknet pair holding the coin, as its base
+  // (priceUsd) or as its quote (priceUsd / priceNative). Both API shapes are read.
   async dexscreener(list) {
     const out = new Map();
     for (let i = 0; i < list.length; i += 30) {
       const part = list.slice(i, i + 30);
-      const j = await this.getJson(`https://api.dexscreener.com/latest/dex/tokens/${part.map((t) => t.id).join(',')}`).catch(() => null);
+      const ids = part.map((t) => t.id).join(',');
+      let j = await this.getJson(`https://api.dexscreener.com/tokens/v1/starknet/${ids}`).catch(() => null);
+      if (!Array.isArray(j) || !j.length) j = (await this.getJson(`https://api.dexscreener.com/latest/dex/tokens/${ids}`).catch(() => null))?.pairs ?? [];
+      const pairs = (Array.isArray(j) ? j : []).filter((p) => p?.chainId === 'starknet' && Number(p.priceUsd) > 0);
       for (const t of part) {
-        const pairs = (j?.pairs ?? []).filter((p) => p?.chainId === 'starknet' && sameAddr(p.baseToken?.address, t.id) && Number(p.priceUsd) > 0);
-        pairs.sort((a, b) => (Number(b.liquidity?.usd) || 0) - (Number(a.liquidity?.usd) || 0));
-        if (pairs.length) out.set(t.id, Number(pairs[0].priceUsd));
+        let best = null;
+        for (const p of pairs) {
+          const liq = Number(p.liquidity?.usd) || 0;
+          let usd = 0;
+          if (sameAddr(p.baseToken?.address, t.id)) usd = Number(p.priceUsd);
+          else if (sameAddr(p.quoteToken?.address, t.id) && Number(p.priceNative) > 0) usd = Number(p.priceUsd) / Number(p.priceNative);
+          if (usd > 0 && (!best || liq > best.liq)) best = { usd, liq };
+        }
+        if (best) out.set(t.id, best.usd);
       }
     }
     return out;
   }
 
-  // GeckoTerminal, many coins in one call (up to 30): its token prices on Starknet
+  // GeckoTerminal (up to 30 coins a call): its token prices on Starknet
   async geckoterminal(list) {
     const out = new Map();
     for (let i = 0; i < list.length; i += 30) {
@@ -163,6 +192,34 @@ export class PriceFeed {
       const j = await this.getJson(`https://api.geckoterminal.com/api/v2/simple/networks/starknet-alpha/token_price/${part.map((t) => t.id).join(',')}`).catch(() => null);
       const prices = j?.data?.attributes?.token_prices ?? {};
       for (const t of part) for (const [k, v] of Object.entries(prices)) if (sameAddr(k, t.id) && Number(v) > 0) out.set(t.id, Number(v));
+    }
+    return out;
+  }
+
+  // DefiLlama's coin prices (no key): "starknet:<address>" → { price }
+  async defillama(list) {
+    const out = new Map();
+    for (let i = 0; i < list.length; i += 30) {
+      const part = list.slice(i, i + 30);
+      const j = await this.getJson(`https://coins.llama.fi/prices/current/${part.map((t) => `starknet:${t.id}`).join(',')}`).catch(() => null);
+      for (const [k, v] of Object.entries(j?.coins ?? {})) {
+        const t = part.find((x) => sameAddr(k.split(':')[1], x.id));
+        if (t && Number(v?.price) > 0) out.set(t.id, Number(v.price));
+      }
+    }
+    return out;
+  }
+
+  // CoinGecko's token prices by contract on Starknet (free API): { "<address>": { usd } }
+  async coingecko(list) {
+    const out = new Map();
+    for (let i = 0; i < list.length; i += 30) {
+      const part = list.slice(i, i + 30);
+      const j = await this.getJson(`https://api.coingecko.com/api/v3/simple/token_price/starknet?contract_addresses=${part.map((t) => t.id).join(',')}&vs_currencies=usd`).catch(() => null);
+      for (const [k, v] of Object.entries(j ?? {})) {
+        const t = part.find((x) => sameAddr(k, x.id));
+        if (t && Number(v?.usd) > 0) out.set(t.id, Number(v.usd));
+      }
     }
     return out;
   }
@@ -186,10 +243,7 @@ export class PriceFeed {
   async refresh() {
     // one call per site for every coin priced by its market this round
     const market = this.tokens.filter((t) => !this.stable(t) && !(t.btc && !t.custom && t.symbol.toUpperCase() !== 'WBTC') && !(this.fixed[t.symbol.toUpperCase()] && !t.custom) && t.id !== this.usdToken?.id);
-    if (market.length && this.fetch && !this.plainOnly) {
-      const [dex, gecko] = await Promise.all([this.dexscreener(market).catch(() => new Map()), this.geckoterminal(market).catch(() => new Map())]);
-      this.ext = new Map(market.map((t) => [t.id, { dex: dex.get(t.id) ?? 0, gecko: gecko.get(t.id) ?? 0 }]));
-    }
+    if (market.length && this.fetch && !this.plainOnly) this.ext = await this.sites(market).catch(() => null);
     try {
       await this.refreshAll();
     } finally {
