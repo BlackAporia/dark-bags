@@ -243,6 +243,19 @@ export class RankBook {
     this.onChange?.(this);
     return { id, fresh };
   }
+  // a title outside the seasons (the STACHE gift): kept for good, worn at once if nothing is on
+  addForeverTitle(key, id) {
+    const r = this.rec(key);
+    r.stitles ??= [];
+    const fresh = !r.stitles.includes(id);
+    if (fresh) r.stitles.push(id);
+    if (fresh && !r.neon) r.neon = id;
+    this.onChange?.(this);
+    return { id, fresh };
+  }
+  stitleIds(key) {
+    return this.recs.get(key)?.stitles ?? [];
+  }
   neon(key) {
     const r = this.recs.get(key);
     return r?.neon && r.stitles?.includes(r.neon) ? r.neon : null;

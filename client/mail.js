@@ -40,6 +40,10 @@ export function createMail({ app, send, sfx, toast, openBox = () => {}, openWhee
     if (m.news?.k === 'welcome') {
       toast(t('mail.welcomeToast'));
       sfx?.play('coin');
+    } else if (m.news?.k === 'stache') {
+      toast(t('stache.toast', { n: m.news.place ?? '' }));
+      sfx?.play('coin');
+      if (app.promo) app.promo.stacheLeft = Math.max(0, (app.promo.stacheLeft ?? 1) - 1);
     } else if (m.news?.k === 'mail') toast(t('mail.newToast'));
     if (m.list) st.list = m.list;
     if (m.locker) {

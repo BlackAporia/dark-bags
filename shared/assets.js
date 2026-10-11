@@ -14,6 +14,8 @@ export const TEST_ASSETS = [
   { id: 'STRK', symbol: 'STRK', decimals: 18, color: '#ec796b', usd: 0.15, faucet: '300000000000000000000' },
   { id: 'ETH', symbol: 'ETH', decimals: 18, color: '#8c93ff', usd: 3500, faucet: '10000000000000000' },
   { id: 'strkBTC', symbol: 'strkBTC', decimals: 8, color: '#f2a900', usd: 100000, faucet: '30000' },
+  // the partner coin (shared/stache.js): about 8,412 STACHE to the $0.99 case
+  { id: 'STACHE', symbol: 'STACHE', decimals: 18, color: '#b08d63', usd: 0.99 / 8412, logo: 'coins/stache.png', faucet: '50000000000000000000000' },
 ];
 
 // Addresses we are sure of on Starknet mainnet. Anything else the player holds in
@@ -41,11 +43,12 @@ export class PriceBook {
     return this.assets.has(id) && this.assets.get(id).priceMicro > 0n;
   }
 
-  // A coin added by address (custom) may only be staked, and only up to its cap (maxStake, mills):
+  // A coin added by address (custom) may only be staked, and only up to its cap (maxStake, mills;
+  // the operator may cap a partner coin the same way):
   // its price comes from a pool anyone can move, so it never buys other coins, tickets or spins.
   stakeError(id, mills) {
     const a = this.assets.get(id);
-    if (a?.custom && a.maxStake != null && mills > a.maxStake) return `Stakes in ${a.symbol} (a coin added by address) go up to ${usdText(a.maxStake)}.`;
+    if (a?.maxStake != null && mills > a.maxStake) return a.custom ? `Stakes in ${a.symbol} (a coin added by address) go up to ${usdText(a.maxStake)}.` : `Stakes in ${a.symbol} go up to ${usdText(a.maxStake)}.`;
     return null;
   }
 

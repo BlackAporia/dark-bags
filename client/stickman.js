@@ -1,6 +1,7 @@
 // Line-drawn runners in the spirit of Gravity Defied: one stroke weight, joints,
 // a walk cycle, weapons held at the aim. Figures stand upright on the map
 // (billboards), with their feet on the runner's position.
+import { stachePath, stacheIcon } from './stachedraw.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { OUTFIT, FINISH, modelFor } from '../shared/cosmetics.js';
 
@@ -667,6 +668,7 @@ function drawHead(ctx, p, a, outfit, color, t, flash) {
     default:
   }
   ctx.restore();
+  if (outfit?.stache) drawStache(ctx, h.x, h.y, r, f, outfit, flash, t);
   if (outfit?.fx === 'laser') {
     // the meme, literally: two red beams from the eyes
     ctx.save();
@@ -688,6 +690,125 @@ function drawHead(ctx, p, a, outfit, color, t, flash) {
     }
     ctx.restore();
   }
+}
+
+// The STACHE runners' moustache (shared/stache.js), under the nose on the side the face looks.
+// Shapes: brush (short), handlebar (tips curled up), horseshoe (down past the mouth), walrus
+// (bushy), imperial (big and waxed, its tips twitching). Each runner has its own hair colour
+// (stacheColor), shaded darker at the roots and lighter at the tips with a few strands, and the
+// rarer ones carry more (stacheFx): shine, silver, gold (a sweeping gleam), glow, sparkle.
+function drawStache(ctx, hx, hy, r, f, outfit, flash, t) {
+  const kind = outfit.stache;
+  const fx = outfit.stacheFx;
+  const hair = outfit.stacheColor ?? '#3a2a1c';
+  const cx = hx + f * r * 0.34;
+  const cy = hy + r * 0.5;
+  const w = r * (kind === 'walrus' || kind === 'imperial' ? 1.12 : kind === 'brush' ? 0.72 : 0.95);
+  const twitch = kind === 'imperial' ? Math.sin(t / 380) * 0.8 : 0;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  // the rarest glow softly behind (no blur: two additive halos)
+  if (!flash && (fx === 'glow' || fx === 'sparkle')) {
+    ctx.globalCompositeOperation = 'lighter';
+    const pulse = 0.5 + 0.5 * Math.sin(t / 420);
+    for (const [k, al] of [
+      [1.9, 0.1 + pulse * 0.06],
+      [1.35, 0.16 + pulse * 0.08],
+    ]) {
+      ctx.globalAlpha = al;
+      ctx.fillStyle = hair;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 0.6, w * k, 3.2 * k, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  stachePath(ctx, cx, cy, w, kind, twitch);
+  // a dark rim so it reads on any face, then the hair: roots darker, tips lighter
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+  if (flash) ctx.fillStyle = '#fff';
+  else {
+    const g = ctx.createLinearGradient(cx - w - 2, cy, cx + w + 2, cy);
+    const root = shade(hair, -0.4);
+    const tipC = shade(hair, fx === 'silver' || fx === 'gold' || fx === 'sparkle' ? 0.35 : 0.18);
+    g.addColorStop(0, tipC);
+    g.addColorStop(0.38, hair);
+    g.addColorStop(0.5, root);
+    g.addColorStop(0.62, hair);
+    g.addColorStop(1, tipC);
+    ctx.fillStyle = g;
+  }
+  ctx.fill();
+  if (!flash) {
+    ctx.save();
+    ctx.clip();
+    // strands: fine lines from the middle out to each tip
+    ctx.strokeStyle = shade(hair, 0.42);
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 0.45;
+    ctx.beginPath();
+    for (const side of [-1, 1])
+      for (let i = 0; i < 4; i++) {
+        const y = cy - 0.6 + i * 0.9;
+        ctx.moveTo(cx + side * 0.6, y);
+        ctx.quadraticCurveTo(cx + side * w * 0.55, y - 0.9, cx + side * (w + 0.5), y + 0.4 + i * 0.3);
+      }
+    ctx.stroke();
+    // shine: a highlight along the top; gold and silver sweep a gleam across it
+    if (fx) {
+      ctx.globalAlpha = fx === 'shine' ? 0.35 : 0.55;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      for (const side of [-1, 1]) {
+        ctx.moveTo(cx + side * 1.2, cy - 0.5);
+        ctx.quadraticCurveTo(cx + side * w * 0.5, cy - 1.2, cx + side * w * 0.85, cy - 0.2);
+      }
+      ctx.stroke();
+    }
+    if (fx === 'gold' || fx === 'silver' || fx === 'sparkle') {
+      const sweep = ((t / 1400) % 1) * (w * 2 + 8) - w - 4;
+      const sg = ctx.createLinearGradient(cx + sweep - 2.5, cy, cx + sweep + 2.5, cy);
+      sg.addColorStop(0, 'rgba(255,255,255,0)');
+      sg.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+      sg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = sg;
+      ctx.fillRect(cx - w - 4, cy - 5, w * 2 + 8, 11);
+    }
+    ctx.restore();
+    // sparkle: tiny stars winking at the waxed tips
+    if (fx === 'sparkle') {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const side of [-1, 1]) {
+        const k = 0.5 + 0.5 * Math.sin(t / 260 + side * 1.7);
+        const sx = cx + side * (w + 1.1);
+        const sy = cy - 2.8 - twitch;
+        ctx.globalAlpha = 0.35 + 0.65 * k;
+        ctx.strokeStyle = '#fff6d0';
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        const L = 1.2 + 1.3 * k;
+        ctx.moveTo(sx - L, sy);
+        ctx.lineTo(sx + L, sy);
+        ctx.moveTo(sx, sy - L);
+        ctx.lineTo(sx, sy + L);
+        ctx.stroke();
+      }
+    }
+    // a thin silver rim, like the coin's hair
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.5;
+    stachePath(ctx, cx, cy, w, kind, twitch);
+    ctx.strokeStyle = fx === 'gold' || fx === 'sparkle' ? '#ffe9a8' : 'rgba(214, 206, 192, 0.9)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // lighten (+) or darken (-) a #rrggbb colour
@@ -1069,6 +1190,14 @@ export function drawWeapon(ctx, p, flash, finish = null, t = performance.now()) 
       ctx.strokeStyle = g;
       ctx.lineWidth = w * 0.9;
       line(x1 + ux * len * 0.25, y1 + uy * len * 0.25, x2, y2);
+    }
+    // the STACHE finishes wear the moustache emblem on the body, along the barrel
+    if (finish.stache) {
+      ctx.save();
+      ctx.translate(x1 + ux * len * 0.36, y1 + uy * len * 0.36);
+      ctx.rotate(Math.atan2(uy, ux));
+      stacheIcon(ctx, 0, 0.2, Math.max(3.4, w * 1.9), finish.stache, finish.stacheSheen ?? 'rgba(255, 246, 220, 0.65)');
+      ctx.restore();
     }
     if (finish.fx === 'shimmer' || finish.fx === 'rainbow' || finish.fx === 'galaxy' || finish.fx === 'ice') {
       // a glint sliding along the barrel, and stars for galaxy

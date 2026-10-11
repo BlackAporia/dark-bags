@@ -28,7 +28,7 @@ export class PriceFeed {
   }
 
   publish(t, usd) {
-    this.prices.set({ id: t.id, symbol: t.symbol, decimals: t.decimals, color: t.color, usd, stable: this.stable(t), ...(t.custom ? { custom: true, maxStake: t.maxStake ?? null } : {}) });
+    this.prices.set({ id: t.id, symbol: t.symbol, decimals: t.decimals, color: t.color, usd, stable: this.stable(t), ...(t.logo ? { logo: t.logo } : {}), ...(t.custom ? { custom: true } : {}), ...(t.maxStake != null ? { maxStake: t.maxStake } : {}) });
   }
 
   // Is there a real market behind this price? Selling `depthUsd` worth into USDC must get at least

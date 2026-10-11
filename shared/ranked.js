@@ -7,6 +7,7 @@
 // Season titles glow in neon over your name and add a bonus to all the XP you earn until the
 // season ends. Pure rules: the server rolls, the client only shows.
 import { seasonAt } from './season.js';
+import { FOREVER_TITLES } from './stache.js';
 
 export const START_RP = 1000;
 
@@ -56,14 +57,21 @@ export const TITLE_TIERS = [
 ];
 export const seasonTitleId = (sid, key) => `${sid}.${key}`;
 export function seasonTitle(id) {
+  // a title that belongs to no season (the STACHE gift): worn the same way, its bonus never ends
+  if (FOREVER_TITLES[id]) return { id, sid: 'forever', ...FOREVER_TITLES[id] };
   const [sid, key] = String(id ?? '').split('.');
   const tier = TITLE_TIERS.find((x) => x.key === key);
   return tier && sid ? { id, sid, ...tier } : null;
 }
+// the bonus of the forever titles someone owns but is not wearing: theirs whatever they wear
+export function foreverBonus(owned = [], worn = null) {
+  return owned.filter((id) => id !== worn && FOREVER_TITLES[id]).reduce((n, id) => n + FOREVER_TITLES[id].bonus, 0);
+}
+
 // the active bonus of a worn title (none once its season is over)
 export function titleBonus(id, now = Date.now()) {
   const t = seasonTitle(id);
-  return t && t.sid === seasonAt(now).id ? t.bonus : 0;
+  return t && (t.forever || t.sid === seasonAt(now).id) ? t.bonus : 0;
 }
 
 // the chance of a bonus spin for a finish

@@ -5,7 +5,9 @@ import { PriceBook, isStable } from './assets.js';
 import { RankBook } from './ranks.js';
 import { validStake, bandOf } from './stakes.js';
 import { MODES, MODE } from './modes.js';
-import { Inventory, OUTFITS, BOXES, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
+import { Inventory, OUTFITS, BOXES, BOX, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
+import { isStache, STACHE_GIFT_CASES, STACHE_CASE_ID, STACHE_TITLE } from './stache.js';
+import { PromoBook } from './promo.js';
 import { SocialBook, GUILD_RANK } from './social.js';
 import { ReferralBook, cleanCode } from './referrals.js';
 import { Guard, GUARD } from './guard.js';
@@ -34,7 +36,7 @@ export { STAKE_MIN as CUSTOM_MIN, STAKE_MAX as CUSTOM_MAX } from './stakes.js';
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ descent = new DescentBook(), pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ promo = new PromoBook(), descent = new DescentBook(), pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
     this.social = social; // players, friends, private messages, guilds
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
@@ -66,6 +68,7 @@ export class Lobby {
     this.rooms = new Map();
     this.guard = guard;
     this.mail = mail;
+    this.promo = promo; // limited gifts (the first 100 STACHE stakers)
     this.fortune = fortune;
     this.daily = daily; // the login calendar, the daily and weekly tasks, achievement rewards
     this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
@@ -173,6 +176,7 @@ export class Lobby {
         chain: this.cashier ? this.cashier.info() : null,
         social: this.socialSummary(s),
         mail: this.key(s) ? this.mail.unread(this.key(s)) : 0,
+        promo: this.practice ? null : { stacheLeft: this.promo.stacheLeft() },
         account: s.account,
         regions: this.regionList?.() ?? null,
         admin: !!s.account && this.isAdmin(s.account),
@@ -406,8 +410,33 @@ export class Lobby {
         this.send(cid, { t: 'tables', tables: this.tables(), balances: this.balances(s) });
         return;
       default:
-        if (s.room) s.room.handle(cid, msg);
+        if (s.room) {
+          s.room.handle(cid, msg);
+          // staking STACHE online: the first 100 players get the gift
+          if (msg.t === 'ready' && !s.room.practice && isStache(s.room.clients.get(cid)?.escrow?.asset)) this.stacheGift(this.key(s));
+        }
     }
+  }
+
+  // The STACHE gift, once per player and for the first 100 only: the Moustache Holder title
+  // (+5% XP for good) and two Stache Cases at full odds. Fair play: not for a flagged account,
+  // nor for one linked (same network or device) to a player who already got it.
+  stacheGift(key) {
+    // regional match servers leave it to the main server (it hands the gift out with the stake ticket)
+    if (this.practice || this.edge || !key || this.guard?.flagged(key)) return null;
+    if (this.promo.stache.some((x) => x.key !== key && this.guard?.linked?.(key, x.key))) return null;
+    const place = this.promo.claimStache(key);
+    if (!place) return null;
+    this.ranks.addForeverTitle(key, STACHE_TITLE);
+    this.inventory.give(key, { k: 'box', id: STACHE_CASE_ID, n: STACHE_GIFT_CASES });
+    this.mail.send({ key, kind: 'news', title: 'STACHE gift', body: `You are STACHE player #${place} of 100.`, i18n: 'stache' });
+    for (const c of this.sessionsOf(key)) {
+      this.send(c, { t: 'mailbox', unread: this.mail.unread(key), news: { k: 'stache', place } });
+      this.send(c, { t: 'career', career: this.ranks.career(key) });
+      this.send(c, { t: 'locker', op: 'sync', locker: this.inventory.view(key) });
+    }
+    console.log(`stache gift #${place} to ${String(key).slice(0, 10)}…`);
+    return place;
   }
 
   // where this session plays from, for today's free Descent ticket (counted per network and device)
@@ -518,7 +547,7 @@ export class Lobby {
       : msg.t === 'vip_claim' ? inv.vipClaim(key)
       : msg.t === 'starter_buy' ? inv.starterBuy(key, pay)
       : msg.t === 'box_all' ? inv.openAll(key)
-      : inv.open(key, id, pay, msg.n);
+      : inv.open(key, id, pay, msg.n, this.coinPay(key, BOX[id]?.coin));
     if (!r.ok) return this.send(cid, { t: 'err', msg: r.error });
     if (!this.practice && this.stats) {
       const now = inv.rec(key);
@@ -728,6 +757,18 @@ export class Lobby {
     }
     this.wallet.credit(key, pick.id, units);
     return out;
+  }
+
+  // A case sold for a coin (the Stache Case: STACHE) is paid in that coin at its live price:
+  // $0.99 is however many STACHE $0.99 buys right now. null when the case is not sold for a coin.
+  coinPay(key, coin) {
+    if (!coin) return null;
+    return (cents) => {
+      const a = this.prices.list().find((x) => (coin === 'STACHE' ? isStache(x.id) : x.symbol === coin) && !x.custom && this.prices.has(x.id));
+      if (!a) return false;
+      const units = this.prices.quote(a.id, cents * 10);
+      return units !== null && this.wallet.debit(key, a.id, units);
+    };
   }
 
   // Shop $ is bought 1:1 with USDC or USDT (play-money test tokens without a cashier)

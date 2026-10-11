@@ -1,6 +1,7 @@
 // Style in motion (shared/style.js lists the items): names painted on the canvas over a runner's
 // head, the kill effects that burst where a victim falls, small stills for the shop and the reel,
 // and the HTML for frames, banners and names in the menus (their animations live in style.css).
+import { stacheIcon } from './stachedraw.js';
 import { STYLE } from '../shared/style.js';
 import { RARITIES } from '../shared/cosmetics.js';
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -135,6 +136,8 @@ export function styleStill(id, w = 120, h = 70) {
     x.fillStyle = g;
     x.fillText('Aa', cx, cy + 2);
   }
+  // the Stache style draws its moustaches over the base look
+  if (String(it.fx).startsWith('stache')) stacheStill(x, it, w, h);
   // the rarity line under it
   x.shadowBlur = 0;
   x.fillStyle = RARITIES[it.rarity]?.color ?? '#fff';
@@ -142,6 +145,66 @@ export function styleStill(id, w = 120, h = 70) {
   const url = c.toDataURL();
   cache.set(k, url);
   return url;
+}
+
+// Stache style stills: the base look above, then the moustaches (gold ones shine)
+function stacheStill(x, it, w, h) {
+  const [c1, c2] = it.c;
+  const gold = it.fx !== 'stache';
+  const cx = w / 2;
+  const cy = h / 2;
+  x.shadowBlur = 0;
+  if (it.kind === 'banner') {
+    // rows of moustaches drifting across the band
+    x.save();
+    x.beginPath();
+    x.roundRect(6, h * 0.18, w - 12, h * 0.64, 8);
+    x.clip();
+    const bg = x.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, c2);
+    bg.addColorStop(1, '#05070d');
+    x.fillStyle = bg;
+    x.fillRect(0, 0, w, h);
+    for (let row = 0; row < 3; row++)
+      for (let i = -1; i < 6; i++) stacheIcon(x, 14 + i * 26 + (row % 2) * 13, h * 0.3 + row * h * 0.2, 9, c1, gold ? '#fff3c4' : 'rgba(255,246,220,0.45)');
+    if (gold) {
+      const g = x.createLinearGradient(w * 0.3, 0, w * 0.6, h);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.5, 'rgba(255,240,200,0.35)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g;
+      x.fillRect(0, 0, w, h);
+    }
+    x.restore();
+  } else if (it.kind === 'frame') {
+    const r = Math.min(w, h) * 0.36;
+    stacheIcon(x, cx, cy + r + 1, r * 0.75, c1, gold ? '#fff3c4' : 'rgba(255,246,220,0.6)');
+  } else if (it.kind === 'killfx') {
+    x.clearRect(0, 0, w, h);
+    const R = Math.min(w, h) * 0.42;
+    if (gold) {
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, R);
+      g.addColorStop(0, 'rgba(255,240,190,0.75)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g;
+      x.beginPath();
+      x.arc(cx, cy, R, 0, TAU);
+      x.fill();
+    }
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU + 0.3;
+      const d = R * (0.62 + (i % 2) * 0.22);
+      x.save();
+      x.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.8);
+      x.rotate(a + Math.PI / 2);
+      stacheIcon(x, 0, 0, 8 + (i % 3) * 1.5, i % 2 ? c1 : c2);
+      x.restore();
+    }
+    stacheIcon(x, cx, cy, Math.min(w, h) * 0.28, c1, '#fff3c4', 'imperial');
+  } else {
+    // a name: the moustache flourish under the letters
+    stacheIcon(x, cx, cy + h * 0.3, w * 0.14, it.fx === 'stache-royal' ? c2 : '#3a2614', '#fff3c4');
+  }
 }
 
 // ------------------------------------------------------------ the raid (canvas)
@@ -160,7 +223,8 @@ export function paintName(ctx, nf, x, w, y, t) {
       break;
     case 'gold':
     case 'ice':
-    case 'galaxy': {
+    case 'galaxy':
+    case 'stache': {
       // a band of light sweeping across
       const s = ((t / 1400) % 1.6) - 0.3;
       const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
@@ -191,6 +255,18 @@ export function paintName(ctx, nf, x, w, y, t) {
       ctx.fillStyle = on ? c1 : '#7a2a62';
       ctx.shadowColor = on ? c2 : 'transparent';
       ctx.shadowBlur = on ? 10 : 0;
+      break;
+    }
+    case 'stache-royal': {
+      // gold into royal purple, a light sweeping across
+      const s = ((t / 1600) % 1.6) - 0.3;
+      const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+      g.addColorStop(0, c1);
+      g.addColorStop(Math.max(0.01, Math.min(0.99, s)), '#fff6d0');
+      g.addColorStop(1, c2);
+      ctx.fillStyle = g;
+      ctx.shadowColor = c2;
+      ctx.shadowBlur = 6;
       break;
     }
     case 'rainbow':
@@ -232,14 +308,14 @@ export class KillFx {
   spawn(kf, x, y, t) {
     const it = STYLE[kf];
     if (!it || it.kind !== 'killfx') return;
-    const n = { sparks: 18, smoke: 12, confetti: 40, coins: 22, pixel: 36, ghost: 1, lightning: 1, frost: 22, blackhole: 30, firework: 48, rugged: 26 }[it.fx] ?? 20;
+    const n = { sparks: 18, smoke: 12, confetti: 40, coins: 22, pixel: 36, ghost: 1, lightning: 1, frost: 22, blackhole: 30, firework: 48, rugged: 26, stache: 10, 'stache-gold': 14 }[it.fx] ?? 20;
     const ps = [];
     for (let i = 0; i < n; i++) {
       const a = Math.random() * TAU;
       const s = 40 + Math.random() * 160;
       ps.push({ a, s, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: Math.random(), c: i % 2 ? it.c[0] : it.c[1], rot: Math.random() * TAU });
     }
-    this.list.push({ fx: it.fx, c: it.c, x, y, t0: t, life: { ghost: 1600, lightning: 700, blackhole: 1300, firework: 1500, rugged: 1600, smoke: 1400 }[it.fx] ?? 1000, ps });
+    this.list.push({ fx: it.fx, c: it.c, x, y, t0: t, life: { ghost: 1600, lightning: 700, blackhole: 1300, firework: 1500, rugged: 1600, smoke: 1400, stache: 1300, 'stache-gold': 1600 }[it.fx] ?? 1000, ps });
     if (this.list.length > 24) this.list.shift();
   }
 
@@ -310,6 +386,38 @@ export class KillFx {
             ctx.globalAlpha = fade;
             ctx.fillRect(Math.cos(a) * d, Math.sin(a) * d, 3, 3);
           }
+          break;
+        }
+        case 'stache':
+        case 'stache-gold': {
+          // moustaches burst out tumbling, and a big one pops up over the body (gold: it shines)
+          const gold = e.fx === 'stache-gold';
+          if (gold && !reduced) {
+            // a warm flash that opens and fades (a gradient, no blur)
+            const R = 30 + 40 * k;
+            const g = ctx.createRadialGradient(0, -14, 0, 0, -14, R);
+            g.addColorStop(0, 'rgba(255, 240, 190, 0.8)');
+            g.addColorStop(0.45, 'rgba(224, 176, 98, 0.35)');
+            g.addColorStop(1, 'rgba(224, 176, 98, 0)');
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = fade;
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(0, -14, R, 0, TAU);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+          }
+          for (const p of e.ps) {
+            ctx.save();
+            ctx.globalAlpha = fade;
+            ctx.translate(p.vx * s * 0.55, p.vy * s * 0.55 + 90 * s * s);
+            ctx.rotate(Math.sin(p.rot + s * (3 + p.r * 4)) * 0.9); // they wobble, but stay moustaches
+            stacheIcon(ctx, 0, 0, 10 + p.r * 6, p.c, gold ? '#fff3c4' : 'rgba(255,246,220,0.55)');
+            ctx.restore();
+          }
+          const pop = Math.min(1, k * 5);
+          ctx.globalAlpha = fade;
+          stacheIcon(ctx, 0, -26 - s * 18, 6 + 14 * pop, e.c[0], '#fff3c4', 'imperial');
           break;
         }
         case 'rugged': {

@@ -3,7 +3,8 @@
 // only stages it: the box charges up in the colour of the best drop, bursts, and the
 // cards flip one by one.
 import { OUTFIT, OUTFITS, RARITIES, RARITY_ORDER, BOXES, BOX, PITY, PACKS, WSKIN, WEAPON_SKINS, MAX_OPEN, usd, boxCost, BULK_FREE_EVERY, FIRST_TOPUP_MAX, firstBonus, boxCatalog, rollRarity } from '../shared/cosmetics.js';
-import { isStable } from '../shared/assets.js';
+import { isStable, formatUnits } from '../shared/assets.js';
+import { isStache } from '../shared/stache.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { figureStill, drawPreview } from './stickman.js';
 import { boxArt, weaponStill } from './locker.js';
@@ -32,6 +33,18 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     return Number(c);
   };
   const reach = () => (L()?.credit ?? 0) + stableCents();
+  // a case sold for a coin (the Stache Case: STACHE): what it costs in that coin right now, and
+  // how many cents of it the player holds
+  const coinAsset = (coin) => (app.assets ?? []).find((a) => (coin === 'STACHE' ? isStache(a.id) : a.symbol === coin) && !a.custom);
+  const coinCents = (coin) => {
+    const a = coinAsset(coin);
+    return a && app.prices?.has(a.id) ? Math.floor(app.prices.value(a.id, BigInt(app.balances?.[a.id] ?? '0')) / 10) : 0;
+  };
+  const coinPrice = (coin, cents) => {
+    const a = coinAsset(coin);
+    const u = a && app.prices?.has(a.id) ? app.prices.quote(a.id, cents * 10) : null;
+    return u === null ? null : `${formatUnits(u, a.decimals, 0)} ${a.symbol}`;
+  };
   // the card shows what was pulled: the outfit worn, or the skin in hand with its own finish
   const shareLook = (res) => {
     const L_ = L();
@@ -51,6 +64,8 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     const root = $('shop-root');
     if (!root || !L()) return;
     const boxes = BOXES.filter((b) => b.family === st.family);
+    // partner cases (paid in their coin) sit above the tabs, in every one of them
+    const partner = BOXES.filter((b) => b.group === 'partner');
     const limited = st.family === 'style' ? [] : [...OUTFITS, ...WEAPON_SKINS].filter((o) => o.limited && (st.family === 'outfit' ? OUTFIT[o.id] : WSKIN[o.id]));
     root.innerHTML = `
       <header class="shop-head">
@@ -66,6 +81,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
         }).join('')}</div>
         <p class="fine">${t('lk.shopNote')}</p>
       </section>
+      ${partner.length ? `<section class="box-group partner"><p class="eyebrow">${t('shop.g.partner')}</p><div class="box-grid">${partner.map(boxCard).join('')}</div></section>` : ''}
       <div class="mode shop-tabs" role="tablist">
         <button type="button" class="seg" role="tab" data-fam="outfit" aria-selected="${st.family === 'outfit'}">${t('shop.bags')}</button>
         <button type="button" class="seg" role="tab" data-fam="weapon" aria-selected="${st.family === 'weapon'}">${t('shop.crates')}</button>
@@ -102,14 +118,17 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     const meter = (label, have, max) => `<div class="pity"><span>${label}</span><div class="pity-bar"><i style="width:${(have / max) * 100}%"></i></div><b>${max - have}</b></div>`;
     const cost = boxCost(bx, paid);
     const gift = Math.floor(paid / BULK_FREE_EVERY);
-    const cta = paid === 0 ? `${t('lk.openFree')} ×${n}` : `${t('shop.open', { n })} · ${gift ? `<s>${usd(paid * bx.price)}</s> ` : ''}${usd(cost)}`;
+    const inCoin = bx.coin ? coinPrice(bx.coin, cost) : null;
+    const cta = paid === 0 ? `${t('lk.openFree')} ×${n}` : bx.coin ? `${t('shop.open', { n })} · ${inCoin ?? '…'}` : `${t('shop.open', { n })} · ${gift ? `<s>${usd(paid * bx.price)}</s> ` : ''}${usd(cost)}`;
+    const short = bx.coin ? paid > 0 && (inCoin === null || cost > coinCents(bx.coin)) : cost > reach();
     const art = bx.art ? `;--c1:${bx.art.c1};--c2:${bx.art.c2}` : '';
     return `<article class="box-card t${bx.tier}${bx.art ? ' themed' : ''}" data-box="${bx.id}" style="--r:${RARITIES[bx.jackpot].color}${art}">
       ${held ? `<span class="held-badge">×${held}</span>` : ''}
       <div class="box-art">${boxArt(bx, 128)}</div>
       ${bx.art ? contents(bx) : ''}
+      ${bx.coin === 'STACHE' && app.promo?.stacheLeft ? `<p class="box-gift">🎁 ${t('shop.stacheGift', { n: app.promo.stacheLeft })}</p>` : ''}
       <h4>${esc(t(`box.${bx.id}`))}</h4>
-      <p class="box-price num">${usd(bx.price)}</p>
+      <p class="box-price num">${usd(bx.price)}${bx.coin ? `<small class="box-coin">${t('shop.inCoin', { v: coinPrice(bx.coin, bx.price) ?? '…' })}</small>` : ''}</p>
       <p class="fine">${t('lk.jackpot')}: <b style="color:${RARITIES[bx.jackpot].color}">${rn(bx.jackpot)}</b></p>
       <div class="odds-bar">${bar}</div>
       <details class="odds-more"><summary>${t('shop.odds')}</summary><ul class="odds">${legend}</ul>
@@ -122,7 +141,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
       </div>
       <div class="qty-chips">${QTY.map((q) => `<button type="button" data-qq="${q}" aria-pressed="${q === n}">×${q}</button>`).join('')}</div>
       <p class="bulk-note${gift ? ' on' : ''}">${gift ? t('shop.bulkOn', { n: gift }) : t('shop.bulk', { n: BULK_FREE_EVERY })}</p>
-      ${demoOnly() ? `<button type="button" class="cta box-go demo">${t('shop.demo')}</button>` : `<button type="button" class="cta box-go" ${cost > reach() ? 'disabled' : ''}>${cta}</button>`}
+      ${demoOnly() ? `<button type="button" class="cta box-go demo">${t('shop.demo')}</button>` : `<button type="button" class="cta box-go" ${short ? 'disabled' : ''}>${cta}</button>`}
     </article>`;
   }
 
@@ -137,7 +156,8 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
       seen.add(k);
       return true;
     }).slice(0, 4);
-    const img = (i) => (bx.family === 'style' ? `<img src="${styleStill(i.id, 120, 70)}" alt="">` : bx.family === 'weapon' ? `<img src="${weaponStill(i.id, 120, 70)}" alt="">` : `<img src="${figureStill({ outfit: i.id, body: 'm' }, 56, 78)}" alt="">`);
+    const fam = (i) => i._k ?? bx.family;
+    const img = (i) => (fam(i) === 'style' ? `<img src="${styleStill(i.id, 120, 70)}" alt="">` : fam(i) === 'weapon' ? `<img src="${weaponStill(i.id, 120, 70)}" alt="">` : `<img src="${figureStill({ outfit: i.id, body: 'm' }, 56, 78)}" alt="">`);
     const strip = top.map((i) => `<figure style="--q:${RARITIES[i.rarity].color}" title="${esc(i.name)}">${img(i)}</figure>`).join('');
     const list = best.slice(0, 60).map((i) => `<li style="--q:${RARITIES[i.rarity].color}">${esc(i.name)}${i.limited ? ' ◆' : ''}</li>`).join('');
     return `<div class="box-peek${bx.family === 'outfit' ? ' fig' : ''}">${strip}</div>
@@ -183,7 +203,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     const { rarity } = rollRarity(box, null, Math.random);
     const pool = boxCatalog(box).filter((i) => i.rarity === rarity && !i.basic);
     const item = pool[Math.floor(Math.random() * pool.length)] ?? boxCatalog(box)[0];
-    setTimeout(() => reveal({ box: id, results: [{ kind: box.family, item: item.id, rarity: item.rarity, dup: false, refund: 0, pity: false, jackpot: false }] }), 500);
+    setTimeout(() => reveal({ box: id, results: [{ kind: item._k ?? box.family, item: item.id, rarity: item.rarity, dup: false, refund: 0, pity: false, jackpot: false }] }), 500);
   }
 
   function buy(id, n) {
@@ -294,9 +314,10 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     const ov = $('opening');
     // the reel: the box's prizes race past the marker and stop on the best drop
     ov.className = 'opening spinning';
-    const tile = (i) => ({ id: i.id, name: i.name, rarity: i.rarity, img: box.family === 'style' ? styleStill(i.id, 120, 70) : box.family === 'weapon' ? weaponStill(i.id, 120, 70) : figureStill({ outfit: i.id, body: L()?.body ?? 'm' }, 56, 78) });
-    const pool = reelPool(box).map(tile);
-    const win = tile(itemOf(best));
+    // a mixed case (Stache Case) shows each prize as what it is: runner, weapon skin or style
+    const tile = (i, k = i._k ?? box.family) => ({ id: i.id, name: i.name, rarity: i.rarity, img: k === 'style' ? styleStill(i.id, 120, 70) : k === 'weapon' ? weaponStill(i.id, 120, 70) : figureStill({ outfit: i.id, body: L()?.body ?? 'm' }, 56, 78) });
+    const pool = reelPool(box).map((i) => tile(i));
+    const win = tile(itemOf(best), best.kind);
     spinReel($('op-stage'), { pool, win, odds: box.odds, sfx, motion: settings.motion, secs: results.length > 1 ? 4.6 : 6.2, label: t(`box.${box.id}`) }).then(() => {
       ov.style.setProperty('--glow', bestColor);
       sfx.play('beep', { f: 1400 + rankOf(best.rarity) * 200, dur: 0.12 });

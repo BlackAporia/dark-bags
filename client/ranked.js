@@ -19,11 +19,12 @@ import { rankBadgeSvg } from './rankbadge.js';
 
 const $ = (id) => document.getElementById(id);
 const DIV = Object.fromEntries(DIVISIONS.map((d) => [d.id, d]));
-const TITLE_RARITY = { contender: 'legendary', elite: 'mythic', champion: 'exotic' };
+const TITLE_RARITY = { contender: 'legendary', elite: 'mythic', champion: 'exotic', moustache: 'exotic' };
 
 // "Neon Uprising Champion": the season's name and the tier, for name tags and lists
 export function neonText(id) {
   const st = seasonTitle(id);
+  if (st?.forever) return t(`st.${st.key}`); // a title outside the seasons: just its name
   return st ? `${seasonInfo(st.sid).theme.name} ${t(`st.${st.key}`)}` : '';
 }
 export const neonColor = (id) => seasonTitle(id)?.color ?? '#00f5ff';
@@ -168,7 +169,7 @@ export function createRanked({ app, send, sfx, toast, go, openBox = () => {}, pr
       const id = `${sid}.${key}`;
       return { id, name: neonText(id), rarity: TITLE_RARITY[key], img: titleImg(id) };
     };
-    const cases = BOXES.filter((b) => b.group !== 'tier' && b.id !== 'c-knife');
+    const cases = BOXES.filter((b) => b.group !== 'tier' && b.group !== 'partner' && b.id !== 'c-knife');
     const caseTile = (b) => ({ id: b.id, name: t(`box.${b.id}`), rarity: 'rare', img: svgUri(boxArt(b, 90).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')) });
     const skins = WEAPON_SKINS.filter((x) => !x.limited && ['legendary', 'mythic'].includes(x.rarity));
     const styleTile = (id) => ({ id, name: STYLE[id].name, rarity: STYLE[id].rarity, img: styleStill(id, 120, 70) });

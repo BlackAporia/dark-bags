@@ -26,6 +26,7 @@ import { featured, storeDay, CARD, STARTER, tierCost } from './store.js';
 import { vipOf, VIP_LEVELS } from './vip.js';
 import { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems } from './season.js';
 import { DESCENT_OUTFITS, DESCENT_FINISHES, DESCENT_GUNS } from './descent-items.js';
+import { STACHE_OUTFITS, STACHE_FINISHES, STACHE_GUNS, STACHE_STYLE, STACHE_CASE_ID, STACHE_CASE_CENTS, isStache } from './stache.js';
 export { SEASON_OUTFITS, SEASON_FINISHES, SEASON_TURRETS, TURRET_SKIN, seasonAt, seasonItems };
 
 export const BODIES = ['m', 'f'];
@@ -155,7 +156,7 @@ export const OUTFITS = [
 // seasonal armour is not in OUTFITS (no box or trial ever drops it); it is still an outfit
 // the Descent's armours: only its milestones hand them out (shared/descent.js)
 export { DESCENT_OUTFITS, DESCENT_FINISHES };
-export const OUTFIT = Object.fromEntries([...OUTFITS, ...SEASON_OUTFITS, ...DESCENT_OUTFITS].map((o) => [o.id, o]));
+export const OUTFIT = Object.fromEntries([...OUTFITS, ...SEASON_OUTFITS, ...DESCENT_OUTFITS, ...STACHE_OUTFITS].map((o) => [o.id, o]));
 export const DEFAULT_OUTFIT = 'basic-0';
 
 // ------------------------------------------------------------ weapon skins
@@ -212,7 +213,7 @@ export const FINISHES = [
   { id: 'supernova', name: 'Supernova', rarity: 'exotic', color: '#fff7ae', accent: '#f97316', fx: 'rainbow' },
   { id: 'dragonlord', name: 'Dragonlord', rarity: 'exotic', limited: 77, color: '#dc2626', accent: '#fbbf24', pattern: 'dots', fx: 'fire' },
 ];
-export const FINISH = Object.fromEntries([...FINISHES, ...SEASON_FINISHES, ...DESCENT_FINISHES].map((f) => [f.id, f]));
+export const FINISH = Object.fromEntries([...FINISHES, ...SEASON_FINISHES, ...DESCENT_FINISHES, ...STACHE_FINISHES].map((f) => [f.id, f]));
 
 // Each skin is also a model: the rarer the finish, the wilder the weapon. Knife skins
 // become daggers, machetes, axes, katanas, twin blades, scythes, energy swords; guns
@@ -289,7 +290,14 @@ export const DESCENT_WSKINS = DESCENT_FINISHES.flatMap((f) =>
     return { id: `${w}.${f.id}`, weapon: w, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, descent: f.descent };
   }),
 );
-export const WSKIN = Object.fromEntries([...WEAPON_SKINS, ...SEASON_WSKINS, ...DESCENT_WSKINS].map((s) => [s.id, s]));
+// STACHE's finishes, on the guns everyone carries (only the Stache Case drops them)
+export const STACHE_WSKINS = STACHE_FINISHES.flatMap((f) =>
+  STACHE_GUNS.map((w) => {
+    const model = modelFor(w, f.id);
+    return { id: `${w}.${f.id}`, weapon: w, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, stacheItem: true };
+  }),
+);
+export const WSKIN = Object.fromEntries([...WEAPON_SKINS, ...SEASON_WSKINS, ...DESCENT_WSKINS, ...STACHE_WSKINS].map((s) => [s.id, s]));
 
 // ------------------------------------------------------------------ boxes
 // odds in percent; the jackpot is what a box is "for" (shared as a hit or a miss);
@@ -350,10 +358,14 @@ export const BOXES = [
   ...COLLECTIONS.map((c) => ({ price: 249, odds: CASE_ODDS, jackpot: 'mythic', tier: 4, group: c.weapons ? 'class' : 'theme', ...c })),
   // style cases: frames, banners, kill effects, name effects
   ...STYLE_CASES.map((c, i) => ({ family: 'style', group: 'style', tier: [2, 4, 7][i], ...c })),
+  // the Stache Case: runners, weapon skins and style in one, paid in STACHE (coin: the payment)
+  { id: STACHE_CASE_ID, family: 'mixed', group: 'partner', coin: 'STACHE', name: 'Stache Case', price: STACHE_CASE_CENTS, odds: CASE_ODDS, jackpot: 'mythic', tier: 4, art: { c1: '#b08d63', c2: '#0b1222', icon: '〰', img: 'coins/stache.png' } },
 ];
 export const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
 // what a box can drop: the whole family, or its collection
 export function boxCatalog(box) {
+  // a mixed case: every kind at once, each item marked with what it is (_k)
+  if (box.family === 'mixed') return [...STACHE_OUTFITS.map((x) => ({ ...x, _k: 'outfit' })), ...STACHE_WSKINS.map((x) => ({ ...x, _k: 'weapon' })), ...STACHE_STYLE.map((x) => ({ ...x, _k: 'style' }))];
   if (box.family === 'style') return STYLE_ITEMS.filter((x) => !x.excl);
   if (box.family === 'outfit') return box.outfits ? box.outfits.map((id) => OUTFIT[id]).filter(Boolean) : OUTFITS;
   if (!box.finishes && !box.weapons) return WEAPON_SKINS;
@@ -981,7 +993,8 @@ export class Inventory {
   }
 
   // Open `count` boxes: the ones you hold go first (free), the rest are bought in one charge.
-  open(key, boxId, external, count = 1) {
+  // coinPay(cents): a case sold for a coin (box.coin) is paid in that coin only, never shop $
+  open(key, boxId, external, count = 1, coinPay = null) {
     const box = BOX[boxId];
     const r = this.rec(key);
     if (!box) return { ok: false, error: 'Unknown box.' };
@@ -993,7 +1006,13 @@ export class Inventory {
     const fromGift = Math.min(gheld, count - fromHeld);
     const free = fromHeld + fromGift;
     const paid = count - free;
-    if (paid > 0 && !this.charge(key, boxCost(box, paid), external)) return { ok: false, error: `Not enough $ (${usd(boxCost(box, paid))} needed).` };
+    if (paid > 0 && box.coin) {
+      const cost = boxCost(box, paid);
+      if (!coinPay?.(cost)) return { ok: false, code: 'coin_funds', error: `Not enough ${box.coin} (${usd(cost)} worth needed).` };
+      r.spent += cost;
+      r.paid = (r.paid ?? 0) + cost; // real money: counts toward VIP
+      this.vipSync(key);
+    } else if (paid > 0 && !this.charge(key, boxCost(box, paid), external)) return { ok: false, error: `Not enough $ (${usd(boxCost(box, paid))} needed).` };
     r.boxes[boxId] = held - fromHeld;
     if (fromGift) r.gboxes[boxId] = gheld - fromGift;
     const results = [];
@@ -1011,10 +1030,15 @@ export class Inventory {
     p.sinceExotic ??= 0;
     const roll = rollRarity(box, cap ? null : p, this.rnd);
     if (cap && rank(roll.rarity) > rank(cap)) roll.rarity = cap;
-    const weapon = box.family === 'weapon';
-    const style = box.family === 'style';
-    const mine = style ? (r.sowned ??= []) : weapon ? r.wowned : r.owned;
-    const item = pickItem(boxCatalog(box), roll.rarity, new Set(mine), this.rnd, { tier: box.tier, minted: this.minted });
+    r.sowned ??= [];
+    const listOf = (kind) => (kind === 'style' ? r.sowned : kind === 'weapon' ? r.wowned : r.owned);
+    // a mixed case draws from every kind: what it hands out decides whose list it joins
+    const owned = box.family === 'mixed' ? [...r.owned, ...r.wowned, ...r.sowned] : listOf(box.family);
+    const item = pickItem(boxCatalog(box), roll.rarity, new Set(owned), this.rnd, { tier: box.tier, minted: this.minted });
+    const kind = item._k ?? box.family;
+    const weapon = kind === 'weapon';
+    const style = kind === 'style';
+    const mine = listOf(kind);
     const dup = mine.includes(item.id);
     let refund = 0;
     let serial = null;
@@ -1033,7 +1057,7 @@ export class Inventory {
     p.sinceLegendary = rank(item.rarity) >= rank('legendary') ? 0 : p.sinceLegendary + 1;
     p.sinceExotic = rank(item.rarity) >= rank('exotic') ? 0 : p.sinceExotic + 1;
     r.opened++;
-    return { kind: box.family, item: item.id, rarity: item.rarity, dup, refund, serial, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
+    return { kind, item: item.id, rarity: item.rarity, dup, refund, serial, pity: roll.pity, jackpot: rank(item.rarity) >= rank(box.jackpot) };
   }
 
   toJSON() {

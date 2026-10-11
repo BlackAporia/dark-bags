@@ -3108,3 +3108,28 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .coin-addr input { min-width: 0; font-family: var(--f-mono, monospace); font-size: 12px; }
 .coin-cnote { margin: -2px 0 2px; }
 .coin-cx { display: inline-block; white-space: nowrap; margin-left: 4px; padding: 0 4px; border-radius: 6px; border: 1px solid rgba(255, 196, 0, 0.5); color: #ffd166; font: 700 8px/1.5 var(--f-ui, inherit); font-style: normal; letter-spacing: 0.02em; text-transform: uppercase; vertical-align: middle; }
+/* a coin's own logo in place of its colour dot (STACHE) */
+.asset .dot.coin-logo { width: 16px; height: 16px; object-fit: cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); }
+/* the partner case (STACHE): paid in its coin, with the first-100 gift */
+.box-price .box-coin { display: block; font-size: 12px; font-weight: 600; color: #e0b062; }
+.box-gift { margin: 2px 0; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(224, 176, 98, 0.45); background: rgba(224, 176, 98, 0.1); color: #f3d9a8; font-size: 12px; line-height: 1.35; }
+.box-group.partner .box-card { border-color: rgba(224, 176, 98, 0.55); }
+
+/* ---- the Stache style (shared/stache.js): moustaches drifting, under the frame, before the name */
+.bnr-stache, .bnr-stache-gold { background: linear-gradient(135deg, var(--c2), #05070d); }
+.bnr-stache::before, .bnr-stache-gold::before { content: ''; position: absolute; inset: -40px; background: var(--c1); opacity: 0.7;
+  -webkit-mask: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M32 10C27 3 18 3 12 9C9 12 6 13 2 10C3 17 10 21 18 19C24 18 28 15.5 32 13.5C36 15.5 40 18 46 19C54 21 61 17 62 10C58 13 55 12 52 9C46 3 37 3 32 10Z' fill='%23000'/%3E%3C/svg%3E") 0 0 / 46px 22px repeat; mask: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M32 10C27 3 18 3 12 9C9 12 6 13 2 10C3 17 10 21 18 19C24 18 28 15.5 32 13.5C36 15.5 40 18 46 19C54 21 61 17 62 10C58 13 55 12 52 9C46 3 37 3 32 10Z' fill='%23000'/%3E%3C/svg%3E") 0 0 / 46px 22px repeat; animation: stacheDrift 9s linear infinite; }
+.bnr-stache-gold::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 240, 200, 0.45) 50%, transparent 70%) 0 0 / 250% 100%; animation: stacheShine 3.2s linear infinite; }
+@keyframes stacheDrift { to { transform: translate(46px, 22px); } }
+@keyframes stacheShine { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.frm-stache::before { background: linear-gradient(135deg, var(--c1), var(--c2) 60%, var(--c1)); padding: 4px; }
+.frm-stache-gold::before { background: conic-gradient(from var(--ang), var(--c2), #fff3c4 10%, var(--c1) 25%, var(--c2) 50%, #fff3c4 60%, var(--c1) 75%, var(--c2)); animation: spinAng 2.6s linear infinite; padding: 4px; }
+.frm-stache-gold::after { box-shadow: 0 0 18px var(--c1); animation: glowPulse 1.6s ease-in-out infinite; }
+.frm-stache::after, .frm-stache-gold::after { background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M32 10C27 3 18 3 12 9C9 12 6 13 2 10C3 17 10 21 18 19C24 18 28 15.5 32 13.5C36 15.5 40 18 46 19C54 21 61 17 62 10C58 13 55 12 52 9C46 3 37 3 32 10Z' fill='%233a2614' stroke='%23e6dcc4' stroke-width='1.2'/%3E%3C/svg%3E") 50% 100% / 64% auto no-repeat; }
+.frm-stache-gold::after { background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M32 10C27 3 18 3 12 9C9 12 6 13 2 10C3 17 10 21 18 19C24 18 28 15.5 32 13.5C36 15.5 40 18 46 19C54 21 61 17 62 10C58 13 55 12 52 9C46 3 37 3 32 10Z' fill='%23e0b062' stroke='%23fff3c4' stroke-width='1.2'/%3E%3C/svg%3E") 50% 100% / 70% auto no-repeat; }
+.nfx-stache, .nfx-stache-royal { position: relative; }
+.nfx-stache::before, .nfx-stache-royal::before { content: ''; display: inline-block; width: 1.25em; height: 0.55em; margin-right: 0.25em; vertical-align: 0.05em; background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M32 10C27 3 18 3 12 9C9 12 6 13 2 10C3 17 10 21 18 19C24 18 28 15.5 32 13.5C36 15.5 40 18 46 19C54 21 61 17 62 10C58 13 55 12 52 9C46 3 37 3 32 10Z' fill='%23e0b062' stroke='%23fff3c4' stroke-width='1.2'/%3E%3C/svg%3E") center / contain no-repeat; }
+.nfx-stache-royal::before { background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M32 10C27 3 18 3 12 9C9 12 6 13 2 10C3 17 10 21 18 19C24 18 28 15.5 32 13.5C36 15.5 40 18 46 19C54 21 61 17 62 10C58 13 55 12 52 9C46 3 37 3 32 10Z' fill='%238b6cf0' stroke='%23fff3c4' stroke-width='1.2'/%3E%3C/svg%3E"); }
+.nfx-stache { background: linear-gradient(90deg, var(--c2), #fffbe6, var(--c1), var(--c2)) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nfxSweep 2.8s linear infinite; }
+.nfx-stache-royal { background: linear-gradient(90deg, var(--c1), #fff6d0, var(--c2), var(--c1)) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nfxSweep 2.2s linear infinite; filter: drop-shadow(0 0 4px rgba(139, 108, 240, 0.6)); }
+@media (prefers-reduced-motion: reduce) { .bnr-stache::before, .bnr-stache-gold::before, .bnr-stache-gold::after { animation: none !important; } }

@@ -63,7 +63,7 @@ export function boxArt(box, size = 120) {
   <ellipse cx="60" cy="106" rx="44" ry="7" fill="#000" opacity=".5"/>
   <circle cx="60" cy="66" r="56" fill="url(#${uid}g)"/>
   ${shape}
-  ${a ? `<circle cx="${crate ? 39 : 60}" cy="${crate ? 74 : 80}" r="13" fill="${a.c2}" stroke="${p.strap}" stroke-width="1.6"/><text x="${crate ? 39 : 60}" y="${crate ? 79 : 85}" text-anchor="middle" font-size="15" font-weight="900" fill="${p.strap}" font-family="system-ui, sans-serif">${a.icon}</text>` : gem}
+  ${a?.img ? `<clipPath id="${uid}c"><circle cx="60" cy="80" r="15"/></clipPath><circle cx="60" cy="80" r="16.5" fill="${a.c2}" stroke="${p.strap}" stroke-width="1.8"/><image href="${a.img}" x="45" y="65" width="30" height="30" clip-path="url(#${uid}c)" preserveAspectRatio="xMidYMid slice"/>` : a ? `<circle cx="${crate ? 39 : 60}" cy="${crate ? 74 : 80}" r="13" fill="${a.c2}" stroke="${p.strap}" stroke-width="1.6"/><text x="${crate ? 39 : 60}" y="${crate ? 79 : 85}" text-anchor="middle" font-size="15" font-weight="900" fill="${p.strap}" font-family="system-ui, sans-serif">${a.icon}</text>` : gem}
 </svg>`;
 }
 
