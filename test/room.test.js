@@ -272,8 +272,11 @@ test('ping: the server measures each client, only its own latest stamp counts, r
   const alice = [...room.world.players.values()].find((p) => p.name === 'alice');
   assert.equal(alice.ping, Math.round(40 * 0.6 + 70 * 0.4));
   const bob = [...room.world.players.values()].find((p) => p.name === 'bob');
-  alice.x = bob.x + 40;
-  alice.y = bob.y;
+  // right where bob looks from: no wall can stand between them (40 apart on a random map, one
+  // sometimes did, and bob rightly saw nothing)
+  const eye = room.world.eyeOf(bob);
+  alice.x = eye.x;
+  alice.y = eye.y;
   const seen = room.world.snapshotFor(bob.id).players.find((p) => p.n === 'alice');
   assert.equal(seen.pg, alice.ping);
 });
