@@ -13,6 +13,7 @@
       "europe-west4-drams3a": {
         "numReplicas": 1
       }
-    }
+    },
+    "drainingSeconds": 20
   }
 }

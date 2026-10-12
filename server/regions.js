@@ -336,11 +336,23 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
   // (never while that player is in a live raid here: the raid's own bookkeeping is on these)
   function seed(key, s) {
     if (!s || locked().has(key)) return;
-    if (s.ranks) lobby.ranks.recs.set(key, structuredClone(s.ranks));
+    // XP only grows: a record here that is ahead of the main server's is a match whose report has
+    // not reached it yet (or is still being retried). Keep it, or the next match here would start
+    // from the old rank and the player would see it drop.
+    const here = lobby.ranks.recs.get(key);
+    const ahead = here && (here.xp ?? 0) > (s.ranks?.xp ?? 0) && pendingFor(key);
+    if (ahead) log.warn?.(`region ${region}: ${key} is ahead of the main server's record (a report is on its way); keeping it`);
+    else if (s.ranks) lobby.ranks.recs.set(key, structuredClone(s.ranks));
     else lobby.ranks.recs.delete(key);
     if (s.inventory) lobby.inventory.data.set(key, structuredClone(s.inventory));
     if (s.referrals) lobby.referrals.users.set(key, structuredClone(s.referrals));
     if (s.daily && lobby.daily) lobby.daily.users.set(key, structuredClone(s.daily));
+  }
+
+  // a report naming this player that the main server has not confirmed yet
+  function pendingFor(key) {
+    const names = (j) => Array.isArray(j?.[2]) && j[2][0] === key;
+    return journal.some(names) || outbox.some((b) => b.journal?.some(names));
   }
 
   // hello with an entry ticket: the session plays as that account
@@ -453,7 +465,20 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
     reply(200, { ok: true, region });
   }
 
+  // Going down (a deploy restarts every server at once, the main one too): keep trying to hand the
+  // reports over for a while. A match server without a persistent disk loses what it still holds.
+  async function drain(ms = 12_000, wait = (t) => new Promise((r) => setTimeout(r, t))) {
+    const until = now() + ms;
+    await flush().catch(() => {});
+    while (outbox.length && now() < until) {
+      await wait(1000);
+      await send().catch(() => {});
+    }
+    if (outbox.length) log.error(`region ${region}: ${outbox.length} report(s) could not reach the main server before shutdown${file ? ` (kept in ${file})` : ' and are lost: give this server a persistent disk at /data'}`);
+    return outbox.length;
+  }
+
   const timer = setInterval(() => flush().catch(() => {}), 2000);
   timer.unref?.();
-  return { admit, ready, flush, send, locked, check, outbox: () => outbox };
+  return { admit, ready, flush, send, drain, locked, check, outbox: () => outbox };
 }

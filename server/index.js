@@ -52,6 +52,25 @@ if (EDGE && (REGION_SECRET.length < 32 || !process.env.MAIN_URL)) {
 }
 const DATA = !EDGE && existsSync('/data') ? '/data' : '';
 const OUTBOX_FILE = EDGE && existsSync('/data') ? '/data/region-outbox.json' : '';
+// Is /data a real disk? The image always has a /data folder, so its being there proves nothing:
+// without a volume mounted on it, it is the container's own layer and every deploy wipes it
+// (ranks, names, skins, mail: everyone starts over, only the wallets come back from the chain).
+// A mount shows in /proc/self/mountinfo; Railway also names its volume in the environment.
+function diskAt(dir) {
+  if (process.env.RAILWAY_VOLUME_MOUNT_PATH) return path.resolve(process.env.RAILWAY_VOLUME_MOUNT_PATH) === path.resolve(dir);
+  try {
+    return readFileSync('/proc/self/mountinfo', 'utf8').split('\n').some((l) => l.split(' ')[4] === dir);
+  } catch {
+    return null; // not Linux: cannot tell
+  }
+}
+const STORAGE = { path: DATA || (EDGE && existsSync('/data') ? '/data' : null), persistent: existsSync('/data') ? diskAt('/data') : false };
+if (STORAGE.path && STORAGE.persistent === false) {
+  const what = EDGE ? 'reports of matches still on their way to the main server' : 'ranks, names, skins, mail, friends and everything else players earn';
+  const warn = () => console.error(`STORAGE: ${STORAGE.path} is not a persistent disk. Every deploy or restart wipes the ${what}. Attach a volume at /data to this service (Railway: right-click the service → Attach Volume, mount path /data).`);
+  warn();
+  setInterval(warn, 15 * 60_000).unref();
+}
 const NET = process.env.CHAIN && process.env.CHAIN !== 'off' ? process.env.CHAIN : 'test';
 const WALLET_FILE = process.env.WALLET_FILE || '';
 const RANKS_FILE = process.env.RANKS_FILE || (DATA ? `${DATA}/${NET}-ranks.json` : '');
@@ -416,7 +435,7 @@ if (regionMain) {
 const regionEdge = EDGE ? createRegionEdge({ lobby, secret: REGION_SECRET, region: process.env.REGION || 'region', mainUrl: process.env.MAIN_URL.replace(/\/+$/, ''), journal, file: OUTBOX_FILE }) : null;
 if (regionEdge) console.log(`regions: match server ${process.env.REGION || 'region'} for ${process.env.MAIN_URL}; REGION_SECRET fingerprint ${REGION_FP} (must match the main server's)`);
 
-const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain });
+const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE });
 
 // ------------------------------------------------------------------ static
 const MIME = {
@@ -506,6 +525,11 @@ async function geoOf(req) {
 const server = http.createServer((req, res) => {
   if (req.url === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
+    return;
+  }
+  // the browser times this to pick the closest region: nothing to build, nothing to send
+  if (req.url.startsWith('/api/ping')) {
+    res.writeHead(204, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end();
     return;
   }
   if (req.url === '/api/geo') {
@@ -728,7 +752,7 @@ const shutdown = async (code = 0) => {
   const refunds = lobby.abortAll();
   if (refunds.length) console.warn(`shutdown: refunded ${refunds.length} stake(s) still on the tables`);
   // a match server sends the refunds home before it goes
-  if (regionEdge) await regionEdge.flush().catch(() => {});
+  if (regionEdge) await regionEdge.drain().catch(() => {});
   await new Promise((r) => setTimeout(r, 300)); // let the notices reach the players
   if (RANKS_FILE) await saveJSON(RANKS_FILE, ranks.toJSON()).catch(() => {});
   if (LOCKER_FILE) await saveJSON(LOCKER_FILE, inventory.toJSON()).catch(() => {});

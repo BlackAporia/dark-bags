@@ -24,8 +24,10 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     probing: false,
     broken: new Set(), // regions that refused us this session: play on the main server instead
   };
-  // a table abroad is worth joining for company only while the ping stays playable
-  const MAX_MS = 320;
+  // a table abroad is worth joining for company only while its ping is close to your best: the
+  // same Wi-Fi playing at 45 ms at home or 120 ms abroad is a different game
+  const MAX_MS = 150;
+  const NEAR_MS = 35;
   const here = () => st.list?.[0]?.id ?? 'eu';
   const current = () => {
     if (!st.list || st.list.length < 2) return here();
@@ -51,7 +53,8 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     for (const r of st.list) {
       if (r.id === mine || st.broken.has(r.id)) continue;
       const ms = st.ping[r.id];
-      if (ms == null || ms > MAX_MS) continue;
+      const mineMs = st.ping[mine];
+      if (ms == null || ms > MAX_MS || (mineMs != null && ms > mineMs + NEAR_MS)) continue;
       const tb = tableOn(r.id, mode, band);
       const n = people(tb);
       if (n > best.n) best = { region: r.id, tb, n };
@@ -63,7 +66,10 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
   const statsUrl = (r) => (r.url ? `${r.url}/api/stats` : '/api/stats');
   const wsUrl = (url) => `${url.replace(/^http/, 'ws')}/ws`;
 
-  // ping and players in each region (the best of three tries, over plain HTTP)
+  // ping and players in each region. The ping is timed on an empty answer (/api/ping), the best
+  // of four (the first one also opens the connection): timing the stats themselves counted the
+  // server building and sending them, so a busy home server looked farther than one abroad.
+  const pingUrl = (r) => (r.url ? `${r.url}/api/ping` : '/api/ping');
   async function probe() {
     if (st.probing || !st.list || st.list.length < 2) return;
     st.probing = true;
@@ -71,22 +77,24 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
       await Promise.all(
         st.list.map(async (r) => {
           let best = Infinity;
-          for (let i = 0; i < 3; i++) {
+          for (let i = 0; i < 4; i++) {
             const t0 = performance.now();
             try {
-              const res = await fetch(statsUrl(r), { cache: 'no-store', signal: AbortSignal.timeout(4000) });
-              const ms = performance.now() - t0;
-              if (res.ok) {
-                const j = await res.json().catch(() => null);
-                if (j?.online != null) st.online[r.id] = j.online;
-                if (Array.isArray(j?.tables)) st.tables[r.id] = j.tables;
-                best = Math.min(best, ms);
-              }
+              const res = await fetch(`${pingUrl(r)}?${i}`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+              if (res.status) best = Math.min(best, performance.now() - t0); // any answer: the server was reached
             } catch {
               /* that region did not answer */
             }
           }
           st.ping[r.id] = Number.isFinite(best) ? Math.round(best) : null;
+          try {
+            const res = await fetch(statsUrl(r), { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+            const j = res.ok ? await res.json().catch(() => null) : null;
+            if (j?.online != null) st.online[r.id] = j.online;
+            if (Array.isArray(j?.tables)) st.tables[r.id] = j.tables;
+          } catch {
+            /* no counts from there this time */
+          }
         }),
       );
     } finally {
@@ -286,5 +294,5 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     const p = placeFor(mode, band);
     return { ...p, flag: FLAG[p.region] ?? '🌐', away: p.region !== current(), name: t(`reg.${p.region}`) === `reg.${p.region}` ? p.region.toUpperCase() : t(`reg.${p.region}`) };
   };
-  return { route, onMain, render, remote, current, where, closeEdge, probe, prepLine, info, choose, onChange, inEdge: () => !!st.edge };
+  return { route, onMain, render, remote, current, where, closeEdge, probe, prepLine, info, choose, onChange, inEdge: () => !!st.edge, playing: () => (st.list ? st.edge?.region ?? here() : null) };
 }

@@ -33,8 +33,9 @@ export class RoomCore {
   // waitForStart (online): a Ready room waits with no timer until the players start it
   // ("start"), the room fills up with humans, or everyone cancels. Otherwise the first
   // Ready starts the prepSeconds countdown (practice, tests).
-  constructor({ descent = null, pots = null, edge = false, stats = null, guard = null, referrals = null, daily = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
+  constructor({ onRank = null, descent = null, pots = null, edge = false, stats = null, guard = null, referrals = null, daily = null, stake, mode = 'raid', wallet, send, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, waitForStart = false, minPlayers = 1 }) {
     this.waitForStart = waitForStart && !practice;
+    this.onRank = onRank; // the lobby: the player's other devices get the new rank too
     // online has no bots: a raid needs at least this many ready players to start
     this.minPlayers = Math.max(1, minPlayers);
     this.mode = MODE[mode] ? mode : 'raid';
@@ -802,6 +803,7 @@ export class RoomCore {
         balances: this.wallet.balances(c.token),
         round: this.roundNo,
       });
+      if (!this.practice) this.onRank?.(c.token);
     }
   }
 

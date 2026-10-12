@@ -195,6 +195,7 @@ game.canvasMode = canvasMode.mode;
 const scoreboard = createScoreboard({ game, app });
 const voice = createVoice({ send, app, game, toast: (m) => toast(m) });
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
+game.pingWhere = () => (app.mode === 'online' ? regions.playing() : null); // which server it is to (EU, US, Asia)
 // share cards: everything that happens can be posted
 // the runner as others see them: outfit, body and every weapon skin they have equipped
 // what you wear, as the server counts it: owned or on a trial that has not run out

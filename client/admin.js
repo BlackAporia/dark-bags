@@ -397,6 +397,14 @@ function wireLang() {
     };
 }
 
+// what is broken in how the servers are set up, on every tab until it is fixed
+function alerts() {
+  const out = [];
+  if (D.storage?.persistent === false) out.push(`<b>Немає постійного диска.</b> ${esc(D.storage.path ?? '/data')} не є томом: кожен деплой чи перезапуск стирає ранги, імена, скіни, пошту й друзів (гаманці повертаються з блокчейну, тому здається, що все гаразд). Railway: правий клік на сервіс → Attach Volume, шлях /data.`);
+  for (const [id, h] of Object.entries(D.regions?.health ?? {})) if (h !== 'ok') out.push(`<b>Регіон ${esc(id.toUpperCase())} не працює:</b> ${esc(h)}. Матчі там не рахуються на головному сервері (XP і ранги губляться), гравців тримає головний сервер.`);
+  return out.length ? `<section>${out.map((x) => `<p class="note bad" style="font-size:14px;padding:10px 12px;border:1px solid currentColor;border-radius:10px">${x}</p>`).join('')}</section>` : '';
+}
+
 function render() {
   $('tabs').innerHTML = TABS.map(([id, l]) => `<button type="button" data-t="${id}" class="${id === tab ? 'on' : ''}">${l}</button>`).join('');
   for (const b of $('tabs').querySelectorAll('button'))
@@ -407,7 +415,7 @@ function render() {
       } catch {}
       render();
     };
-  $('view').innerHTML = VIEWS[tab]();
+  $('view').innerHTML = alerts() + VIEWS[tab]();
   $('meta').innerHTML = `<span class="pill net${D.network === 'mainnet' ? '' : ' test'}">${esc(D.network)}</span><span class="pill"><span class="dot"></span>${num(D.live.online)} онлайн</span><span class="pill">оновлено ${new Date(D.at).toLocaleTimeString(LOCALE[lang])}</span>${langPicker()}`;
   localize($('app'), lang);
   localize($('meta'), lang);

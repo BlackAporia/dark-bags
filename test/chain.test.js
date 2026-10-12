@@ -43,7 +43,7 @@ test('price feed: swap quotes to $, stables and BTC wrappers pegged, stale price
     if (tokenIn.id === lbtc.id) return perToken(50000, 8); // off from WBTC: WBTC's price instead
     return 0n;
   };
-  const feed = new PriceFeed({ tokens, prices, quoter, usd: usdc, now: () => now, log: quiet });
+  const feed = new PriceFeed({ tokens, prices, quoter, usd: usdc, now: () => now, fetchImpl: null, log: quiet }); // no price sites: CI is online
   assert.equal(prices.has(strk.id), false);
   await feed.refresh();
   assert.ok(Math.abs(prices.get(strk.id).usd - 0.15) < 1e-9);

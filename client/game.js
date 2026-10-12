@@ -1291,7 +1291,8 @@ export class GameClient {
     }
     el.ping.hidden = ms == null;
     if (ms != null) {
-      el.ping.textContent = `${ms} ms`;
+      const where = this.pingWhere?.();
+      el.ping.textContent = where ? `${where.toUpperCase()} · ${ms} ms` : `${ms} ms`;
       el.ping.className = `ping-chip ${ms < 80 ? 'good' : ms < 160 ? 'ok' : 'bad'}`;
     }
     const hp = Math.max(0, you.hp);
