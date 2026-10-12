@@ -17,7 +17,7 @@ test('a coin added by address is never a stablecoin, whatever it calls itself', 
   const usd = { ...usdc, id: 'usdc' };
   const t = { id: '0xfa4e', symbol: 'USDC', decimals: 6, custom: true, maxStake: 5000 };
   const prices = new PriceBook([]);
-  const feed = new PriceFeed({ tokens: [usd, t], prices, quoter: async () => 0n, usd, fixed: { USDC: 1 }, log: quiet });
+  const feed = new PriceFeed({ tokens: [usd, t], prices, quoter: async () => 0n, usd, fixed: { USDC: 1 }, fetchImpl: null, log: quiet });
   assert.equal(prices.has(t.id), false, 'no peg, no fixed price: it waits for its own pool');
   assert.equal(prices.get(t.id).custom, true);
   assert.equal(feed.stable(t), false);
@@ -58,7 +58,7 @@ test('it joins only with a real market: selling $200 of it must keep 90% of its 
     const want = (Number(amountIn) / 1e18) * 0.5; // $0.50 a token
     return BigInt(Math.round(Math.min(want, depthUsd) * 1e6));
   };
-  const feed = new PriceFeed({ tokens: [usd], prices: new PriceBook([]), quoter, usd, log: quiet });
+  const feed = new PriceFeed({ tokens: [usd], prices: new PriceBook([]), quoter, usd, fetchImpl: null, log: quiet });
   assert.equal((await feed.depth(t, 200)).ok, true);
   depthUsd = 20; // a $20 pool propped up to look like $0.50
   const thin = await feed.depth(t, 200);
