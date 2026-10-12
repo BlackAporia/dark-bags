@@ -1090,7 +1090,7 @@ body.touch-on .coach { bottom: auto; top: calc(104px + var(--safe-t)); font-size
 .intro.out { opacity: 0; visibility: hidden; }
 .intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .intro-center { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px; text-align: center; }
-.intro-logo { margin: 0; display: flex; flex-direction: column; align-items: center; font: 900 clamp(72px, 16vw, 168px)/0.82 var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; }
+.intro-logo { margin: 0; display: flex; flex-direction: column; align-items: center; font: 900 clamp(40px, min(16vw, 21vh), 168px)/0.82 var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; }
 .intro-logo span { display: block; animation: logo-in 1s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
 .intro-logo .il-dark { color: var(--paper); text-shadow: 0 0 40px rgba(235, 229, 214, 0.15); }
 .intro-logo .il-bags { color: var(--loot); animation-delay: 0.18s; text-shadow: 0 0 60px rgba(247, 147, 26, 0.45); position: relative; }
@@ -1102,6 +1102,12 @@ body.touch-on .coach { bottom: auto; top: calc(104px + var(--safe-t)); font-size
 .intro-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--loot), #ffd166); box-shadow: 0 0 16px var(--loot); }
 .intro-step { margin: 0; min-height: 1.4em; font: 500 12px/1.4 var(--f-num); color: var(--dust); letter-spacing: 0.08em; }
 .intro-go { margin-top: 6px; padding: 16px 44px; font-size: 17px; animation: pulse-go 1.6s ease-in-out infinite; }
+/* a phone on its side: the logo, the bar and Enter all fit the short screen */
+@media (max-height: 480px) {
+  .intro-center { gap: 6px; padding: 10px; }
+  .intro-bar { margin-top: 6px; }
+  .intro-go { padding: 12px 36px; margin-top: 2px; }
+}
 @keyframes pulse-go { 50% { box-shadow: 0 0 0 10px rgba(247, 147, 26, 0), 0 10px 40px -8px rgba(247, 147, 26, 0.9); } }
 body:not(.ready) #lobby { opacity: 0; }
 body.ready #lobby { animation: menu-in 0.6s ease both; }
@@ -2741,7 +2747,7 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 /* ---------------------------------------------------------------- first visit: name, region */
 .welcome { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; padding: 16px; background: radial-gradient(80% 70% at 50% 40%, rgba(247, 147, 26, 0.14), transparent 70%), rgba(3, 4, 8, 0.88); backdrop-filter: blur(8px); opacity: 0; transition: opacity 0.3s; }
 .welcome.in { opacity: 1; }
-.wel-card { position: relative; width: min(860px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; grid-template-columns: 300px minmax(0, 1fr); border-radius: 26px; border: 1px solid rgba(247, 147, 26, 0.45); background: linear-gradient(135deg, rgba(24, 28, 42, 0.98), rgba(10, 12, 18, 0.98)); box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7), 0 0 60px -20px rgba(247, 147, 26, 0.5); animation: wel-in 0.6s cubic-bezier(0.2, 0.9, 0.25, 1.15); }
+.wel-card { position: relative; width: min(860px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; display: grid; grid-template-columns: 300px minmax(0, 1fr); border-radius: 26px; border: 1px solid rgba(247, 147, 26, 0.45); background: linear-gradient(135deg, rgba(24, 28, 42, 0.98), rgba(10, 12, 18, 0.98)); box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7), 0 0 60px -20px rgba(247, 147, 26, 0.5); animation: wel-in 0.6s cubic-bezier(0.2, 0.9, 0.25, 1.15); }
 @keyframes wel-in { from { transform: translateY(30px) scale(0.96); opacity: 0; } }
 .wel-nyx { position: relative; min-height: 360px; background: radial-gradient(circle at 50% 45%, rgba(176, 108, 255, 0.22), transparent 65%), radial-gradient(circle at 50% 80%, rgba(247, 147, 26, 0.2), transparent 60%); overflow: hidden; }
 .wel-nyx svg { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 300px; height: auto; }
@@ -3212,4 +3218,121 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
   .cm-card { grid-template-columns: auto minmax(0, 1fr); }
   .cm-acts { grid-column: 1 / -1; justify-content: stretch; }
   .cm-acts > * { flex: 1; text-align: center; justify-content: center; }
+}
+
+/* ---------------------------------------------- phones on their side, in a match
+   A phone held sideways in Safari leaves about 840 × 310 for the game: everything in the HUD
+   shrinks and moves into the corners so nothing overlaps and the middle stays for the fight. */
+@media (max-height: 500px) {
+  body.touch-on .hud-bag { top: calc(6px + var(--safe-t)); gap: 0; }
+  body.touch-on .hud-bag .eyebrow { font-size: 9px; }
+  body.touch-on .bag-num { font-size: 20px; }
+  body.touch-on .pnl { font-size: 10.5px; }
+  body.touch-on .hud-clock { top: calc(4px + var(--safe-t)); left: 50%; right: auto; transform: translateX(-50%); align-items: center; gap: 0; }
+  body.touch-on .timer { font-size: 22px; }
+  body.touch-on .hud-clock .eyebrow, body.touch-on .storm-line { font-size: 9.5px; }
+  body.touch-on .minimap { top: calc(6px + var(--safe-t)); width: 88px; height: 88px; }
+  body.touch-on .pause-btn { top: calc(6px + var(--safe-t)); right: calc(16px + 88px + 8px + var(--safe-r)); width: 34px; height: 34px; }
+  body.touch-on .sb-btn { top: calc(6px + var(--safe-t)); right: calc(16px + 88px + 8px + 42px + var(--safe-r)); width: 34px; height: 34px; }
+  body.touch-on .fps-chip { top: calc(6px + 88px + 4px + var(--safe-t)); right: calc(16px + var(--safe-r)); font-size: 9.5px; padding: 2px 5px; }
+  body.touch-on .feed { top: calc(6px + 88px + 22px + var(--safe-t)); font-size: 10.5px; max-width: 34vw; }
+  body.touch-on .hud-bottom { top: calc(58px + var(--safe-t)); gap: 4px; }
+  body.touch-on .weapon-panel { width: 124px; padding: 4px 7px; gap: 3px; }
+  body.touch-on .weapon-name { font-size: 13px; }
+  body.touch-on .ammo { margin: 0 0 2px; gap: 2px; }
+  body.touch-on .ammo b { font-size: 12px; }
+  body.touch-on .hp { width: 124px; height: 11px; }
+  body.touch-on .hp-num { font-size: 9px; line-height: 11px; }
+  /* the voice chat sits under the health bar, not on the weapon panel */
+  body.touch-on .vc { top: auto; bottom: calc(118px + var(--safe-b)); }
+  body.touch-on .vc-mic { padding: 3px 7px; font-size: 13px; }
+  body.touch-on .banner { top: 25%; font-size: 17px; white-space: normal; width: auto; max-width: 50vw; text-wrap: balance; line-height: 1.1; }
+  body.touch-on .banner.low { top: 62%; font-size: 15px; }
+  /* first-match hints: low in the middle, clear of the banner and the runner */
+  body.touch-on .coach { top: auto; bottom: calc(62px + var(--safe-b)); max-width: min(40vw, 380px); font-size: 10.5px; padding: 5px 10px; }
+  body.dx-on.touch-on .coach { bottom: calc(54px + var(--safe-b)); }
+  /* a toast in a match: small, low on the left over the move stick's corner, so the middle
+     stays for the hint and the fight */
+  body.touch-on:has(#hud:not([hidden])) .toast { top: auto; left: calc(14px + var(--safe-l)); transform: none; bottom: calc(30px + var(--safe-b)); padding: 5px 10px; font-size: 11.5px; max-width: 30vw; pointer-events: none; }
+  body.touch-on .dx-top { top: calc(44px + var(--safe-t)); gap: 2px; }
+  body.touch-on .dx-fl { font-size: 10.5px; }
+  body.touch-on .dx-ob { font-size: 12px; }
+  body.touch-on .dx-prog { width: 130px; height: 4px; }
+  body.touch-on .dx-bossbar { top: calc(78px + var(--safe-t)); width: min(380px, 50vw); }
+  body.touch-on .dx-bossbar b { font-size: 15px; }
+  body.touch-on .dx-gear { bottom: calc(4px + var(--safe-b)); }
+  body.touch-on .dx-gear-row .dx-g { min-width: 36px; padding: 3px 2px 2px; }
+  body.touch-on .dx-g-ico { font-size: 13px; }
+  body.touch-on .thint { font-size: 9px; }
+  body.touch-on .tbtn.reloadbtn { right: calc(104px + var(--safe-r)); bottom: calc(126px + var(--safe-b)); width: 44px; height: 44px; font-size: 19px; }
+}
+/* nothing in a match or its overlays selects like text under a thumb (iOS shows the copy
+   handles on a long press otherwise) */
+.hud, .touch, .rankup, .streak, .banner, #game, .dx-hud, .dx-camp, .result-wrap { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* a new rank on a phone on its side: the head shrinks to one line while the case spins, so the
+   reel and the buttons under it stay on screen */
+@media (max-height: 420px) {
+  .ru-stage { gap: 6px; padding: 6px 12px; }
+  .ru-badge svg { width: 64px; height: 64px; }
+  .ru-kicker { font-size: 38px; }
+  .rankup.spin .ru-head { transform: none; margin-bottom: 0; gap: 2px; }
+  .rankup.spin .ru-badge { display: none; }
+  .rankup.spin .ru-kicker { font-size: 24px; }
+  .rankup.spin .ru-name { font-size: 13px; }
+  .rankup .reel-window { height: 92px; }
+  .rankup .reel-tile { height: 78px; }
+  .rankup .reel-tile img { max-height: 46px; }
+  .ru-won { font-size: 13px; }
+  .ru-won b { font-size: 15px; }
+  .ru-btns { gap: 6px; }
+  .ru-btns .cta, .ru-btns .ghost { padding: 8px 14px; font-size: 13px; }
+}
+/* a narrow phone: PvP · PvE · Practice share the card's width instead of running past its edge */
+@media (max-width: 400px) {
+  .mode { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mode .seg { padding: 8px 4px; font-size: 12.5px; line-height: 1.15; overflow-wrap: anywhere; }
+}
+/* the first-run welcome on a phone on its side: Nyx narrow on the left, the name box and
+   Next on the right, all on one screen (stacked, Nyx alone filled it) */
+@media (max-height: 500px) {
+  .welcome { padding: 8px; }
+  .wel-card { grid-template-columns: 170px minmax(0, 1fr); max-height: calc(100dvh - 16px); border-radius: 18px; }
+  .wel-nyx { min-height: 0; }
+  .wel-nyx svg { width: 200px; }
+  .wel-main { padding: 12px 14px; gap: 8px; }
+  .wel-t { font-size: 20px; }
+  .wel-b { font-size: 13.5px; line-height: 1.4; }
+  .wel-namebox input { padding: 9px 12px; font-size: 17px; }
+  .wel-dice { font-size: 20px; padding: 0 12px; }
+  .wel-acts { margin-top: 2px; }
+  .wel-acts .cta { padding: 10px 18px; font-size: 14px; }
+  .wel-pick { padding: 10px 12px; gap: 10px; }
+  .wp-n small { font-size: 12px; }
+  .wel-reg { padding: 8px 10px; }
+}
+/* the menus on a phone on its side: thin bars top and bottom, and on the wider phones the side
+   menu becomes a rail of icons, so the page itself gets the screen */
+@media (max-height: 500px) {
+  :root { --top-h: 44px; }
+  .tb-brand { font-size: 18px; }
+  .tb-chip { padding: 5px 10px; }
+  .play-dock { padding: 6px 0 8px; gap: 3px; }
+  .play-dock #play { padding: 12px; font-size: 16px; }
+}
+@media (max-width: 760px) and (max-height: 500px) {
+  .menu.screen { grid-template-rows: calc(var(--top-h) + var(--safe-t)) 1fr calc(42px + var(--safe-b)); }
+  .menu-nav { padding-top: 2px; }
+  .nav-btn { flex-direction: row; gap: 6px; padding: 6px 8px; font-size: 11px; }
+  .nav-btn svg { width: 18px; height: 18px; }
+  .nav-badge { top: 1px; inset-inline-start: 18px; }
+}
+@media (min-width: 761px) and (max-height: 500px) {
+  :root { --nav-w: 64px; }
+  .menu-nav { padding: 6px 8px calc(6px + var(--safe-b)) calc(8px + var(--safe-l)); gap: 2px; }
+  .nav-group, .nav-me { display: none !important; }
+  /* the names stay for screen readers */
+  .nav-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .nav-btn { justify-content: center; padding: 4px; }
+  .nav-ico { width: 34px; height: 34px; }
+  .nav-btn .nav-badge { inset-inline-start: 26px; }
 }

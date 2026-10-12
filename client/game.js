@@ -1200,8 +1200,8 @@ export class GameClient {
       this.bagStart ??= you.bag;
       const touch = this.input.touchOn;
       if (you.storm) hint = t('coach.storm');
-      else if (this.dxMode) hint = inside < 14 ? t('coach.dx') : '';
-      else if (this.zombieMode) hint = inside < 12 ? t('coach.z') : '';
+      else if (this.dxMode) hint = inside < 14 ? t(touch ? 'coach.dxTouch' : 'coach.dx') : '';
+      else if (this.zombieMode) hint = inside < 12 ? t(touch ? 'coach.zTouch' : 'coach.z') : '';
       else if (this.goldMode) hint = inside < 12 ? t('coach.gold') : '';
       else if (this.shopMode && inside >= 4 && inside < 30) hint = t('coach.gl');
       else if (this.dmMode && inside >= 7) hint = t('coach.dm');

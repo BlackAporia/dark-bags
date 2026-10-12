@@ -1755,6 +1755,8 @@ export default {
   'dx.hudCoins': "⛁ {c} · abates {k}",
   'dx.skip': "Pular ▸",
   'coach.dx': "Abates rendem moedas para equipamento (teclas 1–6). Depois de cada andar: descer mais ou sair com as recompensas. E: pistola.",
+  'coach.dxTouch': "Abates rendem moedas: toque nos botões de equipamento abaixo. Depois de cada andar: descer mais ou sair com as recompensas.",
+  'coach.zTouch': "Fiquem na praça, costas com costas. Abates rendem créditos: toque nos botões de torretas, minas e kits médicos",
   'dx.ch.n': "Capítulo {n}",
   'dx.ch.0': "A Cripta",
   'dx.ch.1': "Os Salões de Brasa",
