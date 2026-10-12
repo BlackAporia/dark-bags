@@ -21,6 +21,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # deploy-pages only deploys from a job in the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check that Pages is enabled
         id: pages
@@ -51,4 +55,5 @@ jobs:
         with:
           path: dist
       - uses: actions/deploy-pages@v4
+        id: deployment
         if: steps.pages.outputs.enabled == 'true'
