@@ -1763,6 +1763,8 @@ export default {
   'dx.hudCoins': "⛁ {c} · kills {k}",
   'dx.skip': "Skip ▸",
   'coach.dx': "Kills pay coins for gear (keys 1–6). After every floor: go deeper or extract with the rewards. E swaps to the pistol.",
+  'coach.dxTouch': "Kills pay coins: tap the gear buttons below. After every floor: go deeper or extract with the rewards.",
+  'coach.zTouch': "Stay on the plaza, back to back. Kills pay credits: tap the buttons for turrets, mines and medkits",
   'dx.ch.n': "Chapter {n}",
   'dx.ch.0': "The Crypt",
   'dx.ch.1': "The Ember Halls",

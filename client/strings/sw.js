@@ -1756,6 +1756,8 @@ export default {
   'dx.hudCoins': "⛁ {c} · mauaji {k}",
   'dx.skip': "Ruka ▸",
   'coach.dx': "Mauaji hulipa sarafu za vifaa (vitufe 1–6). Baada ya kila ghorofa: shuka zaidi au toka na zawadi. E: bastola.",
+  'coach.dxTouch': "Mauaji hulipa sarafu: gusa vitufe vya vifaa chini. Baada ya kila ghorofa: shuka zaidi au toka na zawadi.",
+  'coach.zTouch': "Baki uwanjani, mgongo kwa mgongo. Mauaji hulipa mikopo: gusa vitufe vya mizinga, mabomu na huduma ya kwanza",
   'dx.ch.n': "Sura {n}",
   'dx.ch.0': "Kaburi la Chini",
   'dx.ch.1': "Kumbi za Makaa",

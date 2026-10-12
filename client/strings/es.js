@@ -1755,6 +1755,8 @@ export default {
   'dx.hudCoins': "⛁ {c} · bajas {k}",
   'dx.skip': "Saltar ▸",
   'coach.dx': "Las bajas dan monedas para equipo (teclas 1–6). Tras cada piso: bajar más o salir con las recompensas. E: pistola.",
+  'coach.dxTouch': "Las bajas dan monedas: toca los botones de equipo abajo. Tras cada piso: bajar más o salir con las recompensas.",
+  'coach.zTouch': "Quedaos en la plaza, espalda con espalda. Las bajas dan créditos: toca los botones de torretas, minas y botiquines",
   'dx.ch.n': "Capítulo {n}",
   'dx.ch.0': "La Cripta",
   'dx.ch.1': "Las Salas de Ascuas",

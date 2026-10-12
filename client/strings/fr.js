@@ -1755,6 +1755,8 @@ export default {
   'dx.hudCoins': "⛁ {c} · éliminations {k}",
   'dx.skip': "Passer ▸",
   'coach.dx': "Les éliminations rapportent des pièces pour l'équipement (touches 1–6). Après chaque étage : descendre ou sortir avec les récompenses. E : pistolet.",
+  'coach.dxTouch': "Les éliminations rapportent des pièces : touchez les boutons d'équipement en bas. Après chaque étage : descendre ou sortir avec les récompenses.",
+  'coach.zTouch': "Restez sur la place, dos à dos. Les éliminations rapportent des crédits : touchez les boutons tourelles, mines et soins",
   'dx.ch.n': "Chapitre {n}",
   'dx.ch.0': "La Crypte",
   'dx.ch.1': "Les Salles de Braise",

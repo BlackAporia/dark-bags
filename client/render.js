@@ -78,16 +78,26 @@ export class Renderer {
   // keepMap: a quality step only changes the canvas resolution; the map chunks already built
   // are kept (scaled when drawn), so the adaptive quality never rebuilds the whole map mid-fight
   resize(keepMap = false) {
-    const cap = [1, 1.5, 2][this.quality];
-    const dpr = Math.min(devicePixelRatio || 1, cap);
-    this.dpr = dpr;
     this.w = innerWidth;
     this.h = innerHeight;
-    for (const c of [this.canvas, this.dark]) {
-      c.width = Math.round(this.w * dpr);
-      c.height = Math.round(this.h * dpr);
-    }
-    this.scale = Math.max(0.5, Math.min(1.6, Math.sqrt((this.w * this.h) / 1.1e6)));
+    // pixel density: each quality step has a cap, but a small screen (a phone) may go past it
+    // up to a pixel budget, since it has far fewer pixels to fill than a desktop. Without that, a
+    // phone with a 3× screen drew the match at 1× and stretched it: soft and blurry.
+    const area = this.w * this.h;
+    const cap = [1, 1.5, 2][this.quality];
+    const budget = [0.9e6, 1.4e6, 2.2e6][this.quality];
+    const dpr = Math.min(devicePixelRatio || 1, 3, Math.max(cap, Math.sqrt(budget / area)));
+    this.dpr = dpr;
+    this.canvas.width = Math.round(this.w * dpr);
+    this.canvas.height = Math.round(this.h * dpr);
+    // the darkness is soft gradients and shadows: drawn at up to 1.5× and stretched, it looks the
+    // same and costs a fraction on a sharp screen
+    this.ddpr = Math.min(dpr, 1.5);
+    this.dark.width = Math.round(this.w * this.ddpr);
+    this.dark.height = Math.round(this.h * this.ddpr);
+    // zoom: by the screen's area, but nobody sees more than about 1400 units across. A phone on
+    // its side is wide and short, and by area alone it zoomed far out: tiny runners.
+    this.scale = Math.max(0.5, Math.min(1.6, Math.max(Math.sqrt(area / 1.1e6), this.w / 1400)));
     const res = Math.max(0.5, Math.min(2, Math.round(this.scale * dpr * 4) / 4));
     if (!keepMap || !this.layer.cache.size) this.layer.setRes(res, this.quality >= 1);
     this.miniBase = null;
@@ -954,7 +964,8 @@ export class Renderer {
 
   drawDarkness(eye, shx, shy, lights, now) {
     const d = this.dctx;
-    const { dpr, map } = this;
+    const { map } = this;
+    const dpr = this.ddpr;
     const s = this.scale;
     d.setTransform(1, 0, 0, 1, 0, 0);
     d.globalCompositeOperation = 'source-over';
@@ -1011,7 +1022,7 @@ export class Renderer {
     }
     d.fill();
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    this.ctx.drawImage(this.dark, 0, 0);
+    this.ctx.drawImage(this.dark, 0, 0, this.canvas.width, this.canvas.height);
   }
 
   drawStorm(z, t, vb) {

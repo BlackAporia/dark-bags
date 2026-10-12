@@ -1755,6 +1755,8 @@ export default {
   'dx.hudCoins': "⛁ {c} · leş {k}",
   'dx.skip': "Geç ▸",
   'coach.dx': "Leşler teçhizat için para verir (1–6 tuşları). Her kattan sonra: daha derine ya da ödüllerle çıkış. E: tabanca.",
+  'coach.dxTouch': "Leşler para verir: aşağıdaki teçhizat düğmelerine dokun. Her kattan sonra: daha derine ya da ödüllerle çıkış.",
+  'coach.zTouch': "Meydanda sırt sırta kalın. Leşler kredi verir: taret, mayın ve ilk yardım düğmelerine dokun",
   'dx.ch.n': "Bölüm {n}",
   'dx.ch.0': "Mahzen",
   'dx.ch.1': "Kor Salonları",
