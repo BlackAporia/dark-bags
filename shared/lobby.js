@@ -74,7 +74,7 @@ export class Lobby {
     this.daily = daily; // the login calendar, the daily and weekly tasks, achievement rewards
     this.coins = coins; // { list(), import(address) }: coins from the AVNU / Ekubo lists (real tokens only)
     this.descent = descent; // the Descent's tickets and depth records (shared/descent.js)
-    this.roomArgs = { descent, pots, edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
+    this.roomArgs = { onRank: (k) => this.pushRank(k), descent, pots, edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
     for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
@@ -1159,6 +1159,7 @@ export class Lobby {
       const s = this.sessions.get(cid);
       this.send(cid, { t: 'balance', balances: this.balances(s) });
       this.send(cid, { t: 'career', career: this.ranks.career(key) });
+      this.send(cid, { t: 'rank', rank: this.ranks.get(key) });
       this.send(cid, { t: 'locker', op: 'sync', locker: this.inventory.view(key) });
     }
   }
