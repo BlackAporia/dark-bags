@@ -3,6 +3,8 @@
 // usage (a game server on GAME, default localhost:8790; CHROMIUM optional):
 //   node scripts/trailer/hype/capture.mjs <mode> <outdir> [maxSecs] [runners] [stake] [seconds]
 //   python3 scripts/trailer/hype/assemble.py <outdir>     → <outdir>/capture.mp4
+// STACHE=1 dresses the match in the Stache Case (videos/darkbags-stache): our runner as The Stache
+// with Stache Royale on every gun, the bots in the other moustached outfits.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -11,15 +13,16 @@ mkdirSync(`${out}/f`, { recursive: true });
 const W = 1920, H = 1080;
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
 const ctx = await b.newContext({ viewport: { width: W, height: H } });
-await ctx.addInitScript(({ mode, runners, stake, seconds }) => {
+const stache = !!process.env.STACHE;
+await ctx.addInitScript(({ mode, runners, stake, seconds, stache }) => {
   if (sessionStorage.getItem('init')) return;
   sessionStorage.setItem('init', '1');
   const S = (k, v) => localStorage.setItem(k, JSON.stringify(v));
   S('darkbags.epoch', '2026-10-04'); S('darkbags.welcome.done', true); S('darkbags.tour.done', true); S('darkbags.tour.named', true);
-  S('darkbags.name', 'NightFox'); S('darkbags.mode', 'practice'); S('darkbags.lang', 'en'); S('darkbags.news.seen', 999); S('darkbags.gmode', mode);
+  S('darkbags.name', stache ? 'StacheLord' : 'NightFox'); S('darkbags.mode', 'practice'); S('darkbags.lang', 'en'); S('darkbags.news.seen', 999); S('darkbags.gmode', mode);
   S('darkbags.starterDone', true); S('darkbags.gpuTip', true); S('darkbags.stake', Number(stake)); S('darkbags.pdiff', 'normal'); S('darkbags.prunners', Number(runners)); S('darkbags.ptime', Number(seconds));
   S('darkbags.skin', null); S('darkbags.music', false);
-}, { mode, runners, stake, seconds });
+}, { mode, runners, stake, seconds, stache });
 const p = await ctx.newPage();
 p.on('pageerror', (e) => console.log('pageerror', e.message));
 await p.goto(process.env.GAME ?? 'http://localhost:8790/');
@@ -64,7 +67,7 @@ await p.waitForTimeout(600);
 await p.evaluate(() => document.getElementById('ready').click());
 
 // the bot brain plays our runner: its decisions go in through the normal input path
-await p.evaluate(async () => {
+await p.evaluate(async (stache) => {
   const { BotBrain } = await import('/shared/bot.js');
   const L = __darkbags.app.transport.lobby;
   const inp = __darkbags.input;
@@ -82,6 +85,16 @@ await p.evaluate(async () => {
         br.__mine = true;
         w.brains.set(h.id, br);
       }
+      if (stache && !w.__stache) {
+        w.__stache = true;
+        const G = ['pistol', 'rifle', 'shotgun', 'sniper', 'smg', 'knife'];
+        const all = (f) => Object.fromEntries(G.map((g) => [g, f]));
+        Object.assign(h, { outfit: 'st-legend', body: 'm', ws: all('st-royale'), kf: 'k-stache-gold', nf: 'n-stache-gold' });
+        const O = ['st-emperor', 'st-tycoon', 'st-silverfox', 'st-baron', 'st-viking', 'st-gent', 'st-bandit', 'st-barber'];
+        const F = ['st-handlebar', 'st-navy', 'st-wax', 'st-barberpole', 'st-bristle'];
+        let i = 0;
+        for (const q of w.players.values()) if (q.isBot) { Object.assign(q, { outfit: O[i % O.length], body: 'm', ws: all(F[i % F.length]), kf: i % 2 ? 'k-stache' : 'k-stache-gold' }); i++; }
+      }
       me = h;
       window.__W = w;
       return;
@@ -89,6 +102,13 @@ await p.evaluate(async () => {
     me = null;
   };
   setInterval(find, 250);
+  // our own runner is drawn from the client's look, not the snapshot
+  if (stache)
+    setInterval(() => {
+      const g = __darkbags.game;
+      const G = ['pistol', 'deagle', 'shotgun', 'autoshotgun', 'smg', 'pdw', 'rifle', 'carbine', 'scout', 'lmg', 'magnum', 'sniper', 'knife'];
+      if (g && g.outfit?.outfit !== 'st-legend') g.outfit = { outfit: 'st-legend', body: 'm', ws: Object.fromEntries(G.map((x) => [x, 'st-royale'])) };
+    }, 100);
   // what happened when (wall clock, like the screencast): the banners, the announcer's streaks
   window.__ev = [];
   const g = __darkbags.game;
@@ -122,7 +142,7 @@ await p.evaluate(async () => {
   inp.firing = () => !!zed() || !!bi()?.f;
   inp.takeDash = () => !!bi()?.d;
   inp.takeReload = () => !!bi()?.r;
-});
+}, stache);
 
 // record until the result screen has been up a few seconds, or the time cap
 const t0 = Date.now();
