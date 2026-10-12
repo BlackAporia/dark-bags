@@ -527,6 +527,11 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
     return;
   }
+  // the browser times this to pick the closest region: nothing to build, nothing to send
+  if (req.url.startsWith('/api/ping')) {
+    res.writeHead(204, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end();
+    return;
+  }
   if (req.url === '/api/geo') {
     geoOf(req).then((cc) => res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ country: cc, lang: langForCountry(cc) })));
     return;
