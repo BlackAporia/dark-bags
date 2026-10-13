@@ -1474,6 +1474,9 @@ img.wimg { width: 100% !important; max-width: 160px; height: auto !important; as
 
 .dep-have { margin: -2px 0 0; font: 600 12px/1.4 var(--f-num); color: #bff5dc; }
 .dep-have.empty { color: #ff9a9a; }
+.dep-other { margin: 2px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255, 209, 102, 0.5); background: rgba(255, 209, 102, 0.08); font-size: 13px; line-height: 1.45; color: #ffe2a3; }
+.dep-other[hidden] { display: none; }
+.dep-other button { margin-top: 8px; padding: 8px 14px; }
 
 /* getting started checklist */
 .starter { min-width: 0; max-width: 100%; box-sizing: border-box; margin: 4px 0 18px; padding: 16px 18px; border: 1px solid rgba(247, 147, 26, 0.35); border-radius: 14px; background: linear-gradient(135deg, rgba(247, 147, 26, 0.10), rgba(7, 9, 15, 0.6) 60%); }
