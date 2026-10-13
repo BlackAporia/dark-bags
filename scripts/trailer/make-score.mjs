@@ -3,13 +3,14 @@
 // Needs a static server on the repo root: python3 -m http.server 8123, then
 //   node scripts/trailer/make-score.mjs                 the teaser (score.html → darkbags-teaser)
 //   node scripts/trailer/make-score.mjs hype            the hype video (hype-score.html → darkbags-hype)
+//   node scripts/trailer/make-score.mjs features        the features video (features-score.html → darkbags-features)
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const base = process.env.OG_BASE ?? 'http://localhost:8123';
 const which = process.argv[2] ?? 'teaser';
-const [page, project] = which === 'hype' ? ['hype-score', 'darkbags-hype'] : ['score', 'darkbags-teaser'];
+const [page, project] = { hype: ['hype-score', 'darkbags-hype'], features: ['features-score', 'darkbags-features'] }[which] ?? ['score', 'darkbags-teaser'];
 const raw = `videos/${project}/assets/score.raw.wav`;
 const out = `videos/${project}/assets/score.wav`;
 const b = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
