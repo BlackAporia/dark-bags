@@ -412,11 +412,45 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       const bal = await v.walletBalance(cs.chain, t, cs.account);
       cs.walletBal = { ...(cs.walletBal ?? {}), [t.id]: bal };
       if (token($('dep-token').value)?.id !== t.id) return;
-      el.textContent = tr('cx.inWallet', { v: `${formatUnits(bal, t.decimals, 6)} ${t.symbol}` }) + (isStrk(t) ? tr('cx.keepStrk') : '');
+      // the address the balance is read from: a wallet with several accounts shows another one
+      el.textContent = `${tr('cx.inWallet', { v: `${formatUnits(bal, t.decimals, 6)} ${t.symbol}` })} · ${short(cs.account)}` + (isStrk(t) ? tr('cx.keepStrk') : '');
       el.classList.toggle('empty', bal === 0n);
+      checkOtherAccount(v);
     } catch {
       el.textContent = '';
     }
+  }
+
+  // A browser wallet switched to another account than the one you signed in with: its coins
+  // are not the ones the game reads. Say so under the balance, with a button to sign in as it.
+  // (Read without asking the wallet anything; refreshed when the wallet switches.)
+  function checkOtherAccount(v) {
+    const el = $('dep-other');
+    const name = (cs.kind ?? '').startsWith('extension:') ? cs.kind.slice('extension:'.length) : null;
+    const sel = name && v.selectedAccount ? v.selectedAccount(name) : null;
+    if (name && v.onAccountChange && cs.watching !== name) {
+      cs.watching = name;
+      v.onAccountChange(name, () => $('dlg-cashier').open && refreshWalletBal());
+    }
+    if (!el) return;
+    if (!sel || norm(sel) === cs.account) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = t('cx.otherAcct', { w: name, a: short(sel), b: short(cs.account) });
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ghost';
+    b.textContent = t('cx.signInAs', { a: short(sel) });
+    b.addEventListener('click', () => {
+      const entry = v.listWallets().find((x) => x.installed && x.name.toLowerCase() === name.toLowerCase());
+      if (!entry) return;
+      $('dlg-cashier').close();
+      if (!$('dlg-connect').open) $('dlg-connect').showModal();
+      signInWith(cs.kind, () => v.connectExtension(entry, cs.chain));
+    });
+    el.append(document.createElement('br'), b);
   }
   function depositMax() {
     const t = token($('dep-token').value);

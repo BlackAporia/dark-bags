@@ -67,6 +67,26 @@ export function listWallets() {
   return [...found, ...missing];
 }
 
+// The account a browser wallet has selected right now, without asking it anything (no popup):
+// wallet-standard wallets list the accounts this site may see. null when it cannot tell.
+export function selectedAccount(name) {
+  store ??= createStore();
+  store._refreshInjectedWallets?.();
+  const w = store.getWallets().find((x) => String(x.name).toLowerCase() === String(name ?? '').toLowerCase());
+  return w?.accounts?.[0]?.address ?? null;
+}
+
+// fn(address) whenever that wallet switches account (wallet-standard 'change' events)
+export function onAccountChange(name, fn) {
+  store ??= createStore();
+  const w = store.getWallets().find((x) => String(x.name).toLowerCase() === String(name ?? '').toLowerCase());
+  const on = w?.features?.['standard:events']?.on;
+  if (!on) return () => {};
+  return on('change', (ch) => {
+    if (ch?.accounts) fn(ch.accounts[0]?.address ?? null);
+  });
+}
+
 export function onWalletsChanged(fn) {
   store ??= createStore();
   return store.subscribe(() => fn(listWallets()));
