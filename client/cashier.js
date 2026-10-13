@@ -7,6 +7,7 @@ import { esc, fmt } from './game.js';
 import { t } from './i18n.js';
 const tr = t; // where a local `t` (a token) shadows it
 import { createBridgeUi } from './bridge.js';
+import { backups } from './backups.js';
 
 const $ = (id) => document.getElementById(id);
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '');
@@ -267,7 +268,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       const parts = Array.isArray(sig) ? sig : Array.isArray(sig?.signature) ? sig.signature : sig?.r != null ? [sig.r, sig.s] : [];
       if (!parts.length) throw new Error(t('cx.noSig'));
       cs.authPending = true; // the server's answer may come while the dialog is out of the way
-      send({ t: 'auth', address: f.address, signature: parts.map((x) => (typeof x === 'bigint' ? `0x${x.toString(16)}` : String(x))) });
+      send({ t: 'auth', address: f.address, signature: parts.map((x) => (typeof x === 'bigint' ? `0x${x.toString(16)}` : String(x))), backups: backups() });
       // never wait in silence: no answer in time brings the dialog back with a reason
       clearTimeout(cs.authTimer);
       cs.authTimer = setTimeout(() => {
@@ -305,7 +306,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       setStatus('connect-status', t('cx.checkingCode'));
       const tok = await v.privyAuth.loginWithCode(cs.chain.login.privy, $('privy-email').value.trim(), $('privy-code').value.trim());
       cs.kind = 'privy';
-      send({ t: 'auth_privy', token: tok });
+      send({ t: 'auth_privy', token: tok, backups: backups() });
     } catch (e) {
       setStatus('connect-status', friendly(e), true);
     }
@@ -329,7 +330,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       const tok = await v.privyAuth.finishOAuth(cs.chain.login.privy);
       if (tok) {
         cs.kind = 'privy';
-        send({ t: 'auth_privy', token: tok });
+        send({ t: 'auth_privy', token: tok, backups: backups() });
       }
     } catch (e) {
       toast(friendly(e));

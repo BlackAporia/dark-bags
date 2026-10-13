@@ -58,7 +58,7 @@ Share your link or code. For 90 days you get 20% of the house cut from every sta
 ## 5/5
 
 ```
-DARK BAGS is in closed beta. Free in your browser, phone or PC, nothing to install.
+DARK BAGS is in open beta. Free in your browser, phone or PC, nothing to install.
 
 ▶ dark-bags.com
 💬 t.me/dark_bags_starknet

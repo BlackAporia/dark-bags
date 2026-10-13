@@ -27,7 +27,7 @@ titles never come back. It uses its own score (`assets/score.wav`) at 128 BPM, w
 | 11–12 | 20.6–24.4 | The bonus spin lands on the Champion title: up to +15% XP, this season only |
 | 13–15 | 24.4–30 | GUILDS: crew, tag, chat; up to 50 runners |
 | 16–18 | 30–35.6 | INVITE: 20% of the house cut from every stake they play, 90 days, as shop $; welcome and bonus bags |
-| 19–20 | 35.6–39.4 | FOMO: Nov 1, season over · Season 1 titles never come back · closed beta, limited seats · You in? |
+| 19–20 | 35.6–39.4 | FOMO: Nov 1, season over · Season 1 titles never come back · open beta live, get in early · You in? |
 | 21–23 | 39.4–44 | End card: play free in your browser, dark-bags.com, @play_dark_bags, Telegram |
 
 ## Where the footage comes from

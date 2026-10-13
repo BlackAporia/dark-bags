@@ -22,7 +22,7 @@ export function adminSet(env = process.env) {
   return new Set((list.length ? list : DEFAULT_ADMINS).map(norm).filter(Boolean));
 }
 
-export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inventory, social, referrals, mail, fortune, guard, network = 'test', stalls = [], regions = null, storage = null, env = process.env, now = () => Date.now(), startedAt = Date.now() }) {
+export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inventory, social, referrals, mail, fortune, guard, network = 'test', stalls = [], regions = null, storage = null, data = () => null, env = process.env, now = () => Date.now(), startedAt = Date.now() }) {
   const admins = adminSet(env);
   const isAdmin = (account) => !!account && admins.has(norm(account));
   const prices = lobby.prices;
@@ -141,6 +141,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
     let credit = 0;
     let bought = 0;
     let spent = 0;
+    let paid = 0;
     let opened = 0;
     let skins = 0;
     let wskins = 0;
@@ -150,6 +151,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       credit += r.credit ?? 0;
       bought += r.bought ?? 0;
       spent += r.spent ?? 0;
+      paid += r.paid ?? 0;
       opened += r.opened ?? 0;
       skins += r.owned?.length ?? 0;
       wskins += r.wowned?.length ?? 0;
@@ -182,6 +184,13 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
     const modes = MODES.map((m) => ({ id: m.id, kind: m.kind, size: m.size, ...(stats.modes[m.id] ?? { raids: 0, humans: 0, stakes: 0, rake: 0, paid: 0, seconds: 0, last: 0 }) })).sort((a, b) => b.raids - a.raids);
     const totals = modes.reduce((a, m) => ({ raids: a.raids + m.raids, humans: a.humans + m.humans, stakes: a.stakes + m.stakes, rake: a.rake + m.rake, paid: a.paid + m.paid, seconds: a.seconds + m.seconds }), { raids: 0, humans: 0, stakes: 0, rake: 0, paid: 0, seconds: 0 });
 
+    // What the game took in, all time. Shop: the real money in the locker records (shop $ packs, and
+    // anything paid straight in USDC/USDT or a coin); spending shop $ later is not new money. The
+    // Descent tickets and the fortune wheel are paid in coins and live only in the stats book.
+    const coinBuys = (k) => stats.shop[k]?.real ?? stats.shop[k]?.cents ?? 0;
+    const revenue = { rake: totals.rake, shop: (bought + paid) * 10, descent: coinBuys('descent') * 10, fortune: coinBuys('fortune') * 10 };
+    revenue.total = revenue.rake + revenue.shop + revenue.descent + revenue.fortune;
+
     const mem = process.memoryUsage();
     return {
       at: t,
@@ -190,6 +199,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       live: { online: sockets.size, sessions: lobby.sessions.size, signedIn, inRooms, tables, jackpots, peak: stats.peak, hours: stats.hours.slice(-72) },
       players: {
         visitors: stats.players.size,
+        people: stats.people?.() ?? stats.players.size,
         wallets,
         profiles: social.players.size,
         active: { d1: stats.activeWithin(DAY), d7: stats.activeWithin(7 * DAY), d30: stats.activeWithin(30 * DAY) },
@@ -202,7 +212,8 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
         flagged: [...guard.flags].map(([k, v]) => ({ key: k, name: name(k), why: v.why, at: v.at })),
       },
       matches: { totals, modes, stakes: Object.entries(stats.stakesBy).map(([s, n]) => ({ stake: Number(s), n })).sort((a, b) => b.n - a.n), recent: stats.recent.slice(0, 25) },
-      shop: { kinds: stats.shop, items, credit, bought, spent, opened, skins, wskins, passes, buyers, minted: inventory.supply?.() ?? {} },
+      shop: { kinds: stats.shop, items, credit, bought, spent, paid, real: bought + paid, creditSpent: Math.max(0, spent - paid), opened, skins, wskins, passes, buyers, minted: inventory.supply?.() ?? {} },
+      revenue,
       fortune: { ...fortune.toJSON(), mark: fortune.mark(), wins: fortune.wins.slice(0, 10) },
       referrals: { codes: referrals.codes.size, invited, inviters, earned: refEarned },
       mail: { broadcasts: mail.all.length, boxes: mail.users.size },
@@ -211,6 +222,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       days: Object.values(series),
       stalls: stalls.slice(0, 30),
       storage,
+      data: data(),
       regions: regions ? { health: regions.health?.() ?? {}, list: regions.list(), pots: Object.fromEntries(Object.entries(regions.pots()).map(([r, m]) => [r, basket(m)])), pending: regions.pending() } : null,
       clientErrors: lobby.clientErrors?.slice(0, 30) ?? [],
     };

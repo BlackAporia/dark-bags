@@ -65,7 +65,7 @@ const ago = (t) => {
 };
 
 const MODE_UK = { raid: 'Рейд', br: 'Королівська битва', duel: 'Дуель', dm: 'Бій насмерть', gl: 'Guns + Lasers', hardcore: 'Хардкор', knives: 'Тільки ножі', pistols: 'Тільки пістолети', shotguns: 'Тільки дробовики', rifles: 'Тільки гвинтівки', snipers: 'Тільки снайперки', team2: 'Команди 2×2', team4: 'Команди 4×4', team8: 'Команди 8×8', ranked: 'Рейтингова', zombies: 'Зомбі', gold: 'Золота лихоманка' };
-const KIND_UK = { topup: 'Поповнення shop $', box: 'Сумки та кейси', pass: 'Бойовий пропуск', fortune: 'Колесо фортуни' };
+const KIND_UK = { topup: 'Поповнення shop $', box: 'Сумки та кейси', pass: 'Бойовий пропуск', fortune: 'Колесо фортуни', descent: 'Квитки Descent', store: 'Вітрина', card: 'Місячна картка', starter: 'Стартовий набір' };
 const CAREER = [
   ['raids', 'Матчів зіграно (усіма гравцями)'],
   ['kills', 'Вбивств'],
@@ -174,6 +174,7 @@ const TABS = [
   ['matches', 'Матчі й режими'],
   ['shop', 'Покупки'],
   ['chain', 'Ончейн'],
+  ['data', 'Дані'],
   ['sys', 'Система'],
 ];
 let tab = (() => {
@@ -199,13 +200,13 @@ function overview() {
     ${tile('Джекпоти столів', usd(D.live.jackpots), 'на золоті рейди')}
   </div></section>
   <section><h2>Головне</h2><div class="tiles">
-    ${tile('Гравців з гаманцем', num(p.wallets), `${num(p.visitors)} відвідувачів усього`, true)}
+    ${tile('Гравців з гаманцем', num(p.wallets), `${num(p.people ?? p.visitors)} людей усього`, true)}
     ${tile('Активні за 24 год', num(p.active.d1), `7 д: ${num(p.active.d7)} · 30 д: ${num(p.active.d30)}`)}
     ${tile('Нові за 24 год', num(p.fresh.d1), `за 7 д: ${num(p.fresh.d7)}`)}
     ${tile('Ігор зіграно', num(m.raids), `${num(m.humans)} місць гравців`, true)}
     ${tile('Обсяг ставок', usd(m.stakes), `виплачено ${usd(m.paid)}`)}
     ${tile('Комісія гри (рейк)', usd(m.rake), `${pct(m.rake, m.stakes)} від ставок`, true)}
-    ${tile('Покупки в магазині', cents(shopTotal), `${num(Object.values(D.shop.kinds).reduce((n, k) => n + k.n, 0))} покупок`)}
+    ${D.revenue ? tile('Дохід гри за весь час', usd(D.revenue.total), `рейк ${usd(D.revenue.rake)} · магазин ${usd(D.revenue.shop)} · Descent ${usd(D.revenue.descent)} · колесо ${usd(D.revenue.fortune)}`, true) : tile('Покупки в магазині', cents(shopTotal), `${num(Object.values(D.shop.kinds).reduce((n, k) => n + k.n, 0))} покупок`)}
     ${tile('Фортуна: банк', usd(D.fortune.pool), `до ${usd(D.fortune.mark)} · ${num(D.fortune.spins)} обертів`)}
     ${c ? tile('Депозити', usd(c.deposits.total.mills), `${num(c.deposits.n)} шт · ${num(c.deposits.depositors)} гаманців`, true) : ''}
     ${c ? tile('Виводи', usd(c.withdrawals.sent.mills), `${num(c.withdrawals.byStatus.sent ?? 0)} надіслано`) : ''}
@@ -215,7 +216,7 @@ function overview() {
   <section><h2>30 днів</h2><div class="grid2">
     ${card('Активні гравці за день', lineChart(days, { key: 'active' }))}
     ${card('Ігор за день', lineChart(days, { key: 'raids' }))}
-    ${card('Дохід гри за день (рейк + магазин)', lineChart(days, { key: (r) => r.rake + r.shop * 10, fmt: usd }))}
+    ${card('Дохід гри за день (рейк + реальні гроші в магазині)', lineChart(days, { key: (r) => r.rake + r.shop * 10, fmt: usd }))}
     ${c ? card('Депозити та виводи', pairChart(days)) : card('Нові гравці за день', lineChart(days, { key: 'fresh' }))}
   </div></section>
   <section><h2>Популярні режими</h2><div class="card">${hbars(D.matches.modes.filter((x) => x.raids).map((x) => ({ label: MODE_UK[x.id] ?? x.id, v: x.raids, extra: pct(x.raids, m.raids) })))}${m.raids ? '' : '<p class="mut">Ще не зіграно жодного онлайн-матчу.</p>'}</div></section>`;
@@ -227,7 +228,7 @@ function players() {
   return `
   <section><h2>Гравці</h2><div class="tiles">
     ${tile('З гаманцем', num(p.wallets), 'увійшли на мейнеті', true)}
-    ${tile('Відвідувачі', num(p.visitors), 'усі, хто відкривав гру')}
+    ${tile('Людей', num(p.people ?? p.visitors), 'гаманці й пристрої, що ще не входили')}
     ${tile('Профілі', num(p.profiles), 'у списку гравців')}
     ${tile('З рангом', num(p.ranked), 'зіграли хоч раз')}
     ${tile('Активні 24 год / 7 д / 30 д', `${num(p.active.d1)} / ${num(p.active.d7)} / ${num(p.active.d30)}`)}
@@ -285,10 +286,11 @@ function shop() {
   const minted = Object.entries(s.minted ?? {}).filter(([, v]) => v.minted > 0);
   return `
   <section><h2>Покупки</h2><div class="tiles">
-    ${tile('Усього покупок', cents(total), `${num(kinds.reduce((n, [, k]) => n + k.n, 0))} шт`, true)}
-    ${kinds.map(([k, v]) => tile(KIND_UK[k] ?? k, cents(v.cents), `${num(v.n)} шт`)).join('')}
-    ${tile('Куплено shop $ за USDC/USDT', cents(s.bought), 'реальні гроші', true)}
-    ${tile('Витрачено shop $', cents(s.spent), 'сумки, пропуск')}
+    ${tile('Усього покупок', cents(total), `${num(kinds.reduce((n, [, k]) => n + k.n, 0))} шт · разом із тим, що оплачено shop $`, true)}
+    ${kinds.map(([k, v]) => tile(KIND_UK[k] ?? k, cents(v.cents), `${num(v.n)} шт${v.real != null && v.real !== v.cents ? ` · реальними ${cents(v.real)}` : ''}`)).join('')}
+    ${tile('Реальні гроші в магазині', cents(s.real ?? s.bought), `пакети shop $ ${cents(s.bought)} · напряму ${cents(s.paid ?? 0)}`, true)}
+    ${tile('Куплено shop $ за USDC/USDT', cents(s.bought), 'реальні гроші')}
+    ${tile('Витрачено shop $', cents(s.creditSpent ?? s.spent), 'сумки, пропуск (не нові гроші)')}
     ${tile('Залишок shop $ у гравців', cents(s.credit), 'не виводиться')}
     ${tile('Покупців', num(s.buyers))}
     ${tile('Відкрито сумок', num(s.opened))}
@@ -296,7 +298,7 @@ function shop() {
     ${tile('Преміум-пропусків', num(s.passes), 'цього сезону')}
   </div></section>
   <section><div class="grid2">
-    ${card('Покупки за день', lineChart(D.days.slice(-30), { key: (r) => r.shop * 10, fmt: usd }))}
+    ${card('Реальні гроші в магазині за день', lineChart(D.days.slice(-30), { key: (r) => r.shop * 10, fmt: usd }) + '<p class="note">До 13 жовтня сюди потрапляли й витрати shop $, тож ті дні завищені. Загальна сума вгорі рахується із записів шафки й точна за весь час.</p>')}
     ${card('Топ товарів', s.items.length ? hbars(s.items.map((i) => ({ label: itemName(i.id), v: i.cents, extra: `${i.n} шт` })), cents) : '<p class="mut">Поки порожньо</p>')}
   </div></section>
   <section><h2>Колесо фортуни</h2><div class="tiles">
@@ -381,7 +383,33 @@ function sys() {
   <section>${card('Зависання сервера (гра стоїть у всіх)', table(['Коли', '>Тривалість', 'Що працювало'], (D.stalls ?? []).map((x) => `<tr><td>${dt(x.at)}</td><td class="r ${x.ms > 500 ? 'bad' : 'warn'}">${num(x.ms)} мс</td><td>${esc(x.during.join(', ') || 'невідомо')}</td></tr>`)))}</section>`;
 }
 
-const VIEWS = { over: overview, players, matches, shop, chain, sys };
+const bytes = (b) => (b == null ? '—' : b < 1024 ? `${b} Б` : b < 1048576 ? `${(b / 1024).toFixed(1)} КБ` : `${(b / 1048576).toFixed(1)} МБ`);
+const STORE_UK = { ranks: 'Ранги', social: 'Гравці й гільдії' };
+
+// what is on the disk and what keeps it safe
+function data() {
+  const x = D.data;
+  if (!x) return '<section><p class="mut">Сервер не надіслав даних про диск (стара версія).</p></section>';
+  const runs = x.recovered ?? [];
+  const copies = x.copies ?? [];
+  return `
+  <section><h2>Дані</h2><div class="tiles">
+    ${tile('Постійний диск', D.storage?.persistent === false ? '<span class="bad">немає</span>' : D.storage?.persistent ? '<span class="ok">є</span>' : '<span class="warn">невідомо</span>', esc(x.dir ?? 'без папки даних'), true)}
+    ${tile('Копії прогресу в браузерах', x.backups.on ? '<span class="ok">увімкнено</span>' : '<span class="bad">вимкнено</span>', x.backups.on ? `надіслано ${num(x.backups.made)} · повернуто ${num(x.backups.restored)} акаунтів` : 'задай BACKUP_SECRET або REGION_SECRET')}
+    ${tile('Щоденні копії файлів', num(copies.length), copies.length ? `остання ${esc(copies.at(-1))}` : 'перша з’явиться за хвилину після старту')}
+    ${tile('Повернуто з архівів', runs.length ? `<span class="ok">${num(runs.reduce((n, r) => n + r.done.reduce((m, d) => m + d.players, 0), 0))}</span>` : '0', runs.length ? `гравців, ${num(runs.reduce((n, r) => n + r.done.reduce((m, d) => m + d.periods, 0), 0))} періодів` : 'нічого не губилося')}
+    ${tile('Статистика з', dt(D.game.statsSince), `гра з ${dt(D.game.born)}`)}
+    ${tile('Епоха даних з', dt(x.epochAt), 'усе раніше свідомо скинуто')}
+  </div></section>
+  <section>${card('Файли гри на диску', table(['Файл', '>Записів', '>Розмір', 'Змінено'], x.files.map((f) => `<tr><td class="mono" title="${esc(f.path)}">${esc(f.name)}</td><td class="r">${f.records == null ? '—' : num(f.records)}</td><td class="r">${f.bytes == null ? '<span class="warn">немає файлу</span>' : bytes(f.bytes)}</td><td>${dt(f.at)}</td></tr>`)))}</section>
+  ${runs.length ? `<section>${card('Повернення прогресу з архівів', table(['Коли', 'Що', '>Періодів', '>Гравців', 'З архівів'], runs.flatMap((r) => r.done.map((d) => `<tr><td>${dt(Date.parse(r.at))}</td><td>${esc(STORE_UK[d.store] ?? d.store ?? d.file)}</td><td class="r">${num(d.periods)}</td><td class="r">${num(d.players)}</td><td class="mono" style="white-space:normal">${esc(d.from.join(', '))}</td></tr>`))) + '<p class="note">З 2 по 13 жовтня кожен деплой переносив файл рангів в архів, і прогрес починався з нуля. Ці періоди складено назад у живий файл: XP, статистику, досягнення й рейтинг сезону.</p>')}</section>` : ''}
+  <section><div class="grid2">
+    ${card('Архіви на диску', x.archives.length ? `<p class="mono" style="white-space:normal">${x.archives.map(esc).join('<br>')}</p>` : '<p class="mut">Порожньо</p>')}
+    ${card('Щоденні копії (14 днів)', copies.length ? `<p class="mono">${copies.map(esc).join('<br>')}</p>` : '<p class="mut">Поки немає</p>')}
+  </div></section>`;
+}
+
+const VIEWS = { over: overview, players, matches, shop, chain, data, sys };
 
 function langPicker() {
   return `<span class="pill langs" role="group" aria-label="Language">${ADMIN_LANGS.map(([id, label]) => `<button type="button" data-lang="${id}" class="${id === lang ? 'on' : ''}">${label}</button>`).join('')}</span>`;
@@ -401,6 +429,8 @@ function wireLang() {
 function alerts() {
   const out = [];
   if (D.storage?.persistent === false) out.push(`<b>Немає постійного диска.</b> ${esc(D.storage.path ?? '/data')} не є томом: кожен деплой чи перезапуск стирає ранги, імена, скіни, пошту й друзів (гаманці повертаються з блокчейну, тому здається, що все гаразд). Railway: правий клік на сервіс → Attach Volume, шлях /data.`);
+  if (D.data && !D.data.backups.on) out.push('<b>Копії прогресу в браузерах вимкнені.</b> Задай BACKUP_SECRET (32+ символів) у Variables головного сервера: тоді прогрес гравців повертається навіть після втрати диска.');
+  if (D.data?.recoveredNow?.length) out.push(`<span class="ok"><b>Прогрес повернуто.</b></span> При цьому старті сервер склав ${D.data.recoveredNow.map((d) => `${num(d.periods)} періодів (${num(d.players)} гравців)`).join(', ')} з архівів у живі файли. Деталі на вкладці «Дані».`);
   for (const [id, h] of Object.entries(D.regions?.health ?? {})) if (h !== 'ok') out.push(`<b>Регіон ${esc(id.toUpperCase())} не працює:</b> ${esc(h)}. Матчі там не рахуються на головному сервері (XP і ранги губляться), гравців тримає головний сервер.`);
   return out.length ? `<section>${out.map((x) => `<p class="note bad" style="font-size:14px;padding:10px 12px;border:1px solid currentColor;border-radius:10px">${x}</p>`).join('')}</section>` : '';
 }

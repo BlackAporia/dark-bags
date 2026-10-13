@@ -26,8 +26,14 @@ test('stats: visitors once a day, wallets, matches per mode, purchases, the onli
   sb.buy('topup', 1000, 'p10');
   sb.buy('fortune', 5);
   sb.buy('box', 0); // free bags are not purchases
-  assert.deepEqual(sb.shop.topup, { n: 1, cents: 1000 });
+  assert.deepEqual(sb.shop.topup, { n: 1, cents: 1000, real: 1000 });
   assert.equal(sb.days['2026-10-02'].shop, 1005);
+  // a bag paid with shop $ is not new money; one paid partly in USDC is, for that part
+  sb.buy('box', 500, 'b1', 0);
+  sb.buy('box', 800, 'b2', 300);
+  assert.equal(sb.days['2026-10-02'].shop, 1305);
+  assert.equal(sb.days['2026-10-02'].credit, 1000);
+  assert.deepEqual(sb.shop.box, { n: 2, cents: 1300, real: 300 });
   sb.online(3);
   sb.online(7);
   sb.online(4);
@@ -38,6 +44,24 @@ test('stats: visitors once a day, wallets, matches per mode, purchases, the onli
   assert.equal(back.players.size, 2);
   assert.equal(back.modes.br.raids, 1);
   assert.equal(back.boots, 2);
+});
+
+test('stats: a device that signs in is the same person, not a second one', () => {
+  let t = Date.parse('2026-10-01T10:00:00Z');
+  const sb = new StatsBook({ now: () => t });
+  sb.seen('tokdev1'); // opened the game, not signed in
+  sb.seen('0xabc', { wallet: true, device: 'tokdev1' }); // signs in on it
+  const d = sb.days['2026-10-01'];
+  assert.deepEqual([d.active, d.fresh, d.wallets], [1, 1, 1]);
+  assert.equal(sb.people(), 1);
+  assert.equal(sb.activeWithin(86400000), 1);
+  // the next day, back on the same device, signed in at once
+  t += 86400000;
+  sb.seen('0xabc', { wallet: true, device: 'tokdev1' });
+  assert.deepEqual([sb.days['2026-10-02'].active, sb.days['2026-10-02'].fresh], [1, 0]);
+  // a phone that was never signed in is someone else (as far as anyone can tell)
+  sb.seen('tokdev2');
+  assert.equal(sb.people(), 2);
 });
 
 test('stats in the lobby: purchases are counted online, never in practice', () => {

@@ -126,17 +126,22 @@ export function botRank(rnd) {
 export const kd = (kills, deaths) => Math.round(((kills ?? 0) / Math.max(1, deaths ?? 0)) * 100) / 100;
 export const KD_MIN = 3; // PvP matches before a player ranks on K/D
 
+// since: when this record's life began. A record made fresh (a lost file, a new player) gets a new
+// one; the browser's signed copy carries it (server/backup.js), so a copy from an earlier life of
+// the record can be told apart from this one and added to it. Records older than the stamp: 'pre'.
+const newSince = () => `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
+
 export class RankBook {
   constructor({ data = {}, onChange = null } = {}) {
     // old save files hold a bare XP number per key
     this.recs = new Map(
-      Object.entries(data).map(([k, v]) => [k, typeof v === 'object' && v ? { ...v, xp: Math.max(0, Math.floor(Number(v.xp) || 0)) } : { xp: Math.max(0, Math.floor(Number(v) || 0)) }]),
+      Object.entries(data).map(([k, v]) => [k, typeof v === 'object' && v ? { ...v, xp: Math.max(0, Math.floor(Number(v.xp) || 0)), since: v.since ?? 'pre' } : { xp: Math.max(0, Math.floor(Number(v) || 0)), since: 'pre' }]),
     );
     this.onChange = onChange;
   }
 
   rec(key) {
-    if (!this.recs.has(key)) this.recs.set(key, { xp: 0 });
+    if (!this.recs.has(key)) this.recs.set(key, { xp: 0, since: newSince() });
     return this.recs.get(key);
   }
 

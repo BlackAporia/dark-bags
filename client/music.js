@@ -1,8 +1,9 @@
 // Adaptive soundtrack, synthesized live (no audio files, nothing to license). Several tracks
 // in different styles: the raid gets one per match (techno, darksynth, phonk, drum & bass,
-// hardstyle, trap, industrial, chiptune, dubstep, trance, war drums), picked to suit the map;
-// the menus rotate their own chill ones (lo-fi with rain, late-night jazz, a music box, tape
-// chillwave, ambient, bossa nova, dark pulse, slow synthwave). Every raid track has a
+// hardstyle, trap, industrial, chiptune, dubstep, trance, war drums, drill, outrun synthwave,
+// jungle, half-time cyber bass, dembow), picked to suit the map; the menus rotate their own
+// chill ones (lo-fi with rain, late-night jazz, a music box, tape chillwave, ambient, bossa nova,
+// dark pulse, slow synthwave, deep house, vaporwave, a tide, future funk, sad piano). Every raid track has a
 // ready-room build-up and gets faster and denser as the storm closes and danger rises.
 // A short sting plays on the result: a win fanfare or a fall.
 
@@ -454,31 +455,252 @@ export const TRACKS = {
       if (s % 2 === 0) m.hat(t, 0.05);
     },
   },
+  // ------------------------------------------------------------- the October drop
+  drill: {
+    name: 'Cold Block',
+    kind: 'raid',
+    prog: [N(0), N(0), N(-4), N(-2)], // A A F G: drill minor
+    bars: 2,
+    tempo: (mode, bpm) => (mode === 'raid' ? 142 + (bpm - 140) * 0.35 : bpm * 0.9),
+    prep(m, s, t, root) {
+      if (s === 0) m.kick808(t, root, m.beat * 2.5, 0.65, root * 0.84);
+      if (s % 3 === 0) m.hat(t, 0.16);
+      if (s === 0 && m.bar % 2 === 0) m.pad(t, root, m.beat * 8, [0, 3, 7]);
+    },
+    raid(m, s, t, root, I) {
+      // the sliding 808: up or down a step into the next note
+      if (s === 0 || s === 3 || (I >= 2 && s === 10)) m.kick808(t, root, m.beat * (s === 0 ? 1.2 : 0.9), 1, s === 10 ? root * 1.12 : s === 3 ? root * 0.89 : 0);
+      if (s === 8) {
+        m.snare(t, 1);
+        m.clap(t, 0.6);
+      }
+      if (I >= 1 && s === 13 && m.bar % 2 === 1) m.snare(t, 0.4);
+      // triplet hats, the drill shuffle
+      if (s % 3 === 0) m.hat(t, 0.24);
+      if (I >= 2 && s % 3 === 2) m.hat(t + m.beat / 6, 0.13);
+      // a slow dark piano line
+      const mel = [0, -1, -1, 3, -1, 2, -1, -1, 7, -1, -1, 5, -1, 3, 2, -1];
+      if (I >= 1 && mel[s] >= 0) m.bell(t, root * 8 * 2 ** (mel[s] / 12), 0.045, 0.6);
+      if (I >= 3 && s === 0 && m.bar % 2 === 0) m.pad(t, root, m.beat * 8, [0, 3, 7, 10], 0.05);
+      if (I >= 4 && s === 0 && m.bar % 4 === 0) m.siren(t);
+    },
+  },
+  outrun: {
+    name: 'Overdrive',
+    kind: 'raid',
+    prog: [N(0), N(-4), N(3), N(-2)], // Am F C G
+    bars: 2,
+    tempo: (mode, bpm) => (mode === 'raid' ? 118 + (bpm - 140) * 0.6 : bpm * 0.85),
+    prep(m, s, t, root) {
+      if (s % 4 === 0) m.kick(t, 0.7);
+      if (s % 2 === 0) m.bass(t, root, 0.55, 1.5);
+      if (s === 0 && m.bar % 2 === 0) m.pad(t, root, m.beat * 8, [0, 3, 7, 12]);
+    },
+    raid(m, s, t, root, I) {
+      if (s % 4 === 0) m.kick(t, 1);
+      if (s === 4 || s === 12) m.gatedSnare(t, 1);
+      if (s % 2 === 1) m.hat(t, 0.22);
+      // the driving sixteenth bass of a night drive
+      m.bass(t, root * (s % 8 === 7 ? 2 : 1), s % 4 === 0 ? 0.9 : 0.6, 0.8);
+      if (s === 0 && m.bar % 2 === 0) m.pad(t, root, m.beat * 8, [0, 3, 7, 12]);
+      if (I >= 1 && s % 2 === 0) m.pluck(t, root * 4 * 2 ** ([0, 7, 12, 15, 12, 7, 3, 7][(s >> 1) % 8] / 12), 0.035);
+      if (I >= 3 && s === 0) {
+        const mel = [12, 15, 19, 17, 15, 12, 14, 10][m.bar % 8];
+        m.supersaw(t, root * 2 * 2 ** (mel / 12), m.beat * 3.5, 0.02);
+      }
+      if (I >= 4 && s === 0 && m.bar % 4 === 0) m.riser(m.beat * 4);
+    },
+  },
+  jungle: {
+    name: 'Concrete Jungle',
+    kind: 'raid',
+    prog: [N(5), N(5), N(3), N(0)], // D D C A
+    bars: 2,
+    tempo: (mode, bpm) => (mode === 'raid' ? 172 + (bpm - 140) * 0.4 : bpm * 1.08),
+    prep(m, s, t, root) {
+      if (s === 0 || s === 10) m.kick(t, 0.65);
+      if (s === 4 || s === 12) m.snare(t, 0.5);
+      if (s === 0 && m.bar % 2 === 0) m.sub(t, root, m.beat * 7.5, 0.6);
+      if (s % 2 === 1) m.hat(t, 0.15);
+    },
+    raid(m, s, t, root, I) {
+      // a chopped break: kicks and snares moving around, ghost snares in between
+      const k = m.bar % 2 ? [0, 10] : [0, 6, 10];
+      if (k.includes(s)) m.kick(t, 1);
+      if (s === 4 || s === 12 || (m.bar % 4 === 3 && s === 14)) m.snare(t, 1);
+      if (I >= 1 && [7, 9, 15].includes(s)) m.snare(t, 0.2);
+      if (s % 2 === 0) m.hat(t, 0.24);
+      if (I >= 3 && s % 2 === 1) m.hat(t, 0.12);
+      // a deep sub, and the reese when it heats up
+      if (s === 0 && m.bar % 2 === 0) (I >= 2 ? m.reese(t, root, m.beat * 8, 0.9) : m.sub(t, root, m.beat * 7.5, 0.8));
+      if (s === 0 && m.bar % 4 === 0) m.pad(t, root, m.beat * 16, [0, 3, 7, 14], 0.05);
+      if (I >= 2 && s === 2 && m.bar % 2 === 1) m.stab(t, root, 0.05, [0, 3, 7]);
+      if (I >= 4 && s === 0 && m.bar % 2 === 0) m.siren(t);
+    },
+  },
+  cyber: {
+    name: 'Ghost Protocol',
+    kind: 'raid',
+    prog: [N(1), N(1), N(0), N(-2)], // Bb Bb A G
+    bars: 2,
+    tempo: (mode, bpm) => (mode === 'raid' ? 104 + (bpm - 140) * 0.4 : bpm * 0.8),
+    prep(m, s, t, root) {
+      if (s === 0 || s === 8) m.kick(t, 0.75);
+      if (s === 0 && m.bar % 2 === 0) m.pad(t, root, m.beat * 8, [0, 1, 7]);
+      if (s % 4 === 2) m.metal(t, 0.25);
+    },
+    raid(m, s, t, root, I) {
+      // half-time, heavy: kick, a huge snare on three, metal on the off-beats
+      if (s === 0 || (I >= 2 && s === 3) || s === 10) m.kick(t, 1);
+      if (s === 8) {
+        m.snare(t, 1);
+        m.clap(t, 0.5);
+      }
+      if (s % 2 === 0) m.hat(t, 0.2);
+      if (s % 4 === 2) m.metal(t, I >= 2 ? 0.5 : 0.3);
+      if (s === 0 && m.bar % 2 === 0) m.wobble(t, root, m.beat * 4, 0.9, I >= 3 ? 4 : 2);
+      if (s === 8 && m.bar % 2 === 0) m.wobble(t, root * 2 ** (1 / 12), m.beat * 4, 0.8, 3);
+      if (I >= 3 && s === 12 && m.bar % 2 === 1) m.screech(t, root * 8, m.beat, 0.03);
+      if (I >= 4 && s === 0 && m.bar % 4 === 0) m.siren(t);
+    },
+  },
+  dembow: {
+    name: 'Cartel Drums',
+    kind: 'raid',
+    prog: [N(0), N(-4), N(3), N(-2)], // Am F C G
+    bars: 1,
+    tempo: (mode, bpm) => (mode === 'raid' ? 98 + (bpm - 140) * 0.3 : bpm * 0.75),
+    prep(m, s, t, root) {
+      if (s % 4 === 0) m.kick(t, 0.7);
+      if (s === 3 || s === 11) m.rim(t, 0.4);
+      if (s === 0) m.sub(t, root * 2, m.beat * 1.5, 0.5);
+    },
+    raid(m, s, t, root, I) {
+      // the dembow: four on the floor, the snare dragging on 3, 6, 11, 14
+      if (s % 4 === 0) m.kick(t, 1);
+      if ([3, 6, 11, 14].includes(s)) m.snare(t, 0.75);
+      if (s % 2 === 0) m.hat(t, 0.2);
+      if ([0, 6, 8, 14].includes(s)) m.sub(t, root * 2, m.beat * 0.8, 0.7);
+      if (I >= 1 && (s === 0 || s === 6)) m.brass(t, root * 2, m.beat * 0.9, 0.035);
+      if (I >= 2 && [3, 7, 10, 13].includes(s)) m.tom(t, root * 4, 0.5);
+      if (I >= 3 && s % 2 === 1) m.pluck(t, root * 8 * 2 ** ([0, 3, 7, 10, 12, 10, 7, 3][(s >> 1) % 8] / 12), 0.025);
+      if (I >= 4 && s === 0 && m.bar % 4 === 0) m.siren(t);
+    },
+  },
+  // ------------------------------------------------------------- more menu tracks
+  garage: {
+    name: 'Midnight Garage',
+    kind: 'lobby',
+    prog: [N(5), N(3), N(-2), N(0)], // Dm9 Cmaj7 Gm7 Am7
+    chords: [[0, 3, 7, 10, 14], [0, 4, 7, 11], [0, 3, 7, 10], [0, 3, 7, 10]],
+    bars: 1,
+    tempo: () => 112,
+    lobby(m, s, t, root, I, ch) {
+      // deep house, low in the room: a soft four on the floor, off-beat hats, chord stabs
+      if (s % 4 === 0) m.kick(t, 0.42);
+      if (s % 4 === 2) m.hat(t, 0.1);
+      if (s === 4 || s === 12) m.clap(t, 0.18);
+      if (s === 3 || s === 10) m.keys(t, root * 4, ch, m.beat * 0.5, 0.55);
+      if (s === 0 || s === 7 || s === 10) m.sub(t, root * 2, m.beat * 0.6, 0.45);
+    },
+  },
+  vapor: {
+    name: 'Mall at 3 AM',
+    kind: 'lobby',
+    prog: [N(-4), N(-2), N(0), N(3)], // Fmaj7 G6 Am7 C
+    chords: [[0, 4, 7, 11], [0, 4, 7, 9], [0, 3, 7, 10], [0, 4, 7, 14]],
+    bars: 2,
+    crackle: true,
+    tempo: () => 68,
+    lobby(m, s, t, root, I, ch) {
+      // slowed down and washed out: a tape pad, a lazy beat, an echoing bell
+      if (s === 0 || s === 10) m.kick(t, 0.35);
+      if (s === 8) m.gatedSnare(t, 0.25);
+      if (s === 0 && m.bar % 2 === 0) m.tapePad(t, root, m.beat * 8, ch);
+      if (s === 0) m.sub(t, root * 2, m.beat * 3, 0.4);
+      const bell = [[12, -1, 11, 7], [-1, 9, -1, 7], [10, -1, 7, -1], [14, 12, -1, 7]][m.bar % 4];
+      if (s % 4 === 0 && bell[s >> 2] >= 0) m.bell(t, root * 8 * 2 ** (bell[s >> 2] / 12), 0.026, 1.4);
+    },
+  },
+  tide: {
+    name: 'Low Tide',
+    kind: 'lobby',
+    prog: [N(-2), N(3), N(-4), N(0)], // G C F Am
+    chords: [[0, 4, 7, 14], [0, 4, 7, 11], [0, 4, 7, 14], [0, 3, 7, 10]],
+    bars: 2,
+    rain: true,
+    tempo: () => 56,
+    lobby(m, s, t, root, I, ch) {
+      // waves (the rain bed) and long chords, a heartbeat of a kick, a few far-off notes
+      if (s === 0 && m.bar % 2 === 0) m.pad(t, root, m.beat * 8.5, ch, 0.065);
+      if (s === 0) m.kick(t, 0.18);
+      if (s === 0 && m.bar % 2 === 1) m.sub(t, root, m.beat * 3.8, 0.3);
+      if (s === 6 && m.bar % 2 === 0) m.pluck(t, root * 8 * 2 ** (ch[(m.bar >> 1) % ch.length] / 12), 0.02);
+    },
+  },
+  lounge: {
+    name: 'Neon Lounge',
+    kind: 'lobby',
+    prog: [N(5), N(-2), N(3), N(0)], // Dm7 G7 Cmaj7 A7
+    chords: [[0, 3, 7, 10], [0, 4, 7, 10], [0, 4, 7, 11], [0, 4, 7, 10, 13]],
+    bars: 1,
+    swing: 0.12,
+    tempo: () => 104,
+    lobby(m, s, t, root, I, ch) {
+      // future funk, turned down: a bouncing bass, a clap on two and four, bright stabs
+      if (s === 0 || s === 8 || s === 11) m.kick(t, 0.45);
+      if (s === 4 || s === 12) m.clap(t, 0.3);
+      if (s % 2 === 0) m.hat(t, 0.08);
+      const bass = [0, -1, 12, -1, -1, 0, -1, 10, 0, -1, 12, -1, 7, -1, 10, -1];
+      if (bass[s] >= 0) m.sub(t, root * 2 * 2 ** (bass[s] / 12), m.beat * 0.4, 0.5);
+      if (s === 2 || s === 14) m.keys(t, root * 4, ch, m.beat * 0.4, 0.7);
+    },
+  },
+  lastlight: {
+    name: 'Last Light',
+    kind: 'lobby',
+    prog: [N(0), N(-4), N(3), N(-2)], // Am F C G
+    chords: [[0, 3, 7, 10], [0, 4, 7, 11], [0, 4, 7, 14], [0, 4, 7, 9]],
+    bars: 1,
+    swing: 0.2,
+    crackle: true,
+    tempo: () => 76,
+    lobby(m, s, t, root, I, ch) {
+      // a sad piano over a soft lo-fi beat
+      if (s === 0 || s === 9) m.kick(t, s === 0 ? 0.5 : 0.32);
+      if (s === 4 || s === 12) m.snare(t, 0.26);
+      if (s % 2 === 0) m.hat(t, 0.07);
+      if (s === 0) m.keys(t, root * 2, ch, m.beat * 3.8, 0.85);
+      const mel = [[7, -1, 10, 12], [11, -1, 7, -1], [12, 14, -1, 7], [9, -1, 7, 4]][m.bar % 4];
+      if (s % 4 === 0 && mel[s >> 2] >= 0) m.keys(t, root * 8 * 2 ** (mel[s >> 2] / 12), [0], m.beat * 0.9, 0.5);
+      if (s === 0 || s === 10) m.sub(t, root * 2, m.beat * 1.2, 0.4);
+    },
+  },
 };
 export const RAID_TRACKS = Object.keys(TRACKS).filter((k) => TRACKS[k].kind === 'raid');
 const LOBBY_TRACKS = Object.keys(TRACKS).filter((k) => TRACKS[k].kind === 'lobby');
 // the raid tracks that suit each map (auto mode picks from these most of the time)
 const MAP_TRACKS = {
-  docks: ['heist', 'industrial', 'phonk'],
-  chain: ['dubstep', 'trance', 'neon'],
+  docks: ['heist', 'industrial', 'phonk', 'drill'],
+  chain: ['dubstep', 'trance', 'neon', 'cyber'],
   lego: ['chiptune', 'trap'],
-  dunes: ['tribal', 'phonk', 'trap'],
-  snow: ['trance', 'dnb', 'neon'],
-  lava: ['industrial', 'hardstyle', 'dubstep'],
-  city: ['trap', 'phonk', 'heist'],
-  neon: ['neon', 'trance', 'hardstyle'],
-  blackout: ['heist', 'industrial', 'dnb'],
+  dunes: ['tribal', 'phonk', 'trap', 'dembow'],
+  snow: ['trance', 'dnb', 'neon', 'jungle'],
+  lava: ['industrial', 'hardstyle', 'dubstep', 'cyber'],
+  city: ['trap', 'phonk', 'heist', 'drill', 'dembow'],
+  neon: ['neon', 'trance', 'hardstyle', 'outrun'],
+  blackout: ['heist', 'industrial', 'dnb', 'cyber'],
   fantasy: ['tribal', 'trance'],
   toon: ['chiptune', 'trap', 'hardstyle'],
   gravity: ['chiptune', 'dnb', 'hardstyle'],
-  speedway: ['dnb', 'hardstyle', 'trap'],
+  speedway: ['dnb', 'hardstyle', 'trap', 'outrun'],
   skate: ['phonk', 'trap', 'chiptune'],
-  metro: ['dnb', 'industrial', 'heist'],
+  metro: ['dnb', 'industrial', 'heist', 'jungle', 'drill'],
   factory: ['industrial', 'dubstep', 'hardstyle'],
-  jungle: ['tribal', 'dnb'],
+  jungle: ['tribal', 'dnb', 'jungle', 'dembow'],
   junkyard: ['industrial', 'phonk', 'dubstep'],
   moon: ['trance', 'neon', 'dnb'],
-  casino: ['heist', 'phonk', 'neon'],
+  casino: ['heist', 'phonk', 'neon', 'outrun', 'dembow'],
 };
 
 export class Music {

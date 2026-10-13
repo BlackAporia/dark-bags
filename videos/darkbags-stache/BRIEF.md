@@ -24,7 +24,7 @@ the drop (score bars 3–11), then its end card (bars 20–23).
 | 7 | 13.1–15 | 05 · The moustached runners, common to exotic |
 | 8 | 15–16.9 | 06 · The arsenal: 6 finishes on 6 guns, 8 style items, only in the Stache Case |
 | 9 | 16.9–18.75 | 07 · The Stache in a real match: first blood, the golden whisker burst |
-| 10–12 | 18.75–23.4 | End card: both logos, closed beta, dark-bags.com, @play_dark_bags, Telegram |
+| 10–12 | 18.75–23.4 | End card: both logos, open beta, dark-bags.com, @play_dark_bags, Telegram |
 
 ## Where every frame comes from
 

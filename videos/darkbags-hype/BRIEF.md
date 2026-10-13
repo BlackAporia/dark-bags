@@ -21,7 +21,7 @@ the payouts after the match. 128 BPM; one bar (1.875 s) per beat of the story.
 | 12 | 22.5–24.4 | 17 modes: eight cuts on the 8ths |
 | 13–15 | 24.4–30 | Stake from $0.10 in the coin you hold · kill them, take their bag · hold the exit |
 | 16–17 | 30–33.8 | Stake → take: $5 → $15.20, $5 → $13.30, $1 → $2.56, $10 → $19 |
-| 18–19 | 33.8–37.5 | FOMO over the closing storm: closed beta, limited seats, "You in?" |
+| 18–19 | 33.8–37.5 | FOMO over the closing storm: open beta live, "Get in early.", "You in?" |
 | 20–23 | 37.5–44 | End card: play free in your browser, dark-bags.com, @play_dark_bags, Telegram |
 
 ## Where the footage comes from
