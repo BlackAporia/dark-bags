@@ -147,7 +147,7 @@ export function titleTier(id) {
 export const ACHIEVEMENT = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 
 // counters that keep the best value instead of adding up
-const MAX_STATS = new Set(['streak', 'bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles', 'bestWave', 'bestGold', 'dxBest', 'dxEasy', 'dxHard', 'dxHc']);
+export const MAX_STATS = new Set(['streak', 'bestKills', 'bestMulti', 'bestReturn', 'rank', 'outfits', 'bestDiv', 'opened', 'wskins', 'passTier', 'stitles', 'bestWave', 'bestGold', 'dxBest', 'dxEasy', 'dxHard', 'dxHc']);
 
 // What one finished raid adds to the career counters. p is the world's player record.
 // squad: runners in the match; mvp: topped the squad's zombie kills on a clear

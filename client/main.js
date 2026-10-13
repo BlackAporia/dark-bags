@@ -56,6 +56,7 @@ import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
 import { renderDxPanel, renderDxBoard, renderDxPick, dxResult, isDx, DX_MODE, diffOfMode } from './descent.js';
 import { DIFFS } from '../shared/descent.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS, langChosen } from './i18n.js';
+import { keepBackup, backups } from './backups.js';
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -1427,7 +1428,7 @@ function onStatus(st) {
   if (st === 'open') {
     app.everOpen = true;
     const token = app.mode === 'online' ? store.get('darkbags.token', null) : 'practice';
-    send({ t: 'hello', token, name: app.name, dev: deviceId() });
+    send({ t: 'hello', token, name: app.name, dev: deviceId(), ...(app.mode === 'online' ? { backups: backups() } : {}) });
     sendPracticeCfg();
     intro.mark('connect');
   } else if (wasOpen && app.screen !== 'lobby') {
@@ -1558,6 +1559,9 @@ function handleMessage(m) {
       break;
     case 'ev':
       if (game.active) game.onEvents(m.l);
+      break;
+    case 'backup':
+      keepBackup(m.key, m.b);
       break;
     case 'rank':
       // XP outside a match (daily gifts, achievements, the welcome bonus): the card follows

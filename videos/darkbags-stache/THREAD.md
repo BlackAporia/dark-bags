@@ -73,6 +73,6 @@ How to join:
 
 The first 100 get the gift in their mail.
 
-Closed beta: seats are limited.
+Open beta: everyone can play.
 
 Telegram: t.me/dark_bags_starknet

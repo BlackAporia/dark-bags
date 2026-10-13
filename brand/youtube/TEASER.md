@@ -31,7 +31,7 @@ What's inside
 • Ranked seasons with divisions and season titles
 • Optional stakes on Starknet from $0.10 in the coin you hold (USDC, STRK, ETH and more). Your stake stays private.
 
-DARK BAGS is in closed beta. Stakes are optional and only for adults (18+) where it is legal. Play responsibly.
+DARK BAGS is in open beta. Stakes are optional and only for adults (18+) where it is legal. Play responsibly.
 
 Follow the drops
 X: https://x.com/play_dark_bags

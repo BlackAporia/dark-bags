@@ -3,7 +3,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { readFile, writeFile, rename } from 'node:fs/promises';
-import { readFileSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, renameSync, writeFileSync, copyFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { CFG } from '../shared/config.js';
@@ -12,6 +12,8 @@ import { MemoryWallet } from '../shared/wallet.js';
 import { createCashier } from './cashier/index.js';
 import { createPotRecorder } from './cashier/vault.js';
 import { RankBook } from '../shared/ranks.js';
+import { recoverArchives, recoveryLog } from './recover.js';
+import { createBackups } from './backup.js';
 import { Inventory } from '../shared/cosmetics.js';
 import { SocialBook } from '../shared/social.js';
 import { ReferralBook } from '../shared/referrals.js';
@@ -87,8 +89,12 @@ const STATS_FILE = process.env.STATS_FILE || (DATA ? `${DATA}/${NET}-stats.json`
 // Ranks and players used to be one file for every network, so Sepolia test wallets showed up in the
 // mainnet leaderboard and player list. Each network has its own files now; the old shared ones move
 // out of the game once (to <data>/archive/shared-<time>/), so every network starts clean.
+// A live file that sits at one of those paths (RANKS_FILE=/data/ranks.json, as docs/LAUNCH.md once
+// said) is not legacy: moving it wiped everyone's ranks at every deploy (server/recover.js brings
+// them back).
 if (DATA) {
-  const legacy = [`${DATA}/ranks.json`, `${DATA}/social.json`].filter((f) => existsSync(f));
+  const live = new Set([RANKS_FILE, SOCIAL_FILE].filter(Boolean).map((f) => path.resolve(f)));
+  const legacy = [`${DATA}/ranks.json`, `${DATA}/social.json`].filter((f) => existsSync(f) && !live.has(path.resolve(f)));
   if (legacy.length) {
     const dir = path.join(DATA, 'archive', `shared-${new Date().toISOString().replace(/[:.]/g, '-')}`);
     mkdirSync(dir, { recursive: true });
@@ -121,6 +127,15 @@ if (EPOCH_FILE) {
     }
     writeFileSync(EPOCH_FILE, JSON.stringify({ epoch: CFG.EPOCH, at: new Date().toISOString() }));
   }
+}
+
+// The periods the old per-network move archived from live files go back in, once (server/recover.js).
+const EPOCH_AT = EPOCH_FILE && existsSync(EPOCH_FILE) ? Date.parse(JSON.parse(readFileSync(EPOCH_FILE, 'utf8')).at ?? '') || 0 : 0;
+let RECOVERED = [];
+try {
+  RECOVERED = recoverArchives({ dataDir: DATA, files: { ranks: RANKS_FILE, social: SOCIAL_FILE }, epochAt: EPOCH_AT });
+} catch (e) {
+  console.error('recovery of archived progress failed', e);
 }
 
 // a save never leaves a half-written file behind: write a temp file, then swap it in.
@@ -390,6 +405,33 @@ const lobby = new Lobby({
 // the early STACHE gifts that were granted without a letter: their letter now, once
 lobby.resendStacheGifts();
 
+// Every signed-in browser keeps a signed copy of its account's records, and brings back whatever
+// this server loses (server/backup.js). The key must outlive the disk: an environment variable.
+const BACKUP_SECRET = String(process.env.BACKUP_SECRET || REGION_SECRET || process.env.ADMIN_KEY || '');
+const backups = !EDGE && BACKUP_SECRET.length >= 16 ? createBackups({ secret: BACKUP_SECRET, lobby }) : null;
+lobby.backups = backups;
+if (!EDGE && !backups) console.warn("BACKUP_SECRET (or REGION_SECRET) is not set: players' browsers keep no signed copy of their progress");
+
+// A copy of every file on the disk once a day (kept 14 days): a bad write or a bug can be undone.
+const LIVE_FILES = [RANKS_FILE, LOCKER_FILE, SOCIAL_FILE, REFERRAL_FILE, GUARD_FILE, MAIL_FILE, DAILY_FILE, FORTUNE_FILE, PROMO_FILE, DESCENT_FILE, STATS_FILE, process.env.CASHIER_FILE].filter(Boolean);
+function dailyCopy() {
+  if (!DATA) return;
+  try {
+    const day = new Date().toISOString().slice(0, 10);
+    const dir = path.join(DATA, 'backup', day);
+    if (existsSync(dir)) return;
+    mkdirSync(dir, { recursive: true });
+    for (const f of LIVE_FILES) if (existsSync(f)) copyFileSync(f, path.join(dir, path.basename(f)));
+    const all = readdirSync(path.join(DATA, 'backup')).filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n)).sort();
+    for (const old of all.slice(0, Math.max(0, all.length - 14))) rmSync(path.join(DATA, 'backup', old), { recursive: true, force: true });
+    console.log(`backup: today's copy of ${LIVE_FILES.length} files is in ${dir}`);
+  } catch (e) {
+    console.error('daily copy failed', e);
+  }
+}
+setTimeout(dailyCopy, 60_000).unref?.();
+setInterval(dailyCopy, 3600_000).unref?.();
+
 if (real) {
   real.cashier.liveGame = () => [...lobby.rooms.values()].some((r) => r.state === 'live');
   const poll = real.cashier.poll.bind(real.cashier);
@@ -435,7 +477,36 @@ if (regionMain) {
 const regionEdge = EDGE ? createRegionEdge({ lobby, secret: REGION_SECRET, region: process.env.REGION || 'region', mainUrl: process.env.MAIN_URL.replace(/\/+$/, ''), journal, file: OUTBOX_FILE }) : null;
 if (regionEdge) console.log(`regions: match server ${process.env.REGION || 'region'} for ${process.env.MAIN_URL}; REGION_SECRET fingerprint ${REGION_FP} (must match the main server's)`);
 
-const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE });
+// what is on the disk: every file with its records, what the recovery merged, the daily copies
+// and the players' signed copies (for the admin page's data panel)
+function dataInfo() {
+  const books = { [RANKS_FILE]: ranks.recs.size, [LOCKER_FILE]: inventory.data.size, [SOCIAL_FILE]: social.players.size, [REFERRAL_FILE]: referrals.users.size, [DAILY_FILE]: daily.users.size, [DESCENT_FILE]: descentBook.users.size, [MAIL_FILE]: mail.users.size, [STATS_FILE]: stats.players.size };
+  const files = LIVE_FILES.map((f) => {
+    let st = null;
+    try {
+      st = statSync(f);
+    } catch {}
+    return { name: path.basename(f), path: f, bytes: st?.size ?? null, at: st?.mtimeMs ?? null, records: books[f] ?? null };
+  });
+  const list = (dir) => {
+    try {
+      return readdirSync(dir).sort();
+    } catch {
+      return [];
+    }
+  };
+  return {
+    dir: DATA || null,
+    files,
+    archives: DATA ? list(path.join(DATA, 'archive')) : [],
+    copies: DATA ? list(path.join(DATA, 'backup')) : [],
+    recovered: recoveryLog(DATA),
+    recoveredNow: RECOVERED,
+    backups: backups ? { on: true, ...backups.stats() } : { on: false },
+    epochAt: EPOCH_AT || null,
+  };
+}
+const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE, data: dataInfo });
 
 // ------------------------------------------------------------------ static
 const MIME = {

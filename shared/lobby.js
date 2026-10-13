@@ -175,8 +175,10 @@ export class Lobby {
       if (this.cashier) s.account = this.cashier.accountFor(s.token);
       else this.wallet.ensure(s.token);
       this.guard.see(this.key(s), s.net, s.dev);
+      // what this server lost of the account comes back from the browser's signed copy (server/backup.js)
+      if (this.key(s) && Array.isArray(msg.backups)) this.backups?.restore(this.key(s), msg.backups);
       const fresh = this.adoptProfile(s);
-      this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account });
+      this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account, device: s.token });
       this.send(cid, {
         t: 'welcome',
         token: s.token,
@@ -572,7 +574,7 @@ export class Lobby {
       return ok;
     };
     const rec = inv.rec(key);
-    const was = { spent: rec.spent ?? 0, bought: rec.bought ?? 0 };
+    const was = { spent: rec.spent ?? 0, bought: rec.bought ?? 0, paid: rec.paid ?? 0 };
     const r =
       msg.t === 'equip' ? inv.equip(key, id)
       : msg.t === 'body' ? inv.setBody(key, id)
@@ -595,7 +597,8 @@ export class Lobby {
       const now = inv.rec(key);
       if ((now.bought ?? 0) > was.bought) this.stats.buy('topup', now.bought - was.bought, id);
       const kind = { pass_buy: 'pass', pass_tiers: 'pass', store_buy: 'store', card_buy: 'card', starter_buy: 'starter' }[msg.t] ?? 'box';
-      if ((now.spent ?? 0) > was.spent) this.stats.buy(kind, now.spent - was.spent, kind === 'box' ? id : msg.t);
+      // what was paid with real money now (USDC/USDT or a coin) and what with shop $
+      if ((now.spent ?? 0) > was.spent) this.stats.buy(kind, now.spent - was.spent, kind === 'box' ? id : msg.t, (now.paid ?? 0) - was.paid);
     }
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (msg.t === 'topup' && !this.practice) this.welcome(key); // the first top-up earns the welcome bonus (its toast comes last)
@@ -907,9 +910,10 @@ export class Lobby {
         if (!alive()) return;
         s.account = account;
         this.guard.see(account, s.net, s.dev);
+        if (Array.isArray(msg.backups)) this.backups?.restore(account, msg.backups);
         const fresh = this.adoptProfile(s);
         reply({ t: 'social', ...this.socialSummary(s) });
-        this.stats?.seen(account, { wallet: true });
+        this.stats?.seen(account, { wallet: true, device: s.token });
         // the welcome catch-up may add XP (the Founder title): before the reply, so its rank is right
         this.catchUpWelcome(account);
         reply({ t: 'authed', account, name: s.name, fresh, community: this.promo.communityOf(account), admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
@@ -919,9 +923,10 @@ export class Lobby {
         if (!alive()) return;
         s.account = r.account;
         this.guard.see(r.account, s.net, s.dev);
+        if (Array.isArray(msg.backups)) this.backups?.restore(r.account, msg.backups);
         const fresh = this.adoptProfile(s);
         reply({ t: 'social', ...this.socialSummary(s) });
-        this.stats?.seen(r.account, { wallet: true });
+        this.stats?.seen(r.account, { wallet: true, device: s.token });
         this.catchUpWelcome(r.account);
         reply({ t: 'authed', account: r.account, name: s.name, fresh, community: this.promo.communityOf(r.account), admin: this.isAdmin(r.account), privy: r.wallet, balances: this.balances(s), rank: this.ranks.get(r.account), career: this.ranks.career(r.account), locker: this.inventory.view(r.account) });
       } else if (msg.t === 'deposit') {
