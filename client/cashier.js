@@ -332,7 +332,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       cs.shWaiter = null;
       setStatus('connect-status', t('cx.shProve', { a: short(ch.account) }));
       const coin = cs.chain.tokens.find((x) => x.symbol === 'STRK') ?? cs.chain.tokens[0];
-      const tx = await f.shadowProve(dapp, coin.id, ch.challenge);
+      const tx = await f.shadowProve(dapp, coin.id, ch.challenge, ch.account);
       cs.facade = f;
       cs.kind = `shadow:${w.name}`;
       cs.shTx = tx;

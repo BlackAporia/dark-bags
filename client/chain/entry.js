@@ -145,6 +145,7 @@ export async function connectExtension(entry, chain = null) {
       if (e?.code === 119) throw new Error('Not enough private balance for this (and its fee). Shield some first.');
       if (e?.code === 120) throw new Error('The wallet stopped this: it would have linked your shadow account to your wallet. Nothing was sent.');
       if (e?.code === 113) throw new Error('Cancelled in the wallet.');
+      if (e?.code === 114) throw new Error(`${w.name} refused the request (INVALID_REQUEST_PAYLOAD). Update the wallet and try again; if it stays, tell us in Telegram.`);
       if (e?.code === 162 || e?.code === -32601 || /not (supported|found)|unknown method/i.test(String(e?.message))) {
         strk20 = false;
         throw new Error(`${w.name} does not do STRK20 shadow accounts yet. Update it, or use Ready or Xverse.`);
@@ -222,9 +223,15 @@ export async function connectExtension(entry, chain = null) {
     },
     // the partial commitment for our dapp: the server finds the shadow address from it
     shadowCommitment: (dapp) => strk20Call(() => request('wallet_strk20ShadowAccountCommitment', { dapp_name: dapp })),
-    // proof of control: the shadow account sends 0 of a coin to the server's random challenge
-    shadowProve: (dapp, token, challenge) =>
-      strk20Tx([{ type: 'shadow_account_invoke', dapp_name: dapp, nonce: SHADOW_NONCE, calls: [transferCall(token, challenge, 0n)], collect_policy: { type: 'exact', amount: '0x0' } }]),
+    // proof of control: the shadow account sends 0 of a coin to the server's random challenge. The
+    // wallet pays a STRK20 transaction's pool fee from a note it spends, so a shadow call never goes
+    // alone (Xverse refuses one with INVALID_REQUEST_PAYLOAD): the smallest unit of the coin is
+    // withdrawn to the shadow account first, the starter's own funding shape
+    shadowProve: (dapp, token, challenge, shadow) =>
+      strk20Tx([
+        { type: 'withdraw', token, amount: '0x1', recipient: shadow },
+        { type: 'shadow_account_invoke', dapp_name: dapp, nonce: SHADOW_NONCE, calls: [transferCall(token, challenge, 0n)], collect_policy: { type: 'exact', amount: '0x0' } },
+      ]),
     // a deposit: shielded notes → the shadow account → the house, in one transaction
     depositShadow: (dapp, t, units, shadow, house) =>
       strk20Tx([

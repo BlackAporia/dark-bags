@@ -1922,7 +1922,7 @@ export default {
   "cx.carry": "Emporter mon rang, mes skins et objets sur le compte privé (le jeu saura que les deux sont à toi ; sur Starknet rien ne les relie)",
   "cx.shNo": "{w} ne gère pas encore les shadow accounts STRK20. Mets-le à jour ou utilise Ready ou Xverse.",
   "cx.shFind": "Recherche de ton shadow account…",
-  "cx.shProve": "Shadow account {a}. Confirme dans le wallet : il envoie 0 depuis ce compte pour prouver qu’il est à toi (aucun argent ne bouge ; ça prend une minute).",
+  "cx.shProve": "Compte fantôme {a}. Confirme dans le portefeuille : une petite transaction privée prouve qu'il est à toi. Le portefeuille affiche ses frais, payés avec ton STRK protégé ; la preuve prend une minute.",
   "cx.shChecking": "En attente de la confirmation de la preuve par Starknet…",
   "cx.shOn": "Sur ton shadow account {a} : {v}",
   "cx.shCollect": "🔒 Le placer dans mon solde protégé",

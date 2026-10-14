@@ -1922,7 +1922,7 @@ export default {
   "cx.carry": "Llevar mi rango, skins y objetos a la cuenta privada (el juego sabrá que ambas son tuyas; en Starknet nada las vincula)",
   "cx.shNo": "{w} aún no admite shadow accounts de STRK20. Actualízala o usa Ready o Xverse.",
   "cx.shFind": "Buscando tu shadow account…",
-  "cx.shProve": "Shadow account {a}. Confírmalo en la wallet: envía 0 desde ella para demostrar que es tuya (no se mueve dinero; tarda un minuto).",
+  "cx.shProve": "Cuenta sombra {a}. Confirma en la billetera: una pequeña transacción privada prueba que es tuya. La billetera muestra su comisión, pagada con tu STRK protegido; la prueba tarda un minuto.",
   "cx.shChecking": "Esperando a que Starknet confirme la prueba…",
   "cx.shOn": "En tu shadow account {a}: {v}",
   "cx.shCollect": "🔒 Moverlo a mi saldo protegido",
