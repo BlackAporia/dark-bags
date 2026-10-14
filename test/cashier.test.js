@@ -327,3 +327,33 @@ test('a second device signs in with the same wallet: the same runner comes back,
   assert.equal(cashier.accountFor('sess0002'), ALICE);
   assert.ok(Date.now() - cashier.sessions.get('sess0002').at < 1000);
 });
+
+test('a second wallet on the same browser is a new runner with a name of its own', async () => {
+  const { cashier } = setup();
+  const out = [];
+  let n = 0;
+  const lobby = new Lobby({ cashier, send: (cid, m) => out.push(m), newToken: () => `sess${String(++n).padStart(4, '0')}`, bots: false });
+  const last = (t) => out.filter((m) => m.t === t).at(-1);
+  const signIn = async (cid, address) => {
+    lobby.handle(cid, { t: 'auth_start' });
+    const td = last('auth_challenge').typedData;
+    await lobby.cashierOp(cid, lobby.sessions.get(cid), { t: 'auth', address, signature: [`signed:${address}:${td.message.nonce}`] });
+    return last('authed');
+  };
+  lobby.connect(1);
+  lobby.handle(1, { t: 'hello', name: 'FoxAl' });
+  assert.equal((await signIn(1, ALICE)).name, 'FoxAl', 'the first wallet takes the name this browser picked');
+  // the same session switches wallets: Bob is not "FoxAl2"
+  const bob = await signIn(1, BOB);
+  assert.equal(bob.fresh, true);
+  assert.doesNotMatch(bob.name, /^FoxAl/);
+  assert.match(bob.name, /^[A-Z][a-z]+[A-Z][a-z]+\d{2}$/, 'a made-up runner name');
+  // a reload (the browser still remembers Alice's name) and a third wallet: a new name again
+  lobby.connect(2);
+  lobby.handle(2, { t: 'hello', name: 'FoxAl' });
+  const carol = await signIn(2, normAddr('0xca401'));
+  assert.doesNotMatch(carol.name, /^FoxAl/);
+  assert.notEqual(carol.name, bob.name);
+  // and Alice is still Alice
+  assert.equal((await signIn(2, ALICE)).name, 'FoxAl');
+});

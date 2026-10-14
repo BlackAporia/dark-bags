@@ -1923,7 +1923,7 @@ export default {
   "cx.carry": "Hamisha cheo, skins na vitu vyangu kwenye akaunti ya siri (mchezo utajua zote ni zako; kwenye Starknet hakuna kinachoziunganisha)",
   "cx.shNo": "{w} bado haitumii shadow accounts za STRK20. Isasishe, au tumia Ready au Xverse.",
   "cx.shFind": "Inatafuta shadow account yako…",
-  "cx.shProve": "Shadow account {a}. Thibitisha kwenye pochi: itatuma 0 kutoka kwake kuthibitisha ni yako (hakuna pesa inayohama; inachukua dakika moja).",
+  "cx.shProve": "Akaunti kivuli {a}. Thibitisha kwenye pochi: muamala mdogo wa siri unathibitisha kuwa ni yako. Pochi inaonyesha ada yake, inayolipwa kutoka STRK yako iliyolindwa; uthibitisho unachukua dakika moja.",
   "cx.shChecking": "Inasubiri Starknet kuthibitisha uthibitisho…",
   "cx.shOn": "Kwenye shadow account yako {a}: {v}",
   "cx.shCollect": "🔒 Hamishia kwenye salio langu la siri",
@@ -1934,6 +1934,7 @@ export default {
   "cx.shWdL": "🥷 Kwenda shadow account yako",
   "cx.shWdS": "kisha mguso mmoja unaihamishia kwenye salio lako la siri",
   "cx.shHint": "Muamala mmoja wa STRK20: salio lako la siri → shadow account yako → mchezo. Pochi yako inaongeza ada ya mtandao kutoka salio la siri.",
+  "cx.shHave": "Inalipwa kutoka salio lililolindwa kwenye pochi yako: mchezo hausomi kamwe. Andika kiasi; acha STRK kidogo iliyolindwa kwa ada.",
   "cx.shPaid": "Imelipwa kwenye shadow account yako ({tx}). Chini: ihamishie kwenye salio lako la siri.",
   "cx.shCarried": "Cheo, skins na vitu vyako vimehamia kwenye akaunti yako ya siri.",
 };

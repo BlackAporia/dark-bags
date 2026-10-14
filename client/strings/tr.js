@@ -1922,7 +1922,7 @@ export default {
   "cx.carry": "Rütbemi, skinlerimi ve eşyalarımı gizli hesaba taşı (oyun ikisinin de sen olduğunu bilir; Starknet’te hiçbir şey onları bağlamaz)",
   "cx.shNo": "{w} henüz STRK20 shadow account desteklemiyor. Güncelle ya da Ready veya Xverse kullan.",
   "cx.shFind": "Shadow account hesabın aranıyor…",
-  "cx.shProve": "Shadow account {a}. Cüzdanda onayla: senin olduğunu kanıtlamak için ondan 0 gönderilir (para hareket etmez; kanıt bir dakika sürer).",
+  "cx.shProve": "Gölge hesap {a}. Cüzdanda onayla: küçük bir özel işlem hesabın sana ait olduğunu kanıtlar. Cüzdan ücreti gösterir, korumalı STRK'ndan ödenir; kanıt bir dakika sürer.",
   "cx.shChecking": "Starknet’in kanıtı onaylaması bekleniyor…",
   "cx.shOn": "Shadow account {a} üzerinde: {v}",
   "cx.shCollect": "🔒 Korumalı bakiyeme taşı",
@@ -1933,6 +1933,7 @@ export default {
   "cx.shWdL": "🥷 Shadow account hesabına",
   "cx.shWdS": "sonra tek dokunuşla korumalı bakiyene",
   "cx.shHint": "Tek bir STRK20 işlemi: korumalı bakiyen → shadow account → oyun. Ağ ücretini cüzdanın gizli bakiyenden ekler.",
+  "cx.shHave": "Cüzdanındaki korumalı bakiyeden ödenir: oyun onu asla okumaz. Tutarı yaz; ücret için biraz korumalı STRK bırak.",
   "cx.shPaid": "Shadow account hesabına ödendi ({tx}). Aşağıda: korumalı bakiyene taşı.",
   "cx.shCarried": "Rütben, skinlerin ve eşyaların gizli hesabına taşındı.",
 };

@@ -1922,7 +1922,7 @@ export default {
   "cx.carry": "Emporter mon rang, mes skins et objets sur le compte privé (le jeu saura que les deux sont à toi ; sur Starknet rien ne les relie)",
   "cx.shNo": "{w} ne gère pas encore les shadow accounts STRK20. Mets-le à jour ou utilise Ready ou Xverse.",
   "cx.shFind": "Recherche de ton shadow account…",
-  "cx.shProve": "Shadow account {a}. Confirme dans le wallet : il envoie 0 depuis ce compte pour prouver qu’il est à toi (aucun argent ne bouge ; ça prend une minute).",
+  "cx.shProve": "Compte fantôme {a}. Confirme dans le portefeuille : une petite transaction privée prouve qu'il est à toi. Le portefeuille affiche ses frais, payés avec ton STRK protégé ; la preuve prend une minute.",
   "cx.shChecking": "En attente de la confirmation de la preuve par Starknet…",
   "cx.shOn": "Sur ton shadow account {a} : {v}",
   "cx.shCollect": "🔒 Le placer dans mon solde protégé",
@@ -1933,6 +1933,7 @@ export default {
   "cx.shWdL": "🥷 Vers ton shadow account",
   "cx.shWdS": "puis un geste le place dans ton solde protégé",
   "cx.shHint": "Une transaction STRK20 : ton solde protégé → ton shadow account → le jeu. Ton wallet ajoute les frais réseau depuis ton solde privé.",
+  "cx.shHave": "Payé depuis le solde protégé de ton portefeuille : le jeu ne le lit jamais. Saisis le montant ; garde un peu de STRK protégé pour les frais.",
   "cx.shPaid": "Payé sur ton shadow account ({tx}). En dessous : place-le dans ton solde protégé.",
   "cx.shCarried": "Ton rang, tes skins et objets ont suivi sur ton compte privé.",
 };

@@ -1930,7 +1930,7 @@ export default {
   "cx.carry": "Bring my rank, skins and items to the private account (the game will know both are you; on Starknet nothing links them)",
   "cx.shNo": "{w} does not do STRK20 shadow accounts yet. Update it, or use Ready or Xverse.",
   "cx.shFind": "Finding your shadow account…",
-  "cx.shProve": "Shadow account {a}. Confirm in the wallet: it sends 0 from it to prove it is yours (no money moves; proving takes a minute).",
+  "cx.shProve": "Shadow account {a}. Confirm in the wallet: one small private transaction proves it is yours. The wallet shows its fee, paid from your shielded STRK; proving takes a minute.",
   "cx.shChecking": "Waiting for Starknet to confirm the proof…",
   "cx.shOn": "On your shadow account {a}: {v}",
   "cx.shCollect": "🔒 Move it to my shielded balance",
@@ -1941,6 +1941,7 @@ export default {
   "cx.shWdL": "🥷 To your shadow account",
   "cx.shWdS": "then one tap moves it into your shielded balance",
   "cx.shHint": "One STRK20 transaction: your shielded balance → your shadow account → the game. Your wallet adds the network fee from your private balance.",
+  "cx.shHave": "Paid from the shielded balance in your wallet: the game never reads it. Type the amount; keep a little shielded STRK for the fee.",
   "cx.shPaid": "Paid to your shadow account ({tx}). Below: move it into your shielded balance.",
   "cx.shCarried": "Your rank, skins and items came along to your private account.",
 };

@@ -8,10 +8,10 @@ import { createNyx } from './nyx.js';
 import { t, getLang, setLang, LANGS, onLang } from './i18n.js';
 import { store } from './store.js';
 import { esc } from './game.js';
+import { randomRunnerName } from '../shared/names.js';
 
 const $ = (id) => document.getElementById(id);
 const DONE = 'darkbags.welcome.done';
-const PARTS = [['Night', 'Neon', 'Ghost', 'Rogue', 'Silent', 'Lucky', 'Crypto', 'Shadow', 'Iron', 'Wild', 'Frost', 'Hex'], ['Fox', 'Raven', 'Wolf', 'Viper', 'Runner', 'Hawk', 'Tiger', 'Bandit', 'Jackal', 'Lynx', 'Cobra', 'Mantis']];
 const valid = (v) => v.length >= 3 && v.length <= 16 && /^[\p{L}\p{N}_. -]+$/u.test(v);
 
 export function createWelcome({ app, regions, onDone, sfx, signIn = null, send = null, online = () => false }) {
@@ -91,7 +91,7 @@ export function createWelcome({ app, regions, onDone, sfx, signIn = null, send =
       input.addEventListener('input', check);
       input.addEventListener('keydown', (e) => e.key === 'Enter' && !$('wel-next').disabled && nameNext());
       $('wel-dice').addEventListener('click', () => {
-        input.value = `${PARTS[0][Math.floor(Math.random() * PARTS[0].length)]}${PARTS[1][Math.floor(Math.random() * PARTS[1].length)]}${Math.floor(Math.random() * 90 + 10)}`;
+        input.value = randomRunnerName();
         check();
         nyx?.mood('wink', 900);
         sfx?.play?.('beep', { f: 1300, dur: 0.03 });

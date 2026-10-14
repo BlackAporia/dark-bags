@@ -318,12 +318,16 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   // server never sees the wallet's own address. (server/cashier/shadow.js)
   async function signInShadow(w) {
     const dapp = cs.chain.shadow.dapp;
+    // which step failed (1 the commitment, 2 the server's lookup, 3 the proof), shown with the
+    // wallet's own error code so a report says where it stopped
+    let step = 1;
     try {
       setStatus('connect-status', t('cx.waitWallet'));
       const f = await cs.vendor.connectExtension(w, cs.chain);
       if (!(await f.shadowSupported())) throw new Error(t('cx.shNo', { w: w.name }));
       setStatus('connect-status', t('cx.shFind'));
       const partial = await f.shadowCommitment(dapp);
+      step = 2;
       const ch = await new Promise((resolve, reject) => {
         cs.shWaiter = { resolve, reject };
         send({ t: 'auth_shadow_start', partial });
@@ -332,7 +336,8 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       cs.shWaiter = null;
       setStatus('connect-status', t('cx.shProve', { a: short(ch.account) }));
       const coin = cs.chain.tokens.find((x) => x.symbol === 'STRK') ?? cs.chain.tokens[0];
-      const tx = await f.shadowProve(dapp, coin.id, ch.challenge);
+      step = 3;
+      const tx = await f.shadowProve(dapp, coin.id, ch.challenge, ch.account);
       cs.facade = f;
       cs.kind = `shadow:${w.name}`;
       cs.shTx = tx;
@@ -342,7 +347,8 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       send({ t: 'auth_shadow', tx, carry: cs.carry, backups: backups() });
     } catch (e) {
       cs.shWaiter = null;
-      setStatus('connect-status', friendly(e), true);
+      console.warn('[shadow sign-in]', `step ${step}`, e);
+      setStatus('connect-status', `${friendly(e)} · ${step}/3${e?.code ? ` · ${e.code}` : ''}`, true);
     }
   }
 
@@ -519,6 +525,13 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const t = token($('dep-token').value);
     const el = $('dep-have');
     if (!t || !cs.account) return;
+    // private mode pays from the wallet's shielded balance: the shadow account's public one is not
+    // what goes in, and the game never reads the shielded one (that would ask the wallet to reveal it)
+    if (cs.shadow) {
+      el.textContent = tr('cx.shHave');
+      el.classList.remove('empty');
+      return;
+    }
     el.textContent = tr('cx.inWalletChecking');
     try {
       const v = await vendor();
@@ -639,6 +652,10 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     $('wd-go').disabled = !cs.wdRoute;
     $('wd-hint').textContent = cs.wdRoute ? t('cx.minWd', { m: cs.chain.minWithdrawUsd ?? 1, a: short(cs.account) }) : t('cx.wdOff');
     $('dep-hint').textContent = t(cs.depRoute === 'shadow' ? 'cx.shHint' : cs.depRoute === 'private' ? 'cx.hintPrivate' : 'cx.hintPublic');
+    // private mode: no Max (the shielded balance stays unread) and no transfer by hand (the shadow
+    // account sends nothing itself, and a transfer from the main wallet would tie the two together)
+    $('dep-max').hidden = !!cs.shadow;
+    $('dep-manual').hidden = !!cs.shadow;
     renderShadowCollect();
   }
 
