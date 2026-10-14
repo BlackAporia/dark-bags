@@ -3,38 +3,38 @@
 <head>
 <meta charset="utf-8">
 <!-- The scam warning for X: 1600×900 (16:9, shot at 1.2×). DARK BAGS has no token, and a coin
-     carrying our name or logo is somebody else's. The coin on the right wears the game's bag
-     under a red "no" sign; the line under it names the only places news comes from. -->
+     carrying our name or logo is somebody else's. The proof is the launchpad listing itself
+     (scam-shot.png: the rows only, cropped above the page header so no wallet shows): the other
+     projects' rows are dimmed, the fake "Dark Bags" row is circled and stamped. -->
 <link rel="stylesheet" href="../og/fonts/fonts.css">
 <style>
   html, body { margin: 0; width: 1600px; height: 900px; overflow: hidden; background: #05060a; }
   .s { position: relative; width: 1600px; height: 900px; overflow: hidden; font-family: 'Chakra Petch', sans-serif; color: #efe9dc;
     background:
-      radial-gradient(34% 56% at 76% 46%, rgba(255, 45, 70, 0.30), transparent 68%),
-      radial-gradient(40% 60% at 0% 100%, rgba(255, 170, 40, 0.12), transparent 70%),
+      radial-gradient(40% 50% at 70% 72%, rgba(255, 45, 70, 0.26), transparent 70%),
+      radial-gradient(40% 60% at 0% 0%, rgba(255, 170, 40, 0.10), transparent 70%),
       #06070c; }
-  .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 56px 56px; mask-image: radial-gradient(70% 90% at 70% 50%, #000 30%, transparent 85%); }
-  .copy { position: absolute; left: 96px; top: 70px; width: 860px; }
+  .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 56px 56px; mask-image: radial-gradient(70% 90% at 50% 40%, #000 30%, transparent 85%); }
+  .copy { position: absolute; left: 96px; top: 62px; width: 860px; }
   .kicker { display: inline-flex; align-items: center; gap: 14px; font: 700 26px/1 'IBM Plex Mono', monospace; letter-spacing: 0.24em; text-transform: uppercase; color: #fff; background: #e8263f; padding: 14px 20px; border-radius: 10px; box-shadow: 0 0 40px rgba(232, 38, 63, 0.55); }
-  h1 { margin: 34px 0 0; font: 900 168px/0.86 'Big Shoulders Stencil Display', sans-serif; text-transform: uppercase; }
+  h1 { margin: 26px 0 0; font: 900 132px/0.86 'Big Shoulders Stencil Display', sans-serif; text-transform: uppercase; }
   h1 span { display: block; }
-  h1 .a { color: #f3eee2; text-shadow: 0 10px 0 rgba(0,0,0,0.6); }
-  h1 .b { color: #ff3d55; text-shadow: 0 10px 0 rgba(0,0,0,0.55), 0 0 60px rgba(255, 45, 70, 0.55); }
-  .line { margin: 34px 0 0; font: 600 33px/1.3 'Chakra Petch', sans-serif; color: #fff; }
+  h1 .a { color: #f3eee2; text-shadow: 0 8px 0 rgba(0,0,0,0.6); }
+  h1 .b { color: #ff3d55; text-shadow: 0 8px 0 rgba(0,0,0,0.55), 0 0 60px rgba(255, 45, 70, 0.55); }
+  .line { position: absolute; left: 960px; right: 96px; top: 150px; margin: 0; font: 600 32px/1.32 'Chakra Petch', sans-serif; color: #fff; }
   .line b { color: #ffb443; }
-  .coin { position: absolute; left: 1060px; top: 150px; width: 440px; height: 440px; }
-  .coin .face { position: absolute; inset: 0; border-radius: 50%;
-    background: radial-gradient(60% 60% at 38% 32%, #ffe08a, #f0a020 62%, #a85d06);
-    box-shadow: 0 0 0 14px #c27712 inset, 0 0 0 22px #ffd06a inset, 0 24px 60px rgba(0,0,0,0.6); filter: saturate(0.75) brightness(0.8); }
-  .coin svg.bag { position: absolute; left: 100px; top: 92px; width: 240px; height: 240px; opacity: 0.85; }
-  .coin svg.no { position: absolute; inset: -34px; width: 508px; height: 508px; filter: drop-shadow(0 0 22px rgba(255, 40, 60, 0.75)); }
-  .tag { position: absolute; left: 1060px; top: 620px; width: 440px; text-align: center; font: 800 30px/1 'IBM Plex Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; color: #ff6b7d; }
-  .official { position: absolute; left: 96px; right: 96px; bottom: 64px; display: flex; align-items: center; gap: 18px; flex-wrap: nowrap; }
+  .shot { position: absolute; left: 96px; top: 420px; width: 1408px; height: 311px; border-radius: 16px; overflow: visible; transform: rotate(-1.2deg); }
+  .shot img { display: block; width: 1408px; height: 311px; border-radius: 16px; box-shadow: 0 0 0 2px rgba(255,255,255,0.12), 0 30px 80px rgba(0,0,0,0.7); }
+  .shot .dim { position: absolute; left: 0; top: 0; width: 1408px; height: 212px; border-radius: 16px 16px 0 0; background: rgba(4, 5, 9, 0.62); }
+  .shot .ring { position: absolute; left: 2px; top: 206px; width: 1380px; height: 82px; border-radius: 14px; border: 5px solid #ff2d46; box-shadow: 0 0 34px rgba(255, 45, 70, 0.8), inset 0 0 24px rgba(255, 45, 70, 0.35); }
+  .shot .stamp { position: absolute; left: 640px; top: 176px; transform: rotate(-7deg); font: 900 64px/1 'Big Shoulders Stencil Display', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #ff2d46; padding: 8px 22px 6px; border: 6px solid #ff2d46; border-radius: 12px; background: rgba(12, 4, 6, 0.86); box-shadow: 0 0 40px rgba(255, 45, 70, 0.6); }
+  .shot .src { position: absolute; left: 4px; top: -40px; font: 600 20px/1 'IBM Plex Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; color: #a9a39a; }
+  .official { position: absolute; left: 96px; right: 96px; bottom: 60px; display: flex; align-items: center; gap: 18px; flex-wrap: nowrap; }
   .official .lbl { font: 700 22px/1 'IBM Plex Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #3ddc97; white-space: nowrap; }
   .chip { font: 700 26px/1 'IBM Plex Mono', monospace; padding: 15px 18px; border-radius: 12px; border: 2px solid rgba(61, 220, 151, 0.6); background: rgba(5, 12, 10, 0.85); color: #d9ffe9; white-space: nowrap; }
   .hazard { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; background: repeating-linear-gradient(135deg, #e8263f 0 24px, #0b0b0b 24px 48px); }
   .hazard.top { top: 0; bottom: auto; }
-  .vignette { position: absolute; inset: 0; box-shadow: inset 0 0 220px rgba(0,0,0,0.85); pointer-events: none; }
+  .vignette { position: absolute; inset: 0; box-shadow: inset 0 0 200px rgba(0,0,0,0.8); pointer-events: none; }
 </style>
 </head>
 <body>
@@ -43,22 +43,16 @@
   <div class="hazard top"></div>
   <div class="copy">
     <div class="kicker">⚠ Scam alert</div>
-    <h1><span class="a">We have</span><span class="b">no token</span></h1>
-    <p class="line">DARK BAGS never launched a coin, presale or airdrop.<br>A token with our <b>name or logo</b> is not ours.</p>
+    <h1><span class="a">This is not</span><span class="b">our token</span></h1>
   </div>
-  <div class="coin">
-    <div class="face"></div>
-    <svg class="bag" viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M23.5 25v-4.5a8.5 8.5 0 0 1 17 0V25" fill="none" stroke="#5a3204" stroke-width="4.2" stroke-linecap="round"/>
-      <path d="M13.5 25h37l-3.6 25.6a4.5 4.5 0 0 1-4.46 3.9H21.56a4.5 4.5 0 0 1-4.46-3.9z" fill="#7a4506"/>
-      <path d="M32 33.5l6.2 7.2L32 47.9l-6.2-7.2z" fill="#f3b23a"/>
-    </svg>
-    <svg class="no" viewBox="0 0 100 100" aria-hidden="true">
-      <circle cx="50" cy="50" r="44" fill="none" stroke="#ff2d46" stroke-width="7"/>
-      <path d="M19 19L81 81" stroke="#ff2d46" stroke-width="7" stroke-linecap="round"/>
-    </svg>
+  <p class="line">DARK BAGS never launched a coin, presale or airdrop. A token with our <b>name or logo</b> is a scam. Don't buy it.</p>
+  <div class="shot">
+    <div class="src">Seen on a Starknet launchpad ▾</div>
+    <img src="scam-shot.png" alt="">
+    <div class="dim"></div>
+    <div class="ring"></div>
+    <div class="stamp">Fake · not ours</div>
   </div>
-  <div class="tag">Fake · Do not buy</div>
   <div class="official">
     <span class="lbl">Official only ▸</span>
     <span class="chip">𝕏 @play_dark_bags</span>
@@ -68,6 +62,6 @@
   <div class="hazard"></div>
   <div class="vignette"></div>
 </div>
-<script>document.fonts.ready.then(() => { document.body.dataset.ready = '1'; });</script>
+<script>Promise.all([document.fonts.ready, document.querySelector('img').decode()]).then(() => { document.body.dataset.ready = '1'; });</script>
 </body>
 </html>

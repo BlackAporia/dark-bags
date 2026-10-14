@@ -1,6 +1,6 @@
 # Пост на X: у нас немає токена
 
-Картинка: `brand/x/scam-alert.jpg` (1920×1080). Її малює `ONLY=scam node scripts/make-x.mjs` із `scripts/x/scam.html`.
+Картинка: `brand/x/scam-alert.jpg` (1920×1080), зроблена зі скріншота лаунчпада (`scripts/x/scam-shot.png`, обрізаний вище шапки, щоб не видно гаманця). Її малює `ONLY=scam node scripts/make-x.mjs` із `scripts/x/scam.html`.
 
 Текст (261 з 280 символів):
 
