@@ -338,6 +338,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       const coin = cs.chain.tokens.find((x) => x.symbol === 'STRK') ?? cs.chain.tokens[0];
       step = 3;
       const tx = await f.shadowProve(dapp, coin.id, ch.challenge, ch.account);
+      f.shadowAddr = ch.account;
       cs.facade = f;
       cs.kind = `shadow:${w.name}`;
       cs.shTx = tx;
@@ -457,6 +458,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       }
       if (!w) throw new Error(`${cs.kind.slice('shadow:'.length)} is not open in this browser. Unlock it, or sign out and sign in again.`);
       cs.facade = await v.connectExtension(w, cs.chain);
+      cs.facade.shadowAddr = cs.account;
       return cs.facade;
     }
     if (cs.kind === 'privy') {
@@ -875,6 +877,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       setTab('deposit');
       refreshWalletBal();
     },
+    // private mode: coins come to the player's own wallet (its address is only known in this browser)
+    shadow: () => !!cs.shadow,
+    wallet: () => (cs.shadow ? cs.facade?.address ?? null : null),
   });
 
   // --------------------------------------------------------------- wiring
@@ -944,6 +949,22 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     async swap(from, to, units, slippageBps = 50n) {
       const v = await vendor();
       return v.avnuSwap(cs.chain, await ensureFacade(), tokenById(from), tokenById(to), units, slippageBps);
+    },
+    // private swaps: from and back into the shielded balance, through the DARK BAGS shadow account.
+    // Signed in privately it is the only kind (the wallet card stands for the shielded balance);
+    // signed in with a browser wallet it is offered when the chain has shadow accounts
+    get privateOk() {
+      return !!cs.chain?.shadow && !!cs.account && app.mode === 'online' && (cs.shadow || /^extension:/.test(cs.kind ?? ''));
+    },
+    get privateOnly() {
+      return !!cs.shadow;
+    },
+    async swapPrivate(from, to, units, slippageBps = 50n) {
+      const v = await vendor();
+      const f = await ensureFacade();
+      if (!f.strk20) throw new Error(t('cx.noPrivate'));
+      const shadow = await v.shadowAddress(cs.chain, f);
+      return v.avnuSwapPrivate(cs.chain, f, shadow, tokenById(from), tokenById(to), units, slippageBps);
     },
     open: () => openCashier(),
   };

@@ -14,6 +14,7 @@ export function createSwap({ app, send, toast, cashier, signIn }) {
   const st = {
     from: null, to: null, amount: '', busy: false,
     wFrom: null, wTo: null, wAmount: '', slip: 50, quote: null, qBusy: false,
+    priv: false, // the wallet card swaps privately (from and back into the shielded balance)
     list: null, // the AVNU / Ekubo coins (from the server)
     bal: new Map(), // wallet balances by coin id (BigInt, or null when unreadable)
     pick: null, // 'wFrom' | 'wTo' | 'from' | 'to': the open coin picker
@@ -28,6 +29,8 @@ export function createSwap({ app, send, toast, cashier, signIn }) {
   };
   const usdOf = (id, u) => (app.prices.has?.(id) && u != null ? app.prices.value(id, u) : null);
   const w = cashier.avnu;
+  // signed in privately, the wallet card is the shielded balance: private is the only kind
+  const priv = () => !!w.privateOk && (w.privateOnly || st.priv);
 
   // every coin the wallet card can use: the game's first, then the verified lists
   function walletCoins() {
@@ -90,7 +93,7 @@ export function createSwap({ app, send, toast, cashier, signIn }) {
     const b = coin(st.wTo);
     const q = st.quote;
     const amt = a ? parseUnits(st.wAmount, a.decimals) : null;
-    const have = st.bal.get(st.wFrom);
+    const have = priv() ? null : st.bal.get(st.wFrom);
     const over = amt != null && have != null && amt > have;
     let rows = '';
     if (q && a && b && amt) {
@@ -109,13 +112,13 @@ export function createSwap({ app, send, toast, cashier, signIn }) {
       out: st.qBusy ? `<span class="fine">${t('swap.quoting')}</span>` : q && b ? `<b class="num">${esc(formatUnits(q.out, b.decimals, 6))}</b>${outUsd != null ? ` <span class="fine">≈ ${usdText(outUsd)}</span>` : ''}` : '<span class="fine">0.0</span>',
       rows,
       disabled: !q || st.qBusy || st.busy || over,
-      label: over ? t('swap.short') : t('swap.goAvnu'),
+      label: over ? t('swap.short') : priv() ? t('swap.goPrivate') : t('swap.goAvnu'),
       inUsd: a && amt ? usdOf(a.id, amt) : null,
     };
   }
 
   // what the form is built from: when this changes the page is rebuilt, otherwise repainted
-  const shape = () => [w.ready, !!app.swap, app.mode, !!app.chain, app.assets.filter((a) => app.prices.has(a.id)).map((a) => a.id).join()].join('|');
+  const shape = () => [w.ready, priv(), !!w.privateOk, !!app.swap, app.mode, !!app.chain, app.assets.filter((a) => app.prices.has(a.id)).map((a) => a.id).join()].join('|');
 
   // refresh the numbers and buttons without rebuilding the form (keeps focus and clicks)
   function paint() {
@@ -139,7 +142,7 @@ export function createSwap({ app, send, toast, cashier, signIn }) {
       for (const k of ['wFrom', 'wTo']) {
         const x = coin(st[k]);
         const el = root.querySelector(`[data-bal="${k}"]`);
-        if (el && x) el.innerHTML = `${t('swap.balance')}: ${balText(x.id, x.decimals, x.symbol)}`;
+        if (el && x) el.innerHTML = priv() ? '' : `${t('swap.balance')}: ${balText(x.id, x.decimals, x.symbol)}`;
       }
       btn.disabled = c.disabled;
       btn.textContent = c.label;
@@ -207,22 +210,29 @@ export function createSwap({ app, send, toast, cashier, signIn }) {
     const a = coin(st.wFrom);
     const b = coin(st.wTo);
     const c = walletCalc();
+    const p = priv();
+    // private: the shielded balance is not read (that would ask the wallet to reveal it), so no
+    // balances, no MAX; the shadow account and the wallet's address are never shown here
+    const mode = w.privateOk && !w.privateOnly
+      ? `<div class="sw-mode" role="radiogroup"><button type="button" data-wpriv="0" aria-pressed="${!p}">${t('swap.public')}</button><button type="button" data-wpriv="1" aria-pressed="${p}">🥷 ${t('swap.private')}</button></div>`
+      : '';
     return `
-      <p class="fine sw-acct">${esc(short(app.chain && cashier.account ? cashier.account : ''))}</p>
+      ${mode}
+      <p class="fine sw-acct">${p ? `🥷 ${t('swap.fromShielded')}` : esc(short(app.chain && cashier.account ? cashier.account : ''))}</p>
       <div class="sw-box">
-        <div class="sw-top"><span class="eyebrow">${t('swap.youPay')}</span><span class="fine" data-bal="wFrom">${a ? `${t('swap.balance')}: ${balText(a.id, a.decimals, a.symbol)}` : ''}</span></div>
+        <div class="sw-top"><span class="eyebrow">${t('swap.youPay')}</span><span class="fine" data-bal="wFrom">${a && !p ? `${t('swap.balance')}: ${balText(a.id, a.decimals, a.symbol)}` : ''}</span></div>
         <div class="sw-mid">${coinBtn('wFrom', a)}<input data-k="wAmount" inputmode="decimal" placeholder="0.0" value="${esc(st.wAmount)}" aria-label="${t('swap.youPay')}"></div>
-        <div class="sw-bot"><span class="swap-pcts">${[25, 50, 100].map((p) => `<button type="button" data-wpct="${p}">${p === 100 ? 'MAX' : `${p}%`}</button>`).join('')}</span><span class="fine" id="sw-inusd">${c.inUsd != null ? `≈ ${usdText(c.inUsd)}` : ''}</span></div>
+        <div class="sw-bot"><span class="swap-pcts">${p ? '' : [25, 50, 100].map((x) => `<button type="button" data-wpct="${x}">${x === 100 ? 'MAX' : `${x}%`}</button>`).join('')}</span><span class="fine" id="sw-inusd">${c.inUsd != null ? `≈ ${usdText(c.inUsd)}` : ''}</span></div>
       </div>
       <button type="button" class="swap-flip sw-flip" data-wflip aria-label="${t('swap.flip')}">⇅</button>
       <div class="sw-box">
-        <div class="sw-top"><span class="eyebrow">${t('swap.youGet')}</span><span class="fine" data-bal="wTo">${b ? `${t('swap.balance')}: ${balText(b.id, b.decimals, b.symbol)}` : ''}</span></div>
+        <div class="sw-top"><span class="eyebrow">${t('swap.youGet')}</span><span class="fine" data-bal="wTo">${b && !p ? `${t('swap.balance')}: ${balText(b.id, b.decimals, b.symbol)}` : ''}</span></div>
         <div class="sw-mid">${coinBtn('wTo', b)}<div class="sw-out" id="sw-out">${c.out}</div></div>
       </div>
       <div class="swap-pcts slip"><span class="fine">${t('swap.slippage')}</span>${[50, 100, 200].map((bp) => `<button type="button" data-slip="${bp}" aria-pressed="${st.slip === bp}">${bp / 100}%</button>`).join('')}</div>
       <div id="sw-rows">${c.rows}</div>
       <button type="button" class="cta" data-go="avnu" ${c.disabled ? 'disabled' : ''}>${c.label}</button>
-      <p class="fine">${t('swap.walletNote')}</p>`;
+      <p class="fine">${t(p ? 'swap.privNote' : 'swap.walletNote')}</p>`;
   }
 
   // the coin picker: search by symbol, name or address; logos and wallet balances
@@ -360,13 +370,18 @@ export function createSwap({ app, send, toast, cashier, signIn }) {
       send({ t: 'swap', from: st.from, to: st.to, units: u.toString() });
     });
     root.querySelector('[data-go="signin"]')?.addEventListener('click', () => signIn());
+    for (const el of root.querySelectorAll('[data-wpriv]'))
+      el.addEventListener('click', () => {
+        st.priv = el.dataset.wpriv === '1';
+        render();
+      });
     root.querySelector('[data-go="avnu"]')?.addEventListener('click', async () => {
       const tok = coin(st.wFrom);
       if (!tok || !st.quote) return;
       st.busy = true;
       paint();
       try {
-        const r = await w.swap(st.wFrom, st.wTo, parseUnits(st.wAmount, tok.decimals), BigInt(st.slip));
+        const r = await (priv() ? w.swapPrivate : w.swap)(st.wFrom, st.wTo, parseUnits(st.wAmount, tok.decimals), BigInt(st.slip));
         toast(t('swap.sent', { tx: `${String(r.tx).slice(0, 10)}…` }));
         st.wAmount = '';
         st.quote = null;

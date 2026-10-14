@@ -1278,6 +1278,10 @@ body.ready #lobby { animation: menu-in 0.6s ease both; }
 .swap-amt { display: grid; gap: 6px; }
 .swap-amt input { font: 600 26px/1.2 var(--f-num); }
 .swap-pcts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sw-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 12px; }
+.sw-mode button { padding: 8px; border: 0; border-radius: 9px; background: transparent; color: var(--dust); font: 700 13px/1 var(--f-ui); cursor: pointer; }
+.sw-mode button[aria-pressed='true'] { background: rgba(255, 255, 255, 0.08); color: var(--paper); }
+.sw-mode button[data-wpriv='1'][aria-pressed='true'] { background: linear-gradient(180deg, #8b5cf6, #6d28d9); color: #fff; }
 .swap-pcts button { padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--dust); font: 600 12px/1 var(--f-num); }
 .swap-pcts button[aria-pressed='true'] { border-color: var(--paper); color: var(--paper); }
 .swap-flip { align-self: center; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--tarp-2); font-size: 18px; transition: transform 0.2s; }
