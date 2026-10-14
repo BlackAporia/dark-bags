@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"></head>
+<body>
+<!-- The modes video's soundtrack (videos/darkbags-modes), rendered offline in one pass: the hype
+     video's 128 BPM trap / phonk kit (808, cowbell, hat rolls, braams, risers, the game's own
+     announcer), arranged for 39 bars: a mode on each cut, a darker turn for the Descent, the
+     closing filter before the end card. The gameplay clips bring their own shots.
+     scripts/trailer/make-score.mjs modes saves it; the bar grid matches
+     scripts/trailer/modes/build.py. -->
+<script type="module">
+  import { Sfx } from '/client/sfx.js';
+  import { VOICE } from '/client/voice-data.js';
+
+  const SR = 48000;
+  const LEN = 74;
+  const ctx = new OfflineAudioContext(2, SR * LEN, SR);
+
+  // seeded random: the same score every render
+  let seed = 20261011;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  Math.random = rnd;
+
+  // ----------------------------------------------------------------- buses
+  const master = ctx.createGain();
+  master.gain.value = 0.9;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -16;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.18;
+  const limit = ctx.createDynamicsCompressor();
+  limit.threshold.value = -3;
+  limit.knee.value = 0;
+  limit.ratio.value = 20;
+  limit.attack.value = 0.001;
+  limit.release.value = 0.08;
+  master.connect(comp).connect(limit).connect(ctx.destination);
+
+  const impulse = (secs, decay = 3) => {
+    const len = Math.floor(SR * secs);
+    const buf = ctx.createBuffer(2, len, SR);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (rnd() * 2 - 1) * (1 - i / len) ** decay;
+    }
+    return buf;
+  };
+  const hall = ctx.createConvolver();
+  hall.buffer = impulse(4.2, 2.6);
+  const hallIn = ctx.createGain();
+  hallIn.gain.value = 0.5;
+  hallIn.connect(hall).connect(master);
+
+  // music bus with a sidechain duck driven by the kick
+  const music = ctx.createGain();
+  music.gain.value = 1;
+  const duck = ctx.createGain();
+  music.connect(duck).connect(master);
+  const musicVerb = ctx.createGain();
+  musicVerb.gain.value = 0.35;
+  duck.connect(musicVerb).connect(hallIn);
+
+  // the room: rain, hum, keys. Its lowpass closes as we push into the screen.
+  const room = ctx.createGain();
+  const roomLp = ctx.createBiquadFilter();
+  roomLp.type = 'lowpass';
+  roomLp.frequency.value = 16000;
+  room.connect(roomLp).connect(master);
+
+  const noiseBuf = (secs, brown = false) => {
+    const len = Math.floor(SR * secs);
+    const buf = ctx.createBuffer(2, len, SR);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        const w = rnd() * 2 - 1;
+        if (brown) {
+          last = (last + 0.02 * w) / 1.02;
+          d[i] = last * 3.5;
+        } else d[i] = w;
+      }
+    }
+    return buf;
+  };
+  const WHITE = noiseBuf(4);
+  const BROWN = noiseBuf(4, true);
+
+  // ------------------------------------------------------------- helpers
+  const env = (g, t, { a = 0.005, peak = 1, hold = 0, d = 0.3, from = 0.0001 } = {}) => {
+    g.gain.setValueAtTime(from, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    if (hold) g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + d);
+  };
+  const osc = (dest, t, { type = 'sine', f, to = null, glide = null, a = 0.005, peak = 0.3, hold = 0, d = 0.3, detune = 0 }) => {
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f, t);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t + (glide ?? a + hold + d));
+    o.detune.value = detune;
+    const g = ctx.createGain();
+    env(g, t, { a, peak, hold, d });
+    o.connect(g).connect(dest);
+    o.start(t);
+    o.stop(t + a + hold + d + 0.05);
+    return o;
+  };
+  const noise = (dest, t, { brown = false, type = 'bandpass', f = 1000, to = null, q = 0.8, a = 0.005, peak = 0.3, hold = 0, d = 0.3, loop = false }) => {
+    const src = ctx.createBufferSource();
+    src.buffer = brown ? BROWN : WHITE;
+    src.loop = true;
+    const flt = ctx.createBiquadFilter();
+    flt.type = type;
+    flt.frequency.setValueAtTime(f, t);
+    if (to) flt.frequency.exponentialRampToValueAtTime(to, t + a + hold + d);
+    flt.Q.value = q;
+    const g = ctx.createGain();
+    env(g, t, { a, peak, hold, d });
+    src.connect(flt).connect(g).connect(dest);
+    src.start(t, rnd() * 2);
+    src.stop(t + a + hold + d + 0.05);
+  };
+  const pan = (dest, p) => {
+    const n = ctx.createStereoPanner();
+    n.pan.value = p;
+    n.connect(dest);
+    return n;
+  };
+  const shaper = (amount) => {
+    const ws = ctx.createWaveShaper();
+    const n = 2048;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * amount) / Math.tanh(amount);
+    }
+    ws.curve = curve;
+    ws.oversample = '4x';
+    return ws;
+  };
+  const hz = (m) => 440 * 2 ** ((m - 69) / 12);
+
+  // pixabay files
+  const files = {};
+  for (const n of ['click', 'glitch-1', 'glitch-2', 'glitch-3', 'impact-bass-1', 'impact-bass-2', 'riser', 'whoosh-cinematic', 'whoosh', 'whoosh-short', 'sparkle', 'key-press', 'typing']) {
+    const r = await fetch(`/videos/darkbags-hype/assets/sfx/${n}.mp3`);
+    files[n] = await ctx.decodeAudioData(await r.arrayBuffer());
+  }
+  const file = (name, t, { vol = 1, dest = master, offset = 0, rate = 1, dur = null, p = 0, lp = null } = {}) => {
+    const s = ctx.createBufferSource();
+    s.buffer = files[name];
+    s.playbackRate.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    let out = s.connect(g);
+    if (lp) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = lp;
+      out = out.connect(f);
+    }
+    out.connect(p ? pan(dest, p) : dest);
+    if (dur) {
+      g.gain.setValueAtTime(vol, t + dur - 0.04);
+      g.gain.linearRampToValueAtTime(0, t + dur);
+    }
+    s.start(Math.max(0, t), offset + Math.max(0, -t));
+    if (dur) s.stop(t + dur + 0.01);
+  };
+
+  // the game's own sound engine, driven on our clock
+  const game = new Sfx();
+  let T = 0;
+  game.ctx = new Proxy(ctx, {
+    get(target, prop) {
+      if (prop === 'currentTime') return T;
+      const v = target[prop];
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  });
+  game.muted = false;
+  const gameBus = ctx.createGain();
+  gameBus.gain.value = 0.9;
+  gameBus.connect(master);
+  game.master = gameBus;
+  game.bus = ctx.createGain();
+  game.bus.gain.value = 0.8;
+  game.bus.connect(gameBus);
+  game.verbIn = ctx.createGain();
+  game.verbIn.gain.value = 0.7;
+  game.verbIn.connect(hallIn);
+  game.white = WHITE;
+  game.brown = BROWN;
+  const play = (t, name, o = {}) => {
+    T = t;
+    game.play(name, o);
+  };
+  const sting = (t, tier) => {
+    T = t;
+    game.sting(tier);
+  };
+  const voices = {};
+  for (const k of ['s1', 's2', 's3', 's4', 's5', 'victory', 'extracted', 'headshot']) {
+    const bin = Uint8Array.from(atob(VOICE.en[k]), (ch) => ch.charCodeAt(0));
+    voices[k] = await ctx.decodeAudioData(bin.buffer);
+  }
+  const say = (t, k, vol = 1.3) => {
+    const n = ctx.createBufferSource();
+    n.buffer = voices[k];
+    const lo = ctx.createBiquadFilter();
+    lo.type = 'lowshelf';
+    lo.frequency.value = 180;
+    lo.gain.value = 5;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.3;
+    n.connect(lo).connect(g).connect(master);
+    g.connect(wet).connect(hallIn);
+    n.start(t);
+  };
+
+
+  // ================================================================ the grid: 128 BPM
+  const BEAT = 60 / 128;
+  const BAR = BEAT * 4;
+  const at = (bar, step = 0) => bar * BAR + step * (BEAT / 4); // 16 steps a bar
+  const DROP = 3; // the full beat comes in on bar 3 (5.6 s), with the first mode
+  const END = 35; // the end card hit (65.6 s)
+  const FOMO = 33;
+
+  const drums = ctx.createGain();
+  drums.gain.value = 1;
+  drums.connect(master);
+  const dVerb = ctx.createGain();
+  dVerb.gain.value = 0.18;
+  drums.connect(dVerb).connect(hallIn);
+  // the intro plays the beat through a closed filter that opens into the drop
+  const introLp = ctx.createBiquadFilter();
+  introLp.type = 'lowpass';
+  introLp.frequency.setValueAtTime(500, 0);
+  introLp.frequency.exponentialRampToValueAtTime(2200, at(2, 12));
+  introLp.frequency.setValueAtTime(22000, at(DROP) - 0.01);
+  // and the FOMO bars close it again
+  introLp.frequency.setValueAtTime(22000, at(FOMO));
+  introLp.frequency.exponentialRampToValueAtTime(700, at(FOMO + 1, 8));
+  introLp.frequency.setValueAtTime(22000, at(END) - 0.01);
+  const beatBus = ctx.createGain();
+  beatBus.connect(introLp).connect(drums);
+
+  const kick = (t, v = 1) => {
+    osc(beatBus, t, { f: 170, to: 45, glide: 0.07, a: 0.002, d: 0.32, peak: 1.0 * v });
+    noise(beatBus, t, { type: 'highpass', f: 4000, peak: 0.2 * v, d: 0.01 });
+    duck.gain.setValueAtTime(1, t);
+    duck.gain.linearRampToValueAtTime(0.3, t + 0.01);
+    duck.gain.linearRampToValueAtTime(1, t + 0.25);
+  };
+  const clap = (t, v = 1) => {
+    for (const dt of [0, 0.011, 0.022]) noise(beatBus, t + dt, { type: 'bandpass', f: 1500, q: 0.9, peak: 0.45 * v, d: 0.05 });
+    noise(beatBus, t + 0.03, { type: 'bandpass', f: 1300, q: 0.7, peak: 0.5 * v, d: 0.2 });
+    osc(beatBus, t, { type: 'triangle', f: 230, to: 170, peak: 0.25 * v, d: 0.1 });
+    noise(hallIn, t, { type: 'bandpass', f: 1600, q: 0.6, peak: 0.2 * v, d: 0.4 });
+  };
+  const hat = (t, v = 1, open = false) => noise(pan(beatBus, 0.2), t, { type: 'highpass', f: 9000, peak: 0.12 * v, d: open ? 0.15 : 0.025 });
+
+  // 808: a sine with a pitch drop and some dirt, held to the next note
+  const b808Bus = ctx.createGain();
+  b808Bus.gain.value = 0.55;
+  b808Bus.connect(shaper(2.2)).connect(introLp);
+  const b808 = (t, m, len) => {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(hz(m) * 2.2, t);
+    o.frequency.exponentialRampToValueAtTime(hz(m), t + 0.06);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1, t + 0.005);
+    g.gain.setValueAtTime(1, t + Math.max(0.01, len - 0.08));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g).connect(b808Bus);
+    o.start(t);
+    o.stop(t + len + 0.02);
+  };
+
+  // phonk cowbell: two square partials through a bandpass, short and pitched
+  const bellBus = ctx.createGain();
+  bellBus.gain.value = 0.16;
+  const bellBp = ctx.createBiquadFilter();
+  bellBp.type = 'bandpass';
+  bellBp.frequency.value = 1700;
+  bellBp.Q.value = 0.9;
+  bellBus.connect(bellBp).connect(pan(music, -0.1));
+  const bellDly = ctx.createDelay();
+  bellDly.delayTime.value = BEAT * 0.75;
+  const bellFb = ctx.createGain();
+  bellFb.gain.value = 0.25;
+  bellBp.connect(bellDly).connect(bellFb).connect(bellDly);
+  bellFb.connect(pan(music, 0.45));
+  const bell = (t, m, v = 1) => {
+    for (const r of [1, 1.4835]) {
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = hz(m) * r;
+      const g = ctx.createGain();
+      env(g, t, { a: 0.002, d: 0.22, peak: v * (r === 1 ? 1 : 0.6) });
+      o.connect(g).connect(bellBus);
+      o.start(t);
+      o.stop(t + 0.26);
+    }
+  };
+
+  // a dark pad under everything
+  const pad = (t0, t1, chord, vol = 0.05) => {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.4);
+    g.gain.setValueAtTime(vol, t1 - 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t1);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1400;
+    g.connect(lp).connect(music);
+    for (const m of chord)
+      for (const det of [-9, 0, 9]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = hz(m);
+        o.detune.value = det;
+        o.connect(pan(g, det / 20));
+        o.start(t0);
+        o.stop(t1 + 0.05);
+      }
+  };
+
+  const braam = (t, big = 1) => {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3 * big, t + 0.03);
+    g.gain.setValueAtTime(0.3 * big, t + 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4 * big);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 3;
+    lp.frequency.setValueAtTime(200, t);
+    lp.frequency.exponentialRampToValueAtTime(2600, t + 0.12);
+    lp.frequency.exponentialRampToValueAtTime(320, t + 1.8);
+    const sh = shaper(3);
+    sh.connect(lp).connect(g).connect(master);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.6;
+    g.connect(wet).connect(hallIn);
+    for (const m of [26, 38, 45, 50, 53])
+      for (const det of [-14, -4, 7, 15]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(hz(m) * 1.03, t);
+        o.frequency.exponentialRampToValueAtTime(hz(m), t + 0.12);
+        o.detune.value = det;
+        o.connect(sh);
+        o.start(t);
+        o.stop(t + 2.6 * big);
+      }
+    osc(master, t, { f: 110, to: 30, glide: 1.4, a: 0.004, d: 1.5 * big, peak: 0.9 });
+    noise(master, t, { type: 'highpass', f: 2000, peak: 0.55, d: 0.15 });
+    noise(hallIn, t, { brown: true, type: 'lowpass', f: 900, to: 80, q: 0.4, d: 2, peak: 0.7 });
+  };
+  const hit = (t, v = 1) => {
+    osc(master, t, { f: 95, to: 32, glide: 0.5, d: 0.6, peak: 0.75 * v });
+    noise(master, t, { type: 'highpass', f: 2500, peak: 0.35 * v, d: 0.08 });
+    noise(hallIn, t, { type: 'bandpass', f: 1200, q: 0.5, peak: 0.3 * v, d: 0.6 });
+  };
+  const crash = (t, v = 1) => noise(pan(master, 0.1), t, { type: 'highpass', f: 5000, peak: 0.22 * v, d: 1.6 });
+  const swell = (t0, t1, v = 0.35) => noise(master, t0, { type: 'highpass', f: 900, to: 9000, q: 0.5, a: t1 - t0 - 0.02, d: 0.02, peak: v });
+  const coins = (t, n = 6) => {
+    for (let i = 0; i < n; i++) play(t + i * 0.045, 'coin', { tier: i % 3 });
+  };
+
+  // progression, one chord a bar: Dm Dm Bb A  (D minor), the 808 on the roots
+  const ROOTS = [38, 38, 34, 33];
+  const CHORDS = [[50, 53, 57], [50, 53, 57], [46, 50, 53], [45, 49, 52]];
+  // the cowbell riff, 16 steps (null = rest), over two bars
+  const RIFF = [
+    [74, null, 74, 77, null, 74, null, 72, 74, null, 74, 77, null, 79, 77, null],
+    [74, null, 74, 77, null, 74, null, 72, 70, null, 70, 69, null, 72, 74, null],
+  ];
+
+  const beatBar = (bar, { full = true, bells = true, roll = false, kickOnly = false } = {}) => {
+    const r = ROOTS[bar % 4];
+    // kick + 808 on 0, 7, 10; the last bar of four adds 14
+    const ks = bar % 4 === 3 ? [0, 7, 10, 14] : [0, 7, 10];
+    ks.forEach((s, i) => {
+      kick(at(bar, s), s === 0 ? 1 : 0.85);
+      const next = ks[i + 1] ?? 16;
+      b808(at(bar, s), r + (s === 10 && bar % 2 ? 3 : 0), (next - s) * (BEAT / 4));
+    });
+    if (kickOnly) return;
+    clap(at(bar, 8));
+    for (let s = 0; s < 16; s++) {
+      if (roll && s >= 12) {
+        for (let k = 0; k < 2; k++) hat(at(bar, s) + k * (BEAT / 8), 0.6 + (s - 12) * 0.1);
+      } else if (full || s % 2 === 0) hat(at(bar, s), s % 4 === 2 ? 1 : 0.55, s === 6);
+    }
+    if (bells) RIFF[bar % 2].forEach((m, s) => m && bell(at(bar, s), m, s % 4 === 0 ? 1 : 0.7));
+    pad(at(bar), at(bar + 1), CHORDS[bar % 4], 0.035);
+  };
+
+
+  // ------------------------------------------------------------- 0–5.6: the hook, the montage, the logo
+  // "17 MODES." / "ONE TAB." : two hits; then eight cuts on the 8ths under a closed filter
+  hit(0, 1.2);
+  file('impact-bass-1', 0, { vol: 0.7 });
+  hit(at(0, 8), 1.2);
+  file('impact-bass-2', at(0, 8), { vol: 0.6 });
+  beatBar(1, { bells: false, kickOnly: true });
+  for (let k = 0; k < 8; k++) {
+    clap(at(1, k * 2), 0.3 + k * 0.07);
+    file('whoosh-short', at(1, k * 2) - 0.04, { vol: 0.25, rate: 1.05 + k * 0.05 });
+  }
+  // the logo slams, the riser pulls into the first mode
+  braam(at(2));
+  file('glitch-1', at(2, 1), { vol: 0.35, dur: 0.25 });
+  beatBar(2, { full: false, bells: false });
+  file('riser', at(2), { vol: 0.5, offset: 10.032 - BAR + 0.15, dur: BAR - 0.15 });
+  swell(at(2, 4), at(DROP) - 0.18, 0.4);
+
+  // ------------------------------------------------------------- 5.6–48.8: every mode
+  // a crash and a whoosh where each mode starts; half-bar hits through the weapon modes
+  const MODE_AT = [3, 6, 8, 9, 11, 13, 18, 19, 20, 21, 23, 25];
+  for (let bar = DROP; bar < 26; bar++) {
+    beatBar(bar, { roll: bar % 4 === 2 || bar === 25, bells: bar !== 14 });
+    if (MODE_AT.includes(bar)) {
+      crash(at(bar), bar === DROP ? 1.4 : 0.6);
+      file('whoosh', at(bar) - 0.12, { vol: 0.45 });
+    }
+  }
+  braam(at(DROP), 1.1);
+  file('impact-bass-1', at(DROP), { vol: 0.9 });
+  say(at(3, 6), 'extracted', 1.0);
+  say(at(6, 4), 's2', 1.0);
+  say(at(9, 6), 's3', 1.0);
+  say(at(11, 6), 's4', 1.0);
+  // bar 14: start with a knife, every kill upgrades your gun: four kills on the beats
+  for (let k = 0; k < 4; k++) {
+    hit(at(14, k * 4), 0.55 + k * 0.12);
+    file('whoosh-short', at(14, k * 4) - 0.06, { vol: 0.35, rate: 1 + k * 0.06 });
+  }
+  say(at(14, 12), 's5', 1.0);
+  // bars 15–17: five weapon modes, half a bar each
+  for (let k = 0; k < 6; k++) {
+    hit(at(15 + Math.floor(k / 2), (k % 2) * 8), 0.75);
+    file('whoosh-short', at(15 + Math.floor(k / 2), (k % 2) * 8) - 0.05, { vol: 0.3, rate: 1.1 + k * 0.04 });
+  }
+  say(at(21, 4), 'victory', 0.9);
+  coins(at(23, 4), 7);
+
+  // ------------------------------------------------------------- 48.8–54.4: the Descent
+  // darker: the bells go, a heartbeat under the floors, a big hit for the boss
+  for (let bar = 26; bar < 29; bar++) beatBar(bar, { bells: false, roll: bar === 28 });
+  braam(at(26), 1.2);
+  file('impact-bass-2', at(26), { vol: 0.8 });
+  for (const t of [at(26, 0), at(26, 3), at(27, 0), at(27, 3)]) osc(master, t, { f: 58, to: 36, peak: 0.45, d: 0.3 });
+  braam(at(28), 1.35);
+  file('impact-bass-1', at(28), { vol: 1 });
+  say(at(28, 6), 'final', 1.0);
+
+  // ------------------------------------------------------------- 54.4–61.9: why it's different
+  for (let bar = 29; bar < FOMO; bar++) {
+    beatBar(bar, { bells: bar !== 29, roll: bar === FOMO - 1 });
+    hit(at(bar), 0.85);
+    file('whoosh', at(bar) - 0.12, { vol: 0.35 });
+  }
+  crash(at(29), 1.1);
+  coins(at(30, 6), 8);
+  file('sparkle', at(31, 2), { vol: 0.35 });
+  file('chime', at(32, 2), { vol: 0.3 });
+
+  // ------------------------------------------------------------- 61.9–65.6: FOMO
+  beatBar(FOMO, { bells: false });
+  beatBar(FOMO + 1, { bells: false, kickOnly: true });
+  for (const t of [at(FOMO, 0), at(FOMO, 3), at(FOMO + 1, 0), at(FOMO + 1, 3)]) osc(master, t, { f: 58, to: 36, peak: 0.6, d: 0.3 });
+  osc(music, at(FOMO), { type: 'sine', f: 7400, a: 1.2, hold: 1.5, d: 0.4, peak: 0.02 });
+  file('riser', at(FOMO), { vol: 0.55, offset: 10.032 - BAR * 2, dur: BAR * 2 - 0.25 });
+  swell(at(FOMO + 1), at(END) - 0.2, 0.45);
+  file('glitch-2', at(FOMO + 1, 12), { vol: 0.35, dur: 0.2 });
+
+  // ------------------------------------------------------------- 65.6–74: end card
+  braam(at(END), 1.35);
+  file('impact-bass-1', at(END), { vol: 1 });
+  crash(at(END), 1.5);
+  for (let bar = END; bar < END + 3; bar++) beatBar(bar, { roll: bar === END + 2 });
+  kick(at(END + 3));
+  b808(at(END + 3), 38, 2.5);
+  braam(at(END + 3), 0.9);
+  coins(at(END, 8), 6);
+  file('sparkle', at(END + 1), { vol: 0.4 });
+  master.gain.setValueAtTime(0.9, LEN - 1.2);
+  master.gain.linearRampToValueAtTime(0, LEN - 0.1);
+
+  const buf = await ctx.startRendering();
+  // WAV, 16-bit stereo
+  const n = buf.length;
+  const out = new DataView(new ArrayBuffer(44 + n * 4));
+  const str = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  out.setUint32(4, 36 + n * 4, true);
+  str(8, 'WAVE');
+  str(12, 'fmt ');
+  out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true);
+  out.setUint16(22, 2, true);
+  out.setUint32(24, SR, true);
+  out.setUint32(28, SR * 4, true);
+  out.setUint16(32, 4, true);
+  out.setUint16(34, 16, true);
+  str(36, 'data');
+  out.setUint32(40, n * 4, true);
+  const L = buf.getChannelData(0);
+  const R = buf.getChannelData(1);
+  let peak = 0;
+  for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
+  const k = peak > 0.98 ? 0.98 / peak : 1;
+  for (let i = 0; i < n; i++) {
+    out.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i] * k)) * 32767, true);
+    out.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i] * k)) * 32767, true);
+  }
+  const bytes = new Uint8Array(out.buffer);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  window.__wav = btoa(bin);
+  window.__peak = peak;
+  document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
