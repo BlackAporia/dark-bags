@@ -288,7 +288,7 @@ const tour = createTour({
     setTimeout(() => $('play').click(), 500);
   },
 });
-document.addEventListener('darkbags:tour', () => tour.start());
+document.addEventListener('darkbags:tour', () => tour.start({ full: true }));
 // the first visit: a runner name and a region, then the tour
 const welcome = createWelcome({ app, regions, sfx, send: (m) => send(m), online: () => app.mode === 'online' && app.status === 'open', signIn: () => $('connect')?.click(), onDone: () => tour.start() });
 // signed into an account (a wallet on a real-token server; the session itself with play money)
@@ -514,27 +514,21 @@ function navSubs() {
   const online = app.mode === 'online' && !!app.token;
   const dv = daily.view;
   const boxes = Object.values(L?.boxes ?? {}).reduce((n, k) => n + k, 0);
+  // only what is live (who is online, the store's clock, things to claim): a fixed blurb under
+  // every name made the menu a wall of text
   const lines = {
-    play: app.online && app.mode === 'online' ? t('net.online', { n: app.online }) : t(`mode.${app.gameMode}`),
-    ranked: t('nav.s.ranked'),
-    pass: online && L?.pass ? t('nav.d.pass', { n: L.pass.tier }) : t('nav.s.pass'),
-    shop: online && L?.store ? t('nav.d.store', { t: hmsLeft(L.store.ends - Date.now()) }) : t('nav.s.shop'),
-    inventory: online && (boxes || L?.spins) ? [boxes ? `🎁 ${boxes}` : '', L?.spins ? `🎡 ${L.spins}` : ''].filter(Boolean).join(' · ') : t('nav.s.inventory'),
-    swap: t('nav.s.swap'),
-    starknet: t('nav.s.starknet'),
-    chat: t('nav.s.chat'),
-    friends: t('nav.s.friends'),
-    guilds: t('nav.s.guilds'),
-    mail: mail.unread ? t('nav.d.mail', { n: mail.unread }) : t('nav.s.mail'),
-    invite: t('nav.s.invite'),
-    community: community.open() ? t('nav.d.community', { n: community.open() }) : t('nav.s.community'),
-    achievements: online && dv?.ready ? t('nav.d.tasks', { n: dv.ready }) : t('nav.s.achievements'),
-    settings: t('nav.s.settings'),
+    play: app.online && app.mode === 'online' ? t('net.online', { n: app.online }) : '',
+    pass: online && L?.pass?.tier ? t('nav.d.pass', { n: L.pass.tier }) : '',
+    shop: online && L?.store ? t('nav.d.store', { t: hmsLeft(L.store.ends - Date.now()) }) : '',
+    inventory: online && (boxes || L?.spins) ? [boxes ? `🎁 ${boxes}` : '', L?.spins ? `🎡 ${L.spins}` : ''].filter(Boolean).join(' · ') : '',
+    mail: mail.unread ? t('nav.d.mail', { n: mail.unread }) : '',
+    community: community.open() ? t('nav.d.community', { n: community.open() }) : '',
+    achievements: online && dv?.ready ? t('nav.d.tasks', { n: dv.ready }) : '',
   };
   for (const el of document.querySelectorAll('.nav-sub')) {
     const v = lines[el.dataset.sub] ?? '';
     if (el.textContent !== v) el.textContent = v;
-    el.classList.toggle('hot', ['achievements', 'mail', 'inventory', 'community'].includes(el.dataset.sub) && v !== t(`nav.s.${el.dataset.sub}`));
+    el.classList.toggle('hot', ['achievements', 'mail', 'inventory', 'community'].includes(el.dataset.sub) && !!v);
   }
   for (const h of document.querySelectorAll('.nav-group')) h.textContent = t(h.dataset.i18n);
   // you, at the bottom
@@ -867,11 +861,18 @@ function renderModeInfo() {
   if (!el || !m) return;
   const f = modeFacts(m);
   const k = modeKey(m);
+  // an online PvP mode nobody is in yet: it waits for real players, but the same mode plays right
+  // now against bots in Practice (ranked has no practice)
+  const solo = app.mode === 'online' && !isPve(m.id) && !m.ranked && !f.live && !f.waiting;
+  const more = el.dataset.mode === m.id && !!el.querySelector('.mi-more')?.open; // re-renders keep it open
+  el.dataset.mode = m.id;
   el.style.setProperty('--mc', MODE_COLOR[m.id] ?? '#f59e0b');
   el.innerHTML = `<div class="mi-ico" aria-hidden="true">${MODE_ICON[m.id] ?? '•'}</div>
     <div class="mi-body"><p class="eyebrow">${esc(t(`mcat.${MODE_CAT[m.id] ?? 'classic'}`))} · ${esc(t(`kind.${m.kind}`))}</p><h3>${esc(t(m.kind === 'descent' ? 'dx.title' : `mode.${m.id}`))}</h3><p class="mi-d">${esc(t(`mode.${m.id}.d`))}</p>
-      <ul class="mi-facts"><li><b>🏆 ${esc(t('mi.win'))}</b> ${esc(t(`mi.win.${k}`))}</li><li><b>💡 ${esc(t('mi.tip'))}</b> ${esc(t(`mi.tip.${k}`))}</li><li><b>🎁 ${esc(t('mi.pays'))}</b> ${esc(t('mi.rew'))}</li></ul></div>
+      ${solo ? `<p class="mi-solo">${esc(t('mi.solo'))} <button type="button" class="ghost" data-practice>${esc(t('lobby.practice'))} →</button></p>` : ''}
+      <details class="mi-more"${more ? ' open' : ''}><summary>${esc(t('mi.more'))}</summary><ul class="mi-facts"><li><b>🏆 ${esc(t('mi.win'))}</b> ${esc(t(`mi.win.${k}`))}</li><li><b>💡 ${esc(t('mi.tip'))}</b> ${esc(t(`mi.tip.${k}`))}</li><li><b>🎁 ${esc(t('mi.pays'))}</b> ${esc(t('mi.rew'))}</li></ul></details></div>
     <div class="mi-side"><span><small>${esc(t('mi.players'))}</small><b>${esc(f.size)}</b></span><span><small>${esc(t('mi.time'))}</small><b>${esc(f.time)}</b></span><span><small>${esc(t('mi.now'))}</small><b>${f.live ? `<i class="live-dot"></i>${f.live}` : '—'}${f.waiting ? ` · ⏳${f.waiting}` : ''}</b></span></div>`;
+  el.querySelector('[data-practice]')?.addEventListener('click', () => $('mode-practice').click());
 }
 
 // today's goals over the mode picker: what is waiting to be claimed or played for

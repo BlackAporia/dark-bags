@@ -6,7 +6,7 @@ import { Lobby } from '../shared/lobby.js';
 import { MemoryWallet } from '../shared/wallet.js';
 import { BOXES, OUTFIT, OUTFITS, WSKIN, WEAPON_SKINS, RARITY_ORDER, boxCatalog } from '../shared/cosmetics.js';
 import { STYLE } from '../shared/style.js';
-import { DescentBook, DIFFS, FLOORS, MILESTONE, BOSSES, bossOf, objectiveOf, milestoneItems, runItems, runXp, priceFor, MAX_TICKETS, BUY_PER_DAY } from '../shared/descent.js';
+import { DescentBook, DIFFS, FLOORS, MILESTONE, BOSSES, bossOf, objectiveOf, milestoneItems, runItems, runXp, priceFor, MAX_TICKETS, BUY_PER_DAY, HOLD_SECONDS, holdSeconds, endlessCap, floorPlan } from '../shared/descent.js';
 
 const DAY = 86_400_000;
 
@@ -186,4 +186,41 @@ test('descent: a run costs tickets, not money; unready gives them back', () => {
   lobby.handle(1, { t: 'ready', cls: 'medic' });
   for (let i = 0; i < Math.ceil((CFG.PREP_SECONDS + 2) * CFG.TICK_RATE); i++) lobby.tick();
   assert.equal(last(1, 'start')?.mode, 'dx-hard');
+});
+
+test('descent: the seal and the swarm come at a pace one can stand in', () => {
+  // the first seal (floor 4) buried solo players: an endless swarm as thick as a clear floor's
+  assert.equal(objectiveOf(4), 'hold');
+  assert.ok(endlessCap(4) <= floorPlan(4).count, `no more on the floor at once than the floor's own count (${endlessCap(4)})`);
+  assert.ok(endlessCap(4, 4) > endlessCap(4), 'a squad gets more');
+  assert.ok(holdSeconds(4) < HOLD_SECONDS && holdSeconds(FLOORS) === HOLD_SECONDS, 'early seals close sooner');
+  // a solo runner with a maxed gun who stands on the seal and shoots closes it
+  let closed = 0;
+  for (const seed of [1, 2, 3, 4]) {
+    const w = new World({ stake: 0, mode: 'dx-easy', bots: false, seed, roundSeconds: 99999 });
+    const me = w.addPlayer({ name: 'a', skin: '#fff', cls: 'medic' });
+    w.horde.floor = 4;
+    w.horde.cleared = 3;
+    me.dGun = 5;
+    for (let t = 0; t < 20 * 120 && me.status === 'alive' && w.horde.state !== 'camp'; t++) {
+      let best = null;
+      let bd = 1e9;
+      for (const z of w.zombies.values()) {
+        const d = Math.hypot(z.x - me.x, z.y - me.y);
+        if (d < bd) [best, bd] = [z, d];
+      }
+      const H = w.horde.state === 'fight' ? w.horde.holdAt : null;
+      let mx = 0;
+      let my = 0;
+      if (H) {
+        const d = Math.hypot(H.x - me.x, H.y - me.y) || 1;
+        if (d > 40) [mx, my] = [(H.x - me.x) / d, (H.y - me.y) / d];
+      }
+      w.queueInput(me.id, { s: t + 1, mx, my, a: best ? Math.atan2(best.y - me.y, best.x - me.x) : 0, f: !!best && bd < 420 });
+      w.step();
+      w.events.length = 0;
+    }
+    if (w.horde.state === 'camp') closed++;
+  }
+  assert.ok(closed >= 3, `closed ${closed} of 4`);
 });
