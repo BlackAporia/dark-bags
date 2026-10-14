@@ -430,8 +430,30 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
 
   // ---------------------------------------------------------------- messages
 
+  // a renamed player's new name in whatever is on screen: lists, profiles, threads, guild chat
+  function renameIn(o, id, n, seen = new Set()) {
+    if (!o || typeof o !== 'object' || seen.has(o)) return false;
+    seen.add(o);
+    let hit = false;
+    if ((o.id === id || o.f === id) && typeof o.n === 'string') {
+      o.n = n;
+      hit = true;
+    }
+    if ((o.id === id || o.f === id) && typeof o.name === 'string') {
+      o.name = n;
+      hit = true;
+    }
+    for (const v of Object.values(o)) if (v && typeof v === 'object') hit = renameIn(v, id, n, seen) || hit;
+    return hit;
+  }
+
   function onMessage(m) {
     switch (m.t) {
+      case 'player_renamed': {
+        const hit = renameIn(st, m.id, m.n);
+        if (hit && (isOpen('friends') || isOpen('guilds'))) render();
+        break;
+      }
       case 'welcome':
       case 'social': {
         const sm = m.t === 'welcome' ? m.social : m;

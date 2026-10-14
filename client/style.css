@@ -3339,3 +3339,13 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
   .nav-ico { width: 34px; height: 34px; }
   .nav-btn .nav-badge { inset-inline-start: 26px; }
 }
+
+/* private mode (STRK20 shadow accounts): the Public / Private switch above the wallets */
+.login-mode { display: flex; width: 100%; }
+.login-mode button { flex: 1; padding: 8px 10px; font-size: 13px; }
+.login-mode button[data-lm='shadow'][aria-pressed='true'] { background: linear-gradient(180deg, #b48cff, #7c5cff); color: #0b0e16; }
+.login-mode-note { margin: 0; padding: 8px 10px; border-left: 3px solid #7c5cff; background: rgba(124, 92, 255, 0.08); border-radius: 6px; }
+.login-carry { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.login-carry input { margin-top: 2px; }
+.wd-shadow { margin-top: 10px; }
+.wd-shadow button { margin-top: 6px; }

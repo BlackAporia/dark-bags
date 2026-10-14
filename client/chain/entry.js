@@ -20,6 +20,17 @@ import Privy, { LocalStorage } from '@privy-io/js-sdk-core';
 import { RpcProvider } from 'starknet';
 
 const hex = (v) => `0x${BigInt(v).toString(16)}`;
+// shadow accounts need Wallet API 0.10.4 or later
+const SHADOW_API = '0.10.4';
+const SHADOW_NONCE = '0x0';
+const apiAtLeast = (v, min) => {
+  const a = String(v).split('.').map(Number);
+  const b = min.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((a[i] || 0) !== b[i]) return (a[i] || 0) > b[i];
+  return true;
+};
+// an ERC-20 transfer in the Wallet API's call shape (u256 as low, high)
+const transferCall = (token, to, units) => ({ contract_address: token, entry_point: 'transfer', calldata: [hex(BigInt(to)), hex(BigInt(units) & ((1n << 128n) - 1n)), hex(BigInt(units) >> 128n)] });
 const tokenOf = (t) => ({ name: t.name ?? t.symbol, symbol: t.symbol, decimals: t.decimals, address: fromAddress(t.id) });
 
 // What an address holds of a token, read straight from the chain (any sign-in kind), so
@@ -123,6 +134,25 @@ export async function connectExtension(entry, chain = null) {
     }
   }
   let strk20 = null; // unknown until tried; set on first use
+  // a STRK20 call: the wallet's error codes in words the player can act on
+  const strk20Call = async (fn) => {
+    try {
+      const r = await fn();
+      strk20 = true;
+      return r;
+    } catch (e) {
+      if (e?.code === 118) throw new Error('Register this wallet in the STRK20 privacy pool first (the wallet does it on your first shield).');
+      if (e?.code === 119) throw new Error('Not enough private balance for this (and its fee). Shield some first.');
+      if (e?.code === 120) throw new Error('The wallet stopped this: it would have linked your shadow account to your wallet. Nothing was sent.');
+      if (e?.code === 113) throw new Error('Cancelled in the wallet.');
+      if (e?.code === 162 || e?.code === -32601 || /not (supported|found)|unknown method/i.test(String(e?.message))) {
+        strk20 = false;
+        throw new Error(`${w.name} does not do STRK20 shadow accounts yet. Update it, or use Ready or Xverse.`);
+      }
+      throw e;
+    }
+  };
+  const strk20Tx = (actions) => strk20Call(() => request('wallet_strk20InvokeTransaction', { actions })).then((r) => r.transaction_hash);
   const facade = {
     kind: 'extension',
     name: w.name,
@@ -183,6 +213,31 @@ export async function connectExtension(entry, chain = null) {
       strk20 = true;
       return Object.fromEntries(r.map((b) => [b.token, BigInt(b.balance)]));
     },
+
+    // ---- private mode: the player's DARK BAGS shadow account (STRK20, Wallet API 0.10.4)
+    // (server/cashier/shadow.js explains the flow). Never asks for balances: no privacy prompt.
+    async shadowSupported() {
+      const v = await request('wallet_supportedWalletApi').catch(() => null);
+      return Array.isArray(v) && v.some((x) => apiAtLeast(x, SHADOW_API));
+    },
+    // the partial commitment for our dapp: the server finds the shadow address from it
+    shadowCommitment: (dapp) => strk20Call(() => request('wallet_strk20ShadowAccountCommitment', { dapp_name: dapp })),
+    // proof of control: the shadow account sends 0 of a coin to the server's random challenge
+    shadowProve: (dapp, token, challenge) =>
+      strk20Tx([{ type: 'shadow_account_invoke', dapp_name: dapp, nonce: SHADOW_NONCE, calls: [transferCall(token, challenge, 0n)], collect_policy: { type: 'exact', amount: '0x0' } }]),
+    // a deposit: shielded notes → the shadow account → the house, in one transaction
+    depositShadow: (dapp, t, units, shadow, house) =>
+      strk20Tx([
+        { type: 'withdraw', token: t.id, amount: hex(units), recipient: shadow },
+        { type: 'shadow_account_invoke', dapp_name: dapp, nonce: SHADOW_NONCE, calls: [transferCall(t.id, house, units)], collect_policy: { type: 'exact', amount: '0x0' } },
+      ]),
+    // after a cash-out: everything the shadow account holds of the coin goes back into a shielded
+    // note of this wallet (the note's owner is encrypted on chain)
+    collectShadow: (dapp, t, shadow) =>
+      strk20Tx([
+        { type: 'transfer', token: t.id, amount: 'OPEN', recipient: address },
+        { type: 'shadow_account_invoke', dapp_name: dapp, nonce: SHADOW_NONCE, calls: [transferCall(t.id, shadow, 0n)], collect_policy: { type: 'all' } },
+      ]),
     balance: null, // extensions show balances themselves
     send: null,
     async execute(calls) {

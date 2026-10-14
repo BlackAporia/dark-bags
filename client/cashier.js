@@ -25,7 +25,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     chain: null,
     account: null,
     facade: null,
-    kind: store.get('darkbags.walletKind', null), // 'extension:<name>' | 'cartridge' | 'privy'
+    kind: store.get('darkbags.walletKind', null), // 'extension:<name>' | 'shadow:<name>' | 'cartridge' | 'privy'
+    shadow: false, // signed in through a STRK20 shadow account (private mode)
+    loginMode: store.get('darkbags.loginMode', 'public'), // 'public' | 'shadow' (the sign-in dialog's switch)
     privyWallet: null,
     waiter: null, // resolves with the login challenge
     vendor: null,
@@ -175,6 +177,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 
   function kindLabel() {
     if (!cs.kind) return 'wallet';
+    if (cs.kind.startsWith('shadow:')) return `🥷 Shadow · ${cs.kind.slice('shadow:'.length)}`;
     if (cs.kind === 'cartridge') return 'Cartridge';
     if (cs.kind === 'privy') return 'Privy';
     return cs.kind.replace(/^extension:/, '');
@@ -187,6 +190,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     $('login-cartridge').hidden = !cs.chain.login.cartridge;
     $('login-privy').hidden = !cs.chain.login.privy;
     $('login-private-note').hidden = !cs.chain.routes?.includes('private');
+    renderLoginMode();
     setStatus('connect-status', '');
     d.showModal();
     try {
@@ -196,6 +200,30 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     } catch (e) {
       setStatus('connect-status', e.message, true);
     }
+  }
+
+  // Public or private (a STRK20 shadow account): the switch above the wallet list
+  function renderLoginMode() {
+    const on = !!cs.chain?.shadow;
+    $('login-mode').hidden = !on;
+    if (!on) cs.loginMode = 'public';
+    for (const b of document.querySelectorAll('#login-mode [data-lm]')) {
+      b.setAttribute('aria-pressed', String(b.dataset.lm === cs.loginMode));
+      b.onclick = () => {
+        cs.loginMode = b.dataset.lm;
+        store.set('darkbags.loginMode', cs.loginMode);
+        renderLoginMode();
+      };
+    }
+    const shadow = on && cs.loginMode === 'shadow';
+    $('login-mode-note').hidden = !shadow;
+    $('login-mode-note').textContent = shadow ? t('cx.lmNote') : '';
+    // signed in with a wallet now: its progress can come along (the game then knows both are you)
+    $('login-carry').hidden = !(shadow && cs.account && !cs.shadow);
+    // Cartridge and Privy accounts have no STRK20 notes: private mode is browser wallets only
+    $('login-cartridge').hidden = shadow || !cs.chain?.login.cartridge;
+    $('login-privy').hidden = shadow || !cs.chain?.login.privy;
+    $('login-private-note').hidden = shadow || !cs.chain?.routes?.includes('private');
   }
 
   function renderWallets(list) {
@@ -212,7 +240,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         el.innerHTML = `${icon}<span class="opt-name">${esc(w.name)}</span><span class="opt-sub">${w.installed ? 'installed' : 'get it'}</span>`;
         if (w.installed) {
           el.type = 'button';
-          el.addEventListener('click', () => signInWith(`extension:${w.name}`, () => cs.vendor.connectExtension(w, cs.chain)));
+          el.addEventListener('click', () => (cs.chain?.shadow && cs.loginMode === 'shadow' ? signInShadow(w) : signInWith(`extension:${w.name}`, () => cs.vendor.connectExtension(w, cs.chain))));
         } else if (w.download) {
           el.href = w.download;
           el.target = '_blank';
@@ -285,6 +313,77 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     }
   }
 
+  // Private mode: the wallet derives our dapp's shadow account, proves it controls it (0 sent to the
+  // server's random challenge from the shadow account) and the session plays as that account. The
+  // server never sees the wallet's own address. (server/cashier/shadow.js)
+  async function signInShadow(w) {
+    const dapp = cs.chain.shadow.dapp;
+    try {
+      setStatus('connect-status', t('cx.waitWallet'));
+      const f = await cs.vendor.connectExtension(w, cs.chain);
+      if (!(await f.shadowSupported())) throw new Error(t('cx.shNo', { w: w.name }));
+      setStatus('connect-status', t('cx.shFind'));
+      const partial = await f.shadowCommitment(dapp);
+      const ch = await new Promise((resolve, reject) => {
+        cs.shWaiter = { resolve, reject };
+        send({ t: 'auth_shadow_start', partial });
+        setTimeout(() => reject(new Error(t('cx.noAnswer'))), 30000);
+      });
+      cs.shWaiter = null;
+      setStatus('connect-status', t('cx.shProve', { a: short(ch.account) }));
+      const coin = cs.chain.tokens.find((x) => x.symbol === 'STRK') ?? cs.chain.tokens[0];
+      const tx = await f.shadowProve(dapp, coin.id, ch.challenge);
+      cs.facade = f;
+      cs.kind = `shadow:${w.name}`;
+      cs.shTx = tx;
+      cs.shTries = 0;
+      cs.carry = !$('login-carry').hidden && $('carry-cb').checked;
+      setStatus('connect-status', t('cx.shChecking'));
+      send({ t: 'auth_shadow', tx, carry: cs.carry, backups: backups() });
+    } catch (e) {
+      cs.shWaiter = null;
+      setStatus('connect-status', friendly(e), true);
+    }
+  }
+
+  // the cash-out sits on the shadow account: one STRK20 transaction moves it into the wallet's
+  // shielded balance (a note only this wallet can open)
+  async function renderShadowCollect() {
+    const el = $('wd-shadow');
+    if (!el) return;
+    el.hidden = !cs.shadow;
+    if (!cs.shadow) return;
+    const t0 = token($('wd-token').value);
+    if (!t0) return;
+    try {
+      const v = await vendor();
+      const bal = await v.walletBalance(cs.chain, t0, cs.account);
+      el.textContent = t('cx.shOn', { v: `${formatUnits(bal, t0.decimals, 6)} ${t0.symbol}`, a: short(cs.account) });
+      if (bal > 0n) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ghost';
+        b.textContent = t('cx.shCollect');
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          try {
+            setStatus('cash-status', t('cx.shCollecting'));
+            const f = await ensureFacade();
+            const tx = await f.collectShadow(cs.chain.shadow.dapp, t0, cs.account);
+            setStatus('cash-status', t('cx.shCollected', { tx: short(tx) }));
+            setTimeout(renderShadowCollect, 20000);
+          } catch (e) {
+            setStatus('cash-status', friendly(e), true);
+            b.disabled = false;
+          }
+        });
+        el.append(document.createElement('br'), b);
+      }
+    } catch {
+      el.textContent = '';
+    }
+  }
+
   async function privySend() {
     const email = $('privy-email').value.trim();
     if (!/.+@.+\..+/.test(email)) return setStatus('connect-status', t('cx.typeEmail'), true);
@@ -339,9 +438,21 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 
   // after a reload the server still knows the session; the wallet object is gone
   async function ensureFacade() {
-    if (cs.facade && norm(cs.facade.address) === cs.account) return cs.facade;
+    if (cs.facade && (cs.shadow || norm(cs.facade.address) === cs.account)) return cs.facade;
     const v = await vendor();
     let f;
+    if (cs.shadow && (cs.kind ?? '').startsWith('shadow:')) {
+      // private mode: the wallet behind the shadow account (its own address is not the account's)
+      const name = cs.kind.slice('shadow:'.length).toLowerCase();
+      let w = null;
+      for (let i = 0; i < 16 && !w; i++) {
+        w = v.listWallets().find((x) => x.installed && x.name.toLowerCase() === name) ?? null;
+        if (!w) await new Promise((r) => setTimeout(r, 250));
+      }
+      if (!w) throw new Error(`${cs.kind.slice('shadow:'.length)} is not open in this browser. Unlock it, or sign out and sign in again.`);
+      cs.facade = await v.connectExtension(w, cs.chain);
+      return cs.facade;
+    }
     if (cs.kind === 'privy') {
       if (!cs.privyWallet) throw new Error(t('cx.privyAgain'));
       f = await v.connectPrivy(cs.chain, app.token, cs.privyWallet, base);
@@ -392,6 +503,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     $('cash-acct').textContent = `${short(cs.account)} · ${kindLabel()} · house ${short(cs.chain.house)}`;
     fillTokens('dep-token');
     fillTokens('wd-token');
+    $('wd-token').onchange = () => renderShadowCollect();
     setTab(tab);
     setStatus('cash-status', '');
     $('dep-faucet').hidden = cs.chain.network !== 'sepolia';
@@ -488,6 +600,11 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   function routes(kind) {
     const i = cs.chain;
     const out = [];
+    // private mode: in from the shielded balance through the shadow account, out to the shadow account
+    if (cs.shadow) {
+      if (kind === 'deposit') return [{ id: 'shadow', label: t('cx.shDepL'), sub: t('cx.shDepS') }];
+      return i.cashOut.public ? [{ id: 'public', label: t('cx.shWdL'), sub: t('cx.shWdS') }] : [];
+    }
     // Cartridge and Privy accounts are not registered in the STRK20 pool
     const privateOk = !/^(cartridge|privy)$/.test(cs.kind ?? '') && (kind === 'deposit' ? i.routes.includes('private') : i.cashOut.private);
     // the plain transfer is always there; STRK20 privacy is an extra the player can pick
@@ -521,14 +638,16 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     }
     $('wd-go').disabled = !cs.wdRoute;
     $('wd-hint').textContent = cs.wdRoute ? t('cx.minWd', { m: cs.chain.minWithdrawUsd ?? 1, a: short(cs.account) }) : t('cx.wdOff');
-    $('dep-hint').textContent = t(cs.depRoute === 'private' ? 'cx.hintPrivate' : 'cx.hintPublic');
+    $('dep-hint').textContent = t(cs.depRoute === 'shadow' ? 'cx.shHint' : cs.depRoute === 'private' ? 'cx.hintPrivate' : 'cx.hintPublic');
+    renderShadowCollect();
   }
 
   async function deposit() {
     const t = token($('dep-token').value);
     const units = t && parseUnits($('dep-amount').value, t.decimals);
     if (!units) return setStatus('cash-status', tr('cx.typeAmount'), true);
-    const bal = cs.walletBal?.[t.id];
+    // private mode pays from the shielded balance, not the shadow account's public one
+    const bal = cs.shadow ? null : cs.walletBal?.[t.id];
     if (bal != null) {
       const room = isStrk(t) ? bal - FEE_RESERVE : bal;
       const faucet = cs.chain.network === 'sepolia' ? tr('cx.faucet') : '';
@@ -545,6 +664,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
           const have = await f.balance(t).catch(() => null);
           if (have != null && units > have) throw new Error(tr('cx.holdsOnly', { w: f.name ?? 'Wallet', a: short(f.address), v: `${formatUnits(have, t.decimals, 6)} ${t.symbol}`, s: t.symbol }));
         }
+        if (cs.depRoute === 'shadow') return f.depositShadow(cs.chain.shadow.dapp, t, units, cs.account, cs.chain.house);
         if (cs.depRoute === 'private' && cs.chain.vault) {
           // through the vault contract: a one-time reference ties the deposit to us off chain only
           if (!f.depositVault) throw new Error(tr('cx.noPrivate'));
@@ -558,7 +678,8 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         return f.depositPublic(t, units, cs.chain.house);
       });
       setStatus('cash-status', tr('cx.sentWait', { tx: short(tx) }));
-      send({ t: 'deposit', route: cs.depRoute, tx });
+      // through the shadow account it lands as a plain transfer from that account to the house
+      send({ t: 'deposit', route: cs.depRoute === 'shadow' ? 'public' : cs.depRoute, tx });
       store.set('darkbags.lastDeposit', { tx, at: Date.now() });
     } catch (e) {
       setStatus('cash-status', friendly(e), true);
@@ -620,6 +741,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         cs.chain = m.chain ?? null;
         cs.account = m.account ?? null;
         cs.admin = !!m.admin;
+        cs.shadow = !!m.shadow;
         cs.privyWallet = m.privy ?? null;
         if (cs.account && m.privy) cs.kind = 'privy';
         render();
@@ -631,11 +753,22 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
       case 'auth_challenge':
         cs.waiter?.resolve(m.typedData);
         return true;
+      case 'shadow_challenge':
+        cs.shWaiter?.resolve(m);
+        return true;
+      case 'shadow_pending':
+        // the proof is still on its way to Starknet: ask again (for up to ~5 minutes)
+        if (cs.shTx && ++cs.shTries < 60) setTimeout(() => send({ t: 'auth_shadow', tx: cs.shTx, carry: cs.carry, backups: backups() }), 5000);
+        else setStatus('connect-status', t('cx.notConfirmed'), true);
+        return true;
       case 'authed':
         cs.authPending = false;
         clearTimeout(cs.authTimer);
         cs.account = m.account;
         cs.admin = !!m.admin;
+        cs.shadow = !!m.shadow;
+        cs.shTx = null;
+        if (!cs.shadow && (cs.kind ?? '').startsWith('shadow:')) cs.kind = null;
         if (m.privy) cs.privyWallet = m.privy;
         if (!m.account) {
           cs.facade = null;
@@ -646,7 +779,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         app.rank = m.rank ?? null;
         if (m.account) {
           $('dlg-connect').close();
-          toast(t('cx.signedAs', { a: short(m.account) }));
+          toast(m.carried ? t('cx.shCarried') : t('cx.signedAs', { a: short(m.account) }));
         }
         render();
         onChange();
@@ -669,8 +802,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
           else {
             $('wd-go').disabled = false;
             if (m.status === 'sent') {
-              setStatus('cash-status', t('cx.paid', { tx: short(m.tx) }));
+              setStatus('cash-status', t(cs.shadow ? 'cx.shPaid' : 'cx.paid', { tx: short(m.tx) }));
               toast(t('cx.paidToast'));
+              if (cs.shadow) setTimeout(renderShadowCollect, 15000); // then one tap moves it into the shielded balance
             } else if (m.status === 'failed') setStatus('cash-status', t('cx.payFailed'), true);
             else setStatus('cash-status', t('cx.payHeld'), true);
           }
@@ -685,6 +819,11 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         cs.refWaiter?.resolve(m);
         return true;
       case 'err':
+        if (m.code === 'shadow' && cs.shWaiter) {
+          cs.shWaiter.reject(new Error(m.msg));
+          cs.shWaiter = null;
+          return true;
+        }
         // a refused sign-in: bring the sign-in window back with the reason
         if (cs.authPending) {
           cs.authPending = false;

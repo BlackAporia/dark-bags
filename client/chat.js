@@ -65,6 +65,12 @@ export function createChat({ app, send, isOpen }) {
       if (isOpen()) render();
     }
     if (m.t === 'chat') push(m.m);
+    // someone renamed: their earlier lines take the new name
+    if (m.t === 'player_renamed') {
+      let hit = false;
+      for (const x of st.list) if (x.id === m.id) (x.n = m.n), (hit = true);
+      if (hit && isOpen()) render();
+    }
   }
 
   // practice: now and then a bot says something

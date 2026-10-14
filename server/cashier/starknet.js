@@ -6,6 +6,7 @@ import { resolveTokens } from './config.js';
 import { createStrk20 } from './strk20.js';
 import { createVault } from './vault.js';
 import { setupBefore, setupAfter } from './setup.js';
+import { ANONYMIZER, SHADOW_DAPP, shadowAccountOf } from './shadow.js';
 
 const TRANSFER = normAddr(hash.getSelectorFromName('Transfer'));
 
@@ -87,6 +88,11 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
   const ekubo = new EkuboSwapProvider();
   const feeMode = cfg.paymaster ? { type: 'paymaster' } : undefined;
 
+  // STRK20 shadow accounts (private mode): the canonical anonymizer, or SHADOW_ANONYMIZER
+  const anonymizer = normAddr(process.env.SHADOW_ANONYMIZER || ANONYMIZER[cfg.network] || '');
+  if (process.env.SHADOW_ACCOUNTS === '0') log.log?.('shadow accounts: off (SHADOW_ACCOUNTS=0)');
+  const shadowOn = !!anonymizer && process.env.SHADOW_ACCOUNTS !== '0';
+
   const chain = {
     tokens,
     sdk,
@@ -111,7 +117,25 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
       explorer: mainnet ? 'https://voyager.online' : 'https://sepolia.voyager.online',
       tokens: tokens.map(({ id, symbol, decimals, color, name }) => ({ id, symbol, decimals, color, name })),
       login: { wallets: true, cartridge: cfg.cartridge, privy: cfg.privy ? { appId: cfg.privy.appId, clientId: cfg.privy.clientId } : null },
+      shadow: shadowOn ? { dapp: SHADOW_DAPP, anonymizer } : null,
     }),
+
+    // the player's DARK BAGS shadow account for a partial commitment (./shadow.js)
+    shadowAccount: shadowOn ? (partial) => shadowAccountOf((c) => provider.callContract(c), anonymizer, partial) : null,
+
+    // a transaction's receipt once it is final: { status: 'pending' | 'failed' | 'ok', receipt }
+    async readReceipt(tx) {
+      let rc;
+      try {
+        rc = await provider.channel.getTransactionReceipt(tx);
+      } catch (e) {
+        if (/not found|25:|29:/i.test(String(e?.message))) return { status: 'pending', receipt: null };
+        throw e;
+      }
+      if (rc.execution_status === 'REVERTED') return { status: 'failed', receipt: rc };
+      if (rc.finality_status !== 'ACCEPTED_ON_L2' && rc.finality_status !== 'ACCEPTED_ON_L1') return { status: 'pending', receipt: null };
+      return { status: 'ok', receipt: rc };
+    },
 
     async verifySignature(address, typedData, signature) {
       return provider.verifyMessageInStarknet(typedData, signature, address);

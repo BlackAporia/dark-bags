@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { MemoryWallet } from '../../shared/wallet.js';
 import { MILLS } from '../../shared/assets.js';
+import { feltOf, newChallenge, proves } from './shadow.js';
 
 /**
  * The cashier for real tokens. Chain-agnostic: everything that touches Starknet
@@ -38,6 +39,7 @@ import { MILLS } from '../../shared/assets.js';
 
 const MAX_FELT = 2n ** 251n;
 const LOGIN_TTL_MS = 5 * 60 * 1000;
+const SHADOW_LOGIN_TTL_MS = 20 * 60 * 1000; // the proof of control is a STRK20 transaction: proving takes a while
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 const SESSION_RENEW_MS = 24 * 3600 * 1000;
 const PENDING_TTL_MS = 15 * 60 * 1000;
@@ -138,6 +140,7 @@ export class Cashier {
     this.refs = data.refs ?? {}; // vault deposit reference → { account, at }
     if (chain.vault && data.vaultBlock) chain.vault.cursor = data.vaultBlock;
     this.logins = new Map(); // session token → { nonce, issued, at }
+    this.shadowLogins = new Map(); // session token → { account, challenge, at } (private sign-in in progress)
     this.pending = new Map(); // public deposit tx → { account, at }
     this.queue = Promise.resolve(); // withdrawals go out one at a time (house nonce)
     this.onCredit = null; // (account) => void, set by the lobby to push balances
@@ -297,6 +300,51 @@ export class Cashier {
 
   privyWalletOf(userId) {
     return this.privyWallets[userId] ?? null;
+  }
+
+  // ------------------------------------------- private mode: STRK20 shadow accounts (./shadow.js)
+
+  // step 1: the partial commitment the wallet derived for our dapp → the shadow address, and a
+  // random challenge the wallet must send 0 to from that account (proof of control)
+  async shadowStart(session, partial) {
+    if (!this.chain.shadowAccount) throw new CashierError('Private mode is off on this server.');
+    const p = feltOf(partial);
+    if (!p) throw new CashierError('The wallet returned no shadow account commitment.');
+    let r;
+    try {
+      r = await Promise.race([this.chain.shadowAccount(p), new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000))]);
+    } catch (e) {
+      throw new CashierError(e?.message === 'timeout' ? 'Starknet did not answer in time. Try again in a minute.' : 'Could not find your shadow account on Starknet. Try again.');
+    }
+    if (!this.allowed(r.address)) throw new CashierError(`Closed beta: ${r.address} is not on the list yet. Send this address to the team.`);
+    const challenge = newChallenge(crypto.randomBytes);
+    this.shadowLogins.set(session, { account: r.address, challenge, at: this.now() });
+    return { account: r.address, challenge, deployed: r.deployed };
+  }
+
+  // step 2: the transaction that sent 0 from the shadow account to the challenge signs the session in
+  async shadowFinish(session, tx) {
+    const l = this.shadowLogins.get(session);
+    if (!l || this.now() - l.at > SHADOW_LOGIN_TTL_MS) throw new CashierError('The private sign-in expired. Start it again.');
+    const hash = normAddr(tx);
+    if (!hash) throw new CashierError('That is not a transaction hash.');
+    const r = await this.chain.readReceipt(hash);
+    if (r.status === 'pending') return { status: 'pending' };
+    if (r.status === 'failed' || !proves(r.receipt, { shadow: l.account, challenge: l.challenge, tokens: this.tokenIds })) {
+      this.shadowLogins.delete(session);
+      throw new CashierError('That transaction does not prove the shadow account is yours. Start the private sign-in again.');
+    }
+    this.shadowLogins.delete(session);
+    console.log(`login: ${l.account} signed in privately (shadow account)`);
+    this.sessions.set(session, { account: l.account, at: this.now(), shadow: true });
+    this.ledger.ensure(l.account);
+    this.persist();
+    return { status: 'ok', account: l.account };
+  }
+
+  // a session signed in through its shadow account: its cash-outs only ever go back to it
+  isShadow(session) {
+    return !!(session && this.sessions.get(session)?.shadow);
   }
 
   logout(session) {
