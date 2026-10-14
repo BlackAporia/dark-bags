@@ -38,20 +38,36 @@ const tokenOf = (t) => ({ name: t.name ?? t.symbol, symbol: t.symbol, decimals: 
 // Spare nodes (chain.rpcUrls) are tried in turn; the one that answered is asked first next time.
 const providers = new Map();
 let goodNode = null;
-export async function walletBalance(chain, t, address) {
+async function rpcCall(chain, call) {
   const nodes = [...new Set([goodNode, chain.rpcUrl, ...(chain.rpcUrls ?? [])].filter(Boolean))];
   let last;
   for (const url of nodes) {
     try {
       if (!providers.has(url)) providers.set(url, new RpcProvider({ nodeUrl: url }));
-      const r = await providers.get(url).callContract({ contractAddress: t.id, entrypoint: 'balanceOf', calldata: [address] });
+      const r = await providers.get(url).callContract(call);
       goodNode = url;
-      return BigInt(r[0]) + (BigInt(r[1] ?? 0) << 128n);
+      return r;
     } catch (e) {
       last = e;
     }
   }
   throw last;
+}
+export async function walletBalance(chain, t, address) {
+  const r = await rpcCall(chain, { contractAddress: t.id, entrypoint: 'balanceOf', calldata: [address] });
+  return BigInt(r[0]) + (BigInt(r[1] ?? 0) << 128n);
+}
+
+// The wallet's DARK BAGS shadow account (the one private mode plays from), found on the canonical
+// anonymizer from the wallet's partial commitment; remembered on the wallet object. Only the
+// browser learns it here: nothing is sent to the game.
+export async function shadowAddress(chain, facade) {
+  if (facade.shadowAddr) return facade.shadowAddr;
+  const partial = await facade.shadowCommitment(chain.shadow.dapp);
+  const r = await rpcCall(chain, { contractAddress: chain.shadow.anonymizer, entrypoint: 'get_shadow_accounts', calldata: [partial, SHADOW_NONCE, '0x1', '0x0'] });
+  if (r.length < 4 || BigInt(r[0] ?? 0) !== 1n) throw new Error('The anonymizer returned no shadow account for this wallet.');
+  facade.shadowAddr = hex(r[2]);
+  return facade.shadowAddr;
 }
 
 // ------------------------------------------------------------ extensions
@@ -223,6 +239,8 @@ export async function connectExtension(entry, chain = null) {
     },
     // the partial commitment for our dapp: the server finds the shadow address from it
     shadowCommitment: (dapp) => strk20Call(() => request('wallet_strk20ShadowAccountCommitment', { dapp_name: dapp })),
+    // any STRK20 actions in one transaction (the private swap)
+    strk20: (actions) => strk20Tx(actions),
     // proof of control: the shadow account sends 0 of a coin to the server's random challenge. The
     // wallet pays a STRK20 transaction's pool fee from a note it spends, so a shadow call never goes
     // alone (Xverse refuses one with INVALID_REQUEST_PAYLOAD): the smallest unit of the coin is
@@ -427,4 +445,20 @@ export async function avnuSwap(chain, facade, tIn, tOut, units, slippageBps = 50
   avnu ??= new AvnuSwapProvider();
   const prepared = await avnu.prepareSwap(avnuRequest(chain, facade, tIn, tOut, units, slippageBps));
   return { tx: await facade.execute(prepared.calls), out: prepared.quote.amountOutBase };
+}
+
+// A private swap (STRK20, StarkWare's DeFi shape): one transaction takes the coin from the shielded
+// balance to the shadow account, the shadow account swaps it on AVNU, and what it gained of the
+// other coin settles into a new shielded note of this wallet. On chain: a shadow account swapping,
+// nothing about whose; the wallet's own address only names the note's owner, encrypted.
+export async function avnuSwapPrivate(chain, facade, shadow, tIn, tOut, units, slippageBps = 50n) {
+  avnu ??= new AvnuSwapProvider();
+  const prepared = await avnu.prepareSwap(avnuRequest(chain, { address: shadow }, tIn, tOut, units, slippageBps));
+  const calls = prepared.calls.map((c) => ({ contract_address: hex(c.contractAddress), entry_point: c.entrypoint, calldata: (c.calldata ?? []).map((x) => hex(x)) }));
+  const tx = await facade.strk20([
+    { type: 'withdraw', token: tIn.id, amount: hex(units), recipient: shadow },
+    { type: 'transfer', token: tOut.id, amount: 'OPEN', recipient: facade.address },
+    { type: 'shadow_account_invoke', dapp_name: chain.shadow.dapp, nonce: SHADOW_NONCE, calls, collect_policy: { type: 'diff' } },
+  ]);
+  return { tx, out: prepared.quote.amountOutBase };
 }
