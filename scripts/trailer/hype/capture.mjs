@@ -3,7 +3,7 @@
 // usage (a game server on GAME, default localhost:8790; CHROMIUM optional):
 //   node scripts/trailer/hype/capture.mjs <mode> <outdir> [maxSecs] [runners] [stake] [seconds]
 //   python3 scripts/trailer/hype/assemble.py <outdir>     → <outdir>/capture.mp4
-// DXFLOOR=n starts the Descent on floor n (5: the first boss) with our runner geared for it.
+// DXFLOOR=n starts the practice Descent on floor n (5: the first boss) with our runner geared for it.
 // STACHE=1 dresses the match in the Stache Case (videos/darkbags-stache): our runner as The Stache
 // with Stache Royale on every gun, the bots in the other moustached outfits.
 import { chromium } from 'playwright';
@@ -70,6 +70,21 @@ await p.evaluate(() => document.getElementById('ready').click());
 // the bot brain plays our runner: its decisions go in through the normal input path
 await p.evaluate(async ({ stache, dxFloor }) => {
   const { BotBrain } = await import('/shared/bot.js');
+  // DXFLOOR=n: the practice Descent's first floor is n (a boss on every fifth), our runner geared
+  // for it (the run's world is made at the start, so its class is where this goes)
+  if (dxFloor) {
+    const { Descent } = await import('/shared/descent.js');
+    const start = Descent.prototype.startFloor;
+    Descent.prototype.startFloor = function () {
+      if (!this.__fl) {
+        this.__fl = true;
+        this.floor = dxFloor;
+        this.cleared = dxFloor - 1;
+        for (const q of this.w.players.values()) if (!q.isBot) Object.assign(q, { dGun: 5, dArmor: 5, cr: 5000 });
+      }
+      return start.call(this);
+    };
+  }
   const L = __darkbags.app.transport.lobby;
   const inp = __darkbags.input;
   let me = null;
@@ -85,13 +100,6 @@ await p.evaluate(async ({ stache, dxFloor }) => {
         br.skill = 0.97;
         br.__mine = true;
         w.brains.set(h.id, br);
-      }
-      // DXFLOOR=n: the Descent from floor n (a boss on every fifth), our runner geared for it
-      if (dxFloor && w.horde && !w.__fl && w.horde.state === 'intro') {
-        w.__fl = true;
-        w.horde.floor = dxFloor;
-        w.horde.cleared = dxFloor - 1;
-        Object.assign(h, { dGun: 5, dArmor: 5, cr: 5000 });
       }
       if (stache && !w.__stache) {
         w.__stache = true;

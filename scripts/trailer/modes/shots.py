@@ -37,12 +37,12 @@ CLIPS = {
     'knives': ('cap:knives', 13.8, 1.3),
     'pistols': ('cap:pistols', 18.2, 1.3),
     'shotguns': ('cap:shotguns', 16.6, 1.3),
-    'rifles': ('cap:rifles', 0, 1.3),
+    'rifles': ('cap:rifles', 14.5, 1.3),
     'snipers': ('cap:snipers', 11.8, 2.3),
     # teams
-    'team2': ('cap:team2', 0, 2.3),
+    'team2': ('cap:team2', 45.3, 2.3),
     'team4': ('hype:m_team', 0, 2.4),
-    'team8': ('cap:team8', 0, 2.3),
+    'team8': ('cap:team8', 14.3, 2.3),
     # events
     'zom_a': ('cap:zombies2', 55.5, 2.3),
     'zom_b': ('cap:zombies2', 62.4, 2.3),
@@ -52,13 +52,16 @@ CLIPS = {
     # the Descent: the floor's story card, the swarm, the boss
     'dx_a': ('cap:dx', 10.3, 2.3),
     'dx_b': ('cap:dx', 32.8, 2.3),
-    'dx_c': ('cap:dxboss', 0, 2.3),
+    'dx_c': ('cap:dxboss', 38.3, 2.3),
     # under the why lines
     'why0': ('cap:br', 100.0, 2.3),
     'why2': ('cap:raidA', 36.0, 2.3),
     'why3': ('cap:team4', 30.0, 2.3),
     'fomo': ('hype:fomo', 0, 4.4),
 }
+
+# clips with no sound of their own (a page of the menu, not a match)
+SILENT = {'ranked'}
 
 # (shot id, clip, start, length, zoom from, zoom to, origin, volume)
 SHOTS = []
@@ -109,14 +112,15 @@ SEQ = [
     (21, 0, 16, 'zom_a', 14), (22, 0, 16, 'zom_b', None),
     (23, 0, 16, 'gold_a', 15), (24, 0, 16, 'gold_b', None),
     (25, 0, 16, 'ranked', 16),
-    (26, 0, 16, 'dx_a', 17), (27, 0, 16, 'dx_b', None), (28, 0, 16, 'dx_c', None),
+    # the Descent's own story card opens it (it carries its own title), the label comes with the fight
+    (26, 0, 16, 'dx_a', None), (27, 0, 16, 'dx_b', 17), (28, 0, 16, 'dx_c', None),
 ]
 label_from = {}
 for n, (bar, step, steps, clip, lab) in enumerate(SEQ):
     t0 = at(bar, step)
     d = steps * BEAT / 4
     zin = n % 2 == 0
-    shot(clip, clip, t0, d, 1.12 if zin else 1.0, 1.0 if zin else 1.12, vol=0.5)
+    shot(clip, clip, t0, d, 1.12 if zin else 1.0, 1.0 if zin else 1.12, vol=0 if clip in SILENT else 0.5)
     if lab is not None:
         label_from[lab] = (t0, steps < 16)
 # a label stays up until the next label (or the end of the Descent)
@@ -125,6 +129,8 @@ for k, (lab, (t0, half)) in enumerate(starts):
     t1 = starts[k + 1][1][0] if k + 1 < len(starts) else at(29)
     if lab == 5:
         t1 = at(14)  # hardcore, then the gun ladder
+    if lab == 16:
+        t1 = at(26)  # ranked, then the Descent's story card
     LABELS.append((lab, t0, t1, half))
 
 # bar 14: four kills on the beats

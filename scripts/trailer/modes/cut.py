@@ -21,10 +21,11 @@ for name, (src, start, dur) in CLIPS.items():
         'cap': f'{caps}/{ref}/capture.mp4',
     }[kind]
     dst = f'{out}/{name}.mp4'
-    if kind in ('hype', 'feat') and start == 0:
+    if kind == 'hype' and start == 0:
         subprocess.run(['cp', path, dst], check=True)
     else:
         # 1080p30, the game's sound kept; keyframes every half second for clean seeks
+        # (a page capture of the features video has no sound: it stays silent)
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', str(start), '-i', path, '-t', str(dur),
                         '-vf', 'fps=30,scale=1920:1080,format=yuv420p', '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
                         '-g', '15', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', dst], check=True)

@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shots import BAR, BEAT, LEN, at, SHOTS, MODES, LABELS, CHAPTERS
 
 videos = '\n'.join(
-    f'''      <div class="vw" id="w-{s['id']}"><video id="v-{s['id']}" class="clip" src="assets/clips/{s['f']}.mp4" playsinline data-has-audio="true" data-volume="{s['vol']}" data-start="{s['start']}" data-duration="{s['dur']}" data-track-index="2"></video></div>'''
+    f'''      <div class="vw" id="w-{s['id']}"><video id="v-{s['id']}" class="clip" src="assets/clips/{s['f']}.mp4" playsinline {'muted' if not s['vol'] else f'data-has-audio="true" data-volume="{s["vol"]}"'} data-start="{s['start']}" data-duration="{s['dur']}" data-track-index="2"></video></div>'''
     for s in SHOTS)
 labels = '\n'.join(
     f'''      <div class="mlabel{' half' if half else ''}" id="ml-{lab}"><span class="mnum mono">{'Plus · co-op PvE' if MODES[lab][0] == '+' else f'Mode {MODES[lab][0]} / 17'}</span><span class="mname stencil{' pve' if MODES[lab][0] == '+' else ''}">{MODES[lab][1]}</span><span class="msub">{MODES[lab][2]}</span></div>'''

@@ -31,7 +31,7 @@ A 73-second tour of the whole game, built to pull new players in.
 | 21–22 | 39.4–43.1 | 15 Zombies |
 | 23–24 | 43.1–46.9 | 16 Gold Rush |
 | 25 | 46.9–48.8 | 17 Ranked: the season ladder |
-| 26–28 | 48.8–54.4 | Plus The Descent: co-op, 50 floors, a camp between them, a boss every 5th |
+| 26–28 | 48.8–54.4 | Plus The Descent (co-op PvE, 50 floors, 10 bosses): the floor's story card, the swarm, the first boss (the Gravekeeper) |
 | 29–32 | 54.4–61.9 | Why it's different: no download (browser, phone, PC) · free vs bots, or stakes from $0.10 · nobody sees what's in your bag · one account on every device |
 | 33–34 | 61.9–65.6 | Open beta live · get in early · you in? |
 | 35–38 | 65.6–73.1 | End card: dark-bags.com, @play_dark_bags, Telegram |
