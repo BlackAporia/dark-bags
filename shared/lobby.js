@@ -16,6 +16,7 @@ import { MailBook } from './mail.js';
 import { FortuneBook, FORTUNE } from './fortune.js';
 import { DailyBook } from './daily.js';
 import { DescentBook, TICKET_PACKS, packOf, DIFF_IDS } from './descent.js';
+import { randomRunnerName } from './names.js';
 
 /**
  * Session + table routing shared by the WebSocket server and offline mode.
@@ -127,19 +128,33 @@ export class Lobby {
   // A session gets its account's profile: the name saved on the server wins over whatever this
   // device remembers (a phone after a PC is the same runner). A key without a profile yet gets one
   // under the name the device typed. Returns true when the profile is new.
-  adoptProfile(s) {
+  // wallet: a sign-in (wallet, Privy, shadow account) rather than a guest's hello
+  adoptProfile(s, wallet = false) {
     const key = this.key(s);
     if (!key) return false;
     const had = this.social.get(key);
+    // the name this session knows. Signing in, one another account wears is that account's: a
+    // second wallet on the same browser is a new runner with a name of its own, not the first
+    // one's name with a digit. (A guest's taken name still becomes the next free variant.)
+    const own = s.name !== 'runner' && !(wallet && this.social.nameTaken(s.name, key)) ? s.name : null;
     if (had) {
-      // a profile still on a default name takes the name this device knows
-      if (/^runner\d*$/.test(had.name) && s.name !== 'runner') this.social.touch(key, s.name);
+      // a profile still on a default name takes the name this device knows (or a new one)
+      if (/^runner\d*$/.test(had.name)) this.social.touch(key, own ?? this.freshName(key));
       else this.social.touch(key, null);
       s.name = had.name;
       return false;
     }
-    s.name = this.social.touch(key, s.name).name; // a name someone else wears gets a free variant
+    s.name = this.social.touch(key, own ?? (s.name === 'runner' ? s.name : this.freshName(key))).name;
     return true;
+  }
+
+  // a made-up runner name nobody wears yet
+  freshName(key) {
+    for (let i = 0; i < 20; i++) {
+      const n = randomRunnerName();
+      if (!this.social.nameTaken(n, key)) return n;
+    }
+    return randomRunnerName();
   }
 
   // whose balance this session plays with: the session itself (play money) or a signed-in address
@@ -922,7 +937,7 @@ export class Lobby {
         s.shadow = false;
         this.guard.see(account, s.net, s.dev);
         if (Array.isArray(msg.backups)) this.backups?.restore(account, msg.backups);
-        const fresh = this.adoptProfile(s);
+        const fresh = this.adoptProfile(s, true);
         reply({ t: 'social', ...this.socialSummary(s) });
         this.stats?.seen(account, { wallet: true, device: s.token });
         // the welcome catch-up may add XP (the Founder title): before the reply, so its rank is right
@@ -944,7 +959,7 @@ export class Lobby {
         const carried = msg.carry === true && prev && !prevShadow && prev !== account ? this.carryProgress(prev, account) : false;
         this.guard.see(account, s.net, s.dev);
         if (Array.isArray(msg.backups)) this.backups?.restore(account, msg.backups);
-        const fresh = this.adoptProfile(s);
+        const fresh = this.adoptProfile(s, true);
         reply({ t: 'social', ...this.socialSummary(s) });
         this.stats?.seen(account, { wallet: true, device: s.token });
         this.catchUpWelcome(account);
@@ -957,7 +972,7 @@ export class Lobby {
         s.shadow = false;
         this.guard.see(r.account, s.net, s.dev);
         if (Array.isArray(msg.backups)) this.backups?.restore(r.account, msg.backups);
-        const fresh = this.adoptProfile(s);
+        const fresh = this.adoptProfile(s, true);
         reply({ t: 'social', ...this.socialSummary(s) });
         this.stats?.seen(r.account, { wallet: true, device: s.token });
         this.catchUpWelcome(r.account);
