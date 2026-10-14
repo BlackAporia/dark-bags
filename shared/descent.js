@@ -137,6 +137,11 @@ export function objectiveOf(floor) {
   return ROTATION[chapterOf(floor)][(floor % MILESTONE) - 1];
 }
 export const HOLD_SECONDS = 40;
+// the first seals close sooner; from floor 25 on, the full 40 s
+export const holdSeconds = (floor) => Math.min(HOLD_SECONDS, 25 + 0.6 * floor);
+// how many of an endless mission's swarm are on the floor at once, and how much slower they come
+export const endlessCap = (floor, squad = 1) => Math.min(52, Math.round((7 + 0.8 * floor) * (1 + 0.5 * (squad - 1))));
+export const ENDLESS_PACE = 1.5;
 export const HOLD_R = 150;
 export const SURVIVE_SECONDS = 60;
 
@@ -270,18 +275,21 @@ export class Descent extends Horde {
   stepFight(dt) {
     const w = this.w;
     this.spawnT -= dt;
-    const cap = Math.min(52, 30 + this.squad * 6);
-    const alive = [...this.zombies.values()].filter((z) => z.type !== 'nest').length;
     const endless = this.obj === 'survive' || this.obj === 'hold';
+    // the endless missions keep coming however many fall, so they come at a pace one can stand in
+    // (a swarm as thick as a clear floor's, all at once and for good, buried solo players on the
+    // first seal): fewer at a time, a little slower, both growing with the floor and the squad
+    const cap = endless ? endlessCap(this.floor, this.squad) : Math.min(52, 30 + this.squad * 6);
+    const alive = [...this.zombies.values()].filter((z) => z.type !== 'nest').length;
     if ((this.toSpawn > 0 || endless) && this.spawnT <= 0 && alive < cap) {
-      this.spawnT = Math.max(0.18, 0.75 - 0.012 * this.floor) / (1 + 0.3 * (this.squad - 1));
+      this.spawnT = (Math.max(0.18, 0.75 - 0.012 * this.floor) * (endless ? ENDLESS_PACE : 1)) / (1 + 0.3 * (this.squad - 1));
       this.spawn(this.pickType());
       if (this.toSpawn > 0) this.toSpawn--;
     }
     if (this.obj === 'hold') {
       const H = this.holdAt;
       const on = [...w.players.values()].some((p) => p.status === 'alive' && Math.hypot(p.x - H.x, p.y - H.y) < HOLD_R);
-      this.hold = Math.min(1, this.hold + (on ? dt / (HOLD_SECONDS * (1 + 0.15 * (this.squad - 1))) : -dt / 90));
+      this.hold = Math.min(1, this.hold + (on ? dt / (holdSeconds(this.floor) * (1 + 0.15 * (this.squad - 1))) : -dt / 90));
       this.hold = Math.max(0, this.hold);
       if (this.hold >= 1) return this.endFloor(true);
     } else if (this.obj === 'survive') {

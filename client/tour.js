@@ -51,6 +51,10 @@ const FLOW = [
   { key: 'resultWon', target: ['#res-tables'], wait: 'lobby', mood: 'happy' },
   { key: 'bye', mood: 'happy' },
 ];
+// A new player's first session: two lines, then straight into the first match (the page-by-page
+// walk-through was too long for a first visit; Settings → Tour still plays all of FLOW).
+const FIRST_RUN = ['practice', 'raidPick', 'bag', 'play', 'ready', 'raid', 'resultWon'];
+const QUICK = [{ key: 'quick', mood: 'happy' }, { key: 'modes', target: ['#mode-cats', '#modes'], page: 'play' }, ...FLOW.filter((s) => FIRST_RUN.includes(s.key)), { key: 'done', mood: 'happy' }];
 
 export function createTour({ app, go, touch = () => false, sfx = null, game = null, pickRaid = () => {}, tune = () => {}, toast = null }) {
   let el = null;
@@ -372,14 +376,15 @@ export function createTour({ app, go, touch = () => false, sfx = null, game = nu
     true,
   );
 
-  function start() {
+  // full: every page of the game (from Settings); otherwise the short first-run tour
+  function start({ full = false } = {}) {
     if (el || dock) return;
     if (app.screen !== 'lobby') return;
     go('play');
     store.set('darkbags.tour.picked', false);
     store.set('darkbags.tour.active', true);
     store.set('darkbags.tour.done', false);
-    steps = FLOW.map((s) => ({ ...s }));
+    steps = (full ? FLOW : QUICK).map((s) => ({ ...s }));
     build();
     active = true;
     document.body.classList.add('touring');

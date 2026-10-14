@@ -423,10 +423,12 @@ export class DescentHud {
 
   stop() {
     this.root.hidden = true;
+    document.body.classList.remove('dx-camping');
     this.story.stop();
   }
 
   destroy() {
+    document.body.classList.remove('dx-camping');
     this.root.remove();
     this.story.destroy();
   }
@@ -515,7 +517,14 @@ export class DescentHud {
     const cp = this.q('.dx-camp');
     if (camp !== (this.lastState === 2)) {
       cp.hidden = !camp;
-      if (camp) this.g.sfx.music?.set({ mode: 'prep', intensity: 0, bpm: 96 });
+      // the camp is a menu: the touch stick and buttons step aside (they sat over its buttons),
+      // and nothing stays held from the floor before
+      document.body.classList.toggle('dx-camping', camp);
+      if (camp) {
+        this.g.input?.stopStick?.();
+        if (this.g.input) this.g.input.tFire = false;
+        this.g.sfx.music?.set({ mode: 'prep', intensity: 0, bpm: 96 });
+      }
       else this.g.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
     }
     if (camp) {

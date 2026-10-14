@@ -382,6 +382,10 @@ kbd {
 
 /* ------------------------------------------------------------------ touch */
 .touch { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+/* on a touch screen the HUD's own buttons (the Descent gear bar and camp, spectating) sit over the
+   stick's zone, which covers the left half: the HUD itself lets every other touch through */
+body.touch-on .hud { z-index: 7; }
+body.dx-camping .touch { display: none; }
 .tzone { position: absolute; bottom: 0; height: 70%; width: 55%; pointer-events: auto; touch-action: none; }
 .tzone.left { left: 0; }
 .tzone.right { right: 0; }
@@ -1145,12 +1149,12 @@ body.ready #lobby { animation: menu-in 0.6s ease both; }
 .sec-h { margin: 6px 0 0; font: 800 26px/1.1 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* ---------- play page */
-.hero { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: center; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: var(--radius); background: radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--r, #f7931a) 18%, transparent), transparent 60%), var(--glass); }
+.hero { display: grid; grid-template-columns: 170px 1fr; gap: 18px; align-items: center; padding: 14px 18px; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: var(--radius); background: radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--r, #f7931a) 18%, transparent), transparent 60%), var(--glass); }
 .hero-look { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.hero-look canvas { width: 200px; height: 230px; cursor: pointer; }
+.hero-look canvas { width: 150px; height: 172px; cursor: pointer; }
 .hero-look .lt-name { margin: 0; font: 700 15px/1.2 var(--f-ui); text-align: center; }
-.hero-locker { padding: 8px 14px; font-size: 13px; margin-top: 4px; }
-.hero-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.hero-locker { padding: 7px 10px; font-size: 12px; margin-top: 4px; white-space: nowrap; }
+.hero-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .hero-main input#name { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0, 0, 0, 0.35); font: 700 20px/1.2 var(--f-ui); }
 .hero .rank-card { padding: 0; border: 0; background: none; }
 .pf-ach { align-self: flex-start; padding: 8px 12px; font-size: 13px; }
@@ -1348,6 +1352,7 @@ body.ready #lobby { animation: menu-in 0.6s ease both; }
   .pages { padding: 14px 16px 24px; }
   .hero { grid-template-columns: 110px 1fr; gap: 12px; padding: 12px; }
   .hero-look canvas { width: 104px; height: 124px; }
+  .hero-locker { white-space: normal; max-width: 100%; }
   .hero-main input#name { font-size: 17px; padding: 10px 12px; }
   .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .mode-card { padding: 10px; }
@@ -2649,6 +2654,11 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 .mi-ico { font-size: 54px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6)); }
 .mi-body h3 { margin: 2px 0 4px; font: 900 clamp(20px, 2.4vw, 26px)/1.1 var(--f-display); text-transform: uppercase; letter-spacing: 0.03em; color: var(--mc); }
 .mi-d { margin: 0 0 8px; color: #d9deea; }
+.mi-solo { margin: 0 0 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: #ffd58a; }
+.mi-solo button { padding: 5px 10px; font-size: 12px; }
+.mi-more summary { cursor: pointer; width: max-content; font: 700 12px/1.6 var(--f-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dust); }
+.mi-more summary:hover { color: var(--paper); }
+.mi-more[open] summary { margin-bottom: 6px; }
 .mi-facts { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: #c9cfdc; }
 .mi-facts b { color: var(--paper); }
 .mi-side { display: grid; gap: 8px; min-width: 130px; }
@@ -2695,6 +2705,7 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
   .nav-txt > span { color: var(--paper); font-size: 14px; }
   .nav-sub { font: 500 11px/1.2 var(--f-ui); color: var(--dust); opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nav-sub.hot { color: #ffd166; opacity: 1; font-weight: 700; }
+  .nav-sub:empty { display: none; }
   .nav-btn:hover .nav-ico { transform: scale(1.06); background: color-mix(in srgb, var(--nc) 22%, transparent); }
   .nav-btn[aria-current='true'] { background: linear-gradient(90deg, color-mix(in srgb, var(--nc, #f7931a) 18%, transparent), transparent); box-shadow: inset 3px 0 0 var(--nc, var(--loot)); }
   .nav-btn[aria-current='true'] .nav-ico { color: #0b0d14; background: var(--nc); box-shadow: 0 0 16px -4px var(--nc); }
