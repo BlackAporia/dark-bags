@@ -382,6 +382,10 @@ kbd {
 
 /* ------------------------------------------------------------------ touch */
 .touch { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+/* on a touch screen the HUD's own buttons (the Descent gear bar and camp, spectating) sit over the
+   stick's zone, which covers the left half: the HUD itself lets every other touch through */
+body.touch-on .hud { z-index: 7; }
+body.dx-camping .touch { display: none; }
 .tzone { position: absolute; bottom: 0; height: 70%; width: 55%; pointer-events: auto; touch-action: none; }
 .tzone.left { left: 0; }
 .tzone.right { right: 0; }
