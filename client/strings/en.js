@@ -1941,6 +1941,7 @@ export default {
   "cx.shWdL": "🥷 To your shadow account",
   "cx.shWdS": "then one tap moves it into your shielded balance",
   "cx.shHint": "One STRK20 transaction: your shielded balance → your shadow account → the game. Your wallet adds the network fee from your private balance.",
+  "cx.shHave": "Paid from the shielded balance in your wallet: the game never reads it. Type the amount; keep a little shielded STRK for the fee.",
   "cx.shPaid": "Paid to your shadow account ({tx}). Below: move it into your shielded balance.",
   "cx.shCarried": "Your rank, skins and items came along to your private account.",
 };

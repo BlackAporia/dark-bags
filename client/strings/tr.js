@@ -1933,6 +1933,7 @@ export default {
   "cx.shWdL": "🥷 Shadow account hesabına",
   "cx.shWdS": "sonra tek dokunuşla korumalı bakiyene",
   "cx.shHint": "Tek bir STRK20 işlemi: korumalı bakiyen → shadow account → oyun. Ağ ücretini cüzdanın gizli bakiyenden ekler.",
+  "cx.shHave": "Cüzdanındaki korumalı bakiyeden ödenir: oyun onu asla okumaz. Tutarı yaz; ücret için biraz korumalı STRK bırak.",
   "cx.shPaid": "Shadow account hesabına ödendi ({tx}). Aşağıda: korumalı bakiyene taşı.",
   "cx.shCarried": "Rütben, skinlerin ve eşyaların gizli hesabına taşındı.",
 };

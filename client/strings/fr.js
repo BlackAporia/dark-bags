@@ -1933,6 +1933,7 @@ export default {
   "cx.shWdL": "🥷 Vers ton shadow account",
   "cx.shWdS": "puis un geste le place dans ton solde protégé",
   "cx.shHint": "Une transaction STRK20 : ton solde protégé → ton shadow account → le jeu. Ton wallet ajoute les frais réseau depuis ton solde privé.",
+  "cx.shHave": "Payé depuis le solde protégé de ton portefeuille : le jeu ne le lit jamais. Saisis le montant ; garde un peu de STRK protégé pour les frais.",
   "cx.shPaid": "Payé sur ton shadow account ({tx}). En dessous : place-le dans ton solde protégé.",
   "cx.shCarried": "Ton rang, tes skins et objets ont suivi sur ton compte privé.",
 };

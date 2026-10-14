@@ -1934,6 +1934,7 @@ export default {
   "cx.shWdL": "🥷 Kwenda shadow account yako",
   "cx.shWdS": "kisha mguso mmoja unaihamishia kwenye salio lako la siri",
   "cx.shHint": "Muamala mmoja wa STRK20: salio lako la siri → shadow account yako → mchezo. Pochi yako inaongeza ada ya mtandao kutoka salio la siri.",
+  "cx.shHave": "Inalipwa kutoka salio lililolindwa kwenye pochi yako: mchezo hausomi kamwe. Andika kiasi; acha STRK kidogo iliyolindwa kwa ada.",
   "cx.shPaid": "Imelipwa kwenye shadow account yako ({tx}). Chini: ihamishie kwenye salio lako la siri.",
   "cx.shCarried": "Cheo, skins na vitu vyako vimehamia kwenye akaunti yako ya siri.",
 };

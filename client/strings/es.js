@@ -1933,6 +1933,7 @@ export default {
   "cx.shWdL": "🥷 A tu shadow account",
   "cx.shWdS": "luego un toque lo pasa a tu saldo protegido",
   "cx.shHint": "Una transacción STRK20: tu saldo protegido → tu shadow account → el juego. Tu wallet añade la comisión de red desde tu saldo privado.",
+  "cx.shHave": "Se paga con el saldo protegido de tu billetera: el juego nunca lo lee. Escribe la cantidad; deja un poco de STRK protegido para la comisión.",
   "cx.shPaid": "Pagado a tu shadow account ({tx}). Abajo: muévelo a tu saldo protegido.",
   "cx.shCarried": "Tu rango, skins y objetos pasaron a tu cuenta privada.",
 };

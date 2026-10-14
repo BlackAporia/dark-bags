@@ -525,6 +525,13 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     const t = token($('dep-token').value);
     const el = $('dep-have');
     if (!t || !cs.account) return;
+    // private mode pays from the wallet's shielded balance: the shadow account's public one is not
+    // what goes in, and the game never reads the shielded one (that would ask the wallet to reveal it)
+    if (cs.shadow) {
+      el.textContent = tr('cx.shHave');
+      el.classList.remove('empty');
+      return;
+    }
     el.textContent = tr('cx.inWalletChecking');
     try {
       const v = await vendor();
@@ -645,6 +652,10 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     $('wd-go').disabled = !cs.wdRoute;
     $('wd-hint').textContent = cs.wdRoute ? t('cx.minWd', { m: cs.chain.minWithdrawUsd ?? 1, a: short(cs.account) }) : t('cx.wdOff');
     $('dep-hint').textContent = t(cs.depRoute === 'shadow' ? 'cx.shHint' : cs.depRoute === 'private' ? 'cx.hintPrivate' : 'cx.hintPublic');
+    // private mode: no Max (the shielded balance stays unread) and no transfer by hand (the shadow
+    // account sends nothing itself, and a transfer from the main wallet would tie the two together)
+    $('dep-max').hidden = !!cs.shadow;
+    $('dep-manual').hidden = !!cs.shadow;
     renderShadowCollect();
   }
 
