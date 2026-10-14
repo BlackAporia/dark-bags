@@ -1440,7 +1440,7 @@ function onStatus(st) {
 }
 
 // the locker owns its own messages, and sees everything else after the app has updated
-const SOCIAL_MSGS = new Set(['welcome', 'social', 'players', 'friends', 'inbox', 'dms', 'dm', 'friendReq', 'rel', 'profile', 'guilds', 'guild', 'guildDone', 'guildErr', 'guild_chat', 'guild_msg', 'invited', 'invSent']);
+const SOCIAL_MSGS = new Set(['welcome', 'social', 'player_renamed', 'players', 'friends', 'inbox', 'dms', 'dm', 'friendReq', 'rel', 'profile', 'guilds', 'guild', 'guildDone', 'guildErr', 'guild_chat', 'guild_msg', 'invited', 'invSent']);
 function onMessage(m) {
   if (SOCIAL_MSGS.has(m.t)) social.onMessage(m);
   // ping probe: echo the server's stamp straight back, before anything else
@@ -1477,7 +1477,7 @@ function onMessage(m) {
   if (m.t === 'coins' || m.t === 'err') coinImport.onMessage(m);
   if (m.t === 'balance' && app.page === 'shop') fortune.paint();
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables' || m.t === 'coins' || m.t === 'authed') swap.onMessage(m);
-  if (m.t === 'chat' || m.t === 'welcome') chat.onMessage(m);
+  if (m.t === 'chat' || m.t === 'welcome' || m.t === 'player_renamed') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
   if (app.page === 'shop' && (m.t === 'balance' || m.t === 'welcome')) shop.render();
 }

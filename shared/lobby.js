@@ -174,6 +174,7 @@ export class Lobby {
       s.name = cleanName(msg.name);
       if (this.cashier) s.account = this.cashier.accountFor(s.token);
       else this.wallet.ensure(s.token);
+      s.shadow = !!(s.account && this.cashier?.isShadow?.(s.token));
       this.guard.see(this.key(s), s.net, s.dev);
       // what this server lost of the account comes back from the browser's signed copy (server/backup.js)
       if (this.key(s) && Array.isArray(msg.backups)) this.backups?.restore(this.key(s), msg.backups);
@@ -203,6 +204,7 @@ export class Lobby {
         mail: this.key(s) ? this.mail.unread(this.key(s)) : 0,
         promo: this.practice ? null : { stacheLeft: this.promo.stacheLeft() },
         account: s.account,
+        shadow: !!(s.account && this.cashier?.isShadow?.(s.token)),
         regions: this.regionList?.() ?? null,
         admin: !!s.account && this.isAdmin(s.account),
         privy: this.cashier?.privyFor(s.token) ?? null,
@@ -399,6 +401,8 @@ export class Lobby {
       case 'auth_start':
       case 'auth':
       case 'auth_privy':
+      case 'auth_shadow_start':
+      case 'auth_shadow':
       case 'logout':
       case 'deposit':
       case 'deposit_ref':
@@ -413,11 +417,7 @@ export class Lobby {
         if (s.room) return this.send(cid, { t: 'err', code: 'rename', msg: 'Leave the table to change your name.' });
         if (this.social.nameTaken(name, key)) return this.send(cid, { t: 'err', code: 'name_taken', msg: 'That name is taken. Pick another one.' });
         s.name = this.social.touch(key, name).name;
-        for (const c of this.sessionsOf(key)) {
-          const x = this.sessions.get(c);
-          if (x) x.name = s.name;
-          this.send(c, { t: 'renamed', name: s.name });
-        }
+        this.renameEverywhere(key, s.name);
         return;
       }
       case 'name_check': {
@@ -554,7 +554,8 @@ export class Lobby {
     if (now - (s.lastChat ?? 0) < CFG.CHAT_GAP_MS) return this.send(cid, { t: 'err', msg: 'Slow down a little.' });
     s.lastChat = now;
     const key = this.key(s);
-    const m = { n: cleanName(msg.name || s.name), text, at: now, rk: key ? this.ranks.get(key).rank : 1, tt: key ? this.ranks.title(key) : null };
+    const pid = key ? this.social.get(key)?.id : null; // so a later rename reaches this line too
+    const m = { n: cleanName(msg.name || s.name), text, at: now, rk: key ? this.ranks.get(key).rank : 1, tt: key ? this.ranks.title(key) : null, ...(pid ? { id: pid } : {}) };
     this.chat.push(m);
     if (this.chat.length > CFG.CHAT_KEEP) this.chat.splice(0, this.chat.length - CFG.CHAT_KEEP);
     for (const [c, x] of this.sessions) if (x.token) this.send(c, { t: 'chat', m });
@@ -892,7 +893,16 @@ export class Lobby {
       s.account = null;
       return reply({ t: 'authed', account: null, balances: {} });
     }
-    if (msg.t !== 'auth' && msg.t !== 'auth_privy' && !s.account) return reply({ t: 'err', msg: 'Connect a wallet first.' });
+    if (msg.t === 'auth_shadow_start') {
+      // private mode, step 1: which shadow account, and the challenge that proves it is yours
+      if (s.room) return reply({ t: 'err', msg: 'Leave the table to switch wallets.' });
+      try {
+        return reply({ t: 'shadow_challenge', ...(await c.shadowStart(s.token, msg.partial)) });
+      } catch (e) {
+        return reply({ t: 'err', code: 'shadow', msg: e?.user ? e.message : 'Private sign-in failed. Try again.' });
+      }
+    }
+    if (msg.t !== 'auth' && msg.t !== 'auth_privy' && msg.t !== 'auth_shadow' && !s.account) return reply({ t: 'err', msg: 'Connect a wallet first.' });
     if (msg.t === 'history') return reply({ t: 'history', ...c.history(s.account) });
     if (msg.t === 'deposit_ref') {
       try {
@@ -909,6 +919,7 @@ export class Lobby {
         const account = await c.login(s.token, msg.address, msg.signature);
         if (!alive()) return;
         s.account = account;
+        s.shadow = false;
         this.guard.see(account, s.net, s.dev);
         if (Array.isArray(msg.backups)) this.backups?.restore(account, msg.backups);
         const fresh = this.adoptProfile(s);
@@ -917,11 +928,33 @@ export class Lobby {
         // the welcome catch-up may add XP (the Founder title): before the reply, so its rank is right
         this.catchUpWelcome(account);
         reply({ t: 'authed', account, name: s.name, fresh, community: this.promo.communityOf(account), admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
+      } else if (msg.t === 'auth_shadow') {
+        // private mode, step 2: the proof of control is on chain; the session plays as the shadow account
+        if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
+        const r = await c.shadowFinish(s.token, msg.tx);
+        if (!alive()) return;
+        if (r.status === 'pending') return reply({ t: 'shadow_pending' });
+        const account = r.account;
+        const prev = s.account;
+        const prevShadow = !!s.shadow;
+        s.account = account;
+        s.shadow = true;
+        // the player chose to bring what their wallet's account built (the server then knows both
+        // are them; on chain nothing links the two)
+        const carried = msg.carry === true && prev && !prevShadow && prev !== account ? this.carryProgress(prev, account) : false;
+        this.guard.see(account, s.net, s.dev);
+        if (Array.isArray(msg.backups)) this.backups?.restore(account, msg.backups);
+        const fresh = this.adoptProfile(s);
+        reply({ t: 'social', ...this.socialSummary(s) });
+        this.stats?.seen(account, { wallet: true, device: s.token });
+        this.catchUpWelcome(account);
+        reply({ t: 'authed', account, shadow: true, carried, name: s.name, fresh, community: this.promo.communityOf(account), admin: this.isAdmin(account), balances: this.balances(s), rank: this.ranks.get(account), career: this.ranks.career(account), locker: this.inventory.view(account) });
       } else if (msg.t === 'auth_privy') {
         if (s.room) throw Object.assign(new Error('Leave the table to switch wallets.'), { user: true });
         const r = await c.loginPrivy(s.token, String(msg.token ?? ''));
         if (!alive()) return;
         s.account = r.account;
+        s.shadow = false;
         this.guard.see(r.account, s.net, s.dev);
         if (Array.isArray(msg.backups)) this.backups?.restore(r.account, msg.backups);
         const fresh = this.adoptProfile(s);
@@ -941,7 +974,8 @@ export class Lobby {
       } else if (msg.t === 'withdraw') {
         // fair play: an account under aim review keeps its balance but cannot cash out until cleared
         if (this.guard.flagged(s.account)) throw Object.assign(new Error('Your account is under a fair-play review. Withdrawals open again once it is cleared; write to support.'), { user: true });
-        const route = msg.route === 'private' ? 'private' : 'public';
+        // a shadow account's money only goes back to the shadow account (then into the shielded balance)
+        const route = msg.route === 'private' && !c.isShadow?.(s.token) ? 'private' : 'public';
         reply({ t: 'cashier', op: 'withdraw', status: 'sending' });
         reply({ t: 'balance', balances: this.balances(s) });
         const w = await c.withdraw(s.account, { asset: msg.asset, units: msg.units, route });
@@ -958,6 +992,65 @@ export class Lobby {
   }
 
   // ------------------------------------------------------------- social
+
+  // Private mode, by the player's choice: what their wallet's account built moves to their shadow
+  // account (rank, achievements, stats, ranked, skins, shop $, cases, tickets, invites, daily
+  // calendar, mail, the profile and its name). Only into a shadow account with nothing of its own
+  // yet; coins stay where they are (cash out, then deposit privately). Returns whether it moved.
+  carryProgress(from, to) {
+    if (!from || !to || from === to) return false;
+    const r = this.ranks.recs.get(to);
+    if (r && (r.xp > 0 || Object.keys(r.stats ?? {}).length)) return false;
+    const L = this.inventory.data.get(to);
+    if (L && (L.owned?.length || L.wowned?.length || L.credit > 0 || L.bought > 0 || L.spent > 0)) return false;
+    const mv = (map, book) => {
+      if (!map?.has(from)) return;
+      map.set(to, map.get(from));
+      map.delete(from);
+      book?.onChange?.(book);
+    };
+    mv(this.ranks.recs, this.ranks);
+    mv(this.inventory.data, this.inventory);
+    mv(this.descent?.users, this.descent);
+    mv(this.daily?.users, this.daily);
+    mv(this.mail?.users, this.mail);
+    const ref = this.referrals.users.get(from);
+    if (ref) {
+      mv(this.referrals.users, null);
+      if (ref.code) this.referrals.codes.set(ref.code, to);
+      for (const u of this.referrals.users.values()) {
+        if (u.by === from) u.by = to;
+        if (u.refs?.includes(from)) u.refs = u.refs.map((k) => (k === from ? to : k));
+      }
+      this.referrals.changed?.();
+    }
+    this.social.moveKey?.(from, to);
+    return true;
+  }
+
+  // A new name shows everywhere at once: every tab and device of the account, a table or a match
+  // one of them sits at, the lobby chat's earlier lines, and everyone else's open lists and chats
+  // (they get the public id and the new name). Leaderboards, profiles, friends and guild chats read
+  // the name live, so their next view has it anyway.
+  renameEverywhere(key, name) {
+    const id = this.social.get(key)?.id ?? null;
+    for (const c of this.sessionsOf(key)) {
+      const x = this.sessions.get(c);
+      if (!x) continue;
+      x.name = name;
+      this.send(c, { t: 'renamed', name });
+      const rc = x.room?.clients.get(c);
+      if (rc) {
+        rc.name = name;
+        const p = rc.pid && x.room.world ? x.room.world.players.get(rc.pid) : null;
+        if (p) p.name = name;
+        x.room.broadcastPrep(true);
+      }
+    }
+    if (!id) return;
+    for (const m of this.chat) if (m.id === id) m.n = name;
+    for (const [c, x] of this.sessions) if (x.token && this.key(x) !== key) this.send(c, { t: 'player_renamed', id, n: name });
+  }
 
   // rank XP given outside a match (daily gifts, achievements, the welcome bonus): every open tab
   // of the account gets its new rank, or the profile card shows the old one until a reload

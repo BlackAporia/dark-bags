@@ -414,6 +414,13 @@
     <header class="dlg-head"><h2 id="dlg-connect-title" data-i18n="cx.connectT">Sign in to play for tokens</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
     <section class="opt-group">
       <p class="eyebrow" data-i18n="cx.swallet">Starknet wallet</p>
+      <!-- private mode: play from a STRK20 shadow account nothing on chain links to your wallet -->
+      <div id="login-mode" class="seg-row login-mode" role="radiogroup" hidden>
+        <button type="button" data-lm="public" data-i18n="cx.lmPublic">Public</button>
+        <button type="button" data-lm="shadow" data-i18n="cx.lmShadow">🥷 Private · Shadow Account</button>
+      </div>
+      <p id="login-mode-note" class="fine login-mode-note" hidden></p>
+      <label id="login-carry" class="fine login-carry" hidden><input type="checkbox" id="carry-cb" checked> <span data-i18n="cx.carry">Bring my rank, skins and items to the private account</span></label>
       <div id="wallet-list" class="wallet-list"><p class="fine" data-i18n="cx.looking">Looking for wallets…</p></div>
       <p class="fine" id="login-private-note" hidden data-i18n="cx.privNote">Any Starknet wallet works. Ready and Xverse can also deposit and cash out privately through the STRK20 pool.</p>
     </section>
@@ -467,6 +474,7 @@
       <div id="wd-route" class="route" role="radiogroup" aria-label="How"></div>
       <p id="wd-hint" class="fine"></p>
       <button type="button" id="wd-go" class="cta" data-i18n="cx.tCash">Cash out</button>
+      <p id="wd-shadow" class="fine wd-shadow" hidden></p>
     </section>
     <section data-pane="bridge" class="pane" hidden><div id="bridge-root" class="bridge"></div></section>
     <section data-pane="history" class="pane" hidden>

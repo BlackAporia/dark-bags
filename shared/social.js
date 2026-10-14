@@ -122,6 +122,24 @@ export class SocialBook {
     return this.players.get(key) ?? null;
   }
 
+  // the profile moves to another key (private mode): same public id, so friends, guilds and
+  // messages follow it; a bare profile the new key had is dropped
+  moveKey(from, to) {
+    const p = this.players.get(from);
+    if (!p || from === to) return false;
+    const had = this.players.get(to);
+    if (had) {
+      this.ids.delete(had.id);
+      if (this.names.get(had.name.toLowerCase()) === to) this.names.delete(had.name.toLowerCase());
+    }
+    this.players.set(to, p);
+    this.players.delete(from);
+    this.ids.set(p.id, to);
+    this.names.set(p.name.toLowerCase(), to);
+    this.changed();
+    return true;
+  }
+
   keyOf(id) {
     return this.ids.get(String(id)) ?? null;
   }
