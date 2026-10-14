@@ -3,6 +3,7 @@
 // usage (a game server on GAME, default localhost:8790; CHROMIUM optional):
 //   node scripts/trailer/hype/capture.mjs <mode> <outdir> [maxSecs] [runners] [stake] [seconds]
 //   python3 scripts/trailer/hype/assemble.py <outdir>     → <outdir>/capture.mp4
+// DXFLOOR=n starts the Descent on floor n (5: the first boss) with our runner geared for it.
 // STACHE=1 dresses the match in the Stache Case (videos/darkbags-stache): our runner as The Stache
 // with Stache Royale on every gun, the bots in the other moustached outfits.
 import { chromium } from 'playwright';
@@ -67,7 +68,7 @@ await p.waitForTimeout(600);
 await p.evaluate(() => document.getElementById('ready').click());
 
 // the bot brain plays our runner: its decisions go in through the normal input path
-await p.evaluate(async (stache) => {
+await p.evaluate(async ({ stache, dxFloor }) => {
   const { BotBrain } = await import('/shared/bot.js');
   const L = __darkbags.app.transport.lobby;
   const inp = __darkbags.input;
@@ -84,6 +85,13 @@ await p.evaluate(async (stache) => {
         br.skill = 0.97;
         br.__mine = true;
         w.brains.set(h.id, br);
+      }
+      // DXFLOOR=n: the Descent from floor n (a boss on every fifth), our runner geared for it
+      if (dxFloor && w.horde && !w.__fl && w.horde.state === 'intro') {
+        w.__fl = true;
+        w.horde.floor = dxFloor;
+        w.horde.cleared = dxFloor - 1;
+        Object.assign(h, { dGun: 5, dArmor: 5, cr: 5000 });
       }
       if (stache && !w.__stache) {
         w.__stache = true;
@@ -142,7 +150,7 @@ await p.evaluate(async (stache) => {
   inp.firing = () => !!zed() || !!bi()?.f;
   inp.takeDash = () => !!bi()?.d;
   inp.takeReload = () => !!bi()?.r;
-}, stache);
+}, { stache, dxFloor: Number(process.env.DXFLOOR || 0) });
 
 // record until the result screen has been up a few seconds, or the time cap
 const t0 = Date.now();
