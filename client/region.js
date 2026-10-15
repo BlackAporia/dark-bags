@@ -172,7 +172,7 @@ export function createRegions({ app, mainSend, onMessage, toast, deviceId }) {
     if (st.edge !== e) return;
     if (m.t === 'probe') return e.transport.send({ t: 'probe', s: m.s });
     if (m.t === 'ping') {
-      app.ping = m.ms;
+      app.setPing(m.ms);
       return;
     }
     if (m.t === 'edge_ok') {

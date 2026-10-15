@@ -2,6 +2,7 @@
 // shop, the fortune wheel, referrals, fair play, and on a real chain the cashier journal and what the
 // house and fortune wallets hold on chain). Only for the admin wallets (ADMIN_WALLETS) or ADMIN_KEY.
 import crypto from 'node:crypto';
+import { note } from './stall.js';
 import { dayOf } from '../shared/stats.js';
 import { MODES } from '../shared/modes.js';
 
@@ -109,6 +110,10 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
   }
 
   async function snapshot() {
+    // the chain first (it waits on the network); everything after it runs in one go on the game
+    // thread, timed so a slow page shows up among the server stalls
+    const onchain = real ? await onchainBalances() : null;
+    const t0 = performance.now();
     const t = now();
     const DAY = 86_400_000;
     // ----- live
@@ -177,7 +182,6 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       series[k] = { day: k, ...(stats.days[k] ?? { active: 0, fresh: 0, wallets: 0, raids: 0, humans: 0, stakes: 0, rake: 0, paid: 0, shop: 0, buys: 0, spins: 0, peak: 0 }), dep: 0, wd: 0 };
     }
     const chain = real ? cashierPart(series) : null;
-    const onchain = real ? await onchainBalances() : null;
     if (chain && onchain?.house?.rows) chain.coverage = onchain.house.mills - chain.liabilities.mills; // what the house holds over what it owes
 
     // ----- matches
@@ -192,7 +196,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
     revenue.total = revenue.rake + revenue.shop + revenue.descent + revenue.fortune;
 
     const mem = process.memoryUsage();
-    return {
+    const out = {
       at: t,
       network,
       game: { born: Date.parse(env.GAME_LAUNCH_AT || GAME_BORN) || Date.parse(GAME_BORN), statsSince: stats.born, serverUp: startedAt, boots: stats.boots, commit: (env.RAILWAY_GIT_COMMIT_SHA ?? '').slice(0, 7) || null, node: process.version, memMb: Math.round(mem.rss / 1048576) },
@@ -225,7 +229,11 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       data: data(),
       regions: regions ? { health: regions.health?.() ?? {}, list: regions.list(), pots: Object.fromEntries(Object.entries(regions.pots()).map(([r, m]) => [r, basket(m)])), pending: regions.pending() } : null,
       clientErrors: lobby.clientErrors?.slice(0, 30) ?? [],
+      netReports: lobby.netReports?.slice(0, 60) ?? [],
     };
+    const took = performance.now() - t0;
+    if (took > 50) note('admin stats page', took);
+    return out;
   }
 
   // the request may come with a signed-in session (x-darkbags-session) or the team key (x-admin-key)

@@ -195,6 +195,12 @@ const game = new GameClient({ renderer, input, sfx, send, el });
 game.canvasMode = canvasMode.mode;
 const scoreboard = createScoreboard({ game, app });
 const voice = createVoice({ send, app, game, toast: (m) => toast(m) });
+// the chip shows the middle of the last three round trips: one late echo (a busy frame on this
+// device, a hiccup on the link) does not throw it around
+app.setPing = (ms) => {
+  app.pings = [...(app.pings ?? []).slice(-2), ms];
+  app.ping = [...app.pings].sort((a, b) => a - b)[Math.floor(app.pings.length / 2)];
+};
 game.ping = () => (app.mode === 'online' && app.ping != null ? app.ping : null); // own round trip, online only
 game.pingWhere = () => (app.mode === 'online' ? regions.playing() : null); // which server it is to (EU, US, Asia)
 // share cards: everything that happens can be posted
@@ -1447,7 +1453,7 @@ function onMessage(m) {
   // ping probe: echo the server's stamp straight back, before anything else
   if (m.t === 'probe') return send({ t: 'probe', s: m.s });
   if (m.t === 'ping') {
-    if (!regions.inEdge()) app.ping = m.ms; // at a table abroad, the match server's ping counts
+    if (!regions.inEdge()) app.setPing(m.ms); // at a table abroad, the match server's ping counts
     return;
   }
   if (regions.onMain(m)) return;
@@ -1539,6 +1545,7 @@ function handleMessage(m) {
       break;
     }
     case 'start':
+      clearTimeout(app.finaleT);
       app.balances = m.balances ?? app.balances;
       attract.stop();
       sfx.play('beep', { f: 1320, dur: 0.3 });
@@ -1552,7 +1559,6 @@ function handleMessage(m) {
       sfx.music?.forMap?.(m.map.theme);
       voice.begin(m.pid);
       if (m.map.theme && MAP_THEMES.includes(m.map.theme)) toast(t('map.now', { m: t(`map.${m.map.theme}`) }));
-      renderer.prewarm(m.map.w / 2, m.map.h / 2);
       showScreen('game');
       break;
     case 'snap':
@@ -1590,6 +1596,13 @@ function handleMessage(m) {
         break;
       }
       app.wantResult = false;
+      // still in the match: its last moments play out under one word, then the card
+      if (game.active && app.screen === 'game' && !tour.open) {
+        clearTimeout(app.finaleT);
+        game.finale(finaleText(m), m.won || m.status === 'extracted' ? 'gold' : 'warn');
+        app.finaleT = setTimeout(() => app.screen === 'game' && showResult(m), FINALE_MS);
+        break;
+      }
       showResult(m);
       break;
     case 'chain':
@@ -1725,7 +1738,20 @@ $('pause-back').addEventListener('click', () => {
 pauseEl.addEventListener('click', (e) => e.target === pauseEl && closePause());
 
 // ----------------------------------------------------------------- result
+// the word on the screen when a match ends, before its result card
+const FINALE_MS = 1500;
+function finaleText(m) {
+  const kind = MODE[m.mode]?.kind;
+  if (kind === 'zombie') return m.won ? t('res.zCleared') : t('res.defeated');
+  if (kind === 'gold') return m.won ? t('res.goldWon') : t('res.dmLost', { p: m.place ?? '?' });
+  if (m.won) return t(kind === 'team' ? 'res.teamWon' : 'res.victory');
+  if (m.status === 'extracted') return t('res.extracted');
+  if (kind === 'dm' && m.place) return t('res.dmLost', { p: m.place });
+  return t('res.defeated');
+}
+
 function showResult(m) {
+  clearTimeout(app.finaleT);
   sfx.music?.sting(m.status === 'extracted' || !!m.won);
   const k = $('res-kicker');
   const amt = $('res-amount');

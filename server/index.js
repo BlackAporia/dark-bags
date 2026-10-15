@@ -2,8 +2,8 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { readFile, writeFile, rename } from 'node:fs/promises';
-import { readFileSync, existsSync, mkdirSync, renameSync, writeFileSync, copyFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { readFile, writeFile, rename, copyFile } from 'node:fs/promises';
+import { readFileSync, existsSync, mkdirSync, renameSync, writeFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { CFG } from '../shared/config.js';
@@ -143,11 +143,12 @@ try {
 // store), so saves queue up and run one at a time with a gap between them: a tick always gets
 // in between, and two stores never freeze the raids back to back.
 let saveChain = Promise.resolve();
+// obj may be a function: the store's copy is then made in its turn, under the same stall label
 function saveJSON(file, obj) {
   const run = saveChain.then(async () => {
     await new Promise((r) => setTimeout(r, SAVE_GAP));
     const tmp = `${file}.tmp`;
-    const body = track(`save ${path.basename(file)}`, () => JSON.stringify(obj));
+    const body = track(`save ${path.basename(file)}`, () => JSON.stringify(typeof obj === 'function' ? obj() : obj));
     await writeFile(tmp, body);
     await rename(tmp, file);
   });
@@ -181,7 +182,7 @@ const wallet = new MemoryWallet({
     if (!WALLET_FILE || saveTimer) return;
     saveTimer = setTimeout(async () => {
       saveTimer = null;
-      await saveJSON(WALLET_FILE, w.toJSON()).catch((e) => console.error('wallet save failed', e));
+      await saveJSON(WALLET_FILE, () => w.toJSON()).catch((e) => console.error('wallet save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -195,7 +196,7 @@ const ranks = new RankBook({
     if (!RANKS_FILE || rankTimer) return;
     rankTimer = setTimeout(async () => {
       rankTimer = null;
-      await saveJSON(RANKS_FILE, r.toJSON()).catch((e) => console.error('ranks save failed', e));
+      await saveJSON(RANKS_FILE, () => r.toJSON()).catch((e) => console.error('ranks save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -209,7 +210,7 @@ const inventory = new Inventory({
     if (!LOCKER_FILE || lockerTimer) return;
     lockerTimer = setTimeout(async () => {
       lockerTimer = null;
-      await saveJSON(LOCKER_FILE, inv.toJSON()).catch((e) => console.error('locker save failed', e));
+      await saveJSON(LOCKER_FILE, () => inv.toJSON()).catch((e) => console.error('locker save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -222,7 +223,7 @@ const social = new SocialBook({
     if (!SOCIAL_FILE || socialTimer) return;
     socialTimer = setTimeout(async () => {
       socialTimer = null;
-      await saveJSON(SOCIAL_FILE, sb.toJSON()).catch((e) => console.error('social save failed', e));
+      await saveJSON(SOCIAL_FILE, () => sb.toJSON()).catch((e) => console.error('social save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -235,7 +236,7 @@ const referrals = new ReferralBook({
     if (!REFERRAL_FILE || refTimer) return;
     refTimer = setTimeout(async () => {
       refTimer = null;
-      await saveJSON(REFERRAL_FILE, rb.toJSON()).catch((e) => console.error('referrals save failed', e));
+      await saveJSON(REFERRAL_FILE, () => rb.toJSON()).catch((e) => console.error('referrals save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -247,7 +248,7 @@ const referrals = new ReferralBook({
 const guardData = GUARD_FILE && existsSync(GUARD_FILE) ? JSON.parse(readFileSync(GUARD_FILE, 'utf8')) : {};
 const guardSalt = process.env.GUARD_SALT || guardData.salt || crypto.randomBytes(16).toString('hex');
 let guardTimer = null;
-const saveGuard = (g) => saveJSON(GUARD_FILE, { ...g.toJSON(), salt: process.env.GUARD_SALT ? undefined : guardSalt });
+const saveGuard = (g) => saveJSON(GUARD_FILE, () => ({ ...g.toJSON(), salt: process.env.GUARD_SALT ? undefined : guardSalt }));
 const guard = new Guard({
   data: guardData,
   salt: guardSalt,
@@ -274,7 +275,7 @@ const mail = new MailBook({
     if (!MAIL_FILE || mailTimer) return;
     mailTimer = setTimeout(async () => {
       mailTimer = null;
-      await saveJSON(MAIL_FILE, mb.toJSON()).catch((e) => console.error('mail save failed', e));
+      await saveJSON(MAIL_FILE, () => mb.toJSON()).catch((e) => console.error('mail save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -288,7 +289,7 @@ const daily = new DailyBook({
     if (!DAILY_FILE || dailyTimer) return;
     dailyTimer = setTimeout(async () => {
       dailyTimer = null;
-      await saveJSON(DAILY_FILE, db.toJSON()).catch((e) => console.error('daily save failed', e));
+      await saveJSON(DAILY_FILE, () => db.toJSON()).catch((e) => console.error('daily save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -302,7 +303,7 @@ const descentBook = new DescentBook({
     if (!DESCENT_FILE || descentTimer) return;
     descentTimer = setTimeout(async () => {
       descentTimer = null;
-      await saveJSON(DESCENT_FILE, db.toJSON()).catch((e) => console.error('descent save failed', e));
+      await saveJSON(DESCENT_FILE, () => db.toJSON()).catch((e) => console.error('descent save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -316,7 +317,7 @@ const promo = new PromoBook({
     if (!PROMO_FILE || promoTimer) return;
     promoTimer = setTimeout(async () => {
       promoTimer = null;
-      await saveJSON(PROMO_FILE, pb.toJSON()).catch((e) => console.error('promo save failed', e));
+      await saveJSON(PROMO_FILE, () => pb.toJSON()).catch((e) => console.error('promo save failed', e));
     }, SAVE_SOON);
   },
 });
@@ -330,7 +331,7 @@ const fortune = new FortuneBook({
     if (!FORTUNE_FILE || fortuneTimer) return;
     fortuneTimer = setTimeout(async () => {
       fortuneTimer = null;
-      await saveJSON(FORTUNE_FILE, fb.toJSON()).catch((e) => console.error('fortune save failed', e));
+      await saveJSON(FORTUNE_FILE, () => fb.toJSON()).catch((e) => console.error('fortune save failed', e));
     }, SAVE_LATER);
   },
 });
@@ -344,7 +345,7 @@ const stats = new StatsBook({
     if (!STATS_FILE || statsTimer) return;
     statsTimer = setTimeout(async () => {
       statsTimer = null;
-      await saveJSON(STATS_FILE, sb.toJSON()).catch((e) => console.error('stats save failed', e));
+      await saveJSON(STATS_FILE, () => sb.toJSON()).catch((e) => console.error('stats save failed', e));
     }, SAVE_LATER);
   },
 });
@@ -414,14 +415,15 @@ if (!EDGE && !backups) console.warn("BACKUP_SECRET (or REGION_SECRET) is not set
 
 // A copy of every file on the disk once a day (kept 14 days): a bad write or a bug can be undone.
 const LIVE_FILES = [RANKS_FILE, LOCKER_FILE, SOCIAL_FILE, REFERRAL_FILE, GUARD_FILE, MAIL_FILE, DAILY_FILE, FORTUNE_FILE, PROMO_FILE, DESCENT_FILE, STATS_FILE, process.env.CASHIER_FILE].filter(Boolean);
-function dailyCopy() {
+// The copies run off the game thread (fs/promises): a big file copied in one go held every match.
+async function dailyCopy() {
   if (!DATA) return;
   try {
     const day = new Date().toISOString().slice(0, 10);
     const dir = path.join(DATA, 'backup', day);
     if (existsSync(dir)) return;
     mkdirSync(dir, { recursive: true });
-    for (const f of LIVE_FILES) if (existsSync(f)) copyFileSync(f, path.join(dir, path.basename(f)));
+    for (const f of LIVE_FILES) if (existsSync(f)) await copyFile(f, path.join(dir, path.basename(f)));
     const all = readdirSync(path.join(DATA, 'backup')).filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n)).sort();
     for (const old of all.slice(0, Math.max(0, all.length - 14))) rmSync(path.join(DATA, 'backup', old), { recursive: true, force: true });
     console.log(`backup: today's copy of ${LIVE_FILES.length} files is in ${dir}`);
@@ -429,8 +431,8 @@ function dailyCopy() {
     console.error('daily copy failed', e);
   }
 }
-setTimeout(dailyCopy, 60_000).unref?.();
-setInterval(dailyCopy, 3600_000).unref?.();
+setTimeout(() => track('daily backup copy', dailyCopy), 60_000).unref?.();
+setInterval(() => track('daily backup copy', dailyCopy), 3600_000).unref?.();
 
 if (real) {
   real.cashier.liveGame = () => [...lobby.rooms.values()].some((r) => r.state === 'live');
@@ -441,7 +443,19 @@ if (real) {
 }
 // ----------------------------------------------------------------- regions
 const regionList = parseRegions(process.env.REGIONS);
-const regionMain = !EDGE && REGION_SECRET.length >= 32 && regionList.length ? createRegionMain({ lobby, secret: REGION_SECRET, regions: regionList, self: process.env.REGION || 'eu', file: DATA ? `${DATA}/${NET}-regions.json` : '' }) : null;
+const regionMain = !EDGE && REGION_SECRET.length >= 32 && regionList.length ? createRegionMain({
+        lobby,
+        secret: REGION_SECRET,
+        regions: regionList,
+        self: process.env.REGION || 'eu',
+        file: DATA ? `${DATA}/${NET}-regions.json` : '',
+        // a match server's freezes join this server's own on the team's page, named by region
+        onStalls: (region, list) => {
+          for (const x of list) stalls.push({ ...x, region });
+          stalls.sort((a, b) => b.at - a.at);
+          if (stalls.length > 50) stalls.length = 50;
+        },
+      }) : null;
 if (!EDGE && regionList.length && !regionMain) console.warn('REGIONS is set but REGION_SECRET is missing or shorter than 32 characters: regional tables are off');
 if (regionMain) {
   console.log(`regions: main (${regionMain.self}) with ${regionList.map((r) => `${r.id} ${r.url}`).join(', ')}; REGION_SECRET fingerprint ${REGION_FP}`);
@@ -474,7 +488,7 @@ if (regionMain) {
     send(cid, { t: 'stake_ticket', region, ticket: r.ticket, balances: lobby.balances(s) });
   };
 }
-const regionEdge = EDGE ? createRegionEdge({ lobby, secret: REGION_SECRET, region: process.env.REGION || 'region', mainUrl: process.env.MAIN_URL.replace(/\/+$/, ''), journal, file: OUTBOX_FILE }) : null;
+const regionEdge = EDGE ? createRegionEdge({ lobby, secret: REGION_SECRET, region: process.env.REGION || 'region', mainUrl: process.env.MAIN_URL.replace(/\/+$/, ''), journal, file: OUTBOX_FILE, stalls }) : null;
 if (regionEdge) console.log(`regions: match server ${process.env.REGION || 'region'} for ${process.env.MAIN_URL}; REGION_SECRET fingerprint ${REGION_FP} (must match the main server's)`);
 
 // what is on the disk: every file with its records, what the recovery merged, the daily copies
@@ -593,7 +607,9 @@ async function geoOf(req) {
   return cc;
 }
 
-const server = http.createServer((req, res) => {
+// every request's own (synchronous) work is named, so a stall it causes says which page it was
+const server = http.createServer((req, res) => track(`http ${req.method} ${req.url.split('?')[0].slice(0, 40)}`, () => httpHandle(req, res)));
+function httpHandle(req, res) {
   if (req.url === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
     return;
@@ -715,7 +731,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   serveStatic(req, res);
-});
+}
 
 // --------------------------------------------------------------- websocket
 // 128 KB: a passkey (WebAuthn) signature from Cartridge carries the authenticator data and the
@@ -806,9 +822,9 @@ function loop() {
   setTimeout(loop, Math.max(1, STEP - acc - 1));
 }
 loop();
-setInterval(() => lobby.broadcastTables(), 2000);
-setInterval(() => lobby.probe(), 2000);
-setInterval(() => stats.online(sockets.size), 60_000);
+setInterval(() => track('tables to the lobby', () => lobby.broadcastTables()), 2000);
+setInterval(() => track('ping probe', () => lobby.probe()), 2000);
+setInterval(() => track('online count', () => stats.online(sockets.size)), 60_000);
 
 server.listen(PORT, () => {
   console.log(`DARK BAGS on http://localhost:${PORT}  (bots ${BOTS ? 'on' : 'off'}, raid ${ROUND_SECONDS}s, ${real ? `${real.cfg.network} tokens` : 'test tokens'})`);
@@ -825,19 +841,19 @@ const shutdown = async (code = 0) => {
   // a match server sends the refunds home before it goes
   if (regionEdge) await regionEdge.drain().catch(() => {});
   await new Promise((r) => setTimeout(r, 300)); // let the notices reach the players
-  if (RANKS_FILE) await saveJSON(RANKS_FILE, ranks.toJSON()).catch(() => {});
-  if (LOCKER_FILE) await saveJSON(LOCKER_FILE, inventory.toJSON()).catch(() => {});
-  if (REFERRAL_FILE) await saveJSON(REFERRAL_FILE, referrals.toJSON()).catch(() => {});
-  if (DAILY_FILE) await saveJSON(DAILY_FILE, daily.toJSON()).catch(() => {});
+  if (RANKS_FILE) await saveJSON(RANKS_FILE, () => ranks.toJSON()).catch(() => {});
+  if (LOCKER_FILE) await saveJSON(LOCKER_FILE, () => inventory.toJSON()).catch(() => {});
+  if (REFERRAL_FILE) await saveJSON(REFERRAL_FILE, () => referrals.toJSON()).catch(() => {});
+  if (DAILY_FILE) await saveJSON(DAILY_FILE, () => daily.toJSON()).catch(() => {});
   if (GUARD_FILE) await saveGuard(guard).catch(() => {});
-  if (MAIL_FILE) await saveJSON(MAIL_FILE, mail.toJSON()).catch(() => {});
-  if (FORTUNE_FILE) await saveJSON(FORTUNE_FILE, fortune.toJSON()).catch(() => {});
-  if (DESCENT_FILE) await saveJSON(DESCENT_FILE, descentBook.toJSON()).catch(() => {});
-  if (STATS_FILE) await saveJSON(STATS_FILE, stats.toJSON()).catch(() => {});
-  if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, social.toJSON()).catch(() => {});
-  if (PROMO_FILE) await saveJSON(PROMO_FILE, promo.toJSON()).catch(() => {});
+  if (MAIL_FILE) await saveJSON(MAIL_FILE, () => mail.toJSON()).catch(() => {});
+  if (FORTUNE_FILE) await saveJSON(FORTUNE_FILE, () => fortune.toJSON()).catch(() => {});
+  if (DESCENT_FILE) await saveJSON(DESCENT_FILE, () => descentBook.toJSON()).catch(() => {});
+  if (STATS_FILE) await saveJSON(STATS_FILE, () => stats.toJSON()).catch(() => {});
+  if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, () => social.toJSON()).catch(() => {});
+  if (PROMO_FILE) await saveJSON(PROMO_FILE, () => promo.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
-  else if (WALLET_FILE) await saveJSON(WALLET_FILE, wallet.toJSON()).catch(() => {});
+  else if (WALLET_FILE) await saveJSON(WALLET_FILE, () => wallet.toJSON()).catch(() => {});
   process.exit(code);
 };
 process.on('SIGINT', () => shutdown(0));

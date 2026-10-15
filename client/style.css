@@ -220,7 +220,12 @@ kbd {
 .res-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .res-actions .cta { flex: 1 1 100%; }
 .res-actions .ghost { flex: 1 1 0; }
-#result { align-items: end; padding-bottom: calc(24px + var(--safe-b)); background: linear-gradient(0deg, rgba(7, 9, 15, 0.8), rgba(7, 9, 15, 0.1) 60%); }
+#result { align-items: end; padding-bottom: calc(24px + var(--safe-b)); background: linear-gradient(0deg, rgba(7, 9, 15, 0.92), rgba(7, 9, 15, 0.6) 60%, rgba(7, 9, 15, 0.45)); animation: res-in 0.35s ease-out; }
+@keyframes res-in { from { opacity: 0; } }
+/* the match's last word (Victory, Defeated…): alone in the middle, before the result card */
+.banner.finale { top: 38%; font-size: clamp(40px, 9vw, 96px); padding: 12px 24px; white-space: nowrap; text-overflow: clip; animation: finale-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes finale-in { from { transform: translateX(-50%) scale(1.6); opacity: 0; } }
+body.touch-on .banner.finale { top: 34%; font-size: clamp(32px, 8vw, 64px); max-width: calc(100vw - 32px); }
 
 .toast {
   position: fixed;

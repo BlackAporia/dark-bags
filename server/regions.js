@@ -81,7 +81,7 @@ export const REPLAY = {
 
 // ------------------------------------------------------------------ main side
 
-export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '', now = () => Date.now(), log = console }) {
+export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '', now = () => Date.now(), log = console, onStalls = () => {} }) {
   const data = file && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
   const st = {
     pots: data.pots ?? {}, // region -> { asset: units (string) }: what is at stake there
@@ -175,6 +175,12 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
     if (!byId.has(report.region)) return { error: 'unknown region' };
     if (st.batches.includes(report.id)) return { ok: true, dup: true };
     const region = report.region;
+    // the match server's own freezes, for the team's page (only what a stall record holds)
+    if (Array.isArray(report.stalls) && report.stalls.length)
+      onStalls(
+        region,
+        report.stalls.slice(0, 20).map((x) => ({ at: Number(x?.at) || now(), ms: Math.max(0, Math.round(Number(x?.ms) || 0)), during: (Array.isArray(x?.during) ? x.during : []).slice(0, 6).map((d) => String(d).slice(0, 60)) })),
+      );
     const touched = new Set();
     for (const id of report.redeemed ?? []) {
       const x = st.tickets[id];
@@ -321,7 +327,8 @@ export function journaled(name, book, journal) {
   });
 }
 
-export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file = '', now = () => Date.now(), log = console, fetchImpl = fetch }) {
+export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file = '', now = () => Date.now(), log = console, fetchImpl = fetch, stalls = [] }) {
+  let stallsSent = now(); // stalls newer than this still go to the main server
   const used = new Set(); // stake tickets redeemed here
   const redeemed = [];
   let outbox = file && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [];
@@ -427,8 +434,10 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
     }
     const j = journal.splice(0, journal.length);
     const r = redeemed.splice(0, redeemed.length);
-    if (credits.length || j.length || r.length) {
-      outbox.push({ id: crypto.randomUUID(), region, at: now(), credits, journal: j, redeemed: r });
+    const fresh = stalls.filter((x) => x.at > stallsSent);
+    if (fresh.length) stallsSent = fresh[0].at;
+    if (credits.length || j.length || r.length || fresh.length) {
+      outbox.push({ id: crypto.randomUUID(), region, at: now(), credits, journal: j, redeemed: r, ...(fresh.length ? { stalls: fresh } : {}) });
       persist();
     }
     await send();
