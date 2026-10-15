@@ -21,7 +21,14 @@ import { DescentHud } from './descent.js';
 import { BOSSES, HOLD_R } from '../shared/descent.js';
 
 const DT = 1 / CFG.TICK_RATE;
+// The world is drawn this far behind the server: enough for the next snapshot (15 a second) to be
+// in hand. A link whose packets arrive unevenly (phones, Wi-Fi) gets more, up to INTERP_MAX, so
+// the others glide instead of stopping and jumping; past the last snapshot they coast on for a
+// moment (EXTRAP_MS) rather than freeze.
 const INTERP_MS = 110;
+const INTERP_MAX = 260;
+const SNAP_MS = 1000 / 15;
+const EXTRAP_MS = 120;
 const BLUFF = ['small', 'medium', 'fat'];
 const STREAKS = {
   1: { title: 'First blood', voice: 'First blood', cls: 's1' },
@@ -195,6 +202,8 @@ export class GameClient {
     this.corr = { x: 0, y: 0 };
     this.you = null;
     this.offset = null;
+    this.interp = INTERP_MS;
+    this.jit = 0;
     this.acc = 0;
     this.aim = 0;
     this.localFireCd = 0;
@@ -220,6 +229,8 @@ export class GameClient {
     this.anims = new AnimBook();
     this.renderer.setMap(start.map);
     const el = this.el;
+    this.finaleOn = false;
+    this.warmed = false;
     el.hud.hidden = false;
     el.feed.replaceChildren();
     el.golden.hidden = !start.golden;
@@ -246,7 +257,7 @@ export class GameClient {
     const n = this.net;
     if (!n) return null;
     const secs = (performance.now() - n.t0) / 1000;
-    return { mode: this.mode, secs: Math.round(secs), fps: Math.round(n.frames / Math.max(1, secs)), slow: n.slow, hangs: n.hangs, worst: Math.round(n.worst), gpu: gpuName(), gapMax: Math.round(n.gapMax), gaps: n.gaps, ping: n.pingN ? Math.round(n.pingSum / n.pingN) : null, pingMax: n.pingMax, q: this.renderer.quality ?? null, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, touch: !!this.input.touchOn, canvas: this.canvasMode ?? null };
+    return { mode: this.mode, secs: Math.round(secs), fps: Math.round(n.frames / Math.max(1, secs)), slow: n.slow, hangs: n.hangs, worst: Math.round(n.worst), gpu: gpuName(), gapMax: Math.round(n.gapMax), gaps: n.gaps, ping: n.pingN ? Math.round(n.pingSum / n.pingN) : null, pingMax: n.pingMax, region: this.pingWhere?.() ?? null, interp: Math.round(this.interp ?? INTERP_MS), q: this.renderer.quality ?? null, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, touch: !!this.input.touchOn, canvas: this.canvasMode ?? null };
   }
 
   // ------------------------------------------------------------ network in
@@ -268,6 +279,11 @@ export class GameClient {
     const off = s.time - now;
     if (this.offset === null || off > this.offset) this.offset = off;
     else this.offset += (off - this.offset) * 0.02;
+    // how late this one came against the quickest: the link's jitter, held at its peak and let go
+    // slowly; the drawing delay follows it (up at once, down gently)
+    this.jit = Math.max(this.offset - off, this.jit * 0.985);
+    const want = Math.min(INTERP_MAX, Math.max(INTERP_MS, SNAP_MS + this.jit + 30));
+    this.interp += want > this.interp ? (want - this.interp) * 0.5 : (want - this.interp) * 0.03;
     const prev = this.snaps[this.snaps.length - 1];
     this.snaps.push(s);
     if (this.snaps.length > 30) this.snaps.shift();
@@ -277,6 +293,12 @@ export class GameClient {
     const wasAlive = this.you?.st === 'alive';
     if (you.rl > 0 && !(this.you?.rl > 0) && you.st === 'alive') this.sfx.play('reload', { secs: WEAPONS[you.w]?.reload });
     this.you = you;
+    // the map tiles around where you stand are drawn in one go with the first snapshot, not one
+    // by one over the opening seconds (each would cost a frame and show a dark square meanwhile)
+    if (!this.warmed && Number.isFinite(you?.x)) {
+      this.warmed = true;
+      this.renderer.prewarm?.(you.x, you.y);
+    }
     if (you?.w != null) this.lastW = you.w; // the gun in your hands, kept for the share card after the match
     if (this.dead && you.st === 'alive') {
       // deathmatch: back in. Fresh body, fresh prediction.
@@ -307,8 +329,8 @@ export class GameClient {
       if (wasAlive && you.st === 'extracted') this.sfx.play('extract');
     }
     // what the snapshot changed (hits, shots, impacts) plays when the picture gets there: the
-    // world is drawn INTERP_MS behind the server, so the effects wait as long
-    setTimeout(() => this.active && this.diffSnap(prev, s, performance.now()), INTERP_MS);
+    // world is drawn this.interp behind the server, so the effects wait as long
+    setTimeout(() => this.active && this.diffSnap(prev, s, performance.now()), this.interp);
   }
 
   // Effects other runners cause that we only learn about from snapshots.
@@ -488,7 +510,7 @@ export class GameClient {
 
   // events land with the picture (see onSnap): a hit shows when its tracer gets there
   onEvents(list) {
-    setTimeout(() => this.active && this.applyEvents(list), INTERP_MS);
+    setTimeout(() => this.active && this.applyEvents(list), this.interp);
   }
 
   applyEvents(list) {
@@ -743,6 +765,7 @@ export class GameClient {
   // A medal in the centre of the screen: the badge (medals.js), its title and a line under it,
   // the sting and the (English) announcer. One at a time: the rest wait their turn, shorter.
   medal(kind, { title, sub = '', tier = 0 } = {}) {
+    if (this.finaleOn) return; // the match is over: its last word stays alone on the screen
     this.medals ??= [];
     if (this.medals.length >= 3) this.medals.shift();
     this.medals.push({ kind, title, sub, tier });
@@ -805,12 +828,29 @@ export class GameClient {
   }
 
   banner(text, kind, ms) {
+    if (this.finaleOn) return;
     const b = this.el.banner;
     b.textContent = text;
     b.className = `banner ${kind}${this.medalOn ? ' low' : ''}`; // under a medal, never over it
     b.hidden = false;
     clearTimeout(this.bannerT);
     this.bannerT = setTimeout(() => (b.hidden = true), ms);
+  }
+
+  // The match is over: medals, banners and the feed make way for one line in the middle (Victory,
+  // Defeated…) while the last moments play out behind it; the result card follows (main.js).
+  finale(text, kind = 'gold') {
+    this.medals = [];
+    this.medalOn = false;
+    clearTimeout(this.streakT);
+    this.el.streak.hidden = true;
+    this.el.feed.replaceChildren();
+    clearTimeout(this.bannerT);
+    const b = this.el.banner;
+    b.textContent = text;
+    b.className = `banner finale ${kind}`;
+    b.hidden = false;
+    this.finaleOn = true;
   }
 
   // your own turret or tripmine within reach that can still go up a level
@@ -850,7 +890,7 @@ export class GameClient {
     this.anims = new AnimBook();
     this.meAnim = null;
     this.fx.clear();
-    this.renderer.prewarm?.(map.w / 2, map.h / 2);
+    this.warmed = false; // the floor around you is drawn ahead with the first snapshot
   }
 
   buy(item) {
@@ -999,11 +1039,15 @@ export class GameClient {
   buildView(now, dt) {
     const S = this.snaps;
     if (!S.length || !this.you) return null;
-    const rt = now + this.offset - INTERP_MS;
+    const rt = now + this.offset - this.interp;
     const last = S[S.length - 1];
     let a = last;
     let b = last;
-    if (rt < last.time) {
+    if (rt >= last.time && S.length > 1) {
+      // nothing newer yet: carry on along the last step for a moment instead of stopping
+      a = S[S.length - 2];
+      b = last;
+    } else if (rt < last.time) {
       a = S[0];
       b = S[0];
       for (let i = S.length - 1; i > 0; i--) {
@@ -1015,15 +1059,17 @@ export class GameClient {
       }
     }
     const span = b.time - a.time;
-    const k = span > 0 ? Math.min(1, Math.max(0, (rt - a.time) / span)) : 1;
+    const k = span > 0 ? Math.min(1 + Math.min(EXTRAP_MS, span * 2) / span, Math.max(0, (rt - a.time) / span)) : 1;
     const pa = new Map(a.players.map((p) => [p.i, p]));
     const figures = [];
     const zombies = [];
     for (const p of b.players) {
       const q = pa.get(p.i);
-      const x = q ? lerp(q.x, p.x, k) : p.x;
-      const y = q ? lerp(q.y, p.y, k) : p.y;
-      const aim = q ? lerpAngle(q.a, p.a, k) : p.a;
+      // coasting past the last snapshot only for a runner who walked there (never across a respawn)
+      const kk = k > 1 && q && Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 120 ? 1 : k;
+      const x = q ? lerp(q.x, p.x, kk) : p.x;
+      const y = q ? lerp(q.y, p.y, kk) : p.y;
+      const aim = q ? lerpAngle(q.a, p.a, Math.min(1, k)) : p.a;
       if (p.zb) {
         const an = this.anims.update(p.i, x, y, aim, dt, now, { w: 0, color: '#7fae5a' });
         const B = p.bk ? BOSSES.find((x) => x.id === p.bk) : null;
@@ -1220,7 +1266,10 @@ export class GameClient {
     const el = this.el;
     // no picture from the server for a while: say so, instead of a silent freeze
     const lagEl = document.getElementById('lagwarn');
-    if (lagEl) lagEl.hidden = !(this.snapAt && now - this.snapAt > 1200);
+    // (not once the match is over for you: out through an exit, or the end of the match, when
+    // the server rightly sends nothing more)
+    const over = this.finaleOn || you?.st === 'extracted' || you?.st === 'mia';
+    if (lagEl) lagEl.hidden = over || !(this.snapAt && now - this.snapAt > 1200);
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
     if (this.dxMode) {

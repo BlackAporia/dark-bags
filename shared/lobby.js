@@ -42,6 +42,7 @@ export class Lobby {
     this.social = social; // players, friends, private messages, guilds
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
+    this.netReports = []; // how the last matches ran on players' devices and links, newest first
     this.edge = edge; // a regional match server (server/regions.js)
     this.regionOp = null; // main server: entry and stake tickets for regional tables
     this.regionList = null; // main server: () => [{ id, url }]
@@ -277,6 +278,27 @@ export class Lobby {
         if (s.netlogs > 20 || this.practice) break;
         const n = (v, max = 1e6) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(max, Math.round(Number(v)))) : '?');
         const mode = String(msg.mode ?? '?').replace(/[^a-z0-9-]/g, '').slice(0, 16);
+        const num = (v, max) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(max, Math.round(Number(v)))) : null);
+        this.netReports.unshift({
+          at: this.now(),
+          name: String(s.name ?? 'runner').replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 16),
+          mode,
+          region: typeof msg.region === 'string' ? msg.region.replace(/[^a-z0-9-]/g, '').slice(0, 12) || null : null,
+          secs: num(msg.secs, 1e6),
+          fps: num(msg.fps, 500),
+          slow: num(msg.slow, 1e6),
+          hangs: num(msg.hangs, 1e6),
+          worst: num(msg.worst, 1e7),
+          gaps: num(msg.gaps, 1e6),
+          gapMax: num(msg.gapMax, 1e7),
+          ping: num(msg.ping, 99999),
+          pingMax: num(msg.pingMax, 99999),
+          late: num(msg.late, 1e6),
+          touch: !!msg.touch,
+          screen: `${num(msg.w, 10000) ?? '?'}x${num(msg.h, 10000) ?? '?'}`,
+          gpu: String(msg.gpu ?? '').replace(/[^\w .,()/+-]/g, '').slice(0, 60),
+        });
+        if (this.netReports.length > 80) this.netReports.length = 80;
         console.log(`net ${mode} ${String(s.name ?? 'runner').replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 16)}: ${n(msg.secs)}s, ${n(msg.fps, 500)} fps, ${n(msg.slow)} slow frames, ${n(msg.hangs)} hangs >250ms (worst ${n(msg.worst, 1e7)} ms), snapshot gaps >250ms ${n(msg.gaps)} (worst ${n(msg.gapMax)} ms), ping avg ${n(msg.ping, 99999)} max ${n(msg.pingMax, 99999)} ms, ${msg.touch ? 'touch' : 'mouse'} ${n(msg.w, 10000)}x${n(msg.h, 10000)}@${Number(msg.dpr) > 0 ? Number(msg.dpr).toFixed(1) : '?'} q=${String(msg.q ?? '?').slice(0, 10)} canvas=${String(msg.canvas ?? '?').replace(/[^\w /]/g, '').slice(0, 40)} gpu=${String(msg.gpu ?? '?').replace(/[^\w .,()/+-]/g, '').slice(0, 80)}`);
         break;
       }
