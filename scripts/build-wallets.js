@@ -12,7 +12,8 @@ await build({
   bundle: true,
   format: 'esm',
   platform: 'browser',
-  target: ['es2022'],
+  // in-wallet browsers (Braavos, Ready, Xverse on phones) run older WebKit: stay within what iOS 15 parses (class static blocks and the like are lowered)
+  target: ['es2021', 'safari15'],
   minify: true,
   sourcemap: false,
   legalComments: 'none',
