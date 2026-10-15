@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05060a">
+<title>DARK BAGS · Stake. Loot. Get out.</title>
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<!-- The turned layout (land.js): the game in a frame turned a quarter round while the phone's
+     browser stays upright; held sideways, it reads as landscape. Turned back when the browser
+     itself goes landscape. -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05060a; overscroll-behavior: none; touch-action: none; }
+  iframe { position: fixed; top: 0; left: 0; border: 0; display: block; width: 100vw; height: 100vh; height: 100dvh; }
+  @media (orientation: portrait) {
+    iframe { width: 100vh; width: 100dvh; height: 100vw; transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
+  }
+</style>
+<script>
+  window.__darkbagsLand = true;
+  // a computer or a browser that turned by itself has no use for it: the game as usual
+  try {
+    if (!matchMedia('(pointer: coarse)').matches) location.replace('/' + location.search + location.hash);
+  } catch (e) {}
+</script>
+</head>
+<body>
+<iframe id="game" title="DARK BAGS" allow="fullscreen; autoplay; microphone; clipboard-read; clipboard-write; web-share" allowfullscreen></iframe>
+<script>
+  var q = location.search ? location.search + '&inframe=1' : '?inframe=1';
+  document.getElementById('game').src = '/' + q + location.hash;
+</script>
+</body>
+</html>

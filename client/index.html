@@ -6,6 +6,12 @@
 <meta name="description" content="DARK BAGS: stake, start with a knife, level up your gun, loot in the dark and get out before the storm seals the raid.">
 <!--@page-->
 <title>DARK BAGS · Stake. Loot. Get out.</title>
+<script>
+  // the turned layout (land.js): a phone that chose it plays inside /land.html
+  try {
+    if (window === window.top && /^https?:$/.test(location.protocol) && (location.pathname === '/' || location.pathname === '/index.html') && JSON.parse(localStorage.getItem('darkbags.land') || 'false') === true && matchMedia('(pointer: coarse)').matches) location.replace('/land.html' + location.search + location.hash);
+  } catch (e) {}
+</script>
 <meta name="theme-color" content="#05060a">
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -127,6 +133,7 @@
   <div class="rot-ico" aria-hidden="true">📱</div>
   <p class="rot-t" data-i18n="rot.title">Turn your phone sideways</p>
   <p class="rot-s" data-i18n="rot.sub">The raid plays best in landscape: move on the left, Fire on the right.</p>
+  <button id="rot-turn" class="cta" type="button" data-i18n="rot.turn">Can't rotate? Turn the game</button>
   <button id="rot-anyway" class="ghost" type="button" data-i18n="rot.anyway">Play upright anyway</button>
 </div>
 <!-- touch controls -->
