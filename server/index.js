@@ -2,7 +2,9 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { readFile, writeFile, rename, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, rename, copyFile, stat } from 'node:fs/promises';
+import { gzip } from 'node:zlib';
+import { promisify } from 'node:util';
 import { readFileSync, existsSync, mkdirSync, renameSync, writeFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
@@ -523,6 +525,19 @@ function dataInfo() {
 const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE, data: dataInfo });
 
 // ------------------------------------------------------------------ static
+const gzipAsync = promisify(gzip);
+const ZIP = new Set(['.html', '.js', '.css', '.json', '.svg', '.webmanifest', '.txt', '.xml']);
+const gzCache = new Map(); // file -> { at (mtime), gz }
+async function gzipped(file) {
+  const at = (await stat(file)).mtimeMs;
+  const hit = gzCache.get(file);
+  if (hit && hit.at === at) return hit.gz;
+  const gz = await gzipAsync(await readFile(file), { level: 6 });
+  if (gzCache.size > 200) gzCache.clear();
+  gzCache.set(file, { at, gz });
+  return gz;
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -572,8 +587,18 @@ async function serveStatic(req, res) {
     return;
   }
   try {
+    const type = MIME[path.extname(file)] || 'application/octet-stream';
+    // text goes out gzipped when the browser takes it: the wallet code alone is 3 MB, a long
+    // wait on a phone's in-wallet browser. Each file is packed once (off the game thread) and
+    // kept until it changes on disk.
+    if (ZIP.has(path.extname(file)) && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
+      const gz = await gzipped(file);
+      res.writeHead(200, { 'content-type': type, 'content-encoding': 'gzip', vary: 'accept-encoding', 'cache-control': 'no-cache' });
+      res.end(gz);
+      return;
+    }
     const body = await readFile(file);
-    res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' });
+    res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' });
     res.end(body);
   } catch {
     res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');

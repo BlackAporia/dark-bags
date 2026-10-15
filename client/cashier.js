@@ -240,7 +240,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         el.innerHTML = `${icon}<span class="opt-name">${esc(w.name)}</span><span class="opt-sub">${w.installed ? 'installed' : 'get it'}</span>`;
         if (w.installed) {
           el.type = 'button';
-          el.addEventListener('click', () => (cs.chain?.shadow && cs.loginMode === 'shadow' ? signInShadow(w) : signInWith(`extension:${w.name}`, () => cs.vendor.connectExtension(w, cs.chain))));
+          el.addEventListener('click', () => (cs.chain?.shadow && cs.loginMode === 'shadow' ? signInShadow(w) : signInWith(`extension:${w.name}`, async () => (await vendor()).connectExtension(w, cs.chain))));
         } else if (w.download) {
           el.href = w.download;
           el.target = '_blank';
@@ -323,7 +323,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     let step = 1;
     try {
       setStatus('connect-status', t('cx.waitWallet'));
-      const f = await cs.vendor.connectExtension(w, cs.chain);
+      const f = await (await vendor()).connectExtension(w, cs.chain);
       if (!(await f.shadowSupported())) throw new Error(t('cx.shNo', { w: w.name }));
       setStatus('connect-status', t('cx.shFind'));
       const partial = await f.shadowCommitment(dapp);
@@ -890,7 +890,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     if (cs.kind === 'privy') cs.vendor?.privyAuth.logout(cs.chain.login.privy).catch(() => {});
     await cs.facade?.disconnect?.().catch(() => {});
   });
-  $('btn-cartridge').addEventListener('click', () => signInWith('cartridge', () => cs.vendor.connectCartridge(cs.chain, app.token, base)));
+  $('btn-cartridge').addEventListener('click', () => signInWith('cartridge', async () => (await vendor()).connectCartridge(cs.chain, app.token, base)));
   $('privy-send').addEventListener('click', privySend);
   $('privy-verify').addEventListener('click', privyVerify);
   $('privy-code').addEventListener('keydown', (e) => e.key === 'Enter' && privyVerify());
