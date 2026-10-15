@@ -57,6 +57,9 @@ import { renderDxPanel, renderDxBoard, renderDxPick, dxResult, isDx, DX_MODE, di
 import { DIFFS } from '../shared/descent.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS, langChosen } from './i18n.js';
 import { keepBackup, backups } from './backups.js';
+import { setLand, inLandFrame, adoptParentWallets } from './land.js';
+
+adoptParentWallets(); // inside the turned layout: the wallet app's wallet lives on the top window
 
 const $ = (id) => document.getElementById(id);
 const STATIC = !!globalThis.DARK_BAGS_STATIC; // single-file build without its own server
@@ -1998,16 +2001,25 @@ input.onAnyInput = () => sfx.unlock();
 // where that is not possible (iPhone) a raid held upright shows a "turn your phone" card.
 const portrait = matchMedia('(orientation: portrait)');
 let uprightOk = false;
+// Upright on a phone: turn it sideways, or (a browser that never rotates, as inside a wallet
+// app) let the game turn instead (land.js). Asked in the ready room too, where reloading into
+// the turned layout costs nothing; in a match only "play upright" is offered.
 function updateRotate() {
-  $('rotate').hidden = !(input.touchOn && app.screen === 'game' && portrait.matches && !uprightOk);
+  $('rotate').hidden = !(input.touchOn && (app.screen === 'game' || app.screen === 'prep') && portrait.matches && !uprightOk && !inLandFrame());
+  $('rot-turn').hidden = app.screen === 'game';
 }
 portrait.addEventListener?.('change', updateRotate);
+$('rot-turn').addEventListener('click', () => {
+  if (app.inRoom) send({ t: 'leave' }); // out of the ready room first: a stake waiting there comes back
+  setTimeout(() => setLand(true), app.inRoom ? 300 : 0);
+});
 $('rot-anyway').addEventListener('click', () => {
   uprightOk = true;
   updateRotate();
 });
 function goLandscape() {
-  if (!input.touchOn) return;
+  // (never in the turned layout: full screen drops the frame's turn and the game stands upright)
+  if (!input.touchOn || inLandFrame()) return;
   const el = document.documentElement;
   const lock = () => screen.orientation?.lock?.('landscape').catch(() => {});
   if (document.fullscreenElement || !el.requestFullscreen) return lock();

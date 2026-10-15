@@ -8,6 +8,7 @@ import { t } from './i18n.js';
 const tr = t; // where a local `t` (a token) shadows it
 import { createBridgeUi } from './bridge.js';
 import { backups } from './backups.js';
+import { adoptParentWallets } from './land.js';
 
 const $ = (id) => document.getElementById(id);
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '');
@@ -194,6 +195,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     setStatus('connect-status', '');
     d.showModal();
     try {
+      adoptParentWallets(); // a wallet injected late, while the turned layout was already up
       const v = await vendor();
       renderWallets(v.listWallets());
       v.onWalletsChanged((l) => d.open && renderWallets(l));

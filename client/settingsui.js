@@ -4,6 +4,7 @@ import { settings, setSetting } from './settings.js';
 import { LANGS, getLang, setLang } from './i18n.js';
 import { t } from './i18n.js';
 import { TRACKS, RAID_TRACKS } from './music.js';
+import { setLand, inLandFrame } from './land.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,6 +38,7 @@ export function createSettingsUi() {
         <p class="keys" >${t('how.keys')}</p>
         ${row('set.stick', slider('stick', 0.8, 1.4, 0.1))}
         ${row('set.lefty', toggle('lefty'), 'set.leftyNote')}
+        ${document.body.classList.contains('touch-on') || inLandFrame() ? row('set.land', `<label class="switch"><input type="checkbox" data-land ${inLandFrame() ? 'checked' : ''}><i></i></label>`, 'set.landNote') : ''}
       </section>
       <section class="set-card"><p class="eyebrow">${t('set.audio')}</p>
         ${row('set.sound', slider('sound', 0, 1, 0.05))}
@@ -63,6 +65,7 @@ export function createSettingsUi() {
     for (const i of root.querySelectorAll('[data-tog]')) i.addEventListener('change', () => setSetting(i.dataset.tog, i.checked));
     for (const i of root.querySelectorAll('[data-rng]')) i.addEventListener('input', () => setSetting(i.dataset.rng, Number(i.value)));
     for (const b of root.querySelectorAll('[data-lang]')) b.addEventListener('click', () => setLang(b.dataset.lang));
+    root.querySelector('[data-land]')?.addEventListener('change', (e) => setLand(e.target.checked));
     root.querySelector('[data-news]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('darkbags:news')));
     root.querySelector('[data-tour]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('darkbags:tour')));
   }
