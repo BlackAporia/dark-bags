@@ -8,6 +8,9 @@ import { WEAPONS } from '../shared/weapons.js';
 import { DIFFS, DIFF_IDS, CLASSES, CLASS_IDS, PISTOLS, GEAR, FLOORS, MILESTONE, CHAPTERS, BOSSES, bossOf, objectiveOf, chapterOf, milestoneItems, runItems, priceFor, TICKET_PACKS, CAMP_SECONDS } from '../shared/descent.js';
 import { OUTFIT, WSKIN, RARITIES } from '../shared/cosmetics.js';
 import { STYLE } from '../shared/style.js';
+import { MODE } from '../shared/modes.js';
+import { OPS } from '../shared/story.js';
+import { Cinema, Radio, stageFilm } from './story.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const mmss = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
@@ -17,8 +20,11 @@ const hhmm = (ms) => {
 };
 
 export const DX_MODE = { easy: 'dx-easy', hard: 'dx-hard', hardcore: 'dx-hc' };
-export const diffOfMode = (id) => DIFF_IDS.find((d) => DX_MODE[d] === id) ?? null;
+// the Descent's difficulty of a mode (a story operation's too: it runs on the same machinery)
+export const diffOfMode = (id) => (MODE[id]?.kind === 'descent' ? MODE[id].diff : null);
 export const isDx = (id) => !!diffOfMode(id);
+// the Descent itself, not a story operation
+export const isDxOnly = (id) => isDx(id) && !MODE[id].op;
 const OBJ_ICON = { clear: '☠', nests: '✺', hold: '⛨', survive: '⏳', boss: '♛' };
 const DIFF_ICON = { easy: '◆', hard: '◆◆', hardcore: '◆◆◆' };
 const DIFF_COLOR = { easy: '#34d399', hard: '#f97316', hardcore: '#a855f7' };
@@ -403,6 +409,8 @@ export class DescentHud {
         <p class="dx-camp-wait"></p></div></div>`;
     root.append(this.root);
     this.story = new Story(document.body);
+    this.cinema = new Cinema(document.body); // a story operation's films and stage cards
+    this.radio = new Radio(document.body);
     this.q = (s) => this.root.querySelector(s);
     this.q('.dx-go').addEventListener('click', () => this.choose('go'));
     this.q('.dx-out').addEventListener('click', () => this.choose('out'));
@@ -416,21 +424,39 @@ export class DescentHud {
   begin(start) {
     this.mode = start.mode;
     this.diff = diffOfMode(start.mode);
+    this.op = MODE[start.mode]?.op ?? null;
     this.floor = 1;
     this.root.hidden = false;
-    this.story.play(1, { secs: 6.5, reduced: !this.g.motion });
+    this.root.classList.toggle('op', !!this.op);
+    this.radio.clear();
+    // a story operation opens with its film; the first stage starts when the squad has seen it
+    if (this.op) this.cinema.play(`op${OPS[this.op].n}-intro`, { reduced: !this.g.motion, onEnd: () => this.seen() });
+    else this.story.play(1, { secs: 6.5, reduced: !this.g.motion });
+  }
+
+  // a story operation: this runner saw the film (or the stage card), the stage may start
+  seen() {
+    if (this.g.you?.st === 'alive') this.g.send({ t: 'descend', v: 'go' });
+  }
+
+  get covering() {
+    return this.story.covering || this.cinema.covering;
   }
 
   stop() {
     this.root.hidden = true;
     document.body.classList.remove('dx-camping');
     this.story.stop();
+    this.cinema.stop(true);
+    this.radio.clear();
   }
 
   destroy() {
     document.body.classList.remove('dx-camping');
     this.root.remove();
     this.story.destroy();
+    this.cinema.destroy();
+    this.radio.destroy();
   }
 
   choose(v) {
@@ -459,10 +485,18 @@ export class DescentHud {
     const camp = you.ds === 2;
     const intro = you.ds === 0;
     // top line: the floor, the mission, its progress
-    this.q('.dx-fl').textContent = `${t('dx.ch.n', { n: chapterOf(you.zw ?? 1) + 1 })} · ${t(`dx.ch.${chapterOf(you.zw ?? 1)}`)}`;
+    this.q('.dx-fl').textContent = you.op ? `${t(`op.${you.op}.name`)} · ${t(`op.${you.op}.s${you.zw ?? 1}.name`)}` : `${t('dx.ch.n', { n: chapterOf(you.zw ?? 1) + 1 })} · ${t(`dx.ch.${chapterOf(you.zw ?? 1)}`)}`;
     let ob = '';
     let pct = null;
-    if (camp) ob = t('dx.campT', { s: you.dt });
+    if (camp) ob = t(you.op ? 'op.cpT' : 'dx.campT', { s: you.dt });
+    else if (you.op && intro) ob = t(`op.obj.${you.ob}`);
+    else if (you.ob === 'reach') {
+      ob = you.dr != null ? `⛨ ${t('op.doorP', { p: you.dr })}` : `➜ ${t('op.obj.reach.d')}`;
+      pct = you.dr ?? null;
+    } else if (you.ob === 'escort') {
+      ob = `⛑ ${t('op.escortN', { n: you.ss ?? 0, of: you.st0 ?? 6, left: you.sv ?? 0 })}`;
+      pct = ((you.ss ?? 0) / (you.st0 || 6)) * 100;
+    }
     else if (intro) ob = `${OBJ_ICON[you.ob]} ${t(`dx.obj.${you.ob}`)}`;
     else if (you.ob === 'hold') {
       ob = `${OBJ_ICON.hold} ${t('dx.holdP', { p: you.hd ?? 0 })}`;
@@ -527,7 +561,22 @@ export class DescentHud {
       }
       else this.g.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
     }
-    if (camp) {
+    if (camp && you.op) {
+      // a story operation's checkpoint: patch up, shop, on to the next stage (no way out but through)
+      const next = (you.zw ?? 1) + 1;
+      this.q('.dx-camp-k').textContent = t('op.cpK', { n: you.zw, of: you.on ?? 4 });
+      this.q('.dx-camp-h').textContent = t('op.cp');
+      this.q('.dx-camp-next').textContent = t('op.next', { s: t(`op.${you.op}.s${next}.name`), o: t(`op.obj.${OPS[you.op]?.stages[next - 1]?.obj ?? 'boss'}`) });
+      this.q('.dx-camp-ms').hidden = true;
+      this.q('.dx-camp-loot').hidden = true;
+      const go = this.q('.dx-go');
+      go.textContent = `${t('op.go')} · ${you.dt}s`;
+      go.classList.toggle('on', you.ch === 'go');
+      go.disabled = you.st !== 'alive';
+      this.q('.dx-out').hidden = true;
+      this.q('.dx-camp-wait').textContent = you.ch ? t('dx.waiting', { n: you.wait ?? 0 }) : t('op.cpWait', { s: you.dt });
+    } else if (camp) {
+      this.q('.dx-out').hidden = false;
       const next = you.zw + 1;
       const boss = bossOf(next);
       this.q('.dx-camp-k').textContent = t('dx.campK', { n: you.zw, of: FLOORS });
@@ -568,6 +617,7 @@ export class DescentHud {
   // the run's events (the rest go to the zombie mode's handlers in game.js)
   onEvent(ev, now) {
     const g = this.g;
+    if (this.op && this.opEvent(ev)) return true;
     switch (ev.k) {
       case 'floor':
         g.banner(ev.boss ? t('dx.bossIn', { b: t(`dx.boss.${ev.boss}`) }) : `${t('dx.floorN', { n: ev.n, of: ev.of })} · ${t(`dx.obj.${ev.obj}`)}`, ev.boss ? 'warn' : 'gold', 2600);
@@ -625,6 +675,58 @@ export class DescentHud {
       case 'fullClear':
         g.banner(t('dx.fullClear'), 'gold', 5000);
         g.sfx.say?.('victory', 'en');
+        return true;
+      default:
+        return false;
+    }
+  }
+  // a story operation's own events: the stage cards, the radio, the door, the survivors, the
+  // restarts and the ending film (the rest are the Descent's)
+  opEvent(ev) {
+    const g = this.g;
+    const op = this.op;
+    switch (ev.k) {
+      case 'floor':
+        g.banner(ev.boss ? t('dx.bossIn', { b: t(`dx.boss.${ev.boss}`) }) : `${t(`op.${op}.s${ev.n}.name`)} · ${t(`op.obj.${ev.obj}`)}`, ev.boss ? 'warn' : 'gold', 2600);
+        g.sfx.play('storm');
+        if (ev.boss) {
+          g.sfx.say?.('final', 'en');
+          g.shake = Math.max(g.shake, 12);
+        }
+        return true;
+      case 'floorMap':
+        g.newMap(ev.map);
+        this.floor = ev.n;
+        this.cinema.play(stageFilm(op, ev.n, { obj: ev.obj, boss: ev.boss }), { reduced: !g.motion, onEnd: () => this.seen() });
+        return true;
+      case 'camp':
+        g.banner(t('op.cleared', { s: t(`op.${op}.s${ev.n}.name`) }), 'money', 2400);
+        g.sfx.play('level');
+        if (g.pred && ev.bonus) g.fx.floater(g.pred.x, g.pred.y - 46, `+${ev.bonus} ⛁`, '#ffd166', 18, 1.3);
+        return true;
+      case 'radio':
+        this.radio.line(op, ev.line, g.sfx);
+        return true;
+      case 'door':
+        g.banner(t('op.door'), 'warn', 2200);
+        g.fx.ring(ev.x, ev.y, '#fb923c');
+        return true;
+      case 'found':
+        g.feed(t('op.found', { name: `<b>${esc(ev.name)}</b>` }), 'me');
+        return true;
+      case 'saved':
+        g.banner(t('op.saved', { name: ev.name, n: ev.n, of: ev.of }), 'money', 1600);
+        g.fx.ring(ev.x, ev.y, '#4ade80');
+        g.sfx.play('extract');
+        return true;
+      case 'opRetry':
+        g.banner(t('op.retry', { n: ev.left }), 'warn', 3200);
+        this.radio.say('tower', t(`op.${op}.r.retry`), g.sfx);
+        return true;
+      case 'opDone':
+        g.banner(t('op.done'), 'gold', 4000);
+        g.sfx.say?.('victory', 'en');
+        this.cinema.play(`op${OPS[op].n}-outro`, { vars: { n: ev.saved ?? 0 }, reduced: !g.motion });
         return true;
       default:
         return false;

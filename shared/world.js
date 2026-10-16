@@ -10,6 +10,7 @@ import { WEAPONS, XP, XP_PER_LEVEL } from './weapons.js';
 import { MODE } from './modes.js';
 import { Horde } from './horde.js';
 import { Descent, floorMap, CLASSES, PISTOLS, START_COINS, GEAR, priceFor, dmgK, rofK, armorK } from './descent.js';
+import { Operation, opMap, ALLY_DMG, ALLY_HURT, SURVIVOR_HURT } from './story.js';
 
 const DT = 1 / CFG.TICK_RATE;
 // weapon families, for the mastery achievements
@@ -69,6 +70,7 @@ export class World {
     this.maxHp = this.hardcore ? 1 : CFG.HP;
     // side modes on their own arenas: zombies (co-op waves, horde.js) and the gold rush
     this.descent = m.kind === 'descent'; // the Descent: fifty floors of co-op PvE (descent.js)
+    this.op = this.descent && m.op ? m.op : null; // a story operation (story.js) on the Descent's machinery
     this.zombie = m.kind === 'zombie' || this.descent; // the Descent runs on the zombie machinery
     this.goldRush = m.kind === 'gold';
     this.respawns = this.dm || this.goldRush; // back in a few seconds after you drop
@@ -104,13 +106,13 @@ export class World {
     this.stake = stake;
     this.seed = seed;
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
-    this.map = this.descent ? floorMap(seed, 1) : this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed, theme);
+    this.map = this.op ? opMap(seed, this.op, 1) : this.descent ? floorMap(seed, 1) : this.zombie ? generateArena(seed, 'graveyard') : this.goldRush ? generateArena(seed, 'mine') : generateMap(seed, theme);
     this.nav = null; // built lazily by the first bot
     this.raidNo = roundNo; // the room's match count (rounds inside a match are this.roundNo)
     this.golden = bonus > 0; // a golden raid: the room's jackpot adds `bonus` to the loot
     this.duration = roundSeconds;
     this.zonePlan = this.dm || this.zombie || this.goldRush || this.rounds ? staticZone(this.map, roundSeconds) : planZone(this.map, this.rnd, roundSeconds);
-    this.horde = this.descent ? new Descent(this, { diff: m.diff }) : this.zombie ? new Horde(this) : null;
+    this.horde = this.op ? new Operation(this, { op: this.op, diff: m.diff }) : this.descent ? new Descent(this, { diff: m.diff }) : this.zombie ? new Horde(this) : null;
     this.zone = zoneAt(this.zonePlan, 0);
     this.exitStates = this.map.extracts.map((e) => exitState(this.zonePlan, this.zone, e));
     this.time = 0;
@@ -186,8 +188,9 @@ export class World {
   // ---------------------------------------------------------------- entry
 
   // stake: this runner's own (private) stake; the raid's base stake when not given (bots, tests)
-  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null, nf = null, kf = null, stake = null, cls = null, pistol = null }) {
-    if (!this.canJoin()) throw new Error('raid closed');
+  // late: a story operation's survivors, who walk in mid-run (they stake nothing)
+  addPlayer({ name, skin, isBot = false, rank = 1, outfit = null, body = 'm', title = null, ws = null, ts = null, neon = null, weapon = null, nf = null, kf = null, stake = null, cls = null, pistol = null, late = false }) {
+    if (!(late && isBot && this.op) && !this.canJoin()) throw new Error('raid closed');
     stake = Number.isInteger(stake) && stake > 0 ? stake : this.stake;
     const rake = this.feeOnly ? stake : Math.floor(stake * CFG.RAKE);
     const net = stake - rake;
@@ -376,6 +379,7 @@ export class World {
     if (this.tick === 0) {
       this.hadHumans = [...this.players.values()].some((p) => !p.isBot);
       this.fillBots();
+      this.horde?.join?.(); // a story operation: the companions take the empty seats
       this.openingBurst();
     }
     this.tick++;
@@ -480,7 +484,10 @@ export class World {
     this.spawnLoot();
     this.announce();
     if (this.rounds) this.stepRounds();
-    else if (this.zombie && this.hadHumans && !this.aliveCount()) this.end(); // the whole squad is down
+    else if (this.zombie && this.hadHumans && !(this.horde.humansOnly ? this.humansInside() : this.aliveCount())) {
+      // the whole squad is down (a story operation: its humans; the stage may start over)
+      if (!this.horde.wiped?.()) this.end();
+    }
     else if (this.potMode && !this.dm && !this.zombie && !this.goldRush && this.sides > 1 && this.aliveSides().size <= 1) this.end();
     else if (this.time >= this.duration - 1e-9) this.end();
     else if (this.practice && !this.respawns && !this.rounds && this.hadHumans && !this.humansInside() && !this.humansWatching()) this.end();
@@ -521,7 +528,7 @@ export class World {
     const wp = WEAPONS[p.w];
     if (!wp.melee && p.ammo <= 0) return this.reload(p);
     p.fireCd = this.descent ? wp.cd * rofK(p, this.time) : wp.cd;
-    const dk = this.descent ? dmgK(p, this.time) : 1;
+    const dk = (this.descent ? dmgK(p, this.time) : 1) * (p.npc === 'ally' ? ALLY_DMG : 1);
     p.fc = (p.fc + 1) % 1000;
     if (wp.melee) return this.slash(p, wp);
     p.ammo--;
@@ -752,6 +759,7 @@ export class World {
     if (shooter && shooter !== v && this.teamSize && shooter.team === v.team) return; // no friendly fire
     if (shooter && this.zombie) return; // zombies: the squad never hurts itself
     if (this.descent && !shooter && !v.isBot) amount *= armorK(v); // the armour bought in the camp
+    if (v.npc && !shooter) amount *= v.npc === 'sv' ? SURVIVOR_HURT : ALLY_HURT; // a story's companions and survivors
     if (shooter?.isBot && !v.isBot) amount *= this.practice ? PRACTICE_BOT_DAMAGE[this.difficulty] ?? 0.5 : BOT_DAMAGE;
     if (this.hardcore) amount = Math.max(amount, v.hp); // one hit is enough
     if (shooter && shooter !== v) {
@@ -1737,6 +1745,7 @@ export class World {
   scoreboard(me) {
     const rows = [];
     for (const p of this.players.values()) {
+      if (p.npc === 'sv') continue; // a story's survivors are not in the squad
       const dead = p.status === 'dead';
       rows.push([
         p.id,
@@ -1792,6 +1801,7 @@ export class World {
         ...(this.teamSize ? { tm: p.team } : {}),
         ...(p.ws ? { ws: p.ws } : {}),
         ...(p.dClass ? { dc: p.dClass } : {}),
+        ...(p.npc ? { np: p.npc } : {}),
         ...(p.ping != null ? { pg: p.ping } : {}),
         o: p.outfit,
         g: p.body,

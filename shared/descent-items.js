@@ -40,3 +40,23 @@ export const DESCENT_STYLE = DIFF_IDS.flatMap((d) => {
 
 // the guns the Descent's finishes come on: the four class guns and the two pistols
 export const DESCENT_GUNS = ['carbine', 'smg', 'shotgun', 'sniper', 'pistol', 'deagle'];
+
+// The story operations' own items (shared/story.js hands them out for completing an operation,
+// once per difficulty). They ride with the Descent's lists: PvE only, never in cases or the shop.
+// Operation 1, the Tunnels: the first stroke of the flash, the third rail, the last train.
+export const OP_FINISHES = [
+  { id: 'op1-easy', name: 'First Stroke', rarity: 'rare', color: '#f8fafc', accent: '#fb923c', pattern: 'digital', fx: 'glow', descent: 'easy', op: 'tunnels' },
+  { id: 'op1-hard', name: 'Third Rail', rarity: 'epic', color: '#facc15', accent: '#0ea5e9', pattern: 'fade', fx: 'plasma', descent: 'hard', op: 'tunnels' },
+];
+export const OP_OUTFITS = [
+  { id: 'op1-hard', name: 'Tunnel Runner', rarity: 'epic', descent: 'hard', op: 'tunnels', color: '#facc15', accent: '#111827', head: 'visor', armor: { style: 'vanguard', plate: '#111827', trim: '#facc15', glow: '#0ea5e9' } },
+  { id: 'op1-hardcore', name: 'Last Train', rarity: 'legendary', descent: 'hardcore', op: 'tunnels', color: '#f8fafc', accent: '#fb923c', head: 'helmet', fx: 'glow', cape: '#111827', armor: { style: 'warlord', plate: '#0b0f19', trim: '#f8fafc', glow: '#fb923c' } },
+];
+export const OP_STYLE = [
+  { ...STY('banner', 'op1-easy', 'Last Platform', 'rare', ['#fb923c', '#0b0f19'], 'aurora', 'easy'), op: 'tunnels' },
+  { ...STY('frame', 'op1-hardcore', 'Last Train Ring', 'legendary', ['#f8fafc', '#fb923c'], 'gold', 'hardcore'), op: 'tunnels' },
+  { ...STY('namefx', 'op1-hardcore', 'First Stroke', 'legendary', ['#f8fafc', '#fb923c'], 'neon', 'hardcore'), op: 'tunnels' },
+];
+DESCENT_FINISHES.push(...OP_FINISHES);
+DESCENT_OUTFITS.push(...OP_OUTFITS);
+DESCENT_STYLE.push(...OP_STYLE);

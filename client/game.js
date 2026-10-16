@@ -19,6 +19,7 @@ import { pose, legPiece, FEET, hpColor } from './stickman.js';
 import { Fx } from './fx.js';
 import { DescentHud } from './descent.js';
 import { BOSSES, HOLD_R } from '../shared/descent.js';
+import { GOAL_R } from '../shared/story.js';
 
 const DT = 1 / CFG.TICK_RATE;
 // The world is drawn this far behind the server: enough for the next snapshot (15 a second) to be
@@ -188,7 +189,7 @@ export class GameClient {
     this.el.spect.classList.toggle('respawn', this.respawnMode);
     this.prevGadgets = new Map();
     const bagLabel = document.querySelector('.hud-bag .eyebrow');
-    if (bagLabel) bagLabel.textContent = t(this.dxMode ? 'dx.floorK' : this.zombieMode ? 'hud.waveK' : this.goldMode ? 'hud.goldK' : this.potMode ? 'hud.pot' : 'hud.bagPrivate');
+    if (bagLabel) bagLabel.textContent = t(this.dxMode ? (MODE[this.mode]?.op ? 'op.stageK' : 'dx.floorK') : this.zombieMode ? 'hud.waveK' : this.goldMode ? 'hud.goldK' : this.potMode ? 'hud.pot' : 'hud.bagPrivate');
     this.renderer.noExits = this.potMode; // last one standing: no exits to draw
     // no bag to bluff about in pot modes; one fixed weapon means no ladder to climb
     this.el.bluffChip.hidden = this.potMode;
@@ -243,7 +244,7 @@ export class GameClient {
     this.updateBluffChip();
     this.sfx.music?.set({ mode: 'raid', intensity: 1, bpm: 140 });
     if (start.golden) this.banner(t(this.potMode ? 'hud.goldenPot' : 'hud.goldenStart'), 'gold', 3000);
-    else if (this.dxMode) this.banner(t('dx.start'), 'gold', 2600);
+    else if (this.dxMode) this.banner(t(MODE[this.mode]?.op ? 'op.start' : 'dx.start'), 'gold', 2600);
     else this.banner(t(this.zombieMode ? 'hud.startZ' : this.goldMode ? 'hud.startGold' : this.shopMode ? 'hud.startGl' : this.dmMode ? 'hud.startDm' : this.hardcore ? 'hud.startHc' : this.teamMode ? 'hud.startTeam' : this.potMode ? 'hud.startPot' : 'hud.start'), 'money', 2600);
   }
 
@@ -579,8 +580,8 @@ export class GameClient {
           const b = (n) => `<b>${esc(n)}</b>`;
           if (ev.kid === this.pid) this.feed(`${t('feed.youDropped', { name: b(ev.victim) })}${ev.hs ? ` · ${t('hud.headshot')}` : ''}`, 'me');
           else if (ev.cause === 'zombie' || ev.cause === 'boss') this.feed(t(ev.vid === this.pid ? 'feed.zYou' : 'feed.zDown', { name: b(ev.victim) }), ev.vid === this.pid ? 'me' : 'warnline');
-          else if (ev.vid === this.pid) this.feed(how ? t('feed.storm') : t('feed.droppedYou', { name: `<b>${esc(ev.killer ?? 'The dark')}</b>` }), 'me');
-          else if (how) this.feed(t('feed.stormTook', { name: b(ev.victim) }));
+          else if (ev.vid === this.pid) this.feed(how ? t(this.dx?.op ? 'op.wipedYou' : 'feed.storm') : t('feed.droppedYou', { name: `<b>${esc(ev.killer ?? 'The dark')}</b>` }), 'me');
+          else if (how) this.feed(t(this.dx?.op ? 'op.wiped' : 'feed.stormTook', { name: b(ev.victim) }));
           else if (ev.killer) this.feed(`${t('feed.dropped', { a: b(ev.killer), b: b(ev.victim) })}${ev.cause === 'turret' ? ' ◈' : ev.cause === 'mine' ? ' ⌁' : ev.hs ? ' ⌖' : ''}`);
           else this.feed(t('feed.down', { name: b(ev.victim) }));
           break;
@@ -1020,7 +1021,7 @@ export class GameClient {
         this.lastDraw = now;
         this.fpsN = (this.fpsN ?? 0) + 1;
       }
-      if (due && view && !this.dx?.story.covering) this.renderer.draw(view);
+      if (due && view && !this.dx?.covering) this.renderer.draw(view);
     } catch (e) {
       const key = String(e?.message ?? e);
       this.drawErrs ??= new Set();
@@ -1132,6 +1133,10 @@ export class GameClient {
       packs: last.packs,
       // the Descent's seal (a hold mission): where it is and how far it has closed
       seal: this.dxMode && you.ds === 1 && you.ob === 'hold' && you.hx != null ? { x: you.hx, y: you.hy, r: HOLD_R, p: (you.hd ?? 0) / 100 } : null,
+      // a story operation: the goal (the door, the train), the wipe at your back, the survivors' hideout
+      goal: this.dxMode && you.ds === 1 && you.gx != null ? { x: you.gx, y: you.gy, r: GOAL_R, p: you.dr != null ? you.dr / 100 : null, kind: you.ob } : null,
+      wipe: this.dxMode && you.ds === 1 && you.wx != null ? { x: you.wx } : null,
+      hideout: this.dxMode && you.ds === 1 && you.cx != null && (you.sv ?? 0) > 0 ? { x: you.cx, y: you.cy } : null,
       fx: this.fx,
       time: now,
       golden: last.golden,
@@ -1277,7 +1282,7 @@ export class GameClient {
     if (!you) return;
     const alive = you.st === 'alive' && !this.dead;
     if (this.dxMode) {
-      el.bag.textContent = t('dx.floorN', { n: you.zw ?? 1, of: 50 });
+      el.bag.textContent = you.op ? t('op.stageN', { n: you.zw ?? 1, of: you.on ?? 4 }) : t('dx.floorN', { n: you.zw ?? 1, of: 50 });
       el.pnl.textContent = t('dx.hudCoins', { c: you.cr ?? 0, k: you.zk ?? 0 });
       el.pnl.className = 'pnl';
       this.dx?.update(you);
@@ -1406,7 +1411,7 @@ export class GameClient {
       el.storm.classList.toggle('hot', !you.rb && tl <= 15);
     } else if (this.dxMode) {
       // the Descent: the difficulty up here (the floor's mission and the boss bar have their own lines)
-      el.storm.textContent = `${t('dx.title')} · ${t(`dx.diff.${this.dx?.diff ?? 'easy'}`)}`;
+      el.storm.textContent = `${this.dx?.op ? t(`op.${this.dx.op}.name`) : t('dx.title')} · ${t(`dx.diff.${this.dx?.diff ?? 'easy'}`)}`;
       el.storm.classList.remove('hot');
     } else if (this.zombieMode) {
       el.storm.textContent = you.zb != null ? t('hud.bossHp', { p: you.zb }) : you.zbr ? t('hud.zBreak', { s: you.zbr }) : t('hud.zGoal');

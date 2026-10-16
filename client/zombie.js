@@ -372,3 +372,88 @@ export function drawMedkit(ctx, m, t, reduced) {
   ctx.fillRect(m.x - 2, y - 5.5, 4, 11);
   ctx.fillRect(m.x - 5.5, y - 2, 11, 4);
 }
+
+// A story operation's goal on the floor: the metro door (the chase: it fills as it is cut open)
+// or the train (the escort), a ring of light with an arrow and its progress.
+export function drawGoal(ctx, g, t, reduced) {
+  const pulse = reduced ? 0 : Math.sin(t / 260) * 0.5 + 0.5;
+  const col = g.kind === 'escort' ? '74, 222, 128' : '251, 146, 60';
+  ctx.save();
+  ctx.translate(g.x, g.y);
+  const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, g.r);
+  grad.addColorStop(0, `rgba(${col}, ${0.18 + 0.08 * pulse})`);
+  grad.addColorStop(1, `rgba(${col}, 0.02)`);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, g.r, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${col}, ${0.55 + 0.3 * pulse})`;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([16, 10]);
+  ctx.beginPath();
+  ctx.arc(0, 0, g.r, reduced ? 0 : -t / 2000, (reduced ? 0 : -t / 2000) + TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // the door (the chase) or the carriage (the escort), in single lines
+  ctx.strokeStyle = `rgb(${col})`;
+  ctx.lineWidth = 4;
+  if (g.kind === 'escort') {
+    ctx.strokeRect(-46, -22, 92, 44);
+    for (let i = -1; i <= 1; i++) ctx.strokeRect(i * 28 - 9, -12, 18, 14);
+  } else {
+    ctx.strokeRect(-26, -38, 52, 76);
+    ctx.beginPath();
+    ctx.moveTo(0, -38);
+    ctx.lineTo(0, 38);
+    ctx.stroke();
+  }
+  if (g.p != null) {
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 6;
+    ctx.shadowColor = '#fb923c';
+    ctx.shadowBlur = reduced ? 0 : 14;
+    ctx.beginPath();
+    ctx.arc(0, 0, g.r - 22, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(0, Math.min(1, g.p)));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// where the survivors hide (the escort, until they are found): a small light and a mark
+export function drawHideout(ctx, h, t, reduced) {
+  const k = reduced ? 0.6 : Math.sin(t / 300) * 0.3 + 0.6;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.strokeStyle = `rgba(229, 231, 235, ${k})`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, 70, 0, TAU);
+  ctx.stroke();
+  ctx.fillStyle = `rgba(229, 231, 235, ${k})`;
+  ctx.font = '700 28px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('⛑', 0, -82);
+  ctx.restore();
+}
+
+// the wipe: a wall of grey erasure over everything west of x, with a scribbled, moving edge
+export function drawWipe(ctx, wp, t, vb, reduced) {
+  if (wp.x < vb.x0) return;
+  const x1 = Math.min(wp.x, vb.x1 + 40);
+  const g = ctx.createLinearGradient(wp.x - 420, 0, wp.x, 0);
+  g.addColorStop(0, 'rgba(203, 213, 225, 0.92)');
+  g.addColorStop(1, 'rgba(203, 213, 225, 0.25)');
+  ctx.fillStyle = g;
+  ctx.fillRect(vb.x0 - 40, vb.y0 - 40, x1 - vb.x0 + 40, vb.y1 - vb.y0 + 80);
+  if (wp.x > vb.x1 + 40) return;
+  ctx.strokeStyle = 'rgba(15, 23, 42, 0.6)';
+  ctx.lineWidth = 3;
+  for (let k = 0; k < 2; k++) {
+    ctx.beginPath();
+    for (let y = vb.y0 - 40; y < vb.y1 + 40; y += 12) {
+      const dx = reduced ? 0 : Math.sin(y * 0.04 + t / 90 + k) * 16 + Math.sin(y * 0.011 - t / 260) * 26;
+      ctx.lineTo(wp.x + dx - k * 18, y);
+    }
+    ctx.stroke();
+  }
+}
