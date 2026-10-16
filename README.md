@@ -103,6 +103,19 @@ A co-op dungeon for 1–4 runners, played on any region (ping matters less again
 | **Tickets** | One free ticket a UTC day per account (it does not stack: unused, it is gone at midnight). More are bought with any coin you hold at $0.10 each (packs of 10, 50, 100 are cheaper). Practice runs are free and keep nothing. |
 | **Fair play** | The free ticket is capped per network (3 a day) and per device (1 a day), and flagged accounts get none. Purchases are capped per day and in total. The server runs the whole fight; a runner who did under 8% of the squad's damage keeps no items (no carrying alts), and accounts under review keep none until cleared. Tickets taken for a run that never started, or a server that went down mid-run, come back. |
 
+## Story operations (PvE)
+
+The campaign of the Stroke, told as co-op missions (`shared/story.js`, `client/story.js`). On day zero the OUTLINE satellites misfired and one flash redrew everything that lived as a single line: most people became Scribbles (the dead), colour left the world but the orange dust, and the few who kept their minds carry it in bags. Every runner starts the story with the same opening film.
+
+| | |
+|---|---|
+| **Operation 1, The Tunnels** | Four stages, each its own map: **The Flash** (run east through the city with the wipe, a wall of erasure, sweeping in behind you, then hold the shut metro door while it is cut open), **The Platform** (find six survivors hiding on the far side and lead them to the train: they follow the nearest runner, the dead hunt them), **The Breaker** (hold the switch) and **The Dispatcher** (the boss). Four more operations show in the lobby as coming next. |
+| **Squad** | 1–4 runners, a Descent class each. Empty seats are taken by the story's squad (Wedge, Brace, Myra, Hush: one per class, the humans' classes first), AI companions who follow you, shoot the dead and hold the switch with you, so a lone player always has a squad, at any hour. |
+| **Checkpoints** | Between stages: the Descent's camp shop, then on (no way out but through). If every human goes down, the stage starts over from its checkpoint: 2 retries on Easy, 1 on Hard, none on Hardcore. |
+| **Tickets** | The Descent's tickets, one book: Easy 1, Hard 3, Hardcore 5; the free daily ticket opens either. |
+| **Rewards** | Only for completing the whole operation: its items the first time on each difficulty (Easy: the *First Stroke* weapon finish and the *Last Platform* banner; Hard: the *Tunnel Runner* armour and the *Third Rail* finish; Hardcore: the *Last Train* armour, ring and name style), rank XP every time; owned items pay XP. The Descent's fair play holds (carried and flagged accounts keep the XP only). The most survivors brought out is recorded for the story's ending. |
+| **Films and radio** | A film before the first stage and after the boss, a card before every other stage, and the squad's radio during the fight, all subtitled in the game's 11 languages from `client/strings/`. Videos go in `site/media/story/` (brief: `videos/story-op1/BRIEF.md`); until one is there, or when it is slow or the player saves data, the engine draws the same scene under the same subtitles. |
+
 ## Locker, shop and boxes
 
 Your runner is **him or her** in one of **80 outfits** across six rarities (Common, Rare, Epic, Legendary, Mythic, Exotic): crypto memes, comic heroes, cartoon animals, sci-fi and multiverse gods, all original names. Headgear (caps, helmets, hoods, visors, ears, wizard hats, viking horns, astronaut domes, pumpkin and skull masks, frog eyes, a floating diamond, …), capes, auras (glow, pulse, spectral, liquid gold, hologram, glitch, fire, prismatic, laser eyes) and particles (lightning, galaxy, sparks, frost, money rain, code rain, shadow smoke). **144 weapon skins**: 24 finishes on every weapon (camo, tiger, carbon, digital, neon, gold, chrome, glacier, inferno, galaxy, plasma, diamond, prism, void, …), and the rarer the finish, the wilder the model: knife skins become daggers, machetes, tantos, cleavers, axes, katanas, twin blades, scythes, energy swords and a war hammer; guns become revolvers, hand cannons, blasters, double barrels, drum shotguns, machine pistols, vector SMGs, assault rifles, bullpups, plasma rifles, bolt snipers and railguns (same stats, looks only). Energy models glow. From Rare up a skin also paints its **neon tracers**, muzzle flash, blade arc and laser sight: longer trails as rarity climbs, sparks on Legendary, a plasma orb on Mythic, a spectrum-cycling star on Exotic. Everyone in a raid sees them; bots dress up too. Looks only, never stats.
@@ -242,6 +255,7 @@ shared/            runs identically on server and in the browser
   cosmetics.js     outfits, weapon skins, 18 boxes (odds, pity, smart drops, limited editions), shop $ packs, rank-up trials
   horde.js         zombie waves (the Descent builds on it)
   descent.js       the Descent: floors, missions, bosses, classes, camp shop, rewards, the ticket book
+  story.js         story operations on the Descent's machinery: stages, the wipe, survivors, companions, retries, rewards
   descent-items.js the Descent's exclusive outfits, weapon finishes and style items
   zone.js          the storm plan: nested circles collapsing onto the last exit
   movement.js      deterministic movement, shared with client prediction

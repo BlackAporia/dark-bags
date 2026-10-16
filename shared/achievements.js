@@ -156,8 +156,9 @@ export function raidStats(p, { golden = false, lastExit = false, mode = null, sq
   const won = !!p.won;
   const zed = mode?.kind === 'zombie';
   const gold = mode?.kind === 'gold';
-  const dx = mode?.kind === 'descent';
-  const side = zed || gold || dx; // the side modes have their own achievements, not the raid ones
+  const op = !!mode?.op; // a story operation: the Descent's machinery, not its depth records
+  const dx = mode?.kind === 'descent' && !op;
+  const side = zed || gold || dx || op; // the side modes have their own achievements, not the raid ones
   const wk = p.wk ?? {};
   const secs = Math.max(0, Math.round((p.endedAt ?? 0) - (p.joinedAt ?? 0)));
   return {

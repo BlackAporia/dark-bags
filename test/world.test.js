@@ -296,7 +296,8 @@ test('every mode is playable to the end with its own line-up', () => {
     const squad = m.kind === 'zombie' || m.kind === 'descent';
     if (squad) for (let i = 0; i < 2; i++) w.addPlayer({ name: `h${i}`, skin: '#fff', weapon: 'lmg', cls: 'medic' });
     w.step();
-    assert.equal(w.players.size, squad ? 2 : m.size, `${m.id} fills to ${m.size}`);
+    // a story operation: its companions take the squad's empty seats
+    assert.equal(w.players.size, m.op ? m.size : squad ? 2 : m.size, `${m.id} fills to ${m.size}`);
     playOut(w);
     assert.equal(w.phase, 'ended');
     assert.ok(w.audit().ok, `${m.id} audit`);

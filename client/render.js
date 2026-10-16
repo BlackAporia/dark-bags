@@ -8,7 +8,7 @@ import { pose, drawFigure, FEET, hpColor } from './stickman.js';
 import { textures, canvas } from './textures.js';
 import { FINISH, RARITY_ORDER, TURRET_SKIN } from '../shared/cosmetics.js';
 import { neonText, neonColor } from './ranked.js';
-import { drawZombie, drawZombieTag, drawGoldBag, drawMedkit, drawSeal } from './zombie.js';
+import { drawZombie, drawZombieTag, drawGoldBag, drawMedkit, drawSeal, drawGoal, drawHideout, drawWipe } from './zombie.js';
 import { THEME, glowPoints, Weather } from './themes.js';
 import { KillFx, paintName, resetPaint } from './flair.js';
 
@@ -210,6 +210,8 @@ export class Renderer {
     for (const g of v.gold ?? []) if (inView(g.x, g.y, 40)) drawGoldBag(ctx, g, t, this.reduced);
     for (const m of v.packs ?? []) if (inView(m.x, m.y, 40)) drawMedkit(ctx, m, t, this.reduced);
     if (v.seal && inView(v.seal.x, v.seal.y, v.seal.r + 40)) drawSeal(ctx, v.seal, t, this.reduced);
+    if (v.goal && inView(v.goal.x, v.goal.y, v.goal.r + 40)) drawGoal(ctx, v.goal, t, this.reduced);
+    if (v.hideout && inView(v.hideout.x, v.hideout.y, 120)) drawHideout(ctx, v.hideout, t, this.reduced);
 
     // 4. runners and graves, sorted by depth
     const items = [];
@@ -250,6 +252,7 @@ export class Renderer {
     // 7. the storm glows through the dark, the weather drifts over it
     worldTf();
     if (v.zone) this.drawStorm(v.zone, t, vb);
+    if (v.wipe) drawWipe(ctx, v.wipe, t, vb, this.reduced);
     if (this.weather?.kind && this.quality >= 2) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this.weather.draw(ctx, this.w, this.h, this.cam, t, this.reduced, this.quality);
@@ -274,6 +277,9 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (v.showArrows) this.drawExitArrows(v.eye, v.exitStates);
     if (v.storm && v.zone) this.drawSafeArrow(v.eye, v.zone, t);
+    // a story operation: an arrow to where the mission is, while it is off the screen
+    const aim = v.hideout ?? v.goal;
+    if (aim && v.eye && Math.hypot(aim.x - v.eye.x, aim.y - v.eye.y) > Math.min(this.w, this.h) * 0.45 / (this.scale || 1)) this.drawGoalArrow(v.eye, aim, t);
     this.drawVignette(v.hurt, v.storm, t);
     // the minimap changes slowly: ten redraws a second are plenty
     if (!(t - (this.miniT ?? -1e9) < 100)) {
@@ -1126,6 +1132,30 @@ export class Renderer {
     ctx.lineTo(-4, 0);
     ctx.lineTo(-10, 14);
     ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // the way to a story operation's goal: an orange arrow near the screen's edge
+  drawGoalArrow(eye, g, t) {
+    const ctx = this.ctx;
+    const a = Math.atan2(g.y - eye.y, g.x - eye.x);
+    const r = Math.min(this.w, this.h) * 0.36;
+    const pulse = this.reduced ? 1 : 0.75 + Math.sin(t / 160) * 0.25;
+    ctx.save();
+    ctx.translate(this.w / 2 + Math.cos(a) * r, this.h / 2 + Math.sin(a) * r);
+    ctx.rotate(a);
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#fb923c';
+    ctx.strokeStyle = 'rgba(4, 6, 10, 0.85)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(26, 0);
+    ctx.lineTo(-12, -16);
+    ctx.lineTo(-5, 0);
+    ctx.lineTo(-12, 16);
+    ctx.closePath();
+    ctx.stroke();
     ctx.fill();
     ctx.restore();
   }

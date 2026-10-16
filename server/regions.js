@@ -76,7 +76,7 @@ export const REPLAY = {
   guard: ['aim'],
   stats: ['raid'],
   daily: ['raid', 'bonusXp'],
-  descent: ['refund', 'record'], // the Descent's tickets back, and its depth records
+  descent: ['refund', 'record', 'recordOp'], // the Descent's tickets back, its depth records, the story operations'
 };
 
 // ------------------------------------------------------------------ main side

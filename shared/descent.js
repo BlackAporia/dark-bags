@@ -248,6 +248,22 @@ export class Descent extends Horde {
   get wave() {
     return this.floor;
   }
+
+  // how hard the dead come on this floor (a story operation sets its own per stage)
+  get depth() {
+    return this.floor;
+  }
+
+  // this floor's boss (a story operation has its own)
+  bossDef() {
+    return bossOf(this.floor);
+  }
+
+  // where the next one of the dead comes in
+  gate() {
+    const gates = this.w.map.gates;
+    return gates[Math.floor(this.w.rnd() * gates.length)];
+  }
   set wave(_v) {}
 
   plan() {
@@ -279,17 +295,17 @@ export class Descent extends Horde {
     // the endless missions keep coming however many fall, so they come at a pace one can stand in
     // (a swarm as thick as a clear floor's, all at once and for good, buried solo players on the
     // first seal): fewer at a time, a little slower, both growing with the floor and the squad
-    const cap = endless ? endlessCap(this.floor, this.squad) : Math.min(52, 30 + this.squad * 6);
+    const cap = endless ? endlessCap(this.depth, this.squad) : Math.min(52, 30 + this.squad * 6);
     const alive = [...this.zombies.values()].filter((z) => z.type !== 'nest').length;
     if ((this.toSpawn > 0 || endless) && this.spawnT <= 0 && alive < cap) {
-      this.spawnT = (Math.max(0.18, 0.75 - 0.012 * this.floor) * (endless ? ENDLESS_PACE : 1)) / (1 + 0.3 * (this.squad - 1));
+      this.spawnT = (Math.max(0.18, 0.75 - 0.012 * this.depth) * (endless ? ENDLESS_PACE : 1)) / (1 + 0.3 * (this.squad - 1));
       this.spawn(this.pickType());
       if (this.toSpawn > 0) this.toSpawn--;
     }
     if (this.obj === 'hold') {
       const H = this.holdAt;
       const on = [...w.players.values()].some((p) => p.status === 'alive' && Math.hypot(p.x - H.x, p.y - H.y) < HOLD_R);
-      this.hold = Math.min(1, this.hold + (on ? dt / (holdSeconds(this.floor) * (1 + 0.15 * (this.squad - 1))) : -dt / 90));
+      this.hold = Math.min(1, this.hold + (on ? dt / (holdSeconds(this.depth) * (1 + 0.15 * (this.squad - 1))) : -dt / 90));
       this.hold = Math.max(0, this.hold);
       if (this.hold >= 1) return this.endFloor(true);
     } else if (this.obj === 'survive') {
@@ -305,7 +321,7 @@ export class Descent extends Horde {
       if (z.type !== 'nest') continue;
       z.cd -= dt;
       if (z.cd <= 0 && alive < cap) {
-        z.cd = Math.max(3, DTYPES.nest.cd - this.floor * 0.05);
+        z.cd = Math.max(3, DTYPES.nest.cd - this.depth * 0.05);
         for (let i = 0; i < 2; i++) this.spawn(this.w.rnd() < 0.7 ? 'runner' : 'walker', { x: z.x, y: z.y });
         w.emit({ k: 'hatch', x: Math.round(z.x), y: Math.round(z.y) });
       }
@@ -452,10 +468,9 @@ export class Descent extends Horde {
   spawn(type, at = null) {
     const w = this.w;
     const base = DTYPES[type];
-    const sc = floorScale(this.floor, this.diff);
-    const gates = w.map.gates;
-    const g = at ?? gates[Math.floor(w.rnd() * gates.length)];
-    const B = type === 'boss' ? bossOf(this.floor) ?? BOSSES[0] : null;
+    const sc = floorScale(this.depth, this.diff);
+    const g = at ?? this.gate(type);
+    const B = type === 'boss' ? this.bossDef() ?? BOSSES[0] : null;
     const hp = type === 'boss' ? BASE_BOSS_HP * B.hp * this.D.hp * (1 + 0.65 * (this.squad - 1)) : base.hp * sc.hp * (type === 'nest' ? 1 + 0.4 * (this.squad - 1) : 1);
     const spread = type === 'nest' ? 0 : 60;
     const z = {
@@ -547,7 +562,7 @@ export class Descent extends Horde {
   // bosses: the base slam and summon, plus charge, volley and stone
   bossMoves(z, tgt, d, dt) {
     const w = this.w;
-    const B = bossOf(this.floor) ?? BOSSES[0];
+    const B = this.bossDef() ?? BOSSES[0];
     const sk = z.skills ?? {};
     const enraged = z.hp < z.max * BOSS.enrage;
     const rate = enraged ? 1.4 : 1;
@@ -563,15 +578,15 @@ export class Descent extends Horde {
     }
     if (sk.summon !== undefined && sk.summon <= 0) {
       sk.summon = SKILL.summon;
-      const n = BOSS.summon + Math.floor(this.floor / 15);
+      const n = BOSS.summon + Math.floor(this.depth / 15);
       for (let i = 0; i < n; i++) this.spawn(i % 3 === 2 ? 'spitter' : 'runner', { x: z.x + (w.rnd() - 0.5) * 120, y: z.y + (w.rnd() - 0.5) * 120 });
       w.emit({ k: 'summon' });
     }
     if (sk.volley !== undefined && sk.volley <= 0) {
       sk.volley = SKILL.volley;
-      const n = 10 + Math.floor(this.floor / 10) * 2;
+      const n = 10 + Math.floor(this.depth / 10) * 2;
       const off = w.rnd() * Math.PI;
-      for (let i = 0; i < n; i++) this.acid(z, off + (i / n) * Math.PI * 2, 14 * this.D.dmg * (1 + 0.02 * this.floor), 420);
+      for (let i = 0; i < n; i++) this.acid(z, off + (i / n) * Math.PI * 2, 14 * this.D.dmg * (1 + 0.02 * this.depth), 420);
       w.emit({ k: 'volley', x: Math.round(z.x), y: Math.round(z.y), boss: B.id });
     }
     if (sk.charge !== undefined && sk.charge <= 0 && d > 140 && d < 700) {
@@ -584,7 +599,7 @@ export class Descent extends Horde {
     if (sk.shield !== undefined && sk.shield <= 0) {
       sk.shield = SKILL.shield;
       z.stoneT = 4;
-      for (let i = 0; i < 3 + Math.floor(this.floor / 12); i++) this.spawn(w.rnd() < 0.5 ? 'brute' : 'runner', { x: z.x + (w.rnd() - 0.5) * 160, y: z.y + (w.rnd() - 0.5) * 160 });
+      for (let i = 0; i < 3 + Math.floor(this.depth / 12); i++) this.spawn(w.rnd() < 0.5 ? 'brute' : 'runner', { x: z.x + (w.rnd() - 0.5) * 160, y: z.y + (w.rnd() - 0.5) * 160 });
       w.emit({ k: 'stone', zid: z.id, x: Math.round(z.x), y: Math.round(z.y), secs: 4 });
     }
   }
@@ -602,7 +617,7 @@ export class Descent extends Horde {
       if (p.status !== 'alive' || z.hitIds.includes(p.id)) continue;
       if (Math.hypot(p.x - z.x, p.y - z.y) < z.r + CFG.PLAYER_R + 6) {
         z.hitIds.push(p.id);
-        w.damage(p, null, 28 * this.D.dmg * (1 + 0.02 * this.floor), 'boss');
+        w.damage(p, null, 28 * this.D.dmg * (1 + 0.02 * this.depth), 'boss');
       }
     }
   }
@@ -622,7 +637,7 @@ export class Descent extends Horde {
     w.emit({ k: 'zhit', to: by ? [by.id] : undefined, zid: z.id, x: Math.round(z.x), y: Math.round(z.y), d: dealt, ...(hs ? { hs: 1 } : {}), ...(z.hp <= 0 ? { fatal: 1 } : {}) });
     if (z.hp > 0) return;
     this.zombies.delete(z.id);
-    const coins = coinsFor(z.type, this.floor, this.diff);
+    const coins = coinsFor(z.type, this.depth, this.diff);
     if (by) {
       by.zk = (by.zk ?? 0) + 1;
       by.cr = Math.min(GL.MAX * 10, (by.cr ?? 0) + coins);
@@ -751,6 +766,7 @@ export class DescentBook {
       runs: r.runs,
       best: { ...r.best },
       clears: { ...r.clears },
+      ops: JSON.parse(JSON.stringify(r.ops ?? {})),
     };
   }
 
@@ -821,6 +837,21 @@ export class DescentBook {
     r.runs++;
     r.best[diff] = Math.max(r.best[diff] ?? 0, floors | 0);
     if (full) r.clears[diff] = (r.clears[diff] ?? 0) + 1;
+    this.changed();
+  }
+
+  // a finished story operation: the furthest stage per difficulty, completions, and the most
+  // survivors brought out in one completed run (the story's ending reads it)
+  recordOp(key, { op, diff, stages = 0, full = false, saved = 0 }) {
+    if (!DIFFS[diff] || typeof op !== 'string' || op.length > 24) return;
+    const r = this.rec(key);
+    r.ops ??= {};
+    const o = (r.ops[op] ??= { best: {}, clears: {}, saved: 0 });
+    o.best[diff] = Math.max(o.best[diff] ?? 0, stages | 0);
+    if (full) {
+      o.clears[diff] = (o.clears[diff] ?? 0) + 1;
+      o.saved = Math.max(o.saved ?? 0, saved | 0);
+    }
     this.changed();
   }
 

@@ -8,6 +8,7 @@ import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
 import { MODE, ZOMBIE_WEAPONS } from './modes.js';
 import { CLASSES, PISTOLS, DUP_XP, runItems } from './descent.js';
+import { opItems } from './story.js';
 import { STYLE } from './style.js';
 import { WAVES } from './horde.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, WSKIN, seasonAt } from './cosmetics.js';
@@ -675,6 +676,7 @@ export class RoomCore {
   // out with them (or cleared all fifty). Fair play: a flagged account, and in a squad a runner who
   // barely fought (carried), get the XP and nothing else. Items already owned pay rank XP.
   descentRewards(c, p, earned) {
+    if (MODE[this.mode].op) return this.opRewards(c, p, earned);
     const w = this.world;
     const diff = MODE[this.mode].diff;
     const floors = p.dFloors ?? 0;
@@ -700,6 +702,40 @@ export class RoomCore {
     }
     if (out.dupXp) {
       earned.parts.push({ label: 'Descent duplicates', xp: out.dupXp });
+      earned.total += out.dupXp;
+    }
+    return out;
+  }
+
+  // A story operation's end for one runner: its items only for completing the whole operation
+  // (the first time on a difficulty; owned ones pay rank XP), and the same fair play as the
+  // Descent (flagged accounts and carried runners keep the XP only). The survivors saved are
+  // recorded: they shape the story's ending.
+  opRewards(c, p, earned) {
+    const w = this.world;
+    const m = MODE[this.mode];
+    const full = !!p.dFull;
+    const out = { op: m.op, diff: m.diff, stages: p.dFloors ?? 0, of: w.horde?.stages ?? 0, full, banked: full, saved: full ? p.dSaved ?? 0 : 0, cls: p.dClass, items: [], dupXp: 0, carried: false, flagged: false };
+    if (this.practice) return { ...out, practice: true };
+    const humans = [...w.players.values()].filter((q) => !q.isBot);
+    const total = humans.reduce((n, q) => n + (q.zDmg ?? 0), 0);
+    out.carried = humans.length > 1 && total > 0 && (p.zDmg ?? 0) / total < CARRIED_SHARE;
+    out.flagged = !!this.guard?.flagged(c.token);
+    this.descent?.recordOp(c.token, { op: m.op, diff: m.diff, stages: out.stages, full, saved: out.saved });
+    if (!full || out.carried || out.flagged) return out;
+    const lv = this.inventory.view(c.token);
+    for (const it of opItems(m.op, m.diff, p.dClass)) {
+      const owned = it.k === 'outfit' ? lv.owned.includes(it.id) : it.k === 'wskin' ? lv.wowned.includes(it.id) : (lv.sowned ?? []).includes(it.id);
+      const rarity = (it.k === 'outfit' ? OUTFIT[it.id] : it.k === 'wskin' ? WSKIN[it.id] : STYLE[it.id])?.rarity ?? 'rare';
+      if (owned) {
+        out.dupXp += DUP_XP[rarity] ?? 0;
+        continue;
+      }
+      this.inventory.give(c.token, { k: it.k, id: it.id });
+      out.items.push({ ...it, rarity });
+    }
+    if (out.dupXp) {
+      earned.parts.push({ label: 'Operation duplicates', xp: out.dupXp });
       earned.total += out.dupXp;
     }
     return out;
