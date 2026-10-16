@@ -74,6 +74,9 @@ export async function shadowAddress(chain, facade) {
 
 let store = null;
 export const isCartridgeEntry = (name) => /^(cartridge )?controller$|^cartridge$/i.test(String(name ?? '').trim());
+// Xverse speaks Starknet through wallet-standard and is not in get-starknet's list of known
+// wallets: listed here so phones without it get "open in app"
+const XVERSE = { id: 'xverse', name: 'Xverse', icon: '', downloads: { web: 'https://www.xverse.app/' } };
 export function listWallets() {
   store ??= createStore();
   // extensions that inject window.starknet_* after the page loaded are only seen on a rescan
@@ -84,12 +87,13 @@ export function listWallets() {
     .filter((w) => !isCartridgeEntry(w.name))
     .map((w) => ({ id: w.name, name: w.name, icon: typeof w.icon === 'string' ? w.icon : '', installed: true, wallet: w }));
   const have = new Set(found.map((w) => w.name.toLowerCase()));
-  const missing = KNOWN_WALLETS.filter((k) => !isCartridgeEntry(k.name) && !isCartridgeEntry(k.id) && !have.has(k.name.toLowerCase()) && !have.has(k.id.toLowerCase())).map((k) => ({
+  const missing = [...KNOWN_WALLETS, XVERSE].filter((k) => !isCartridgeEntry(k.name) && !isCartridgeEntry(k.id) && !have.has(k.name.toLowerCase()) && !have.has(k.id.toLowerCase())).map((k) => ({
     id: k.id,
     name: k.name,
     icon: k.icon,
     installed: false,
     download: Object.values(k.downloads ?? {})[0] ?? null,
+    downloads: k.downloads ?? {},
   }));
   return [...found, ...missing];
 }
@@ -334,7 +338,8 @@ function clearCartridgeFrames() {
   document.getElementById('controller')?.remove();
   for (const f of document.querySelectorAll('iframe#controller-keychain, iframe[id^="controller-"]')) f.remove();
 }
-export async function connectCartridge(chain, session, base) {
+// signup: 'google' | 'discord' opens Cartridge straight on that login; null shows all of its ways
+export async function connectCartridge(chain, session, base, signup = null) {
   const key = `${chain.network}|${chain.rpcUrl}`;
   if (cartridge?.key === key) return cartridgeFacade(chain);
   clearCartridgeFrames();
@@ -347,6 +352,9 @@ export async function connectCartridge(chain, session, base) {
   const sdk = sdkFor(cchain, session, base);
   // pre-approve deposits so they go through without a popup each time
   const policies = chain.tokens.map((t) => ({ target: t.id, method: 'transfer' }));
+  // Starkzap does not pass sign-up options through: scripts/build-wallets.js hands this one to
+  // the Controller's connect()
+  globalThis.__darkbagsCartridgeSignup = signup ? [signup] : undefined;
   try {
     const { wallet } = await sdk.onboard({ strategy: OnboardStrategy.Cartridge, cartridge: { policies }, deploy: 'if_needed' });
     const name = (await wallet.username?.().catch(() => null)) || 'Cartridge';
@@ -355,6 +363,8 @@ export async function connectCartridge(chain, session, base) {
     clearCartridgeFrames();
     if (/failed to initialize/i.test(String(e?.message))) throw new Error('Cartridge did not load. Check that x.cartridge.gg is not blocked (ad blocker, strict tracking protection, VPN) and try again.');
     throw e;
+  } finally {
+    globalThis.__darkbagsCartridgeSignup = undefined;
   }
   return cartridgeFacade(chain);
 }

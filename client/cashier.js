@@ -228,25 +228,58 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     $('login-private-note').hidden = shadow || !cs.chain?.routes?.includes('private');
   }
 
+  // The wallets, in a fixed order (the ones players ask about first), then any other the browser
+  // has. Installed: sign in. Missing on a phone: open this page in the wallet app's own browser
+  // (Braavos and Xverse publish a link for it; the others get the address to paste there).
+  // Missing on a computer: where to get it.
+  const ORDER = ['ready', 'braavos', 'xverse', 'okx', 'keplr'];
+  const rank = (w) => {
+    const n = `${w.id} ${w.name}`.toLowerCase();
+    const i = ORDER.findIndex((k) => n.includes(k) || (k === 'ready' && n.includes('argent')));
+    return i < 0 ? ORDER.length : i;
+  };
+  const phone = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  const appLink = (w) => {
+    const n = `${w.id} ${w.name}`.toLowerCase();
+    if (n.includes('braavos')) return `https://link.braavos.app/dapp/${location.host}`;
+    if (n.includes('xverse')) return `https://connect.xverse.app/browser?url=${encodeURIComponent(location.origin + location.pathname)}`;
+    return null;
+  };
+  const shortName = (w) => (/argent|ready/i.test(w.name) ? 'Ready' : w.name);
+  const letter = (w) => `<span class="lr-ico lr-letter">${esc(shortName(w).slice(0, 1))}</span>`;
   function renderWallets(list) {
     const box = $('wallet-list');
+    // MetaMask's Starknet snap is offered only when it is there
+    list = list.filter((w) => w.installed || !/metamask/i.test(w.name)).sort((a, b) => rank(a) - rank(b) || Number(b.installed) - Number(a.installed));
     if (!list.length) {
-      box.innerHTML = '<p class="fine">No Starknet wallet found in this browser.</p>';
+      box.innerHTML = `<p class="fine">${t('cx.noWallets')}</p>`;
       return;
     }
+    const mobile = phone();
     box.replaceChildren(
       ...list.map((w) => {
-        const el = document.createElement(w.installed ? 'button' : 'a');
-        el.className = `opt wallet ${w.installed ? '' : 'missing'}`;
-        const icon = w.icon && /^data:image\/|^https:\/\//.test(w.icon) ? `<img src="${esc(w.icon)}" alt="">` : '<span class="noicon"></span>';
-        el.innerHTML = `${icon}<span class="opt-name">${esc(w.name)}</span><span class="opt-sub">${w.installed ? 'installed' : 'get it'}</span>`;
+        const link = !w.installed && mobile ? appLink(w) : null;
+        const copy = !w.installed && mobile && !link;
+        const get = !w.installed && !mobile ? w.download : null;
+        const el = document.createElement(link || get ? 'a' : 'button');
+        el.className = `opt lrow wallet${w.installed ? '' : ' missing'}`;
+        const icon = w.icon && /^data:image\/|^https:\/\//.test(w.icon) ? `<span class="lr-ico"><img src="${esc(w.icon)}" alt=""></span>` : letter(w);
+        const sub = w.installed ? t('cx.wConnect') : link ? t('cx.wOpenApp') : copy ? t('cx.wCopy') : t('cx.wGet');
+        el.innerHTML = `${icon}<span class="opt-name">${esc(shortName(w))}</span><span class="opt-sub">${esc(sub)}</span>`;
         if (w.installed) {
           el.type = 'button';
           el.addEventListener('click', () => (cs.chain?.shadow && cs.loginMode === 'shadow' ? signInShadow(w) : signInWith(`extension:${w.name}`, async () => (await vendor()).connectExtension(w, cs.chain))));
-        } else if (w.download) {
-          el.href = w.download;
-          el.target = '_blank';
+        } else if (link || get) {
+          el.href = link ?? get;
+          el.target = link ? '_self' : '_blank';
           el.rel = 'noopener';
+        } else {
+          el.type = 'button';
+          el.addEventListener('click', async () => {
+            const url = location.origin + location.pathname;
+            await navigator.clipboard?.writeText(url).catch(() => {});
+            setStatus('connect-status', t('cx.wCopied', { w: shortName(w), u: url }));
+          });
         }
         return el;
       }),
@@ -892,7 +925,8 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
     if (cs.kind === 'privy') cs.vendor?.privyAuth.logout(cs.chain.login.privy).catch(() => {});
     await cs.facade?.disconnect?.().catch(() => {});
   });
-  $('btn-cartridge').addEventListener('click', () => signInWith('cartridge', async () => (await vendor()).connectCartridge(cs.chain, app.token, base)));
+  // Google, Discord, Cartridge: one Cartridge account each way in (Google and Discord open on that login)
+  for (const b of document.querySelectorAll('#login-cartridge [data-cart]')) b.addEventListener('click', () => signInWith('cartridge', async () => (await vendor()).connectCartridge(cs.chain, app.token, base, b.dataset.cart || null)));
   $('privy-send').addEventListener('click', privySend);
   $('privy-verify').addEventListener('click', privyVerify);
   $('privy-code').addEventListener('keydown', (e) => e.key === 'Enter' && privyVerify());

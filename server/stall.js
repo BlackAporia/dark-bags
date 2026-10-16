@@ -49,15 +49,27 @@ function remember(s) {
   console.warn(`stall ${s.ms} ms${s.during.length ? ` during ${s.during.join(', ')}` : ''}`);
 }
 
-export function watchStalls({ every = 100, over = 150 } = {}) {
+// live(): how many matches were being played (a stall nobody played through costs nothing).
+// The CPU this process used across the pause tells the two kinds apart: our own code (or GC)
+// burns it; a host that paused or throttled the container leaves it near zero.
+export function watchStalls({ every = 100, over = 150, live = () => null } = {}) {
   let last = performance.now();
+  let cpu = process.cpuUsage();
   const t = setInterval(() => {
     const now = performance.now();
     const late = now - last - every;
     last = now;
+    const c = process.cpuUsage(cpu);
+    cpu = process.cpuUsage();
     if (late > over) {
       const gc = gcs.filter((g) => g.end > now - late - every - 50).map((g) => `GC ${g.kind} ${g.ms} ms`);
-      remember({ at: Date.now(), ms: Math.round(late), during: [...busy.keys(), ...gc] });
+      const used = Math.round((c.user + c.system) / 1000);
+      const why = busy.size || gc.length ? [] : [used < (late + every) * 0.3 ? `host paused the server (it ran ${used} ms of CPU)` : `untracked work (${used} ms of CPU)`];
+      let n = null;
+      try {
+        n = live();
+      } catch {}
+      remember({ at: Date.now(), ms: Math.round(late), during: [...busy.keys(), ...gc, ...why], ...(n != null ? { live: n } : {}) });
     }
   }, every);
   t.unref?.();
