@@ -114,7 +114,7 @@ The campaign of the Stroke, told as co-op missions (`shared/story.js`, `client/s
 | **Checkpoints** | Between stages: the Descent's camp shop, then on (no way out but through). If every human goes down, the stage starts over from its checkpoint: 2 retries on Easy, 1 on Hard, none on Hardcore. |
 | **Tickets** | The Descent's tickets, one book: Easy 1, Hard 3, Hardcore 5; the free daily ticket opens either. |
 | **Rewards** | Only for completing the whole operation: its items the first time on each difficulty (Easy: the *First Stroke* weapon finish and the *Last Platform* banner; Hard: the *Tunnel Runner* armour and the *Third Rail* finish; Hardcore: the *Last Train* armour, ring and name style), rank XP every time; owned items pay XP. The Descent's fair play holds (carried and flagged accounts keep the XP only). The most survivors brought out is recorded for the story's ending. |
-| **Films and radio** | A film before the first stage and after the boss, a card before every other stage, and the squad's radio during the fight, all subtitled in the game's 11 languages from `client/strings/`. Videos go in `site/media/story/` (brief: `videos/story-op1/BRIEF.md`); until one is there, or when it is slow or the player saves data, the engine draws the same scene under the same subtitles. |
+| **Films and radio** | A film before the first stage and after the boss, a card before every other stage, and the squad's radio during the fight, all subtitled in the game's 11 languages from `client/strings/`. The films are in `site/media/story/` (mp4 and webm, 1080p and 720p), rendered from the engine's own scenes with a synthesized score and the announcer's Piper voice (`scripts/story/`, brief: `videos/story-op1/BRIEF.md`); when a film is missing or slow, or the player saves data, the engine draws the same scene under the same subtitles. |
 
 ## Locker, shop and boxes
 
@@ -134,7 +134,7 @@ Opening is a show: the box charges up and glows through the rarities up to your 
 **Announcer**: first blood, double and triple kills, rampage, godlike, victory, extraction, the final circle and, in deathmatch, "you have taken / lost the lead" are recorded voice lines (`client/voice-data.js`, about 100 KB) played through the game's own mixer, so they work on every device and follow the sound volume; the music ducks under them. One English announcer for every language, like the big shooters; each line comes with a medal in the centre of the screen (`client/medals.js`): first blood, multi-kills, headshot, long shot, knife kill. Off in Settings.
 
 Voices (generated offline with [Piper](https://github.com/rhasspy/piper), MIT):
-English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0).
+English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0). The story films' narrator is the same voice; Tower on the radio is LibriTTS speaker 60.
 
 **Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
 

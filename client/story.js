@@ -3,7 +3,7 @@
 // operation's own lines for the Descent's HUD (client/descent.js runs the run itself).
 //
 // A film is a script: timed subtitle lines (every language from client/strings) over a video
-// when one is published under site/media/story/<id>.mp4 (and <id>-720.mp4 for phones), or over a
+// when one is published under site/media/story/<id>.mp4 / .webm (and <id>-720 for phones), or over a
 // scene the engine draws when there is none, it fails to load, or the player saves data. The
 // same subtitles serve both, so a new language costs strings, not a re-render.
 import { t, getLang } from './i18n.js';
@@ -161,8 +161,13 @@ export class Cinema {
     this.useVideo = false;
     const saveData = !!navigator.connection?.saveData;
     const base = video && F.op && !saveData ? mediaBase() : null;
-    if (base && typeof film === 'string') this.tryVideo(`${base}${film}${Math.min(innerWidth, innerHeight) < 600 ? '-720' : ''}.mp4`);
-    this.P = Array.from({ length: reduced ? 0 : 120 }, (_, i) => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() * 1.8, v: 0.01 + Math.random() * 0.04, p: i }));
+    if (base && typeof film === 'string') {
+      // H.264 where the browser has it, VP9 where it does not (open Chromium builds)
+      const v = this.video;
+      const ext = v.canPlayType('video/mp4; codecs="avc1.640028, mp4a.40.2"') ? 'mp4' : v.canPlayType('video/webm; codecs="vp9, opus"') ? 'webm' : null;
+      if (ext) this.tryVideo(`${base}${film}${Math.min(innerWidth, innerHeight) < 600 ? '-720' : ''}.${ext}`);
+    }
+    this.P = filmParticles(reduced ? 0 : 120);
     const loop = (now) => {
       if (this.el.hidden) return;
       const secs = this.useVideo && this.video.duration ? this.video.currentTime : (now - this.t0) / 1000;
@@ -223,12 +228,7 @@ export class Cinema {
     const w = Math.round(innerWidth * Math.min(2, devicePixelRatio || 1));
     const h = Math.round(innerHeight * Math.min(2, devicePixelRatio || 1));
     if (c.width !== w || c.height !== h) [c.width, c.height] = [w, h];
-    const x = c.getContext('2d');
-    const k = Math.min(1, secs / this.F.secs);
-    const scene = SCENES[this.F.scene] ?? SCENES.metro;
-    x.save();
-    scene(x, w, h, { secs, k, now, P: this.P, reduced: this.reduced, vars: this.vars });
-    x.restore();
+    drawFilm(c.getContext('2d'), w, h, this.F, secs, { vars: this.vars, P: this.P, reduced: this.reduced });
   }
 
   stop(silent = false) {
@@ -257,6 +257,66 @@ export class Cinema {
 }
 
 // ------------------------------------------------------------- the scenes
+
+// the dust of a film: the same every time it plays (and in the published render)
+export function filmParticles(n = 120) {
+  let r = 7;
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647);
+  return Array.from({ length: n }, (_, i) => ({ x: rnd(), y: rnd(), s: 0.5 + rnd() * 1.8, v: 0.01 + rnd() * 0.04, p: i }));
+}
+
+/**
+ * One frame of a film's scene at `secs`: what plays when there is no video, and what
+ * scripts/story/render-films.mjs records into the video. Deterministic: the same second draws
+ * the same frame.
+ */
+export function drawFilm(x, w, h, film, secs, { vars = {}, P = filmParticles(), reduced = false } = {}) {
+  const F = typeof film === 'string' ? FILMS[film] : film;
+  if (!F) return;
+  const scene = SCENES[F.scene] ?? SCENES.metro;
+  const k = Math.min(1, secs / F.secs);
+  const now = secs * 1000;
+  x.save();
+  // a slow push in, the camera breathing a little
+  const z = reduced ? 1 : 1 + 0.07 * k;
+  x.translate(w / 2, h / 2);
+  x.scale(z, z);
+  if (!reduced) x.translate(Math.sin(secs * 0.4) * 3, Math.cos(secs * 0.3) * 2);
+  x.translate(-w / 2, -h / 2);
+  scene(x, w, h, { secs, k, now, P, reduced, vars });
+  x.restore();
+  post(x, w, h, secs, reduced);
+}
+
+// the film look over every scene: a vignette and a little grain
+let GRAIN = null;
+function post(x, w, h, secs, reduced) {
+  const g = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.55)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, w, h);
+  if (reduced) return;
+  if (!GRAIN) {
+    GRAIN = document.createElement('canvas');
+    GRAIN.width = GRAIN.height = 128;
+    const gx = GRAIN.getContext('2d');
+    const d = gx.createImageData(128, 128);
+    let r = 3;
+    for (let i = 0; i < d.data.length; i += 4) {
+      r = (r * 16807) % 2147483647;
+      d.data[i] = d.data[i + 1] = d.data[i + 2] = r % 256;
+      d.data[i + 3] = 255;
+    }
+    gx.putImageData(d, 0, 0);
+  }
+  x.save();
+  x.globalAlpha = 0.055;
+  x.translate(-Math.floor((secs * 997) % 128), -Math.floor((secs * 631) % 128));
+  x.fillStyle = x.createPattern(GRAIN, 'repeat');
+  x.fillRect(0, 0, w + 128, h + 128);
+  x.restore();
+}
 
 const S = (w, h) => Math.min(w, h) / 900;
 const ease = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
@@ -431,6 +491,16 @@ const SCENES = {
     }
     const wipe = seg(secs, 25.5, 34);
     if (wipe > 0) wipeWall(x, h, wipe * w * 0.55, s, reduced ? 0 : now);
+    // the flash: a bloom from the sky, then white
+    const bloom = seg(secs, 7.4, 8.6) * (secs < 9.5 ? 1 : 0);
+    if (bloom > 0) {
+      const b = x.createRadialGradient(w * 0.5, h * 0.15, 0, w * 0.5, h * 0.15, Math.max(w, h) * bloom);
+      b.addColorStop(0, `rgba(255,255,255,${0.9 * bloom})`);
+      b.addColorStop(0.4, `rgba(186,230,253,${0.35 * bloom})`);
+      b.addColorStop(1, 'rgba(186,230,253,0)');
+      x.fillStyle = b;
+      x.fillRect(0, 0, w, h);
+    }
     if (flash > 0) {
       x.fillStyle = `rgba(255,255,255,${flash})`;
       x.fillRect(0, 0, w, h);

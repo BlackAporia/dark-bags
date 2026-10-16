@@ -9,6 +9,17 @@ language: none on screen (the game adds the subtitles)
 
 # Operation 1, The Tunnels: the films
 
+**Rendered:** `site/media/story/op1-intro.*` and `op1-outro.*` (mp4 and webm, 1080p and 720p)
+are rendered from the engine's own scenes with a synthesized score and a Piper voice:
+
+```bash
+python3 scripts/story/make-audio.py --model en-us-libritts-high.onnx --out /tmp/story-audio
+node scripts/story/render-films.mjs /tmp/story-audio
+```
+
+The rest of this brief is for replacing them with generated or hand-made films: keep the file
+names and the timings, and the game picks them up.
+
 Two films for the first story operation (`shared/story.js`, `client/story.js`). The game plays
 them before the first stage and after the boss. Until they exist, the game draws the same scenes
 itself (`SCENES.stroke` and `SCENES.train` in `client/story.js`), so the films replace that
@@ -75,6 +86,7 @@ in the voice, or record one take per count (0–6) if the voice should say it.
 
 - `op1-intro.mp4`, `op1-outro.mp4`: 1920×1080, H.264, AAC, under 10 MB each.
 - `op1-intro-720.mp4`, `op1-outro-720.mp4`: 1280×720 for phones, under 5 MB each.
+- The same four as `.webm` (VP9, Opus): browsers without H.264 (open Chromium builds) play those.
 - Put them in `site/media/story/`. The game looks for them there (on Pages: `/media/story/`, on
   the game server: `/site/media/story/`, or anywhere with `?media=<url>`). If a file is missing,
   slow or the player saves data, the engine's own scene plays instead with the same subtitles.
