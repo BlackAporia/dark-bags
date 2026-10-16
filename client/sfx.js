@@ -44,6 +44,7 @@ export class Sfx {
         this.music.setEnabled(this.musicOn);
         this.music.setVolume(this.musicVolume ?? 1);
         this.music.choose(this.trackChoice ?? 'auto');
+        this.music.chooseLobby(this.menuChoice ?? 'auto');
         this.startStormBed();
       } catch {
         this.ctx = null;

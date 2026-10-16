@@ -11,7 +11,8 @@ const DEFAULTS = {
   gore: false, // 18+: limbs come off
   sound: 0.9, // 0..1
   music: 0.6, // 0..1
-  track: 'auto', // the raid soundtrack: auto (a different track each match) or one track id
+  track: 'auto', // the match soundtrack: auto (a different track each match) or one track id
+  menuTrack: 'auto', // the menu soundtrack: auto (they take turns) or one track id
   voice: true, // the announcer (first blood, double kill, …) in your language
   vchat: true, // voice chat in the match (hear others; K for your own microphone)
   stick: 1, // touch stick size, 0.8..1.4
