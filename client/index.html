@@ -419,6 +419,13 @@
 <dialog id="dlg-connect" class="dlg" aria-labelledby="dlg-connect-title">
   <div class="dlg-inner">
     <header class="dlg-head"><h2 id="dlg-connect-title" data-i18n="cx.connectT">Sign in to play for tokens</h2><button type="button" class="x" data-close aria-label="Close">×</button></header>
+    <!-- social sign-in goes through Cartridge Controller (a Starknet smart account, no seed phrase):
+         Google and Discord open it straight on that login, Cartridge shows all of its ways in -->
+    <section id="login-cartridge" class="opt-group login-list" hidden>
+      <button type="button" class="opt lrow" data-cart="google"><span class="lr-ico lr-white"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg></span><span class="opt-name">Google</span><span class="opt-sub" data-i18n="cx.viaCart">via Cartridge</span></button>
+      <button type="button" class="opt lrow" data-cart="discord"><span class="lr-ico lr-discord"><svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#fff" d="M247.51,174.39,218,58a16.08,16.08,0,0,0-13-11.88l-36.06-5.92a16.22,16.22,0,0,0-18.26,11.88l-.21.85a4,4,0,0,0,3.27,4.93,155.62,155.62,0,0,1,24.41,5.62,8.2,8.2,0,0,1,5.62,9.7,8,8,0,0,1-10.19,5.64,155.4,155.4,0,0,0-90.8-.1,8.22,8.22,0,0,1-10.28-4.81,8,8,0,0,1,5.08-10.33,156.85,156.85,0,0,1,24.72-5.72,4,4,0,0,0,3.27-4.93l-.21-.85A16.21,16.21,0,0,0,87.08,40.21L51,46.13A16.08,16.08,0,0,0,38,58L8.49,174.39a15.94,15.94,0,0,0,9.06,18.51l67,29.71a16.17,16.17,0,0,0,21.71-9.1l3.49-9.45a4,4,0,0,0-3.27-5.35,158.13,158.13,0,0,1-28.63-6.2,8.2,8.2,0,0,1-5.61-9.67,8,8,0,0,1,10.2-5.66,155.59,155.59,0,0,0,91.12,0,8,8,0,0,1,10.19,5.65,8.19,8.19,0,0,1-5.61,9.68,157.84,157.84,0,0,1-28.62,6.2,4,4,0,0,0-3.27,5.35l3.49,9.45a16.18,16.18,0,0,0,21.71,9.1l67-29.71A15.94,15.94,0,0,0,247.51,174.39ZM92,152a12,12,0,1,1,12-12A12,12,0,0,1,92,152Zm72,0a12,12,0,1,1,12-12A12,12,0,0,1,164,152Z"/></svg></span><span class="opt-name">Discord</span><span class="opt-sub" data-i18n="cx.viaCart">via Cartridge</span></button>
+      <button type="button" id="btn-cartridge" class="opt lrow" data-cart=""><span class="lr-ico lr-dark"><svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#ffc94a" d="M247.44,173.75a.68.68,0,0,0,0-.14L231.05,89.44c0-.06,0-.12,0-.18A60.08,60.08,0,0,0,172,40H83.89a59.88,59.88,0,0,0-59,49.52L8.58,173.61a.68.68,0,0,0,0,.14,36,36,0,0,0,60.9,31.71l.35-.37L109.52,160h37l39.71,45.09c.11.13.23.25.35.37A36.08,36.08,0,0,0,212,216a36,36,0,0,0,35.43-42.25ZM104,112H96v8a8,8,0,0,1-16,0v-8H72a8,8,0,0,1,0-16h8V88a8,8,0,0,1,16,0v8h8a8,8,0,0,1,0,16Zm40-8a8,8,0,0,1,8-8h24a8,8,0,0,1,0,16H152A8,8,0,0,1,144,104Zm84.37,87.47a19.84,19.84,0,0,1-12.9,8.23A20.09,20.09,0,0,1,198,194.31L167.8,160H172a60,60,0,0,0,51-28.38l8.74,45A19.82,19.82,0,0,1,228.37,191.47Z"/></svg></span><span class="opt-name">Cartridge</span><span class="opt-sub" data-i18n="cx.cartPasskey">passkey &amp; more</span></button>
+    </section>
     <section class="opt-group">
       <p class="eyebrow" data-i18n="cx.swallet">Starknet wallet</p>
       <!-- private mode: play from a STRK20 shadow account nothing on chain links to your wallet -->
@@ -428,12 +435,8 @@
       </div>
       <p id="login-mode-note" class="fine login-mode-note" hidden></p>
       <label id="login-carry" class="fine login-carry" hidden><input type="checkbox" id="carry-cb" checked> <span data-i18n="cx.carry">Bring my rank, skins and items to the private account</span></label>
-      <div id="wallet-list" class="wallet-list"><p class="fine" data-i18n="cx.looking">Looking for wallets…</p></div>
+      <div id="wallet-list" class="wallet-list login-list"><p class="fine" data-i18n="cx.looking">Looking for wallets…</p></div>
       <p class="fine" id="login-private-note" hidden data-i18n="cx.privNote">Any Starknet wallet works. Ready and Xverse can also deposit and cash out privately through the STRK20 pool.</p>
-    </section>
-    <section id="login-cartridge" class="opt-group" hidden>
-      <p class="eyebrow" data-i18n="cx.noWallet">No wallet · Cartridge</p>
-      <button type="button" id="btn-cartridge" class="opt"><span class="opt-name">Cartridge Controller</span><span class="opt-sub" data-i18n="cx.cartSub">passkey or social login, gasless</span></button>
     </section>
     <section id="login-privy" class="opt-group" hidden>
       <p class="eyebrow" data-i18n="cx.privyT">Email or social · Privy</p>

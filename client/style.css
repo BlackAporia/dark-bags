@@ -3369,3 +3369,21 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .login-carry input { margin-top: 2px; }
 .wd-shadow { margin-top: 10px; }
 .wd-shadow button { margin-top: 6px; }
+
+/* sign-in: one row per way in (Google, Discord, Cartridge, then the wallets), icon tile on the
+   left, what the tap does on the right */
+.login-list { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.opt.lrow { box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 60px; border-radius: 16px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.12); transition: border-color 0.15s, background 0.15s, transform 0.1s; }
+.opt.lrow:hover { border-color: rgba(255, 255, 255, 0.32); background: rgba(255, 255, 255, 0.08); }
+.opt.lrow:active { transform: scale(0.99); }
+.opt.lrow .opt-name { flex: 1; font-size: 17px; font-weight: 700; }
+.opt.lrow .opt-sub { flex: none; font-size: 14px; color: var(--dust); text-align: right; }
+.opt.lrow.missing { opacity: 1; }
+.lr-ico { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; overflow: hidden; background: #11141c; }
+.lr-ico svg { width: 26px; height: 26px; }
+.lr-ico img { width: 40px; height: 40px; object-fit: cover; border-radius: 0; background: none; }
+.lr-white { background: #fff; }
+.lr-discord { background: #5865f2; }
+.lr-dark { background: #0c0c0e; box-shadow: inset 0 0 0 1px rgba(255, 201, 74, 0.25); }
+.lr-letter { background: #1d2230; color: var(--paper); font: 800 18px/1 var(--f-display); }
+@media (max-width: 420px) { .opt.lrow { min-height: 54px; gap: 12px; } .opt.lrow .opt-name { font-size: 16px; } .opt.lrow .opt-sub { font-size: 12px; } .lr-ico { width: 36px; height: 36px; } .lr-ico img { width: 36px; height: 36px; } }

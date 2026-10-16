@@ -162,7 +162,8 @@ const SAVE_GAP = 60; // ms between two saves in the queue
 // batches (a deploy or restart saves everything on the way out anyway)
 const SAVE_SOON = 5000;
 const SAVE_LATER = 30000;
-watchStalls();
+// (lobby is made further down: until then the count throws and reads as unknown)
+watchStalls({ live: () => [...lobby.rooms.values()].filter((r) => r.state === 'live').length });
 // players, friends, messages, guilds: on the data volume when there is one
 
 // ------------------------------------------------------------------ wallet

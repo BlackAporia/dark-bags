@@ -29,13 +29,16 @@ await build({
     {
       // Starkzap gives the Cartridge keychain iframe 10 s to load, then fails with "Cartridge
       // Controller failed to initialize". On a busy browser (many extensions, slow network) it
-      // needs longer: give it 45 s.
+      // needs longer: give it 45 s. And it calls connect() bare: our sign-up choice goes in.
       name: 'cartridge-wait',
       setup(b) {
         b.onLoad({ filter: /starkzap[\\/]dist[\\/]src[\\/]wallet[\\/]cartridge\.js$/ }, async (args) => {
           const src = await readFile(args.path, 'utf8');
-          const out = src.replace('const MAX_CONTROLLER_WAIT_MS = 10000;', 'const MAX_CONTROLLER_WAIT_MS = 45000;');
-          if (out === src) console.warn('build-wallets: Starkzap changed, the Cartridge wait patch did not apply');
+          const out = src
+            .replace('const MAX_CONTROLLER_WAIT_MS = 10000;', 'const MAX_CONTROLLER_WAIT_MS = 45000;')
+            // Google / Discord buttons: the Controller opens on that one login (client/chain/entry.js)
+            .replace('await controller.connect();', 'await controller.connect(globalThis.__darkbagsCartridgeSignup);');
+          if (!out.includes('MAX_CONTROLLER_WAIT_MS = 45000') || !out.includes('__darkbagsCartridgeSignup')) console.warn('build-wallets: Starkzap changed, a Cartridge patch did not apply');
           return { contents: out, loader: 'js' };
         });
       },

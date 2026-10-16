@@ -179,7 +179,7 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
     if (Array.isArray(report.stalls) && report.stalls.length)
       onStalls(
         region,
-        report.stalls.slice(0, 20).map((x) => ({ at: Number(x?.at) || now(), ms: Math.max(0, Math.round(Number(x?.ms) || 0)), during: (Array.isArray(x?.during) ? x.during : []).slice(0, 6).map((d) => String(d).slice(0, 60)) })),
+        report.stalls.slice(0, 20).map((x) => ({ at: Number(x?.at) || now(), ms: Math.max(0, Math.round(Number(x?.ms) || 0)), during: (Array.isArray(x?.during) ? x.during : []).slice(0, 6).map((d) => String(d).slice(0, 60)), ...(Number.isFinite(x?.live) ? { live: Math.max(0, Math.round(x.live)) } : {}) })),
       );
     const touched = new Set();
     for (const id of report.redeemed ?? []) {

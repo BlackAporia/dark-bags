@@ -56,9 +56,13 @@ function lerpAngle(a, b, t) {
 // What breaks on a player's device is invisible to us: a frame or script error goes to the server
 // (a few per page, each message once) so it shows on the team's analytics page.
 const reported = new Set();
+// Errors that are not the game's: a browser extension's own (MetaMask, Phantom… inject scripts
+// into every page and fail there), or a wallet the player closed. Kept out of the team's list.
+const NOT_OURS = /chrome-extension:|moz-extension:|safari-web-extension:|Failed to connect to MetaMask|MetaMask extension not found|User rejected|User denied|User canceled|User cancelled|Request rejected|ResizeObserver loop/i;
 export function reportError(where, e) {
   try {
     const m = String(e?.message ?? e).slice(0, 300);
+    if (NOT_OURS.test(m) || NOT_OURS.test(String(e?.stack ?? '')) || NOT_OURS.test(String(e?.filename ?? ''))) return;
     if (reported.has(m) || reported.size >= 8) return;
     reported.add(m);
     globalThis.__darkbagsSend?.({ t: 'cerr', where, m, st: String(e?.stack ?? '').slice(0, 900), ua: navigator.userAgent.slice(0, 160) });
