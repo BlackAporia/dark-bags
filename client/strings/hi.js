@@ -142,6 +142,7 @@ export default {
   'cx.wOpenApp': "ऐप में खोलें",
   'cx.wCopy': "लिंक कॉपी करें",
   'cx.wGet': "इंस्टॉल करें",
+  'cx.wNoShadow': "निजी मोड नहीं",
   'cx.wCopied': "लिंक कॉपी हुआ: {u} को {w} के ब्राउज़र में खोलें और वहीं साइन इन करें।",
   'cx.noWallets': "इस ब्राउज़र में कोई Starknet वॉलेट नहीं मिला।",
   'cx.privyT': "ईमेल या सोशल · Privy",

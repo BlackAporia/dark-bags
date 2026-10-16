@@ -142,6 +142,7 @@ export default {
   'cx.wOpenApp': "uygulamada aç",
   'cx.wCopy': "bağlantıyı kopyala",
   'cx.wGet': "yükle",
+  'cx.wNoShadow': "gizli mod yok",
   'cx.wCopied': "Bağlantı kopyalandı: {u} adresini {w} tarayıcısında aç ve orada giriş yap.",
   'cx.noWallets': "Bu tarayıcıda Starknet cüzdanı yok.",
   'cx.privyT': "E-posta veya sosyal · Privy",

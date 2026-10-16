@@ -142,6 +142,7 @@ export default {
   'cx.wOpenApp': "افتح في التطبيق",
   'cx.wCopy': "انسخ الرابط",
   'cx.wGet': "ثبّت",
+  'cx.wNoShadow': "لا يدعم الوضع الخاص",
   'cx.wCopied': "تم نسخ الرابط: افتح {u} في متصفح {w} وسجّل الدخول هناك.",
   'cx.noWallets': "لا توجد محفظة Starknet في هذا المتصفح.",
   'cx.privyT': "بريد أو حساب اجتماعي · Privy",

@@ -143,6 +143,7 @@ export default {
   "cx.wOpenApp": "fungua kwenye programu",
   "cx.wCopy": "nakili kiungo",
   "cx.wGet": "pakua",
+  "cx.wNoShadow": "hakuna hali ya faragha",
   "cx.wCopied": "Kiungo kimenakiliwa: fungua {u} kwenye kivinjari cha {w} na uingie huko.",
   "cx.noWallets": "Hakuna pochi ya Starknet kwenye kivinjari hiki.",
   "cx.privyT": "Barua pepe au mitandao · Privy",

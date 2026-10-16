@@ -142,6 +142,7 @@ export default {
   'cx.wOpenApp': "在应用中打开",
   'cx.wCopy': "复制链接",
   'cx.wGet': "安装",
+  'cx.wNoShadow': "不支持私密模式",
   'cx.wCopied': "链接已复制：在 {w} 的浏览器中打开 {u} 并登录。",
   'cx.noWallets': "此浏览器中没有 Starknet 钱包。",
   'cx.privyT': "邮箱或社交账号 · Privy",

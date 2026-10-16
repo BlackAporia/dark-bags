@@ -142,6 +142,7 @@ export default {
   'cx.wOpenApp': "abrir no app",
   'cx.wCopy': "copiar link",
   'cx.wGet': "instalar",
+  'cx.wNoShadow': "sem modo privado",
   'cx.wCopied': "Link copiado: abra {u} no navegador da {w} e entre por lá.",
   'cx.noWallets': "Nenhuma carteira Starknet neste navegador.",
   'cx.privyT': "Email ou redes · Privy",

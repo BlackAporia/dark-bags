@@ -143,6 +143,7 @@ export default {
   'cx.wOpenApp': "open in app",
   'cx.wCopy': "copy link for the app",
   'cx.wGet': "get it",
+  'cx.wNoShadow': "no private mode",
   'cx.wCopied': "Link copied: open {u} in {w}'s browser and sign in there.",
   'cx.noWallets': "No Starknet wallet found in this browser.",
   'cx.privyT': "Email or social · Privy",
