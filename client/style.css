@@ -3446,3 +3446,5 @@ body.dx-camping .op-radio { bottom: calc(24px + var(--safe-b)); }
   .op-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .op-radio { bottom: calc(170px + var(--safe-b)); }
 }
+
+.opt.lrow.no-shadow { opacity: 0.55; }

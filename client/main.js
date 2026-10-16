@@ -1916,6 +1916,10 @@ function applySetting(k) {
     sfx.trackChoice = settings.track;
     sfx.music?.choose(settings.track);
   }
+  if (k === 'menuTrack') {
+    sfx.menuChoice = settings.menuTrack;
+    sfx.music?.chooseLobby(settings.menuTrack);
+  }
   if (k === 'gore') {
     app.gore = settings.gore;
     game.gore = settings.gore;
@@ -1926,7 +1930,7 @@ function applySetting(k) {
   if (k === 'motion') document.documentElement.classList.toggle('no-motion', !settings.motion);
 }
 onSetting(applySetting);
-for (const k of ['quality', 'sound', 'music', 'track', 'voice', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
+for (const k of ['quality', 'sound', 'music', 'track', 'menuTrack', 'voice', 'gore', 'stick', 'lefty', 'motion']) applySetting(k);
 $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 // Online and PvE share the server: the tab only picks which modes are on the board
 function pickTab(pve) {

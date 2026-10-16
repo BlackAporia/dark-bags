@@ -215,6 +215,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         cs.loginMode = b.dataset.lm;
         store.set('darkbags.loginMode', cs.loginMode);
         renderLoginMode();
+        if (cs.walletList) renderWallets(cs.walletList); // private mode lists only the wallets it works with
       };
     }
     const shadow = on && cs.loginMode === 'shadow';
@@ -247,10 +248,17 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   };
   const shortName = (w) => (/argent|ready/i.test(w.name) ? 'Ready' : w.name);
   const letter = (w) => `<span class="lr-ico lr-letter">${esc(shortName(w).slice(0, 1))}</span>`;
+  // Shadow Accounts need the STRK20 Wallet API (0.10.4): Ready and Xverse ship it. Other wallets
+  // stay listed in private mode only when installed (the sign-in asks the wallet itself and says
+  // so if it cannot); one missing there is not offered at all.
+  const SHADOW_WALLET = /ready|argent|xverse/i;
   function renderWallets(list) {
+    cs.walletList = list;
     const box = $('wallet-list');
+    const shadow = !!cs.chain?.shadow && cs.loginMode === 'shadow';
     // MetaMask's Starknet snap is offered only when it is there
-    list = list.filter((w) => w.installed || !/metamask/i.test(w.name)).sort((a, b) => rank(a) - rank(b) || Number(b.installed) - Number(a.installed));
+    list = list.filter((w) => (w.installed || !/metamask/i.test(w.name)) && (!shadow || w.installed || SHADOW_WALLET.test(w.name))).sort((a, b) => rank(a) - rank(b) || Number(b.installed) - Number(a.installed));
+    if (shadow) list.sort((a, b) => Number(SHADOW_WALLET.test(b.name)) - Number(SHADOW_WALLET.test(a.name)));
     if (!list.length) {
       box.innerHTML = `<p class="fine">${t('cx.noWallets')}</p>`;
       return;
@@ -264,7 +272,9 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
         const el = document.createElement(link || get ? 'a' : 'button');
         el.className = `opt lrow wallet${w.installed ? '' : ' missing'}`;
         const icon = w.icon && /^data:image\/|^https:\/\//.test(w.icon) ? `<span class="lr-ico"><img src="${esc(w.icon)}" alt=""></span>` : letter(w);
-        const sub = w.installed ? t('cx.wConnect') : link ? t('cx.wOpenApp') : copy ? t('cx.wCopy') : t('cx.wGet');
+        const noShadow = shadow && !SHADOW_WALLET.test(w.name);
+        const sub = noShadow ? t('cx.wNoShadow') : w.installed ? t('cx.wConnect') : link ? t('cx.wOpenApp') : copy ? t('cx.wCopy') : t('cx.wGet');
+        if (noShadow) el.classList.add('no-shadow');
         el.innerHTML = `${icon}<span class="opt-name">${esc(shortName(w))}</span><span class="opt-sub">${esc(sub)}</span>`;
         if (w.installed) {
           el.type = 'button';
