@@ -7,3 +7,4 @@ client/vendor/
 .strk20-cache/
 cashier*.json
 __pycache__/
+videos/

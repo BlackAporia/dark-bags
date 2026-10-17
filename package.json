@@ -2,7 +2,9 @@
   "name": "dark-bags",
   "version": "0.1.0",
   "private": true,
-  "description": "DARK BAGS \u2014 a browser extraction game with private bags and sats stakes",
+  "description": "DARK BAGS: a top-down extraction shooter in the browser, with private stakes on Starknet",
+  "homepage": "https://dark-bags.com",
+  "repository": { "type": "git", "url": "https://github.com/BlackAporia/dark-bags.git" },
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
