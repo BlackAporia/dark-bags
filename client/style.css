@@ -3442,6 +3442,8 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .op-cine.short .op-bars { display: none; }
 .op-card { --tint: #fb923c; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 20px; text-align: center; pointer-events: none; text-shadow: 0 2px 10px #000; animation: op-card-in 0.6s ease-out both; }
 .op-card[hidden] { display: none; }
+/* the case cards share the name: none of their shape here (it pushed the title off screen) */
+.op-cine .op-card { aspect-ratio: auto; transform-style: flat; transition: none; height: auto; width: auto; }
 .op-card .eyebrow { margin: 0; color: var(--tint); letter-spacing: 0.3em; }
 .op-card h2 { margin: 0; font: 400 clamp(34px, 7vw, 64px)/1 var(--f-display); letter-spacing: 0.05em; }
 .op-card-obj { margin: 0; font-size: 15px; color: var(--gold); }
