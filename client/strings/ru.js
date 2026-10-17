@@ -1509,7 +1509,7 @@ export default {
   'ref.copy': "Копировать",
   'ref.share': "Поделиться",
   'ref.copied': "Ссылка скопирована",
-  'ref.shareText': "Заходи в DARK BAGS, пойдём в рейд вместе. Мой код: {c}",
+  'ref.shareText': "Заходи в DARK BAGS 🎒 бесплатный шутер с эвакуацией прямо в браузере, пойдём в рейд вместе. Мой код: {c} @play_dark_bags",
   'ref.invited': "Приглашено",
   'ref.active': "Сыграли матч",
   'ref.earned': "Ты заработал",

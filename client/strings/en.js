@@ -1517,7 +1517,7 @@ export default {
   'ref.copy': "Copy",
   'ref.share': "Share",
   'ref.copied': "Link copied",
-  'ref.shareText': "Come raid with me in DARK BAGS. My code: {c}",
+  'ref.shareText': "Come raid with me in DARK BAGS 🎒 a free extraction shooter in your browser. My invite code: {c} @play_dark_bags",
   'ref.invited': "Invited",
   'ref.active': "Played a match",
   'ref.earned': "You earned",

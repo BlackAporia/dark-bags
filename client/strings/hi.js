@@ -1509,7 +1509,7 @@ export default {
   'ref.copy': "कॉपी",
   'ref.share': "शेयर",
   'ref.copied': "लिंक कॉपी हुआ",
-  'ref.shareText': "DARK BAGS में मेरे साथ रेड पर चलो। मेरा कोड: {c}",
+  'ref.shareText': "DARK BAGS में मेरे साथ रेड पर चलो 🎒 ब्राउज़र में मुफ़्त एक्सट्रैक्शन शूटर। मेरा कोड: {c} @play_dark_bags",
   'ref.invited': "आमंत्रित",
   'ref.active': "मैच खेला",
   'ref.earned': "आपकी कमाई",

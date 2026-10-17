@@ -1509,7 +1509,7 @@ export default {
   'ref.copy': "Copier",
   'ref.share': "Partager",
   'ref.copied': "Lien copié",
-  'ref.shareText': "Viens faire des raids avec moi sur DARK BAGS. Mon code : {c}",
+  'ref.shareText': "Viens faire des raids avec moi sur DARK BAGS 🎒 un shooter d'extraction gratuit dans ton navigateur. Mon code : {c} @play_dark_bags",
   'ref.invited': "Invités",
   'ref.active': "Ont joué un match",
   'ref.earned': "Tu as gagné",

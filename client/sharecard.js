@@ -8,6 +8,7 @@ import { rankBadgeSvg } from './rankbadge.js';
 import { OUTFIT, RARITIES, usd } from '../shared/cosmetics.js';
 import { usdText } from '../shared/assets.js';
 import { RANKS } from '../shared/ranks.js';
+import { OPS } from '../shared/story.js';
 
 const W = 1200;
 const H = 675;
@@ -241,7 +242,7 @@ export async function renderCard(spec) {
   ctx.fillStyle = '#8d93a6';
   ctx.font = `500 18px ${UI}`;
   ctx.textAlign = 'right';
-  ctx.fillText(spec.footer ?? 'Get out alive · nobody sees your bag', W - 40, H - 25);
+  ctx.fillText(spec.footer ?? 'dark-bags.com · @play_dark_bags', W - 40, H - 25);
   return c;
 }
 
@@ -262,17 +263,23 @@ function wrap(ctx, text, maxW) {
 
 // ------------------------------------------------------------ the moments
 
+// what every post ends with: where to play and who to follow (the game's X account)
+const CTA = '\n\nPlay free in your browser 👉 @play_dark_bags #DARKBAGS';
+const kills = (n) => `${n ?? 0} ${n === 1 ? 'kill' : 'kills'}`;
+const DIFF_NAME = { easy: 'Easy', hard: 'Hard', hardcore: 'Hardcore' };
+const OP_NAME = { tunnels: 'The Tunnels' };
+
 // Turn a game moment into { spec, text } for the card and the post.
 export function moment(kind, d) {
   const look = d.look;
-  const tag = '#DARKBAGS';
+  const tag = CTA;
   switch (kind) {
     case 'win': {
       const pnl = d.payout - d.stake;
       const pct = Math.round((pnl / d.stake) * 100);
       return {
         spec: { accent: '#3ddc97', kicker: d.won ? 'Victory' : 'Extracted', title: usdText(d.payout), titleGlow: true, sub: d.won ? `Last one standing on a ${usdText(d.stake)} stake. The pot is mine.` : `Walked out of the dark on a ${usdText(d.stake)} stake. Nobody saw what I was carrying.`, chips: [['Profit', `${pnl >= 0 ? '+' : '−'}${Math.abs(pct)}%`], ['Kills', String(d.kills)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon },
-        text: d.won ? `Won ${usdText(d.payout)} on a ${usdText(d.stake)} stake, ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Last one standing. ${tag}` : `Got out with ${usdText(d.payout)} on a ${usdText(d.stake)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Nobody saw what I was carrying. ${tag}`,
+        text: d.won ? `🏆 Last one standing in DARK BAGS: ${usdText(d.payout)} on a ${usdText(d.stake)} stake, ${kills(d.kills)}.${tag}` : `🎒 Made it out alive in DARK BAGS with ${usdText(d.payout)} on a ${usdText(d.stake)} stake (${pnl >= 0 ? '+' : ''}${pct}%), ${kills(d.kills)}. Nobody saw what was in my bag.${tag}`,
       };
     }
     case 'loss': {
@@ -280,7 +287,7 @@ export function moment(kind, d) {
       const who = d.killer ? `${d.killer} has my bag now` : storm ? 'The storm ate me' : 'Sealed inside at 0:00';
       return {
         spec: { accent: '#ff4d5e', kicker: storm ? 'Eaten by the storm' : d.status === 'mia' ? 'Sealed inside' : 'Dropped', title: `−${usdText(d.stake)}`, sub: `${who}. Only the two of us will ever know what was inside. Next raid.`, chips: [['Kills', String(d.kills)], ['Inside', mmss(d.secs)], ['Lost', usdText(d.lost)]], look, rank: d.rank, pose: 'down', stamp: storm ? 'STORM' : 'DROPPED', stampColor: '#ff4d5e' },
-        text: `${who}: dropped ${usdText(d.lost)} after ${mmss(d.secs)} inside with ${d.kills} ${d.kills === 1 ? 'kill' : 'kills'}. Running it back. ${tag}`,
+        text: `💀 ${who} in DARK BAGS: lost ${usdText(d.lost)} after ${mmss(d.secs)} inside, ${kills(d.kills)}. Running it back.${tag}`,
       };
     }
     case 'boxHit':
@@ -303,7 +310,7 @@ export function moment(kind, d) {
           rank: d.rank,
           stamp: hit ? null : 'SO CLOSE',
         },
-        text: hit ? `Pulled ${o.name} (${r.name}) from a ${d.box.name} in DARK BAGS. ${tag}` : `Chased the ${jackpot} in a ${d.box.name}, got ${o.name} (${r.name}). Next one. ${tag}`,
+        text: hit ? `✨ Pulled ${o.name} (${r.name}) from a ${d.box.name} in DARK BAGS!${tag}` : `🎲 Chased the ${jackpot} in a ${d.box.name}, got ${o.name} (${r.name}) in DARK BAGS. The next one hits.${tag}`,
       };
     }
     case 'zombie': {
@@ -311,13 +318,13 @@ export function moment(kind, d) {
       const of = d.waves ?? 10;
       return {
         spec: { accent: d.won ? '#9be36b' : '#ff4d5e', kicker: d.won ? 'Zombies · cleared' : `Zombies · overrun on wave ${Math.min(of, w + 1)}`, title: d.won ? 'BOSS DOWN' : `WAVE ${w}/${of}`, titleGlow: !!d.won, sub: d.won ? `Ten waves of the dead and their boss, ${d.squad > 1 ? `with a squad of ${d.squad}` : 'alone'}.` : `Held the graveyard for ${w} ${w === 1 ? 'wave' : 'waves'} before the dead got through.`, chips: [['Waves', `${w} / ${of}`], ['Zombies', String(d.zk ?? 0)], ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon, pose: d.won ? 'stand' : 'down', stamp: d.won ? null : 'OVERRUN', stampColor: '#ff4d5e' },
-        text: d.won ? `Cleared all ${of} zombie waves and dropped the boss in DARK BAGS (${d.zk ?? 0} zombies). ${tag}` : `Held off ${w} waves of zombies (${d.zk ?? 0} down) in DARK BAGS. ${tag}`,
+        text: d.won ? `🧟 Cleared all ${of} waves and dropped the boss in DARK BAGS Zombies: ${d.zk ?? 0} zombies down.${tag}` : `🧟 Held the graveyard for ${w} ${w === 1 ? 'wave' : 'waves'} in DARK BAGS Zombies: ${d.zk ?? 0} zombies down.${tag}`,
       };
     }
     case 'goldRush': {
       return {
         spec: { accent: '#ffd166', kicker: d.won ? 'Gold rush · first' : `Gold rush · place ${d.place ?? '?'}`, title: `${d.gb ?? 0} BAGS`, titleGlow: !!d.won, sub: d.won ? `Grabbed more gold than anyone and took the whole pot: ${usd(d.credit ?? 0)} to spend in the shop.` : `${d.gb ?? 0} bags of gold; the winner had ${d.top ?? 0}.`, chips: [['Bags', String(d.gb ?? 0)], ['Kills', String(d.kills ?? 0)], d.won ? ['Won', usd(d.credit ?? 0)] : ['Place', String(d.place ?? '?')]], look, rank: d.rank, weapon: d.weapon },
-        text: d.won ? `Won the gold rush with ${d.gb} bags of gold in DARK BAGS. ${tag}` : `${d.gb ?? 0} bags of gold in the DARK BAGS gold rush. Next one is mine. ${tag}`,
+        text: d.won ? `🥇 Won the DARK BAGS gold rush with ${d.gb} bags of gold.${tag}` : `💰 ${d.gb ?? 0} bags of gold in the DARK BAGS gold rush. The next one is mine.${tag}`,
       };
     }
     case 'rankUp': {
@@ -325,7 +332,7 @@ export function moment(kind, d) {
       const trial = d.rewards?.find((x) => x.trial)?.trial;
       return {
         spec: { accent: '#ffd166', kicker: `Rank up · ${d.rank}`, title: r.name.toUpperCase(), titleGlow: true, sub: `Climbed to rank ${d.rank} of 90 in DARK BAGS.`, chips: [['Rank', `${d.rank} / 90`], trial ? ['New look', OUTFIT[trial.id]?.name ?? '72h'] : ['Next', `rank ${d.rank + 1}`]], look: trial && OUTFIT[trial.id] ? { ...look, outfit: trial.id } : look, rank: d.rank },
-        text: `Ranked up to ${r.name} (${d.rank}/90) in DARK BAGS. ${tag}`,
+        text: `⬆️ Ranked up to ${r.name} (rank ${d.rank} of 90) in DARK BAGS.${tag}`,
       };
     }
     case 'fortune': {
@@ -345,7 +352,27 @@ export function moment(kind, d) {
           stamp: jp ? 'JACKPOT' : null,
           stampColor: '#ffd34d',
         },
-        text: jp ? `Hit the DARK BAGS fortune wheel jackpot: ${jp.amount} ${jp.symbol} on a $0.05 spin! ${tag}` : `Pulled ${it.name} (${r.name}) from a $0.05 spin of the DARK BAGS fortune wheel. ${tag}`,
+        text: jp ? `🎰 Hit the DARK BAGS fortune wheel jackpot: ${jp.amount} ${jp.symbol} on a $0.05 spin!${tag}` : `🎡 Pulled ${it.name} (${r.name}) from a $0.05 spin of the DARK BAGS fortune wheel.${tag}`,
+      };
+    }
+    case 'pve': {
+      // a story operation or the Descent: what was cleared and what it paid (exclusive items)
+      const x = d.descent ?? {};
+      const diff = DIFF_NAME[x.diff] ?? '';
+      const got = x.items?.length ?? 0;
+      if (x.op) {
+        const name = `Operation ${OPS[x.op]?.n ?? 1}: ${OP_NAME[x.op] ?? x.op}`;
+        const done = !!x.full;
+        return {
+          spec: { accent: done ? '#fb923c' : '#ff4d5e', kicker: `${name} · ${diff}`, title: done ? 'MISSION COMPLETE' : `STAGE ${Math.min(x.of || 4, (x.stages ?? 0) + 1)} / ${x.of || 4}`, titleGlow: done, sub: done ? `All ${x.of} stages cleared${x.saved ? `, ${x.saved} ${x.saved === 1 ? 'survivor' : 'survivors'} brought home` : ''}.${got ? ` ${got} exclusive ${got === 1 ? 'item' : 'items'} earned.` : ''}` : 'The tunnels took me this time. Going back in.', chips: [['Stages', `${x.stages ?? 0} / ${x.of || 4}`], ['Kills', String(d.kills ?? 0)], got ? ['Rewards', String(got)] : ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon, pose: done ? 'stand' : 'down', stamp: done ? null : 'DOWN', stampColor: '#ff4d5e' },
+          text: done ? `🚇 Cleared ${name} on ${diff} in DARK BAGS, ${kills(d.kills)}${got ? `, ${got} exclusive ${got === 1 ? 'item' : 'items'} you can't buy` : ''}.${tag}` : `🚇 Made it through ${x.stages ?? 0} of ${x.of || 4} stages of ${name} (${diff}) in DARK BAGS. Going back in.${tag}`,
+        };
+      }
+      const floors = x.floors ?? 0;
+      const out = !!x.banked;
+      return {
+        spec: { accent: out ? '#a78bfa' : '#ff4d5e', kicker: `The Descent · ${diff}`, title: `FLOOR ${floors}`, titleGlow: out, sub: out ? `Went ${floors} ${floors === 1 ? 'floor' : 'floors'} down and got out with the loot.${got ? ` ${got} exclusive ${got === 1 ? 'item' : 'items'} earned.` : ''}` : `The deep kept me on floor ${floors}. Running it back.`, chips: [['Floors', String(floors)], ['Kills', String(d.kills ?? 0)], got ? ['Rewards', String(got)] : ['Inside', mmss(d.secs)]], look, rank: d.rank, weapon: d.weapon, pose: out ? 'stand' : 'down', stamp: out ? null : 'DOWN', stampColor: '#ff4d5e' },
+        text: out ? `⛏️ Went ${floors} ${floors === 1 ? 'floor' : 'floors'} deep in The Descent (${diff}) in DARK BAGS and got out with the loot${got ? `: ${got} exclusive ${got === 1 ? 'item' : 'items'}` : ''}.${tag}` : `⛏️ Reached floor ${floors} of The Descent (${diff}) in DARK BAGS before it took me. Running it back.${tag}`,
       };
     }
     default:

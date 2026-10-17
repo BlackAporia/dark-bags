@@ -1509,7 +1509,7 @@ export default {
   'ref.copy': "Kopyala",
   'ref.share': "Paylaş",
   'ref.copied': "Bağlantı kopyalandı",
-  'ref.shareText': "DARK BAGS'te benimle baskına gel. Kodum: {c}",
+  'ref.shareText': "DARK BAGS'te benimle baskına gel 🎒 tarayıcıda ücretsiz bir extraction shooter. Davet kodum: {c} @play_dark_bags",
   'ref.invited': "Davet edilen",
   'ref.active': "Maç oynayan",
   'ref.earned': "Kazancın",
