@@ -1,8 +1,41 @@
+<p align="center"><a href="https://dark-bags.com"><img src="brand/x/banner.jpg" alt="DARK BAGS: stake, loot, get out" width="100%"></a></p>
+
+<p align="center">
+  <a href="https://dark-bags.com"><img alt="Play at dark-bags.com" src="https://img.shields.io/badge/PLAY-dark--bags.com-f7931a?style=for-the-badge"></a>
+  <a href="https://x.com/play_dark_bags"><img alt="X: @play_dark_bags" src="https://img.shields.io/badge/X-@play__dark__bags-111111?style=for-the-badge&logo=x&logoColor=white"></a>
+  <a href="https://t.me/dark_bags_starknet"><img alt="Telegram" src="https://img.shields.io/badge/Telegram-community-26A5E4?style=for-the-badge&logo=telegram&logoColor=white"></a>
+  <a href="https://dark-bags.com/whitepaper"><img alt="Player white paper" src="https://img.shields.io/badge/White%20paper-read-ebe5d6?style=for-the-badge"></a>
+</p>
+<p align="center">
+  <img alt="Open beta" src="https://img.shields.io/badge/status-open%20beta-3ddc97">
+  <a href="https://github.com/BlackAporia/dark-bags/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/BlackAporia/dark-bags/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Built on Starknet" src="https://img.shields.io/badge/built%20on-Starknet-ec796b">
+</p>
+
 # DARK BAGS
 
-A browser extraction game played for dollars. Think Escape from Tarkov crossed with Counter-Strike's Arms Race and a battle-royale storm: everyone stakes, readies up and drops in together with a knife and 100 health. Kill to climb from knife to laser sniper, grab the orange loot, outrun the shrinking storm and get out through an exit it hasn't swallowed yet. Die, and everything you carried drops on the floor for whoever gets there first.
+**A top-down extraction shooter that runs in your browser, on PC and phone. Free to play, no download.**
 
-**The hook is privacy.** Nobody can see how much anyone is carrying. A fat target and an empty bluffer look the same, and you choose how big your own bag *looks*. Without that, every match turns into "everyone shoots the leader".
+Drop in with a bag, grab the orange loot, fight other runners and get out through an exit before the storm closes. Go down and everything you carried drops for whoever gets there first. Nobody can see how much anyone is carrying: a loaded runner and an empty bluffer look the same.
+
+<p align="center">
+  <img src="site/whitepaper/img/raid_a.jpg" alt="A raid" width="49%">
+  <img src="site/whitepaper/img/dx_c.jpg" alt="The Descent: a boss fight" width="49%">
+  <img src="site/whitepaper/img/zom_a.jpg" alt="Zombies" width="49%">
+  <img src="site/whitepaper/img/phone-match.jpg" alt="On a phone" width="49%">
+</p>
+
+| | |
+|---|---|
+| ⚔️ **PvP** | Raids, battle royale, deathmatch, duels, weapon-only rounds, teams from 2v2 to 8v8, ranked seasons |
+| 🧟 **PvE** | Story Operations with cinematic films, the Descent and Zombies: solo, with an AI squad or with friends. One free run a day, and exclusive skins you can only earn there |
+| 🎯 **Practice** | The whole game against bots, right in the page, any time |
+| 🎒 **Your runner** | Ranks, achievements, a battle pass, outfits and weapon skins, guilds, friends, and chat in the menu and in the match |
+| 🌍 **Everywhere** | 11 languages, servers in Europe, the US and Asia, touch controls on phones |
+
+**Play:** [dark-bags.com](https://dark-bags.com) · **News:** [@play_dark_bags](https://x.com/play_dark_bags) · **Community:** [Telegram](https://t.me/dark_bags_starknet) · **How it all works, for players:** [white paper](https://dark-bags.com/whitepaper)
+
+> DARK BAGS has no token. Anyone offering a DARK BAGS token, airdrop or presale is a scam; news only comes from [@play_dark_bags](https://x.com/play_dark_bags).
 
 ## Built on Starknet: private by default
 
@@ -17,15 +50,15 @@ A browser extraction game played for dollars. Think Escape from Tarkov crossed w
 | Bitcoin | BTC on Starknet stakes like any coin; winnings come back in BTC. | `shared/assets.js` |
 | Public impact numbers | `GET /api/impact`: totals only (players, matches, $ staked, private transfers, TVL). Shown on the landing page and the in-game Starknet page. | `server/analytics.js` |
 
-The brief for the Starknet Foundation is in [`docs/GRANT.md`](docs/GRANT.md).
+> **Test build by default.** Without `CHAIN` set, every token is play money: no deposits, no withdrawals. With `CHAIN=sepolia` or `mainnet` the server runs a real cashier on Starknet (see [Real tokens](#real-tokens)); read [Before real money](#before-real-money) first.
 
 > **Test build by default.** Without `CHAIN` set, every token is play money: no deposits, no withdrawals. With `CHAIN=sepolia` or `mainnet` the server runs a real cashier on Starknet (see [Real tokens](#real-tokens)); read [Before real money](#before-real-money) first.
 
 ## Play it
 
-**Site: <https://blackaporia.github.io/dark-bags/>** (landing page with the trailer) · **Game: <https://blackaporia.github.io/dark-bags/play/>** (practice vs bots runs entirely in the page). The Pages workflow publishes `npm run build`: the landing page from `site/` at the root and the one-file game at `play/`. Served straight from a branch instead, the root `index.html` forwards to `site/`, whose Play buttons then lead to `client/`.
+**[dark-bags.com](https://dark-bags.com)**: the game at the root, the landing page at `/site/`, the player white paper at `/whitepaper`. Practice vs bots runs entirely in the page. The Pages workflow can also publish `npm run build` (the landing page from `site/` and the one-file game at `play/`) as a static demo.
 
-It opens with a short intro and a real loading bar, then the menu: **Play** (your runner, rank, mode, stake, coin), **Shop** (bags and crates), **Inventory**, **Swap**, **Chat**, **Achievements** and **Settings**; a side rail on desktop, a bottom tab bar on phones. The UI speaks English, 中文, हिन्दी, Español, Français, العربية (right to left), Português, Українська, Русский, Türkçe and Kiswahili. Your first three raids show short hints (controls, loot, when and how to get out). For Online on that page, point the repo variable `DARK_BAGS_SERVER` at a running game server (see [Deploy](#deploy-for-playtests)).
+It opens with a short intro and a real loading bar, then the menu: **Play** (your runner, rank, mode, stake, coin), **Shop** (bags and crates), **Inventory**, **Swap**, **Chat**, **Achievements** and **Settings**; a side rail on desktop, a bottom tab bar on phones. The UI speaks English, 中文, हिन्दी, Español, Français, العربية (right to left), Português, Українська, Русский, Türkçe and Kiswahili. New players get a short tour with Nyx, their handler, ending in a guided first match.
 
 ## Run it
 
@@ -52,7 +85,7 @@ Game modes, each at every stake:
 | Knives / Pistols / Shotguns / Rifles / Snipers only | 12 | Battle royale with one weapon for everyone, all raid |
 | Team 2 v 2, 4 v 4, 8 v 8 | 4 / 8 / 16 | Every stake grows one team pot; the last team standing splits it equally, fallen teammates included; no friendly fire |
 
-Every mode takes the same 5% rake (4% house, 1% into the table's jackpot that pays for golden raids). See [docs/TOKENOMICS.md](docs/TOKENOMICS.md).
+Every mode takes the same 5% rake (4% house, 1% into the table's jackpot that pays for golden raids).
 
 Other commands:
 
@@ -118,7 +151,7 @@ The campaign of the Stroke, told as co-op missions (`shared/story.js`, `client/s
 | **Checkpoints** | Between stages: the Descent's camp shop, then on (no way out but through). If every human goes down, the stage starts over from its checkpoint: 2 retries on Easy, 1 on Hard, none on Hardcore. |
 | **Tickets** | The Descent's tickets, one book: Easy 1, Hard 3, Hardcore 5; the free daily ticket opens either. |
 | **Rewards** | Only for completing the whole operation, and only here (never in cases, the shop or the Descent): on every difficulty a runner of its own, a finish on your class gun and style, rarer the harder. Easy: the *Wipe Walker* outfit (Epic), the *First Stroke* finish and the *Last Platform* banner; Hard: the *Tunnel Runner* armour and the *Third Rail* finish (Legendary) and the *Rubbed Out* kill effect; Hardcore: the *Last Train* armour, *The Eraser* finish, ring and name style (Mythic). Rank XP every time; owned items pay XP. The lobby shows every reward as a card with its art (tap for a close look). The Descent's fair play holds (carried and flagged accounts keep the XP only). The most survivors brought out is recorded for the story's ending. |
-| **Films and radio** | A film before the first stage and after the boss, a card before every other stage, and the squad's radio during the fight, all subtitled in the game's 11 languages from `client/strings/`. The films are in `site/media/story/` (mp4 and webm, 1080p and 720p), rendered from the engine's own scenes with a synthesized score and the announcer's Piper voice (`scripts/story/`, brief: `videos/story-op1/BRIEF.md`); when a film is missing or slow, or the player saves data, the engine draws the same scene under the same subtitles. |
+| **Films and radio** | A film before the first stage and after the boss, a card before every other stage, and the squad's radio during the fight, all subtitled in the game's 11 languages from `client/strings/`. The films are in `site/media/story/` (mp4 and webm, 1080p and 720p), rendered from the engine's own scenes with a synthesized score and the announcer's Piper voice (`scripts/story/`); when a film is missing or slow, or the player saves data, the engine draws the same scene under the same subtitles. |
 
 ## Locker, shop and boxes
 
@@ -142,7 +175,7 @@ English from the LibriTTS voice (speaker 432; LibriTTS corpus, CC BY 4.0). The s
 
 **Achievements**: 39 of them (raids, extractions, kills, multi-kills, time played, pot wins, ranks, collection…). Each pays rank XP once and unlocks its name as a title shown over your name.
 
-Paid random rewards are regulated in some countries; skins only through boxes is the riskiest version of that model. Read [docs/TOKENOMICS.md](docs/TOKENOMICS.md) before selling boxes for real stablecoins.
+Paid random rewards are regulated in some countries; skins only through boxes is the riskiest version of that model. Check the rules where you sell before selling boxes for real stablecoins.
 
 ## Look and sound
 
@@ -166,7 +199,7 @@ stakes + jackpot bonus + rollover in  ==  rake + payouts + rollover out + money 
 
 **Crowds**: each mode and stake has its table; when that table is full, or its PvE run is already under way (a run lasts an hour or more), the next runners get a twin of it (same mode and stake, their own match), up to 40 per table, and empty twins go. A PvP table that is only mid-round keeps a newcomer for its next round. Two accounts from one network or device never share a match: the second gets a twin instead of a refusal, so people behind one address (mobile carriers, campus wifi) still play. An invite seats the friend in the inviter's own room. Load test on one server (1,000 people in the menu chatting, 200 in matches across ten modes): about half a core, 210 MB, ping p50 31 ms.
 
-All tuning lives in [`shared/config.js`](shared/config.js); the full model, the numbers and an honest commercial assessment are in [docs/TOKENOMICS.md](docs/TOKENOMICS.md).
+All tuning lives in [`shared/config.js`](shared/config.js).
 
 ## Privacy model
 
@@ -218,11 +251,11 @@ A session is bound to the address. A leaked session token can play with that bal
 | `PAYMASTER_API_KEY`, `PAYMASTER_URL` | AVNU paymaster for gasless house payouts and sponsored player deposits. |
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_CLIENT_ID` | Privy sign-in. Add the game's origin to the app's allowed origins and enable the login methods you want. |
 | `CARTRIDGE=0` | Hides the Cartridge option. |
-| `ALLOWLIST` | Closed beta: comma-separated addresses that may sign in; transfers from anyone else are held, not credited. |
+| `ALLOWLIST` | Optional gate: comma-separated addresses that may sign in; transfers from anyone else are held, not credited. |
 | `MAX_BALANCE_USD`, `MAX_TOTAL_USD` | Mainnet beta caps: a deposit that would take a player (or everyone together) over this many $ is held for a manual refund (`npm run house -- held`). Ignored on Sepolia unless `SEPOLIA_CAPS=1`. |
 | `PAUSE_FILE` | The pause switch (default `<CASHIER_FILE>.paused`; `npm run house -- pause` / `resume`): no new stakes, box buys, top-ups or swaps; cash-outs always work. |
 
-On mainnet the server refuses to start without `CASHIER_FILE`, and a journal written on one network never loads on another. Step-by-step launch (Render, house wallet, Sepolia checklist, closed-beta mainnet): [docs/LAUNCH.md](docs/LAUNCH.md).
+On mainnet the server refuses to start without `CASHIER_FILE`, and a journal written on one network never loads on another.
 
 The browser wallet layer is a separate 2.5 MB bundle (`npm run build:wallets`, done by the Dockerfile and the Render blueprint) loaded only when a player opens the cashier. The static single-file build can point at a real-token server (`DARK_BAGS_SERVER`); the server allows it cross-origin for `/api/*` and `/vendor/*`.
 
@@ -288,9 +321,7 @@ Netcode: 30 Hz authoritative simulation, 15 Hz snapshots (~0.5 KB each), client-
 
 ## Deploy for playtests
 
-**Render (simplest).** `render.yaml` is a blueprint: Render → New → Blueprint → pick this repo. The free plan supports WebSockets but sleeps after ~15 idle minutes, so the first visit after a pause takes ~50 s.
-
-**Railway (the live server).** `railway.json` builds the Dockerfile, health-checks `/healthz` and keeps one replica (the journal lives on one volume). New Project → Deploy from GitHub repo, region EU West, a volume at `/data`, and a generated domain (a custom one later: CNAME and TXT records at the registrar, as Railway shows them). The image starts as root only to hand the mounted volume to the `node` user, then drops privileges. The Pages build plays on `wss://dark-bags-production.up.railway.app`. Step by step (Ukrainian): [docs/LAUNCH.md](docs/LAUNCH.md). Vercel suits the static site only: no long-lived WebSocket server or disk.
+**Railway (the live server).** `railway.json` builds the Dockerfile, health-checks `/healthz` and keeps one replica (the journal lives on one volume). New Project → Deploy from GitHub repo, region EU West, a volume at `/data`, and a generated domain (a custom one later: CNAME and TXT records at the registrar, as Railway shows them). The image starts as root only to hand the mounted volume to the `node` user, then drops privileges. The Pages build plays on `wss://dark-bags-production.up.railway.app`. Vercel suits the static site only: no long-lived WebSocket server or disk.
 
 **Docker (any VPS).**
 
@@ -312,7 +343,15 @@ docker run -p 8080:8080 dark-bags
 ## Next up
 
 - Playtest the numbers: bot lethality, rake, bag share, loot curve (`npm run sim` helps).
-- Spending and session limits, self-exclusion, provably fair box seeds (see docs/TOKENOMICS.md).
+- Spending and session limits, self-exclusion, provably fair box seeds.
 - Parties (queue with friends into the same team), ranked seasons.
 - Rank names in every language (they are English today; everything else is translated).
 - Raid replays/clips for streamers.
+
+## Security
+
+Found a vulnerability? Please report it privately, never in a public issue: see [SECURITY.md](SECURITY.md). Secrets (keys, admin and region tokens) live only in the server's environment, never in this repository.
+
+## License
+
+No open-source license: © DARK BAGS, all rights reserved. The code is public to read and review.
