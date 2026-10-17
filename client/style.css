@@ -3513,7 +3513,7 @@ body.touch-on .mchat { left: 50%; transform: translateX(-50%); bottom: auto; top
 body.touch-on .mchat-list li { align-self: center; font-size: 12px; }
 @media (max-height: 500px) {
   body.touch-on .mchat-btn { top: calc(6px + var(--safe-t)); right: calc(16px + 88px + 8px + 84px + var(--safe-r)); width: 34px; height: 34px; font-size: 15px; }
-  body.touch-on .mchat { top: calc(54px + var(--safe-t)); width: min(340px, 44vw); }
+  body.touch-on .mchat { top: calc(68px + var(--safe-t)); width: min(340px, 44vw); }
   body.touch-on .mchat-list li { font-size: 11px; padding: 2px 7px; }
   body.touch-on .mchat-form input, body.touch-on .mchat-send { height: 32px; }
 }

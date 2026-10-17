@@ -364,12 +364,14 @@ const norm64 = (a) => {
 
 // ------------------------------------------------------------------- lobby
 const sockets = new Map(); // cid -> { ws, msgs, windowStart }
+const WIRE = Symbol.for('darkbags.wire'); // a message's JSON, written once for all its readers
 const send = (cid, msg) => {
   const s = sockets.get(cid);
   if (!s || s.ws.readyState !== 1) return;
   // a slow link: drop stale frames instead of queueing them (a queue is lag); ~4 s of snapshots
   if (msg.t === 'snap' && s.ws.bufferedAmount > 48 * 1024) return;
-  s.ws.send(JSON.stringify(msg));
+  // one message for everyone (a chat line to the whole lobby) comes already written: see shared()
+  s.ws.send(msg[WIRE] ?? JSON.stringify(msg));
 };
 // a match server journals what its matches write to these books, for the main server to replay
 const journal = [];

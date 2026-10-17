@@ -68,6 +68,7 @@ export function createChat({ app, send, isOpen, release = () => {} }) {
       if (isOpen()) render();
     }
     if (m.t === 'chat') push(m.m);
+    if (m.t === 'chats') for (const x of m.ms ?? []) push(x); // a busy minute: several at once
     // someone renamed: their earlier lines take the new name
     if (m.t === 'player_renamed') {
       let hit = false;

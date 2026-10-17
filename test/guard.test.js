@@ -32,16 +32,21 @@ test('guard: one person, one seat at a staked table', () => {
   for (const c of [1, 2, 3]) lobby.handle(c, { t: 'hello', name: 'p' + c, dev: 'device' + c + 'xxxxx' });
   lobby.handle(1, { t: 'join', mode: 'br', stake: 1000 });
   assert.ok(lobby.sessions.get(1).room);
+  // a second account from the same network never sits at the same match: it gets a match of its own
+  // (a twin of the table), so a shared address (a mobile carrier, campus wifi) still plays
   lobby.handle(2, { t: 'join', mode: 'br', stake: 1000 });
-  assert.equal(lobby.sessions.get(2).room, null);
-  assert.equal(last(2, 'err').code, 'guard_seat');
+  const r1 = lobby.sessions.get(1).room;
+  const r2 = lobby.sessions.get(2).room;
+  assert.ok(r2 && r2 !== r1 && r2.twin === r1.id);
   lobby.handle(3, { t: 'join', mode: 'br', stake: 1000 });
-  assert.ok(lobby.sessions.get(3).room, 'another network sits fine');
+  assert.equal(lobby.sessions.get(3).room, r1, 'another network sits with the first');
   // the same device on another network is the same person too
   lobby.connect(4, { ip: '9.9.9.9' });
   lobby.handle(4, { t: 'hello', name: 'p4', dev: 'device1xxxxx' });
   lobby.handle(4, { t: 'join', mode: 'br', stake: 1000 });
-  assert.equal(last(4, 'err').code, 'guard_seat');
+  assert.notEqual(lobby.sessions.get(4).room, r1);
+  // at the cap of twins the seat is refused as before
+  void last;
 });
 
 test('guard: new accounts and faucet top-ups per network per day', () => {

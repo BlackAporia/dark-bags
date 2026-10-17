@@ -9,7 +9,7 @@
 // Pure bookkeeping, no I/O: the server persists toJSON(). Networks and devices are stored only as
 // salted hashes, never raw.
 export const GUARD = {
-  connsPerIp: 16, // open sockets from one network (mobile carriers put many people behind one address)
+  connsPerIp: 64, // open sockets from one network (mobile carriers and campus wifi put many people behind one address)
   newPerIpDay: 20, // new play accounts from one network a day
   faucetPerIpDay: 3, // test-token top-ups from one network a day
   refPerDay: 10, // invites one account can collect a day

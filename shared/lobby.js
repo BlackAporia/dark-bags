@@ -29,6 +29,12 @@ import { randomRunnerName } from './names.js';
  *   auth_privy {token} → authed {account, privy: {walletId, publicKey}}
  *   logout   deposit {route, tx}   withdraw {asset, units, route}   history
  */
+// A message many readers get as it is: its JSON is written once (the server's send uses it)
+const WIRE = Symbol.for('darkbags.wire');
+const shared = (m) => {
+  m[WIRE] = JSON.stringify(m);
+  return m;
+};
 const PAUSABLE = new Set(['ready', 'stake_ticket', 'box', 'topup', 'swap', 'dx_buy']);
 const SOCIAL = new Set(['players', 'profile', 'friend', 'unfriend', 'friends', 'dm', 'dms', 'inbox', 'guilds', 'guild', 'guild_create', 'guild_join', 'guild_leave', 'guild_say', 'guild_chat', 'guild_read', 'invite', 'guild_invite']);
 
@@ -67,7 +73,9 @@ export class Lobby {
     this.send = send;
     this.newToken = newToken;
     this.sessions = new Map();
-    // one table per mode and stake
+    this.chatOut = []; // chat lines on their way to everyone (flushChat)
+    this.chatAt = 0;
+    // one table per mode and stake, and its twins while a crowd needs them (seatIn)
     this.rooms = new Map();
     this.guard = guard;
     this.mail = mail;
@@ -78,22 +86,69 @@ export class Lobby {
     this.descent = descent; // the Descent's tickets and depth records (shared/descent.js)
     this.roomArgs = { onRank: (k) => this.pushRank(k), descent, pots, edge, stats, wallet, send, prices, ranks, inventory, referrals, guard, daily, practice, bots, roundSeconds, prepSeconds, waitForStart, minPlayers };
     // every mode at every stake level; zombies and the gold rush at their one flat entry
-    for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.rooms.set(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
+    for (const m of MODES) for (const stake of m.fixed ? [m.fixed] : tiers) this.addRoom(`${m.id}:${stake}`, new RoomCore({ stake, mode: m.id, ...this.roomArgs }));
     this.tiers = tiers;
     this.roundSeconds = roundSeconds;
   }
 
+  addRoom(id, r) {
+    r.id = id;
+    this.rooms.set(id, r);
+    return r;
+  }
+
+  // the list people browse: one line per table, its twins counted in
   tables() {
-    return [...this.rooms.values()].map((r) => r.info());
+    const lines = new Map();
+    for (const r of this.rooms.values()) {
+      const i = r.info();
+      const line = lines.get(r.twin ?? r.id);
+      if (!line) lines.set(r.id, i);
+      else for (const k of ['ready', 'humans', 'watching']) line[k] += i[k];
+    }
+    return [...lines.values()];
   }
 
   // The table for a stake: one per mode and stake band (shared/stakes.js). Whatever you stake
   // inside the band is yours to know: the table only shows the whole pool.
-  roomFor(mode, stake) {
+  roomFor(mode, stake, s = null, hint = null) {
     const m = MODE[mode] ? mode : 'raid';
-    if (MODE[m].fixed) return this.rooms.get(`${m}:${MODE[m].fixed}`) ?? null;
-    if (!validStake(stake)) return null;
-    return this.rooms.get(`${m}:${bandOf(stake)}`) ?? null;
+    let base;
+    if (MODE[m].fixed) base = this.rooms.get(`${m}:${MODE[m].fixed}`);
+    else if (validStake(stake)) base = this.rooms.get(`${m}:${bandOf(stake)}`);
+    return base ? this.seatIn(base, s, hint) : null;
+  }
+
+  // A table's room for one more runner. A table that is full, or whose PvE run is under way (a
+  // run lasts an hour or more), gets a twin: same mode and stake, its own match, so a crowd (a
+  // stream's viewers) plays at once instead of waiting on someone else's run. A PvP table that is
+  // only mid-round keeps the newcomer for its next round, with the people already there. A room a
+  // runner from the same network or device already sits in is skipped (fair play) rather than
+  // refused. An invite (hint) seats you with the one who invited you. Twins go once empty.
+  seatIn(base, s, hint) {
+    const fam = [...this.rooms.values()].filter((r) => r === base || r.twin === base.id);
+    if (s?.room && fam.includes(s.room)) return s.room;
+    const seats = MODE[base.mode].size;
+    const pve = !!MODE[base.mode].solo;
+    const fits = (r) => r.clients.size < seats && r.state !== 'live' && (r.practice || !s || this.seatOk(s, r));
+    const h = hint ? this.rooms.get(String(hint)) : null;
+    if (h && fam.includes(h) && fits(h)) return h;
+    // a story operation with a runner gone solo takes nobody else
+    const open = (r) => fits(r) && !(MODE[r.mode].op && r.readyList().some((c) => c.squad === 'solo'));
+    // the fullest open room first: people waiting together start sooner
+    const best = fam.filter(open).sort((a, b) => b.clients.size - a.clients.size)[0];
+    if (best) return best;
+    if (!pve && base.clients.size < seats && base.state === 'live' && (base.practice || !s || this.seatOk(s, base))) return base;
+    if (fam.length >= CFG.TWINS_MAX) return base;
+    let n = 2;
+    while (this.rooms.has(`${base.id}#${n}`)) n++;
+    const twin = new RoomCore({ stake: base.stake, mode: base.mode, ...this.roomArgs });
+    twin.twin = base.id;
+    // practice settings (bot difficulty, runners, clock) carry over
+    twin.difficulty = base.difficulty;
+    twin.botFill = base.botFill;
+    twin.roundSeconds = base.roundSeconds;
+    return this.addRoom(`${base.id}#${n}`, twin);
   }
 
   // people connected right now (every signed session, in a raid or browsing)
@@ -108,10 +163,11 @@ export class Lobby {
   // ping look worse (by waiting) but never better. The value is shown to everyone in a raid.
   probe() {
     const now = this.now();
+    const out = shared({ t: 'probe', s: now });
     for (const [cid, s] of this.sessions) {
       if (!s.token) continue;
       s.probeAt = now;
-      this.send(cid, { t: 'probe', s: now });
+      this.send(cid, out);
     }
   }
 
@@ -470,7 +526,7 @@ export class Lobby {
         }
         // ranked is online only
         if (this.practice && MODE[msg.mode]?.ranked) return this.send(cid, { t: 'err', code: 'online_only', msg: 'Ranked works in online play only.' });
-        const room = this.roomFor(msg.mode, Number(msg.stake));
+        const room = this.roomFor(msg.mode, Number(msg.stake), s, msg.room);
         if (!room) return;
         if (!this.key(s)) {
           this.send(cid, { t: 'err', msg: 'Connect a wallet first.' });
@@ -595,7 +651,19 @@ export class Lobby {
     const m = { n: cleanName(msg.name || s.name), text, at: now, rk: key ? this.ranks.get(key).rank : 1, tt: key ? this.ranks.title(key) : null, ...(pid ? { id: pid } : {}) };
     this.chat.push(m);
     if (this.chat.length > CFG.CHAT_KEEP) this.chat.splice(0, this.chat.length - CFG.CHAT_KEEP);
-    for (const [c, x] of this.sessions) if (x.token) this.send(c, { t: 'chat', m });
+    // to everyone a moment later, with whatever else was said meanwhile: a busy chat (a stream's
+    // viewers) costs one message per reader every CHAT_FLUSH_MS, not one per line per reader
+    this.chatOut.push(m);
+    if (this.now() - this.chatAt >= CFG.CHAT_FLUSH_MS) this.flushChat();
+  }
+
+  flushChat() {
+    this.chatAt = this.now();
+    if (!this.chatOut.length) return;
+    const ms = this.chatOut;
+    this.chatOut = [];
+    const out = shared(ms.length === 1 ? { t: 'chat', m: ms[0] } : { t: 'chats', ms });
+    for (const [c, x] of this.sessions) if (x.token) this.send(c, out);
   }
 
   // Locker: cosmetics bought with shop $. The server rolls every box.
@@ -1272,7 +1340,7 @@ export class Lobby {
         s.invites ??= new Map();
         if (now - (s.invites.get(k) ?? 0) < 15000) return err('Invite sent already. Give them a moment.');
         s.invites.set(k, now);
-        this.pushTo(k, { t: 'invited', from: this.card(key, k), mode: room.mode, stake: room.stake, waiting: room.readyList().length });
+        this.pushTo(k, { t: 'invited', from: this.card(key, k), mode: room.mode, stake: room.stake, room: room.id, waiting: room.readyList().length });
         return reply({ t: 'invSent', id: String(msg.id) });
       }
       default:
@@ -1280,10 +1348,24 @@ export class Lobby {
   }
 
   tick() {
+    if (this.chatOut.length && this.now() - this.chatAt >= CFG.CHAT_FLUSH_MS) this.flushChat();
     for (const [id, r] of this.rooms) {
       r.tick();
-      // custom-stake tables go once nobody is at them and no raid runs
-      if (r.custom && !r.clients.size && r.state !== 'live') this.rooms.delete(id);
+      // custom-stake tables and twins go once nobody is at them and no raid runs
+      if ((r.custom || r.twin) && !r.clients.size && r.state !== 'live') {
+        this.rooms.delete(id);
+        // what a twin holds for later (the golden-raid jackpot, an unclaimed pot) goes home
+        const base = r.twin ? this.rooms.get(r.twin) : null;
+        if (base) {
+          base.jackpot += r.jackpot;
+          base.rollover += r.rollover;
+          for (const k of ['raids', 'rake', 'stakesIn', 'paidOut', 'sponsorIn']) base.totals[k] += r.totals[k];
+          for (const [a, v] of Object.entries(r.totals.byAsset)) {
+            const into = (base.totals.byAsset[a] ??= {});
+            for (const [k, x] of Object.entries(v)) into[k] = typeof x === 'bigint' ? (into[k] ?? 0n) + x : (into[k] ?? 0) + x;
+          }
+        }
+      }
     }
   }
 

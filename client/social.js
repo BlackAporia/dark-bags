@@ -402,7 +402,7 @@ export function createSocial({ app, send, toast, joinRoom, isOpen }) {
     const [join, later] = el.querySelectorAll('button');
     join.addEventListener('click', () => {
       el.remove();
-      joinRoom(m.mode, m.stake);
+      joinRoom(m.mode, m.stake, m.room);
     });
     later.addEventListener('click', () => el.remove());
     box.prepend(el);

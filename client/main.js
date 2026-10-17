@@ -353,7 +353,8 @@ const social = createSocial({
   send,
   toast: (m) => toast(m),
   isOpen: (page) => app.screen === 'lobby' && app.page === page,
-  joinRoom: (mode, stake) => {
+  joinRoom: (mode, stake, room = null) => {
+    app.roomHint = room; // the inviter's own room (a busy table has twins)
     if (app.inRoom) {
       send({ t: 'unready' });
       send({ t: 'leave' });
@@ -1532,7 +1533,7 @@ function onMessage(m) {
   if (m.t === 'coins' || m.t === 'err') coinImport.onMessage(m);
   if (m.t === 'balance' && app.page === 'shop') fortune.paint();
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables' || m.t === 'coins' || m.t === 'authed') swap.onMessage(m);
-  if (m.t === 'chat' || m.t === 'welcome' || m.t === 'player_renamed') chat.onMessage(m);
+  if (m.t === 'chat' || m.t === 'chats' || m.t === 'welcome' || m.t === 'player_renamed') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
   if (app.page === 'shop' && (m.t === 'balance' || m.t === 'welcome')) shop.render();
 }
@@ -1914,7 +1915,8 @@ function goToTable() {
     store.set('darkbags.name', app.name);
   }
   // band: which table this stake sits at, so the regions can seat you where people already wait
-  send({ t: 'join', stake: app.stake, band: MODE[app.gameMode]?.fixed ?? bandOf(app.stake), mode: app.gameMode, name: app.name || 'runner', skin: app.skin });
+  send({ t: 'join', stake: app.stake, band: MODE[app.gameMode]?.fixed ?? bandOf(app.stake), mode: app.gameMode, name: app.name || 'runner', skin: app.skin, ...(app.roomHint ? { room: app.roomHint } : {}) });
+  app.roomHint = null;
   app.inRoom = true;
   showScreen('prep');
 }
