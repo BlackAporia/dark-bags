@@ -234,7 +234,7 @@ function cardWeapon(last) {
   return best?.i ?? last ?? WEAPONS.findIndex((x) => x.id === 'rifle');
 }
 function shareMoment(kind, data = {}) {
-  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, player: (app.name || '').trim() || null, ...data, ...(data.weapon !== undefined || ['win', 'zombie', 'goldRush'].includes(kind) ? { weapon: cardWeapon(data.weapon) } : {}) });
+  return openShare(kind, { look: myLook(), rank: app.rank?.rank ?? 1, player: (app.name || '').trim() || null, ...data, ...(data.weapon !== undefined || ['win', 'zombie', 'goldRush', 'pve'].includes(kind) ? { weapon: cardWeapon(data.weapon) } : {}) });
 }
 wireShare();
 
@@ -1996,7 +1996,7 @@ $('res-share').addEventListener('click', () => {
   const m = app.lastResult;
   if (!m) return;
   const kind = MODE[m.mode]?.kind;
-  shareMoment(kind === 'zombie' ? 'zombie' : kind === 'gold' ? 'goldRush' : m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? game.lastW ?? null });
+  shareMoment(kind === 'descent' ? 'pve' : kind === 'zombie' ? 'zombie' : kind === 'gold' ? 'goldRush' : m.status === 'extracted' || m.won ? 'win' : 'loss', { ...m, rank: m.rank?.after.rank ?? app.rank?.rank ?? 1, weapon: game.you?.w ?? game.lastW ?? null });
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();

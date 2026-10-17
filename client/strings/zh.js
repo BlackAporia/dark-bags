@@ -1509,7 +1509,7 @@ export default {
   'ref.copy': "复制",
   'ref.share': "分享",
   'ref.copied': "链接已复制",
-  'ref.shareText': "来 DARK BAGS 和我一起突袭。我的邀请码：{c}",
+  'ref.shareText': "来 DARK BAGS 和我一起突袭 🎒 浏览器里免费玩的撤离射击游戏。我的邀请码：{c} @play_dark_bags",
   'ref.invited': "已邀请",
   'ref.active': "已打过比赛",
   'ref.earned': "你已获得",

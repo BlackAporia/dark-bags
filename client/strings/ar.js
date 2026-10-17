@@ -1509,7 +1509,7 @@ export default {
   'ref.copy': "نسخ",
   'ref.share': "مشاركة",
   'ref.copied': "تم نسخ الرابط",
-  'ref.shareText': "تعال نغزو معًا في DARK BAGS. رمزي: {c}",
+  'ref.shareText': "تعال نغزو معًا في DARK BAGS 🎒 لعبة تصويب وهروب مجانية في المتصفح. رمزي: {c} @play_dark_bags",
   'ref.invited': "المدعوون",
   'ref.active': "لعبوا مباراة",
   'ref.earned': "أرباحك",
