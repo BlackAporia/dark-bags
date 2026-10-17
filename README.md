@@ -162,7 +162,9 @@ stakes + jackpot bonus + rollover in  ==  rake + payouts + rollover out + money 
 
 **Swap**: coins in your game balance swap instantly at the live price with a 0.3% spread (always in practice and on Sepolia; on mainnet only when the operator sets `SWAP_INTERNAL=1`). With a Starknet wallet signed in, you can also swap inside that wallet through AVNU's aggregator (Starkzap's `AvnuSwapProvider`); you sign, the game never holds those tokens.
 
-**Chat**: one lobby channel, plain text, 200 characters, one message per 1.5 s.
+**Chat**: one lobby channel, plain text, 200 characters, one message per 1.5 s. The same channel runs inside a match: fresh lines show at the left for 10 s, **Enter** opens a line to type in (the 💬 button on phones). A busy chat goes out in batches every 250 ms, each written once for every reader.
+
+**Crowds**: each mode and stake has its table; when that table is full, or its PvE run is already under way (a run lasts an hour or more), the next runners get a twin of it (same mode and stake, their own match), up to 40 per table, and empty twins go. A PvP table that is only mid-round keeps a newcomer for its next round. Two accounts from one network or device never share a match: the second gets a twin instead of a refusal, so people behind one address (mobile carriers, campus wifi) still play. An invite seats the friend in the inviter's own room. Load test on one server (1,000 people in the menu chatting, 200 in matches across ten modes): about half a core, 210 MB, ping p50 31 ms.
 
 All tuning lives in [`shared/config.js`](shared/config.js); the full model, the numbers and an honest commercial assessment are in [docs/TOKENOMICS.md](docs/TOKENOMICS.md).
 

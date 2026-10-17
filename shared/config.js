@@ -60,7 +60,9 @@ export const CFG = {
   SWAP_FEE: 0.003,        // in-game swaps: 0.3% spread to the house
   SWAP_MIN: 100,          // smallest swap, in mills ($0.10)
   CHAT_MAX: 200,          // characters per chat message
+  TWINS_MAX: 40,         // rooms one table may spread over when a crowd comes (shared/lobby.js seatIn)
   CHAT_GAP_MS: 1500,      // one message per 1.5 s per player
+  CHAT_FLUSH_MS: 250,     // the lobby's chat goes out in batches at most this often
   CHAT_KEEP: 60,          // messages a newcomer sees
   JACKPOT_SHARE: 0.2,     // share of the rake on players' stakes that feeds the room's jackpot (1% of each stake)
   GOLDEN_EVERY: 4,        // every Nth raid is golden if the jackpot can pay for it

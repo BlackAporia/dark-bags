@@ -270,7 +270,7 @@ const starknet = createStarknetPage({
     store.set('darkbags.asset', id);
   },
 });
-const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
+const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby', release: () => input.release() });
 const settingsUi = createSettingsUi();
 // Nyx's first-run tour: on the first launch here, and the first time a wallet signs in
 const tour = createTour({
@@ -353,7 +353,8 @@ const social = createSocial({
   send,
   toast: (m) => toast(m),
   isOpen: (page) => app.screen === 'lobby' && app.page === page,
-  joinRoom: (mode, stake) => {
+  joinRoom: (mode, stake, room = null) => {
+    app.roomHint = room; // the inviter's own room (a busy table has twins)
     if (app.inRoom) {
       send({ t: 'unready' });
       send({ t: 'leave' });
@@ -594,6 +595,7 @@ function showScreen(name) {
   if (name !== 'game') {
     scoreboard.hide();
     voice.end();
+    chat.closeMatch();
   }
   $('lobby').hidden = name !== 'lobby';
   $('prep').hidden = name !== 'prep';
@@ -1531,7 +1533,7 @@ function onMessage(m) {
   if (m.t === 'coins' || m.t === 'err') coinImport.onMessage(m);
   if (m.t === 'balance' && app.page === 'shop') fortune.paint();
   if (m.t === 'swapped' || m.t === 'err' || m.t === 'balance' || m.t === 'tables' || m.t === 'coins' || m.t === 'authed') swap.onMessage(m);
-  if (m.t === 'chat' || m.t === 'welcome' || m.t === 'player_renamed') chat.onMessage(m);
+  if (m.t === 'chat' || m.t === 'chats' || m.t === 'welcome' || m.t === 'player_renamed') chat.onMessage(m);
   if (app.screen === 'lobby' && (app.page === 'inventory' ? ['balance', 'locker', 'result', 'welcome', 'swapped', 'tables'].includes(m.t) : false)) inventory.render();
   if (app.page === 'shop' && (m.t === 'balance' || m.t === 'welcome')) shop.render();
 }
@@ -1769,6 +1771,17 @@ addEventListener('keydown', (e) => {
     $('pause-main').hidden = false;
   } else closePause();
 });
+// Enter in a match: the chat (the same one as the menu's). Not over a film, the story card,
+// the menu, Nyx's tour or the spectator's Enter (that one opens the results).
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Enter' && e.code !== 'NumpadEnter') return;
+  if (app.screen !== 'game' || pauseOpen() || app.pendingResult || tour.open || chat.matchOpen()) return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLButtonElement && !e.target.closest('#hud'))) return;
+  if (document.querySelector('.op-cine:not([hidden]), .dx-story:not([hidden]), dialog[open]')) return;
+  e.preventDefault();
+  chat.openMatch();
+});
+$('chat-chip').addEventListener('click', () => chat.openMatch());
 $('pause-btn').addEventListener('click', openPause);
 $('pause-resume').addEventListener('click', closePause);
 $('pause-leave').addEventListener('click', leaveMatch);
@@ -1902,7 +1915,8 @@ function goToTable() {
     store.set('darkbags.name', app.name);
   }
   // band: which table this stake sits at, so the regions can seat you where people already wait
-  send({ t: 'join', stake: app.stake, band: MODE[app.gameMode]?.fixed ?? bandOf(app.stake), mode: app.gameMode, name: app.name || 'runner', skin: app.skin });
+  send({ t: 'join', stake: app.stake, band: MODE[app.gameMode]?.fixed ?? bandOf(app.stake), mode: app.gameMode, name: app.name || 'runner', skin: app.skin, ...(app.roomHint ? { room: app.roomHint } : {}) });
+  app.roomHint = null;
   app.inRoom = true;
   showScreen('prep');
 }

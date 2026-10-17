@@ -376,3 +376,26 @@ test('online waiting room: when everyone sitting there is ready, it starts by it
   assert.equal(room.state, 'live');
   assert.ok(a);
 });
+
+test('chat: a busy lobby gets its lines in batches, each message written once for everyone', () => {
+  let clock = 10_000;
+  const { lobby, client } = setup();
+  lobby.now = () => clock;
+  const a = client(1, 'alice');
+  const b = client(2, 'bob');
+  const c = client(3, 'carol');
+  lobby.handle(1, { t: 'chat', text: 'first' }); // a quiet lobby: out at once
+  assert.equal(c.last('chat').m.text, 'first');
+  clock += 50;
+  lobby.handle(2, { t: 'chat', text: 'second' });
+  clock += 50;
+  lobby.handle(3, { t: 'chat', text: 'third' });
+  assert.equal(c.last('chats'), undefined, 'held for the batch');
+  clock += 200;
+  lobby.tick();
+  const got = c.last('chats');
+  assert.deepEqual(got.ms.map((m) => m.text), ['second', 'third']);
+  assert.equal(a.last('chats'), got, 'one message object for every reader');
+  assert.equal(JSON.parse(got[Symbol.for('darkbags.wire')]).ms.length, 2);
+  void b;
+});
