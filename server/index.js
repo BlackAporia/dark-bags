@@ -556,11 +556,13 @@ const MIME = {
   '.mp3': 'audio/mpeg',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
+  '.pdf': 'application/pdf',
   '.xml': 'application/xml',
 };
 
 // One address for everything: the game at the root of every host (dark-bags.com), the landing
-// page under /site/. An old play/ link lands on the game itself.
+// page under /site/ (the player white paper at /site/whitepaper/, short link /whitepaper). An old
+// play/ link lands on the game itself.
 async function serveStatic(req, res) {
   const url = new URL(req.url, 'http://x');
   let rel = decodeURIComponent(url.pathname);
@@ -573,6 +575,14 @@ async function serveStatic(req, res) {
     res.writeHead(302, { location: `/site/${url.search}` }).end();
     return;
   }
+  if (rel === '/whitepaper' || rel === '/whitepaper/') {
+    res.writeHead(302, { location: `/site/whitepaper/${url.search}` }).end();
+    return;
+  }
+  if (rel === '/site/whitepaper') {
+    res.writeHead(302, { location: `/site/whitepaper/${url.search}` }).end();
+    return;
+  }
   if (rel.startsWith('/site/')) {
     base = path.join(ROOT, 'site');
     rel = rel.slice('/site'.length);
@@ -581,7 +591,8 @@ async function serveStatic(req, res) {
     base = path.join(ROOT, 'shared');
     rel = rel.slice('/shared'.length);
   }
-  if (rel === '/' || rel === '') rel = '/index.html';
+  if (rel === '') rel = '/';
+  if (rel.endsWith('/')) rel += 'index.html'; // a folder's page, like /site/whitepaper/
   const file = path.normalize(path.join(base, rel));
   if (!file.startsWith(base + path.sep)) {
     res.writeHead(403).end();
