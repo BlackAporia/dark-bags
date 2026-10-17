@@ -439,7 +439,8 @@ export class DescentHud {
         <p class="dx-camp-wait"></p></div></div>`;
     root.append(this.root);
     this.story = new Story(document.body);
-    this.cinema = new Cinema(document.body); // a story operation's films and stage cards
+    // a story operation's films and stage cards; the game's music steps out while one plays
+    this.cinema = new Cinema(document.body, { hush: (on) => this.g.sfx.hushMusic?.(on) });
     this.radio = new Radio(document.body);
     this.q = (s) => this.root.querySelector(s);
     this.q('.dx-go').addEventListener('click', () => this.choose('go'));
