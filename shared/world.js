@@ -57,7 +57,9 @@ export class World {
     botFill = CFG.BOT_FILL,
     mode = 'raid',
     theme = 'docks', // the raid map's look and layout (shared/map.js MAP_THEMES)
+    squad = 'ai', // a story operation: who takes the empty seats (story.js SQUADS)
   }) {
+    this.squad = squad;
     // the mode's rules (modes.js): raid = extraction; br/team = one prize pot, last side standing
     this.mode = MODE[mode] ? mode : 'raid';
     const m = MODE[this.mode];
@@ -1844,7 +1846,7 @@ export class World {
         dashDy: me.dashDy,
         hp: Math.ceil((me.hp * CFG.HP) / this.maxHp),
         shield: r2(me.shield),
-        storm: me.inStorm && me.status === 'alive' ? 1 : 0,
+        storm: (me.inStorm || me.inWipe) && me.status === 'alive' ? 1 : 0, // a story's wipe reads as the storm
         w: me.w,
         xp: Math.floor(me.xp),
         pr: me.prestige,

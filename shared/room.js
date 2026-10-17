@@ -8,7 +8,7 @@ import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
 import { MODE, ZOMBIE_WEAPONS } from './modes.js';
 import { CLASSES, PISTOLS, DUP_XP, runItems } from './descent.js';
-import { opItems } from './story.js';
+import { opItems, SQUADS } from './story.js';
 import { STYLE } from './style.js';
 import { WAVES } from './horde.js';
 import { Inventory, botLook, OUTFIT, BOXES, WEAPON_SKINS, WSKIN, seasonAt } from './cosmetics.js';
@@ -93,7 +93,7 @@ export class RoomCore {
   // gate: the network and device this client plays from (today's free Descent ticket is counted
   // per network and device too, so a stack of fresh accounts on one phone gets one, not a stack)
   addClient(cid, { token, name, skin, stake, gate = null }) {
-    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle', vote: null, stake: this.ownStake(stake), cls: 'assault', pistol: 'pistol', gate: gate ?? {} });
+    this.clients.set(cid, { cid, token, name: cleanName(name), skin: this.pickSkin(skin), pid: null, ready: false, escrow: null, reported: true, weapon: 'rifle', vote: null, stake: this.ownStake(stake), cls: 'assault', pistol: 'pistol', squad: 'ai', gate: gate ?? {} });
     if (this.state === 'idle') this.openPrep();
     this.broadcastPrep();
   }
@@ -145,6 +145,11 @@ export class RoomCore {
         // the Descent: your class and your pistol
         if (CLASSES[msg.cls]) c.cls = msg.cls;
         if (PISTOLS.includes(msg.pistol)) c.pistol = msg.pistol;
+        // a story operation: solo, the AI squad, or waiting for friends
+        if (SQUADS.includes(msg.squad) && MODE[this.mode].op) {
+          c.squad = msg.squad;
+          this.squadClock();
+        }
         this.broadcastPrep();
         break;
       case 'vote':
@@ -159,6 +164,7 @@ export class RoomCore {
         if (ZOMBIE_WEAPONS.includes(msg.weapon)) c.weapon = msg.weapon;
         if (CLASSES[msg.cls]) c.cls = msg.cls;
         if (PISTOLS.includes(msg.pistol)) c.pistol = msg.pistol;
+        if (SQUADS.includes(msg.squad) && MODE[this.mode].op) c.squad = msg.squad;
         if (this.tickets) this.readyTickets(c, this.edge ? msg._tickets ?? null : null);
         else this.ready(c, typeof msg.asset === 'string' ? msg.asset : 'USDC', this.edge ? msg._units : null);
         break;
@@ -233,7 +239,7 @@ export class RoomCore {
     c.ready = true;
     c.escrow = { asset, units, mills: c.stake };
     if (this.state === 'idle') this.openPrep();
-    if (this.state === 'prep' && this.countT === null && !this.waitForStart) this.countT = this.prepSeconds;
+    if (this.state === 'prep' && this.countT === null && !this.waitForStart && !this.waitFriends()) this.countT = this.prepSeconds;
     this.hurry();
     this.broadcastPrep();
   }
@@ -263,7 +269,7 @@ export class RoomCore {
       c.escrow = { tickets: this.tickets, took, mills: 0 };
     }
     if (this.state === 'idle') this.openPrep();
-    if (this.state === 'prep' && this.countT === null && !this.waitForStart) this.countT = this.prepSeconds;
+    if (this.state === 'prep' && this.countT === null && !this.waitForStart && !this.waitFriends()) this.countT = this.prepSeconds;
     this.hurry();
     this.broadcastPrep();
   }
@@ -319,6 +325,21 @@ export class RoomCore {
   book(asset, key, units) {
     const t = (this.totals.byAsset[asset] ??= { in: 0n, out: 0n });
     t[key] += BigInt(units);
+  }
+
+  // a story operation where the one ready runner is waiting for friends: no countdown until a
+  // second runner is ready (or someone presses Start)
+  waitFriends() {
+    if (!MODE[this.mode].op) return false;
+    const ready = this.readyList();
+    return ready.length === 1 && ready[0].squad === 'friends';
+  }
+
+  // the squad choice changed in the ready room: wait for friends, or count down as usual
+  squadClock() {
+    if (this.state !== 'prep' || !this.readyList().length) return;
+    if (this.waitFriends()) this.countT = null;
+    else if (this.countT === null && !this.waitForStart) this.countT = this.prepSeconds;
   }
 
   // everyone in the room is ready (and there are at least two humans): don't make them wait
@@ -392,6 +413,7 @@ export class RoomCore {
       botFill: this.botFill,
       mode: this.mode,
       theme: pickTheme(ready.map((c) => c.vote)),
+      squad: ready.some((c) => c.squad === 'ai') ? 'ai' : 'none', // the companions come if anyone asked for them
     });
     this.world = w;
     this.rollover = 0;
@@ -535,7 +557,7 @@ export class RoomCore {
       resT: this.state === 'results' ? Math.ceil(this.resT) : 0,
       slotsTotal: Math.max(this.botFill, ready.length),
       min: this.minPlayers,
-      waiting: this.waitForStart && this.state === 'prep' && this.countT === null, // no timer: start when you like
+      waiting: (this.waitForStart || this.waitFriends()) && this.state === 'prep' && this.countT === null, // no timer: start when you like
       soon: this.waitForStart && this.state === 'prep' && this.countT !== null && this.countT > CFG.PREP_ALL_READY, // starting by itself, Start still cuts it short
       bots,
       votes: this.mapVotes(),
@@ -551,7 +573,7 @@ export class RoomCore {
           const tt = this.ranks.title(r.token);
           return { n: r.name, c: OUTFIT[look.outfit].color, o: look.outfit, g: look.body, rk: this.ranks.get(r.token).rank, ...(look.fr ? { fr: look.fr } : {}), ...(look.nf ? { nf: look.nf } : {}), ...(tt ? { tt } : {}), ...(this.noBots && !this.tickets ? { wp: r.weapon } : {}), ...(this.tickets ? { cls: r.cls, pz: r.pistol } : {}), me: r === c ? 1 : 0 };
         }),
-        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, cls: c.cls, pistol: c.pistol, ...(this.tickets && this.descent && !this.edge && !this.practice ? { tk: this.descent.view(c.token, c.gate) } : {}), vote: c.vote, stake: c.escrow?.mills ?? c.stake, escrow: c.escrow && c.escrow.units != null ? { asset: c.escrow.asset, units: c.escrow.units.toString() } : null },
+        me: { ready: c.ready, inRaid: this.inRaid(c), weapon: c.weapon, cls: c.cls, pistol: c.pistol, squad: c.squad, ...(this.tickets && this.descent && !this.edge && !this.practice ? { tk: this.descent.view(c.token, c.gate) } : {}), vote: c.vote, stake: c.escrow?.mills ?? c.stake, escrow: c.escrow && c.escrow.units != null ? { asset: c.escrow.asset, units: c.escrow.units.toString() } : null },
         balances: this.wallet.balances(c.token),
       });
     }

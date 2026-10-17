@@ -433,8 +433,9 @@ export class GameClient {
     }
   }
 
-  // the kill went through the head: a big HEADSHOT over them, a ping, and the announcer
-  headshotFx(x, y, now, vid = null) {
+  // the kill went through the head: a big HEADSHOT over them, a ping, and the announcer (the
+  // centre-screen medal at most every `every` ms: the dead fall by the dozen, players don't)
+  headshotFx(x, y, now, vid = null, every = 1200) {
     if (vid != null) {
       // the victim's last known spot (kill events carry no position)
       const a = this.anims.get(vid) ?? (vid === this.pid ? this.meAnim : null);
@@ -446,7 +447,7 @@ export class GameClient {
       this.hsPing = now;
       this.sfx.play('headshot');
     }
-    if (now - (this.hsSay ?? 0) > 1200) {
+    if (now - (this.hsSay ?? 0) > every) {
       this.hsSay = now;
       this.medal('hs', { title: t('hud.headshot') });
     }
@@ -713,7 +714,7 @@ export class GameClient {
           const a = this.anims.get(ev.zid);
           this.zDeathFx(a?.x ?? ev.x, a?.y ?? ev.y, ev.type, now);
           this.anims.map.delete(ev.zid);
-          if (ev.kid === this.pid && ev.hs) this.headshotFx(ev.x, ev.y, now);
+          if (ev.kid === this.pid && ev.hs) this.headshotFx(ev.x, ev.y, now, null, 20000);
           else if (ev.kid === this.pid) this.fx.floater(ev.x, ev.y - 30, ev.type === 'boss' ? '☠ BOSS' : '+1', ev.type === 'boss' ? '#ff4d5e' : '#9be36b', ev.type === 'boss' ? 26 : 13, 0.7);
           break;
         }

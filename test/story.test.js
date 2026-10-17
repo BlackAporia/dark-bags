@@ -204,3 +204,82 @@ test('story: the same tickets as the Descent; items for completing only, once pe
   assert.ok(again.descent.dupXp > 0, 'pays XP instead');
   assert.equal(descent.view(token).best.easy ?? 0, 0, 'the Descent depth board is left alone');
 });
+
+test('story: the train leaves once a runner is aboard with everyone who came along; the rest stay behind', () => {
+  const w = new World({ stake: 0, mode: 'op1-easy', bots: false, seed: 31, roundSeconds: 99999 });
+  const me = w.addPlayer({ name: 'me', skin: '#fff', cls: 'assault' });
+  w.step();
+  const h = w.horde;
+  h.floor = 1;
+  h.endFloor();
+  h.leaveCamp();
+  for (let t = 0; t < 30 * 20 && h.state !== 'fight'; t++) drive(w, me, t);
+  assert.equal(h.obj, 'escort');
+  const sv = h.survivorsLeft();
+  assert.equal(sv.length, 2, 'two survivors');
+  assert.ok(Math.hypot(sv[0].x - sv[1].x, sv[0].y - sv[1].y) > 600, 'hiding apart');
+  // one is found and walks onto the train; the other still hides far away
+  const G = w.map.goal;
+  sv[0].found = true;
+  sv[0].x = G.x;
+  sv[0].y = G.y;
+  me.x = G.x + 40;
+  me.y = G.y;
+  const seen = new Set();
+  let t = 0;
+  for (; t < 30 * 12 && h.state === 'fight'; t++) {
+    me.hp = 100;
+    w.queueInput(me.id, { s: t + 1, mx: 0, my: 0, a: 0, f: false });
+    w.step();
+    for (const e of w.events) seen.add(e.k);
+    w.events.length = 0;
+    if (h.floor === 2 && h.state === 'fight') assert.ok(!h.view(me).cx || sv[1].status === 'alive', 'the marker points at the one still hiding');
+  }
+  assert.ok(seen.has('saved') && seen.has('depart'), 'saved, then the train leaves');
+  assert.ok(seen.has('camp'), 'the stage is done');
+  assert.ok(t < 30 * 11, `within the departure time (${(t / 30).toFixed(1)} s)`);
+  assert.equal(sv[1].status, 'mia', 'the one still hiding is left behind');
+});
+
+test('story: solo and friends bring no companions; friends waits for a second runner or Start', () => {
+  for (const squad of ['solo', 'friends']) {
+    const w = new World({ stake: 0, mode: 'op1-easy', bots: false, seed: 5, squad: 'none' });
+    w.addPlayer({ name: 'me', skin: '#fff', cls: 'medic' });
+    w.step();
+    assert.equal([...w.players.values()].filter((p) => p.npc === 'ally').length, 0, `${squad}: no companions`);
+  }
+  const inbox = [];
+  const descent = new DescentBook({ now: () => Date.UTC(2026, 9, 16, 12) });
+  const lobby = new Lobby({ wallet: new MemoryWallet(), descent, send: (cid, m) => inbox.push([cid, m]), newToken: () => `tok${Math.random().toString(36).slice(2, 12)}`, bots: false, roundSeconds: 120 });
+  const room = lobby.rooms.get(`op1-easy:${MODE['op1-easy'].fixed}`);
+  for (const cid of [1, 2]) {
+    lobby.connect(cid, { ip: `10.0.0.${cid}` });
+    lobby.handle(cid, { t: 'hello', name: `p${cid}` });
+  }
+  lobby.handle(1, { t: 'join', mode: 'op1-easy', stake: MODE['op1-easy'].fixed });
+  lobby.handle(1, { t: 'ready', cls: 'assault', squad: 'friends' });
+  assert.equal(room.state, 'prep');
+  assert.equal(room.countT, null, 'no countdown: waiting for friends');
+  for (let i = 0; i < 30 * 30; i++) lobby.tick();
+  assert.equal(room.state, 'prep', 'still waiting after 30 s');
+  lobby.handle(2, { t: 'join', mode: 'op1-easy', stake: MODE['op1-easy'].fixed });
+  lobby.handle(2, { t: 'ready', cls: 'medic', squad: 'friends' });
+  assert.ok(room.countT !== null, 'a friend is ready: the countdown runs');
+  for (let i = 0; i < 30 * 40 && room.state !== 'live'; i++) lobby.tick();
+  assert.equal(room.state, 'live');
+  lobby.tick();
+  assert.equal([...room.world.players.values()].filter((p) => p.npc === 'ally').length, 0, 'two friends, no companions');
+  // changing your mind to the AI squad starts the clock for a lone runner
+  const lone = new Lobby({ wallet: new MemoryWallet(), descent, send: () => {}, newToken: () => `tok${Math.random().toString(36).slice(2, 12)}`, bots: false, roundSeconds: 120 });
+  const r2 = lone.rooms.get(`op1-easy:${MODE['op1-easy'].fixed}`);
+  lone.connect(9, { ip: '10.0.0.9' });
+  lone.handle(9, { t: 'hello', name: 'z' });
+  lone.handle(9, { t: 'join', mode: 'op1-easy', stake: MODE['op1-easy'].fixed });
+  lone.handle(9, { t: 'ready', cls: 'sniper', squad: 'friends' });
+  assert.equal(r2.countT, null);
+  lone.handle(9, { t: 'pick', squad: 'ai' });
+  assert.ok(r2.countT !== null, 'the AI squad: counting down');
+  for (let i = 0; i < 30 * 40 && r2.state !== 'live'; i++) lone.tick();
+  lone.tick(); // the companions sit down on the world's first tick
+  assert.equal([...r2.world.players.values()].filter((p) => p.npc === 'ally').length, 3, 'the companions fill the squad');
+});
