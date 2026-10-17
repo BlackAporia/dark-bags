@@ -997,9 +997,13 @@ function renderLobby() {
   $('mode-practice').setAttribute('aria-selected', String(app.mode === 'practice'));
 
   const st = $('net-status');
-  st.classList.toggle('bad', app.status === 'closed' || app.status === 'error');
+  st.classList.toggle('bad', app.mode !== 'practice' && (app.status === 'closed' || app.status === 'error'));
   if (app.mode === 'practice') st.textContent = t('net.practice');
   else if (app.status === 'open') st.textContent = t('net.open');
+  // a free host sleeps when idle: the first connection can take up to a minute
+  else if (!app.everOpen && performance.now() - (app.connectT ?? 0) > 4000) st.textContent = t('net.waking');
+  else if (app.status === 'connecting') st.textContent = t('net.connecting');
+  else st.textContent = t('net.down');
   // how many people are on the server right now (online only)
   const on = $('tb-online');
   on.hidden = !(app.mode === 'online' && app.status === 'open' && app.online);
@@ -1008,10 +1012,6 @@ function renderLobby() {
     on.querySelector('b').textContent = innerWidth < 560 ? String(app.online) : t('net.online', { n: app.online });
     on.title = t('net.online', { n: app.online });
   }
-  // a free host sleeps when idle: the first connection can take up to a minute
-  else if (!app.everOpen && performance.now() - (app.connectT ?? 0) > 4000) st.textContent = t('net.waking');
-  else if (app.status === 'connecting') st.textContent = t('net.connecting');
-  else st.textContent = t('net.down');
 
   const list = $('tables');
   const fixed = MODE[app.gameMode]?.fixed;
