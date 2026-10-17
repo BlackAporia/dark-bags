@@ -270,7 +270,7 @@ const starknet = createStarknetPage({
     store.set('darkbags.asset', id);
   },
 });
-const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby' });
+const chat = createChat({ app, send, isOpen: () => app.page === 'chat' && app.screen === 'lobby', release: () => input.release() });
 const settingsUi = createSettingsUi();
 // Nyx's first-run tour: on the first launch here, and the first time a wallet signs in
 const tour = createTour({
@@ -594,6 +594,7 @@ function showScreen(name) {
   if (name !== 'game') {
     scoreboard.hide();
     voice.end();
+    chat.closeMatch();
   }
   $('lobby').hidden = name !== 'lobby';
   $('prep').hidden = name !== 'prep';
@@ -1769,6 +1770,17 @@ addEventListener('keydown', (e) => {
     $('pause-main').hidden = false;
   } else closePause();
 });
+// Enter in a match: the chat (the same one as the menu's). Not over a film, the story card,
+// the menu, Nyx's tour or the spectator's Enter (that one opens the results).
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Enter' && e.code !== 'NumpadEnter') return;
+  if (app.screen !== 'game' || pauseOpen() || app.pendingResult || tour.open || chat.matchOpen()) return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLButtonElement && !e.target.closest('#hud'))) return;
+  if (document.querySelector('.op-cine:not([hidden]), .dx-story:not([hidden]), dialog[open]')) return;
+  e.preventDefault();
+  chat.openMatch();
+});
+$('chat-chip').addEventListener('click', () => chat.openMatch());
 $('pause-btn').addEventListener('click', openPause);
 $('pause-resume').addEventListener('click', closePause);
 $('pause-leave').addEventListener('click', leaveMatch);
