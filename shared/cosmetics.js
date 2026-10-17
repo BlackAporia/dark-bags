@@ -285,7 +285,7 @@ export const SEASON_WSKINS = SEASON_FINISHES.flatMap((f) =>
 );
 // the Descent's finishes, on its six guns
 export const DESCENT_WSKINS = DESCENT_FINISHES.flatMap((f) =>
-  DESCENT_GUNS.map((w) => {
+  (f.guns ?? DESCENT_GUNS).map((w) => {
     const model = modelFor(w, f.id);
     return { id: `${w}.${f.id}`, weapon: w, finish: f.id, model, name: `${f.name} ${MODEL_NAMES[model]}`, rarity: f.rarity, descent: f.descent };
   }),

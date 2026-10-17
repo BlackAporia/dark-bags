@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="lib/gsap.min.js"></script>
+    <script src="lib/film.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      #op1-intro-cv {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Operation 1, The Tunnels: every frame is drawn by lib/film.js from the time alone -->
+    <div id="root" data-composition-id="op1-intro" data-start="0" data-duration="34" data-width="1920" data-height="1080">
+      <canvas id="op1-intro-cv" class="clip" width="1920" height="1080" data-start="0" data-duration="34" data-track-index="0"></canvas>
+      <audio id="op1-intro-audio" src="assets/op1-intro-audio.m4a" data-start="0" data-duration="34" data-track-index="1"></audio>
+    </div>
+    <script>
+      const cv = document.getElementById('op1-intro-cv');
+      const clock = { t: 0 };
+      const tl = gsap.timeline({ paused: true });
+      tl.to(clock, { t: 34, duration: 34, ease: 'none', onUpdate: () => drawFilmFrame(cv, 'op1-intro', clock.t) }, 0);
+      drawFilmFrame(cv, 'op1-intro', 0);
+      window.__timelines['op1-intro'] = tl;
+    </script>
+  </body>
+</html>

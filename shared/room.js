@@ -8,6 +8,7 @@ import { RankBook, botRank, raidXp } from './ranks.js';
 import { raidStats } from './achievements.js';
 import { MODE, ZOMBIE_WEAPONS } from './modes.js';
 import { CLASSES, PISTOLS, DUP_XP, runItems } from './descent.js';
+import { zbItems } from './descent-items.js';
 import { opItems, SQUADS } from './story.js';
 import { STYLE } from './style.js';
 import { WAVES } from './horde.js';
@@ -729,6 +730,37 @@ export class RoomCore {
     return out;
   }
 
+  // Zombies' end for one runner: the graveyard set for the waves held (wave 10's boss down, all
+  // twenty), online only, once each (owned ones pay rank XP). Fair play as in the Descent: a
+  // flagged account, and in a squad a runner who barely fought, keep the XP only.
+  zombieRewards(c, p, earned) {
+    const w = this.world;
+    const waves = p.zWave ?? 0;
+    const out = { waves, items: [], dupXp: 0, carried: false, flagged: false };
+    if (this.practice) return { ...out, practice: true };
+    const humans = [...w.players.values()].filter((q) => !q.isBot);
+    const total = humans.reduce((n, q) => n + (q.zDmg ?? 0), 0);
+    out.carried = humans.length > 1 && total > 0 && (p.zDmg ?? 0) / total < CARRIED_SHARE;
+    out.flagged = !!this.guard?.flagged(c.token);
+    if (out.carried || out.flagged) return out;
+    const lv = this.inventory.view(c.token);
+    for (const it of zbItems(waves, c.weapon)) {
+      const owned = it.k === 'outfit' ? lv.owned.includes(it.id) : it.k === 'wskin' ? lv.wowned.includes(it.id) : (lv.sowned ?? []).includes(it.id);
+      const rarity = (it.k === 'outfit' ? OUTFIT[it.id] : it.k === 'wskin' ? WSKIN[it.id] : STYLE[it.id])?.rarity ?? 'rare';
+      if (owned) {
+        out.dupXp += DUP_XP[rarity] ?? 0;
+        continue;
+      }
+      this.inventory.give(c.token, { k: it.k, id: it.id });
+      out.items.push({ ...it, rarity });
+    }
+    if (out.dupXp) {
+      earned.parts.push({ label: 'Graveyard duplicates', xp: out.dupXp });
+      earned.total += out.dupXp;
+    }
+    return out;
+  }
+
   // A story operation's end for one runner: its items only for completing the whole operation
   // (the first time on a difficulty; owned ones pay rank XP), and the same fair play as the
   // Descent (flagged accounts and carried runners keep the XP only). The survivors saved are
@@ -785,6 +817,7 @@ export class RoomCore {
       const earned = this.practice ? { total: 0, parts: [] } : raidXp(p, { kind: MODE[this.mode].kind, diff: MODE[this.mode].diff });
       // the Descent: what the run hands out (only to those who got out with it)
       const descent = w.descent ? this.descentRewards(c, p, earned) : null;
+      const zb = w.zombie && !w.descent ? this.zombieRewards(c, p, earned) : null;
       // achievements: career counters, each completed one pays its XP once
       const stats = raidStats(p, { golden: w.golden, lastExit: p.status === 'extracted' && p.extId === w.zonePlan.finalExit, mode: MODE[this.mode], squad: w.players.size, mvp: w.zombie && p.won && [...w.players.values()].every((q) => q === p || (q.zk ?? 0) < (p.zk ?? 0)), goldWin: w.goldRush && !!p.won });
       // ranked: the finish moves the season rating, and may earn a bonus spin
@@ -850,6 +883,7 @@ export class RoomCore {
         ...(w.dm ? { deaths: p.deaths, place: w.standings().indexOf(p) + 1, top: w.standings()[0]?.kills ?? 0 } : {}),
         ...(w.zombie && !w.descent ? { zWave: p.zWave ?? 0, zk: p.zk ?? 0, waves: WAVES, squad: w.players.size } : {}),
         ...(descent ? { descent } : {}),
+        ...(zb ? { zb } : {}),
         ...(w.goldRush ? { gb: p.gb, place: w.goldOrder().indexOf(p) + 1, top: w.goldOrder()[0]?.gb ?? 0, deaths: p.deaths, credit: this.accounts.get(p.id)?.credit ?? 0 } : {}),
         secs: Math.round((p.endedAt ?? w.time) - p.joinedAt),
         killer: p.killerName,

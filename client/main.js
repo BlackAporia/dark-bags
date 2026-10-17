@@ -55,6 +55,8 @@ import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
 import { renderDxPanel, renderDxBoard, renderDxPick, dxResult, isDx, isDxOnly, DX_MODE, diffOfMode, opSquad } from './descent.js';
 import { renderOpPanel, opResult, isOp, opMode, opPicked, OP_CARD } from './story.js';
+import { rewardCards, wireRewards, ownedIn } from './rewards.js';
+import { zbItems, ZB_REWARDS } from '../shared/descent-items.js';
 import { DIFFS } from '../shared/descent.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS, langChosen } from './i18n.js';
 import { keepBackup, backups } from './backups.js';
@@ -853,6 +855,7 @@ function renderDx() {
     renderOpPanel($('dx-panel'), {
       mode: app.gameMode,
       view: app.dx,
+      locker: app.mode === 'online' ? app.locker : null,
       online: app.mode === 'online' && !!app.token && (!cashier.active || cashier.signedIn),
       practice: app.mode === 'practice',
       asset: app.asset,
@@ -875,6 +878,7 @@ function renderDx() {
   renderDxPanel($('dx-panel'), {
     mode: app.gameMode,
     view: app.dx,
+    locker: app.mode === 'online' ? app.locker : null,
     online: app.mode === 'online' && !!app.token && (!cashier.active || cashier.signedIn),
     practice: app.mode === 'practice',
     asset: app.asset,
@@ -910,8 +914,16 @@ function renderModeInfo() {
     <div class="mi-body"><p class="eyebrow">${esc(t(`mcat.${MODE_CAT[m.id] ?? 'classic'}`))} · ${esc(t(`kind.${m.kind}`))}</p><h3>${esc(t(m.op ? 'op.title' : m.kind === 'descent' ? 'dx.title' : `mode.${m.id}`))}</h3><p class="mi-d">${esc(t(m.op ? 'op.card' : `mode.${m.id}.d`))}</p>
       ${solo ? `<p class="mi-solo">${esc(t('mi.solo'))} <button type="button" class="ghost" data-practice>${esc(t('lobby.practice'))} →</button></p>` : ''}
       <details class="mi-more"${more ? ' open' : ''}><summary>${esc(t('mi.more'))}</summary><ul class="mi-facts"><li><b>🏆 ${esc(t('mi.win'))}</b> ${esc(t(`mi.win.${k}`))}</li><li><b>💡 ${esc(t('mi.tip'))}</b> ${esc(t(`mi.tip.${k}`))}</li><li><b>🎁 ${esc(t('mi.pays'))}</b> ${esc(t('mi.rew'))}</li></ul></details></div>
-    <div class="mi-side"><span><small>${esc(t('mi.players'))}</small><b>${esc(f.size)}</b></span><span><small>${esc(t('mi.time'))}</small><b>${esc(f.time)}</b></span><span><small>${esc(t('mi.now'))}</small><b>${f.live ? `<i class="live-dot"></i>${f.live}` : '—'}${f.waiting ? ` · ⏳${f.waiting}` : ''}</b></span></div>`;
+    <div class="mi-side"><span><small>${esc(t('mi.players'))}</small><b>${esc(f.size)}</b></span><span><small>${esc(t('mi.time'))}</small><b>${esc(f.time)}</b></span><span><small>${esc(t('mi.now'))}</small><b>${f.live ? `<i class="live-dot"></i>${f.live}` : '—'}${f.waiting ? ` · ⏳${f.waiting}` : ''}</b></span></div>${m.kind === 'zombie' ? zombieRewards() : ''}`;
+  wireRewards(el);
   el.querySelector('[data-practice]')?.addEventListener('click', () => $('mode-practice').click());
+}
+
+// Zombies' graveyard set under the mode card: what holding out pays (online only, once each)
+function zombieRewards() {
+  const items = zbItems(20, app.zweapon ?? 'rifle');
+  const L = app.mode === 'online' ? app.locker : null;
+  return `<div class="mi-rewards"><p class="eyebrow">${esc(t('rw.zbH'))}</p>${rewardCards(items, { owned: ownedIn(L), tag: (it) => t(it.wave >= ZB_REWARDS.at(-1).wave ? 'rw.zbAll' : 'rw.zbWave', { n: it.wave }), only: t('rw.onlyZb') })}${app.mode === 'practice' ? `<p class="dx-note">${esc(t('rw.zbPractice'))}</p>` : ''}</div>`;
 }
 
 // today's goals over the mode picker: what is waiting to be claimed or played for
@@ -1805,13 +1817,17 @@ function showResult(m) {
     amt.textContent = dxr.amount;
     amt.className = `res-amount${dxr.win ? ' win' : ''}`;
     det.innerHTML = `${dxr.detail} ${inside}.${dxr.items}`;
+    wireRewards(det);
   } else if (MODE[m.mode]?.kind === 'zombie') {
     const w = m.zWave ?? 0;
     k.textContent = m.won ? t('res.zCleared') : t('res.zFell', { n: Math.min(m.waves ?? 10, w + 1) });
     k.className = `res-kicker ${m.won ? 'win' : 'loss'}`;
     amt.textContent = t('res.zWaves', { n: w, of: m.waves ?? 10 });
     amt.className = `res-amount${m.won ? ' win' : ''}`;
-    det.innerHTML = `${t(m.won ? 'res.zWonText' : 'res.zText', { k: `<b>${m.zk ?? 0}</b>`, s: `<b>${m.squad ?? 1}</b>` })} ${t('res.zTime', { t: mmss(m.secs) })}.`;
+    const zi = m.zb?.items?.length ? `<p class="eyebrow">${esc(t('dx.res.items'))}</p>${rewardCards(m.zb.items, { tag: (it) => t(it.wave >= ZB_REWARDS.at(-1).wave ? 'rw.zbAll' : 'rw.zbWave', { n: it.wave }), only: t('rw.onlyZb') })}` : '';
+    const zx = m.zb?.dupXp ? ` ${esc(t('dx.res.dup', { xp: m.zb.dupXp }))}` : '';
+    det.innerHTML = `${t(m.won ? 'res.zWonText' : 'res.zText', { k: `<b>${m.zk ?? 0}</b>`, s: `<b>${m.squad ?? 1}</b>` })} ${t('res.zTime', { t: mmss(m.secs) })}.${zx}${zi}`;
+    wireRewards(det);
   } else if (MODE[m.mode]?.kind === 'gold') {
     k.textContent = m.won ? t('res.goldWon') : t('res.goldLost', { p: m.place ?? '?' });
     k.className = `res-kicker ${m.won ? 'win' : 'loss'}`;
