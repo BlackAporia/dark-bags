@@ -456,7 +456,9 @@ export class Music {
     this.filter.type = 'lowpass';
     this.filter.frequency.value = TOP; // the console's own soft top end
     this.duckG = ctx.createGain();
-    this.out.connect(this.filter).connect(this.duckG).connect(dest);
+    // a story film plays its own score: the music (and its stings) steps out under it (see hush)
+    this.hushG = ctx.createGain();
+    this.out.connect(this.filter).connect(this.duckG).connect(this.hushG).connect(dest);
     // a short echo, the one luxury modern chiptune allows itself
     this.delay = ctx.createDelay(1);
     this.delay.delayTime.value = 0.28;
@@ -637,6 +639,14 @@ export class Music {
     g.setTargetAtTime(1, t + secs, 0.25);
   }
 
+  // a story film is on: the game's music (and its stings) fades out, and comes back after
+  hush(on) {
+    const g = this.hushG.gain;
+    const t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(on ? 0 : 1, t, on ? 0.12 : 0.6);
+  }
+
   // taking a hit: the music drops out for a moment, like your ears ringing
   muffle() {
     const f = this.filter.frequency;
@@ -654,7 +664,7 @@ export class Music {
     // the sting rides its own bus, past the duck that quiets the track under it
     if (!this.stingBus) {
       this.stingBus = this.ctx.createGain();
-      this.stingBus.connect(this.dest);
+      this.stingBus.connect(this.hushG);
     }
     this.stingBus.gain.value = 0.9 * (this.volume ?? 1);
     const main = this.out;

@@ -103,7 +103,9 @@ function mediaBase() {
  * speaks, a skip button. Any key or the button skips; onEnd runs once either way.
  */
 export class Cinema {
-  constructor(root = document.body) {
+  // hush(on): quiets the game's own music while a film plays (the films carry their score)
+  constructor(root = document.body, { hush = null } = {}) {
+    this.hush = hush;
     this.el = document.createElement('div');
     this.el.className = 'op-cine';
     this.el.hidden = true;
@@ -143,6 +145,7 @@ export class Cinema {
     this.vars = vars;
     this.reduced = reduced;
     this.el.hidden = false;
+    this.hush?.(true);
     this.el.classList.remove('out', 'vid');
     this.el.classList.toggle('short', !!F.card);
     this.q('.op-skip').textContent = t('dx.skip');
@@ -238,6 +241,7 @@ export class Cinema {
     } catch {}
     this.video.removeAttribute('src');
     if (!this.el.hidden) {
+      this.hush?.(false);
       this.el.classList.add('out');
       setTimeout(() => {
         if (this.el.classList.contains('out')) this.el.hidden = true;

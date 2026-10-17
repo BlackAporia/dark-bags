@@ -45,6 +45,7 @@ export class Sfx {
         this.music.setVolume(this.musicVolume ?? 1);
         this.music.choose(this.trackChoice ?? 'auto');
         this.music.chooseLobby(this.menuChoice ?? 'auto');
+        if (this.hushed) this.music.hush(true);
         this.startStormBed();
       } catch {
         this.ctx = null;
@@ -70,6 +71,12 @@ export class Sfx {
     store.set('darkbags.muted', this.muted);
     if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.9 * (this.volume ?? 1), this.ctx.currentTime, 0.05);
     return this.muted;
+  }
+
+  // a story film is on (it carries its own score): the music steps out until it ends
+  hushMusic(on) {
+    this.hushed = on;
+    this.music?.hush(on);
   }
 
   toggleMusic() {
