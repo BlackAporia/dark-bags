@@ -82,15 +82,17 @@ export const COMPANIONS = [
 ];
 export const SURVIVORS = ['Vera', 'Old Ilko', 'Nadia', 'Tymko', 'Lev', 'Dina', 'Marko', 'Zoya'];
 
-// What completing an operation hands out (only the first time on a difficulty: owned items pay
-// rank XP like the Descent's duplicates).
+// What completing an operation hands out: on every difficulty a runner of its own (nowhere else to
+// get it), a finish on your class gun and style; rarer the harder (easy Epic, hard Legendary,
+// hardcore Mythic). Only the first time on a difficulty: owned items pay rank XP like the
+// Descent's duplicates.
 export function opItems(op, diff, cls = 'assault') {
   if (!OPS[op]) return [];
   const gun = CLASSES[cls]?.weapon ?? 'carbine';
   const n = OPS[op].n;
-  if (diff === 'hardcore') return [{ k: 'outfit', id: `op${n}-hardcore` }, { k: 'style', id: `f-op${n}-hardcore` }, { k: 'style', id: `n-op${n}-hardcore` }];
-  if (diff === 'hard') return [{ k: 'outfit', id: `op${n}-hard` }, { k: 'wskin', id: `${gun}.op${n}-hard` }];
-  return [{ k: 'wskin', id: `${gun}.op${n}-easy` }, { k: 'style', id: `b-op${n}-easy` }];
+  if (diff === 'hardcore') return [{ k: 'outfit', id: `op${n}-hardcore` }, { k: 'wskin', id: `${gun}.op${n}-hardcore` }, { k: 'style', id: `f-op${n}-hardcore` }, { k: 'style', id: `n-op${n}-hardcore` }];
+  if (diff === 'hard') return [{ k: 'outfit', id: `op${n}-hard` }, { k: 'wskin', id: `${gun}.op${n}-hard` }, { k: 'style', id: `k-op${n}-hard` }];
+  return [{ k: 'outfit', id: `op${n}-easy` }, { k: 'wskin', id: `${gun}.op${n}-easy` }, { k: 'style', id: `b-op${n}-easy` }];
 }
 
 // ------------------------------------------------------------------ maps

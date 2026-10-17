@@ -186,3 +186,43 @@ test('zombies: 1000 credits stand the whole downed squad back up; not in other m
   x.cr = 5000;
   assert.equal(g.buy(x.id, 'revive'), false, 'guns + lasers has no revive');
 });
+
+test('zombies: the graveyard set for the waves held, online only, never twice', async () => {
+  const { OUTFIT, WSKIN, BOXES, OUTFITS, WEAPON_SKINS, boxCatalog, Inventory } = await import('../shared/cosmetics.js');
+  const { STYLE } = await import('../shared/style.js');
+  const { zbItems } = await import('../shared/descent-items.js');
+  // every item exists, and no case or shop list has it
+  const inBoxes = new Set([...BOXES.flatMap((b) => boxCatalog(b)).map((x) => x.id), ...OUTFITS.map((o) => o.id), ...WEAPON_SKINS.map((s) => s.id)]);
+  for (const it of zbItems(20, 'lmg')) {
+    assert.ok(it.k === 'outfit' ? OUTFIT[it.id] : it.k === 'wskin' ? WSKIN[it.id] : STYLE[it.id], `${it.id} exists`);
+    assert.ok(!inBoxes.has(it.id), `${it.id} is not in a case`);
+  }
+  const wallet = { debit: () => true, credit: () => {}, balances: () => ({}) };
+  const inventory = new Inventory();
+  const run = (practice, waves) => {
+    const sent = [];
+    const room = new RoomCore({ stake: 100, mode: 'zombies', wallet, inventory, practice, send: (cid, m) => sent.push([cid, m]) });
+    room.addClient('c1', { token: 't1', name: 'solo' });
+    room.handle('c1', { t: 'ready', weapon: 'shotgun' });
+    room.handle('c1', { t: 'start' });
+    for (let i = 0; i < 30 * 30 && room.state !== 'live'; i++) room.tick();
+    assert.equal(room.state, 'live');
+    const p = [...room.world.players.values()][0];
+    p.zWave = waves;
+    room.world.horde.cleared = waves; // the waves this squad held (the end reads them from here)
+    room.world.end();
+    for (let i = 0; i < 5 && !sent.some(([, m]) => m.t === 'result'); i++) room.tick();
+    return { room, res: sent.find(([, m]) => m.t === 'result')?.[1] };
+  };
+  const ids = (r) => (r.res.zb?.items ?? []).map((x) => x.id).sort();
+  assert.deepEqual(ids(run(false, 4)), [], 'wave 4: nothing yet');
+  const mid = run(false, 10);
+  assert.deepEqual(ids(mid), ['b-zb-fence', 'zb-digger'], 'wave 10: the first set');
+  assert.ok(mid.room.inventory.view('t1').owned.includes('zb-digger'), 'it is in the locker');
+  const all = run(false, 20);
+  assert.deepEqual(ids(all), ['n-zb-undead', 'shotgun.zb-bone', 'zb-warden'], 'all twenty: the rest, the finish on the gun you took');
+  assert.ok(all.res.zb.dupXp > 0, 'what you have already pays XP instead');
+  const pr = run(true, 20);
+  assert.equal(pr.res.zb?.practice, true);
+  assert.deepEqual(ids(pr), [], 'practice pays nothing');
+});

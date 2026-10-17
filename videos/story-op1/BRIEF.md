@@ -9,8 +9,12 @@ language: none on screen (the game adds the subtitles)
 
 # Operation 1, The Tunnels: the films
 
-**Rendered:** `site/media/story/op1-intro.*` and `op1-outro.*` (mp4 and webm, 1080p and 720p)
-are rendered from the engine's own scenes with a synthesized score and a Piper voice:
+**Rendered (now):** `videos/story-op1-cine/` makes all five films (`op1-intro`, the stage cards
+`op1-s2`, `op1-s3`, `op1-s4`, and `op1-outro`) as HyperFrames compositions over one procedural
+renderer (`lib/film.js`), with the narrator and score below. Render with
+`npx hyperframes render -c compositions/<id>.html` there, then encode into `site/media/story/`.
+
+**First version:** `site/media/story/op1-intro.*` and `op1-outro.*` were rendered from the engine's own scenes with a synthesized score and a Piper voice:
 
 ```bash
 python3 scripts/story/make-audio.py --model en-us-libritts-high.onnx --out /tmp/story-audio

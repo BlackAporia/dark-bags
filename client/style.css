@@ -2968,9 +2968,11 @@ body.touch-on .sb-btn { display: grid; place-items: center; }
 .dx-pack small { color: var(--loot); font: 600 11px/1 var(--f-num); }
 .dx-pack i { position: absolute; top: -7px; inset-inline-end: -4px; font: 700 9.5px/1 var(--f-num); font-style: normal; padding: 2px 4px; border-radius: 6px; background: var(--exit); color: #04130b; }
 .dx-track { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
-.dx-ms { --rc: #fff; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--rc) 45%, transparent); background: color-mix(in srgb, var(--rc) 8%, transparent); cursor: help; }
+.dx-ms { --rc: #fff; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--rc) 45%, transparent); background: color-mix(in srgb, var(--rc) 8%, transparent); }
 .dx-ms b { font: 700 10.5px/1 var(--f-num); color: var(--dust); }
 .dx-ms span { font-size: 14px; color: var(--rc); }
+.dx-ms button { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.dx-ms.sel { outline: 2px solid var(--rc); outline-offset: 1px; }
 .dx-ms.got { background: color-mix(in srgb, var(--rc) 22%, transparent); }
 .dx-ms.got b { color: var(--paper); }
 .dx-ms.crown { border-color: var(--gold); box-shadow: 0 0 12px rgba(255, 209, 102, 0.3); animation: dx-glow 2.4s ease-in-out infinite; }
@@ -3085,6 +3087,33 @@ body.touch-on .dx-g kbd, body.touch-on .dx-swap kbd { display: none; }
 .dx-items { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; text-align: start; }
 .dx-items li { --rc: #fff; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent); background: color-mix(in srgb, var(--rc) 10%, transparent); }
 .dx-items b { color: var(--rc); font-size: 13px; }
+/* PvE rewards with their art (client/rewards.js): tap one for a close look */
+.mi-rewards { grid-column: 1 / -1; min-width: 0; }
+.rw-cards { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; text-align: start; }
+.rw-card { --rc: #fff; position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px 10px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent); background: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--rc) 22%, transparent), transparent 70%), rgba(255, 255, 255, 0.03); color: var(--paper); font: inherit; text-align: start; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+.rw-card:hover, .rw-card:focus-visible { transform: translateY(-2px); border-color: var(--rc); }
+.rw-art { align-self: stretch; display: grid; place-items: center; height: 76px; margin-bottom: 4px; }
+.rw-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.rw-art.fig img { height: 100%; width: auto; }
+.rw-art.fig { height: 100px; }
+.rw-card b { color: var(--rc); font-size: 13px; line-height: 1.2; }
+.rw-card small { font-size: 11px; color: var(--dust); }
+.rw-card small em { font-style: normal; color: var(--rc); }
+.rw-card i { font-style: normal; font-size: 11px; color: var(--paper); opacity: 0.8; }
+.rw-got { position: absolute; top: 6px; right: 8px; font-size: 10.5px; font-weight: 700; color: #3ddc97; }
+.rw-card.got { opacity: 0.72; }
+.rw-modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px; background: rgba(3, 4, 8, 0.78); backdrop-filter: blur(4px); }
+.rw-modal[hidden] { display: none; }
+.rw-box { --rc: #fff; position: relative; width: min(420px, 100%); display: grid; justify-items: center; gap: 6px; padding: 22px 22px 20px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--rc) 60%, transparent); background: radial-gradient(100% 70% at 50% 0%, color-mix(in srgb, var(--rc) 26%, transparent), transparent 70%), #0d1018; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px color-mix(in srgb, var(--rc) 25%, transparent); }
+.rw-modal .rw-box { --rc: inherit; }
+.rw-big { display: grid; place-items: center; min-height: 180px; }
+.rw-big img { max-width: 100%; }
+.rw-box .rw-kind { margin: 4px 0 0; color: var(--rc); }
+.rw-box h3 { margin: 0; font: 400 clamp(26px, 5vw, 36px)/1 var(--f-display); letter-spacing: 0.04em; color: var(--rc); }
+.rw-tag { margin: 0; color: var(--paper); }
+.rw-only { margin: 0; font-size: 13px; color: var(--gold); }
+.rw-only:empty, .rw-tag:empty { display: none; }
+.rw-x { position: absolute; top: 8px; right: 10px; border: 0; background: none; color: var(--dust); font-size: 18px; cursor: pointer; }
 .dx-items small { font-size: 11px; color: var(--dust); }
 
 /* the ranks window: where you stand, the ladder of 90, what pays XP */
@@ -3413,6 +3442,8 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .op-cine.short .op-bars { display: none; }
 .op-card { --tint: #fb923c; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 20px; text-align: center; pointer-events: none; text-shadow: 0 2px 10px #000; animation: op-card-in 0.6s ease-out both; }
 .op-card[hidden] { display: none; }
+/* the case cards share the name: none of their shape here (it pushed the title off screen) */
+.op-cine .op-card { aspect-ratio: auto; transform-style: flat; transition: none; height: auto; width: auto; }
 .op-card .eyebrow { margin: 0; color: var(--tint); letter-spacing: 0.3em; }
 .op-card h2 { margin: 0; font: 400 clamp(34px, 7vw, 64px)/1 var(--f-display); letter-spacing: 0.05em; }
 .op-card-obj { margin: 0; font-size: 15px; color: var(--gold); }

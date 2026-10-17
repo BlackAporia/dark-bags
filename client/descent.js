@@ -11,6 +11,7 @@ import { STYLE } from '../shared/style.js';
 import { MODE } from '../shared/modes.js';
 import { OPS, SQUADS } from '../shared/story.js';
 import { Cinema, Radio, stageFilm } from './story.js';
+import { rewardCards, wireRewards, ownedIn } from './rewards.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const mmss = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
@@ -39,7 +40,7 @@ const itemKind = (it) => (it.k === 'outfit' ? t('dx.kOutfit') : it.k === 'wskin'
 
 // The panel under the mode card when a Descent difficulty is picked: tickets (today's free one,
 // those bought, packs to buy), the reward track of the difficulty and the deepest runners.
-export function renderDxPanel(el, { mode, view, online, practice, asset, assetLabel, onDiff, onBuy, onBoard }) {
+export function renderDxPanel(el, { mode, view, locker = null, online, practice, asset, assetLabel, onDiff, onBuy, onBoard }) {
   const diff = diffOfMode(mode);
   if (!el) return;
   el.hidden = !diff;
@@ -57,21 +58,34 @@ export function renderDxPanel(el, { mode, view, online, practice, asset, assetLa
       </div>
       <p class="eyebrow dx-buy-h">${esc(t('dx.buyH', { c: assetLabel }))}</p>
       <div class="dx-packs">${TICKET_PACKS.map((p) => `<button type="button" class="dx-pack" data-n="${p.n}"><b>${p.n} 🎫</b><small>$${(p.mills / 1000).toFixed(2)}</small>${p.n > 1 ? `<i>−${Math.round(100 - (p.mills / (p.n * 100)) * 100)}%</i>` : ''}</button>`).join('')}</div>`;
+  const reached = v?.best?.[diff] ?? 0;
+  const pick = Number(el.dataset.ms) && el.dataset.msDiff === diff ? Number(el.dataset.ms) : Math.min(FLOORS, (Math.floor(reached / MILESTONE) + 1) * MILESTONE);
   const track = Array.from({ length: FLOORS / MILESTONE }, (_, i) => {
     const f = (i + 1) * MILESTONE;
     const items = milestoneItems(diff, f, store.get('darkbags.dxClass', 'assault'), store.get('darkbags.dxPistol', 'pistol'));
     const top = items[0];
     const r = itemOf(top)?.rarity ?? 'rare';
     const best = v?.best?.[diff] ?? 0;
-    return `<li class="dx-ms ${best >= f ? 'got' : ''} ${f === FLOORS ? 'crown' : ''}" style="--rc:${RARITIES[r].color}" title="${esc(items.map((x) => `${itemOf(x)?.name ?? x.id} · ${t(`r.${itemOf(x)?.rarity ?? 'rare'}`)}`).join('\n'))}"><b>${f}</b><span>${f === FLOORS ? '♛' : top.k === 'outfit' ? '🛡' : top.k === 'wskin' ? '✦' : '◈'}</span></li>`;
+    return `<li class="dx-ms ${best >= f ? 'got' : ''} ${f === FLOORS ? 'crown' : ''} ${f === pick ? 'sel' : ''}" style="--rc:${RARITIES[r].color}"><button type="button" data-f="${f}" title="${esc(items.map((x) => `${itemOf(x)?.name ?? x.id} · ${t(`r.${itemOf(x)?.rarity ?? 'rare'}`)}`).join('\n'))}"><b>${f}</b><span>${f === FLOORS ? '♛' : top.k === 'outfit' ? '🛡' : top.k === 'wskin' ? '✦' : '◈'}</span></button></li>`;
   }).join('');
+  // the milestone you picked on the track (the next one to reach, at first): what it pays
+  const pickItems = milestoneItems(diff, pick, store.get('darkbags.dxClass', 'assault'), store.get('darkbags.dxPistol', 'pistol'));
+  const cards = rewardCards(pickItems, { owned: locker ? ownedIn(locker) : () => false, tag: () => t('rw.floor', { n: pick, d: t(`dx.diff.${diff}`) }), only: t('rw.onlyDx') });
   el.style.setProperty('--dc', DIFF_COLOR[diff]);
   el.innerHTML = `<div class="dx-diffs" role="radiogroup" aria-label="${esc(t('dx.diffH'))}">${DIFF_IDS.map((d) => `<button type="button" class="dx-diff${d === diff ? ' on' : ''}" data-d="${d}" role="radio" aria-checked="${d === diff}" style="--dc:${DIFF_COLOR[d]}"><b>${DIFF_ICON[d]} ${esc(t(`dx.diff.${d}`))}</b><small>${esc(t('dx.cost', { n: DIFFS[d].tickets }))}</small><em>${esc(t(`dx.diff.${d}.d`))}</em>${v?.best?.[d] ? `<i class="dx-best">⬇ ${v.best[d]}/${FLOORS}${v.clears?.[d] ? ` · ♛×${v.clears[d]}` : ''}</i>` : ''}</button>`).join('')}</div>
     ${tix}
     <p class="eyebrow">${esc(t('dx.trackH'))}</p><ol class="dx-track">${track}</ol>
+    <p class="eyebrow dx-ms-h">${esc(t('rw.floorH', { n: pick }))}</p>${cards}
     <p class="dx-note">${esc(t(D.revive ? 'dx.rule' : 'dx.ruleHc'))}</p>
     <button type="button" class="ghost dx-board-btn">🏔 ${esc(t('dx.board'))}</button>
     <div class="dx-board" hidden></div>`;
+  wireRewards(el);
+  for (const b of el.querySelectorAll('.dx-ms button[data-f]'))
+    b.addEventListener('click', () => {
+      el.dataset.ms = b.dataset.f;
+      el.dataset.msDiff = diff;
+      renderDxPanel(el, { mode, view, locker, online, practice, asset, assetLabel, onDiff, onBuy, onBoard });
+    });
   for (const b of el.querySelectorAll('.dx-diff')) b.addEventListener('click', () => onDiff(b.dataset.d));
   for (const b of el.querySelectorAll('.dx-pack')) b.addEventListener('click', () => onBuy(Number(b.dataset.n), asset));
   el.querySelector('.dx-board-btn').addEventListener('click', () => onBoard(diff));
@@ -152,11 +166,8 @@ export function dxResult(m) {
   if (d.carried) lines.push(t('dx.res.carried'));
   if (d.flagged) lines.push(t('dx.res.flagged'));
   if (d.dupXp) lines.push(t('dx.res.dup', { xp: d.dupXp }));
-  const items = (d.items ?? []).map((it) => {
-    const x = itemOf(it);
-    return `<li style="--rc:${RARITIES[it.rarity]?.color ?? '#fff'}"><b>${esc(x?.name ?? it.id)}</b><small>${esc(itemKind(it))} · ${esc(t(`r.${it.rarity}`))} · ${esc(t('dx.floorN', { n: it.floor, of: FLOORS }))}</small></li>`;
-  });
-  return { win: d.banked, kicker, amount, detail: lines.map(esc).join(' '), items: items.length ? `<p class="eyebrow">${esc(t('dx.res.items'))}</p><ul class="dx-items">${items.join('')}</ul>` : '' };
+  const items = rewardCards(d.items ?? [], { tag: (it) => t('dx.floorN', { n: it.floor, of: FLOORS }), only: t('rw.onlyDx') });
+  return { win: d.banked, kicker, amount, detail: lines.map(esc).join(' '), items: items ? `<p class="eyebrow">${esc(t('dx.res.items'))}</p>${items}` : '' };
 }
 
 // ----------------------------------------------------------- inside the run

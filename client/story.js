@@ -7,12 +7,11 @@
 // scene the engine draws when there is none, it fails to load, or the player saves data. The
 // same subtitles serve both, so a new language costs strings, not a re-render.
 import { t, getLang } from './i18n.js';
+import { rewardCards, wireRewards, ownedIn } from './rewards.js';
 import { store } from './store.js';
 import { MODE } from '../shared/modes.js';
 import { DIFFS, DIFF_IDS, TICKET_PACKS } from '../shared/descent.js';
 import { OPS, OP_IDS, OP_SOON, OP_BOSSES, opItems, RETRIES } from '../shared/story.js';
-import { OUTFIT, WSKIN, RARITIES } from '../shared/cosmetics.js';
-import { STYLE } from '../shared/style.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const TAU = Math.PI * 2;
@@ -33,8 +32,6 @@ const DIFF_ICON = { easy: '◆', hard: '◆◆', hardcore: '◆◆◆' };
 const DIFF_COLOR = { easy: '#34d399', hard: '#f97316', hardcore: '#a855f7' };
 const OBJ_ICON = { reach: '➜', escort: '⛑', hold: '⛨', boss: '♛' };
 
-const itemOf = (it) => (it.k === 'outfit' ? OUTFIT[it.id] : it.k === 'wskin' ? WSKIN[it.id] : STYLE[it.id]);
-const itemKind = (it) => (it.k === 'outfit' ? t('dx.kOutfit') : it.k === 'wskin' ? t('dx.kSkin') : t(`dx.k.${STYLE[it.id]?.kind ?? 'frame'}`));
 
 // who speaks on the radio: a colour and an initial for the portrait
 export const VOICES = {
@@ -161,11 +158,13 @@ export class Cinema {
     this.useVideo = false;
     const saveData = !!navigator.connection?.saveData;
     const base = video && F.op && !saveData ? mediaBase() : null;
-    if (base && typeof film === 'string') {
+    // a film's own video: FILMS by id, or a stage card that names one (op1-s2…)
+    const vid = typeof film === 'string' ? film : F.video;
+    if (base && vid) {
       // H.264 where the browser has it, VP9 where it does not (open Chromium builds)
       const v = this.video;
       const ext = v.canPlayType('video/mp4; codecs="avc1.640028, mp4a.40.2"') ? 'mp4' : v.canPlayType('video/webm; codecs="vp9, opus"') ? 'webm' : null;
-      if (ext) this.tryVideo(`${base}${film}${Math.min(innerWidth, innerHeight) < 600 ? '-720' : ''}.${ext}`);
+      if (ext) this.tryVideo(`${base}${vid}${Math.min(innerWidth, innerHeight) < 600 ? '-720' : ''}.${ext}`);
     }
     this.P = filmParticles(reduced ? 0 : 120);
     const loop = (now) => {
@@ -646,6 +645,7 @@ export function stageFilm(op, n, { obj, boss } = {}) {
     op,
     secs: 6,
     scene,
+    video: `op${O.n}-s${n}`, // the stage's film in site/media/story/, when there is one
     lines: [],
     card: {
       k: `${t(`op.${op}.name`)} · ${t('op.stageN', { n, of: O.stages.length })}`,
@@ -720,7 +720,7 @@ export class Radio {
 
 // The panel under the operations card: the operations in story order (the next ones locked),
 // difficulty, tickets (the Descent's: one book), what completing pays and how far you got.
-export function renderOpPanel(el, { mode, view, online, practice, asset, assetLabel, onPick, onBuy }) {
+export function renderOpPanel(el, { mode, view, locker = null, online, practice, asset, assetLabel, onPick, onBuy }) {
   if (!el) return;
   const op = opOf(mode);
   el.hidden = !op;
@@ -748,23 +748,18 @@ export function renderOpPanel(el, { mode, view, online, practice, asset, assetLa
       <p class="eyebrow dx-buy-h">${esc(t('dx.buyH', { c: assetLabel }))}</p>
       <div class="dx-packs">${TICKET_PACKS.map((p) => `<button type="button" class="dx-pack" data-n="${p.n}"><b>${p.n} 🎫</b><small>$${(p.mills / 1000).toFixed(2)}</small>${p.n > 1 ? `<i>−${Math.round(100 - (p.mills / (p.n * 100)) * 100)}%</i>` : ''}</button>`).join('')}</div>`;
   const cls = store.get('darkbags.dxClass', 'assault');
-  const rewards = opItems(op, diff, cls)
-    .map((it) => {
-      const x = itemOf(it);
-      const r = x?.rarity ?? 'rare';
-      const got = !!rec?.clears?.[diff];
-      return `<li class="${got ? 'got' : ''}" style="--rc:${RARITIES[r]?.color ?? '#fff'}"><b>${esc(x?.name ?? it.id)}</b><small>${esc(itemKind(it))} · ${esc(t(`r.${r}`))}${got ? ' · ✓' : ''}</small></li>`;
-    })
-    .join('');
+  // owned: from the locker when we have it (an item added after your clear still shows as to win)
+  const rewards = rewardCards(opItems(op, diff, cls), { owned: locker ? ownedIn(locker) : () => !!rec?.clears?.[diff], tag: () => t('rw.opTag', { d: t(`dx.diff.${diff}`) }), only: t('rw.onlyOp', { o: t(`op.${op}.name`) }) });
   const stages = OPS[op].stages.map((s, i) => `<li class="${(rec?.best?.[diff] ?? 0) > i ? 'got' : ''}"><span>${OBJ_ICON[s.obj]}</span><b>${esc(t(`op.${op}.s${i + 1}.name`))}</b><small>${esc(t(`op.obj.${s.obj}`))}</small></li>`).join('');
   el.style.setProperty('--dc', DIFF_COLOR[diff]);
   el.innerHTML = `<p class="op-lede">${esc(t(`op.${op}.lede`))}</p>
     <ol class="op-ops">${list}</ol>
     <div class="dx-diffs" role="radiogroup" aria-label="${esc(t('dx.diffH'))}">${DIFF_IDS.map((d) => `<button type="button" class="dx-diff${d === diff ? ' on' : ''}" data-d="${d}" role="radio" aria-checked="${d === diff}" style="--dc:${DIFF_COLOR[d]}"><b>${DIFF_ICON[d]} ${esc(t(`dx.diff.${d}`))}</b><small>${esc(t('dx.cost', { n: DIFFS[d].tickets }))}</small><em>${esc(t('op.retries', { n: RETRIES[d] }))}</em>${rec?.clears?.[d] ? `<i class="dx-best">✓ ×${rec.clears[d]}</i>` : ''}</button>`).join('')}</div>
     <p class="eyebrow">${esc(t('op.stagesH'))}</p><ol class="op-stages">${stages}</ol>
-    <p class="eyebrow">${esc(t('op.rewardsH'))}</p><ul class="dx-items op-rewards">${rewards}</ul>
+    <p class="eyebrow">${esc(t('op.rewardsH'))}</p>${rewards}
     <p class="dx-note">${esc(t('op.rule'))}${rec?.saved ? ` ${esc(t('op.savedBest', { n: rec.saved }))}` : ''}</p>
     ${tix}`;
+  wireRewards(el);
   for (const b of el.querySelectorAll('.op-op button[data-op]')) b.addEventListener('click', () => onPick(b.dataset.op, diff));
   for (const b of el.querySelectorAll('.dx-diff')) b.addEventListener('click', () => onPick(op, b.dataset.d));
   for (const b of el.querySelectorAll('.dx-pack')) b.addEventListener('click', () => onBuy(Number(b.dataset.n), asset));
@@ -785,11 +780,8 @@ export function opResult(m) {
   if (d.carried) lines.push(t('dx.res.carried'));
   if (d.flagged) lines.push(t('dx.res.flagged'));
   if (d.dupXp) lines.push(t('dx.res.dup', { xp: d.dupXp }));
-  const items = (d.items ?? []).map((it) => {
-    const x = itemOf(it);
-    return `<li style="--rc:${RARITIES[it.rarity]?.color ?? '#fff'}"><b>${esc(x?.name ?? it.id)}</b><small>${esc(itemKind(it))} · ${esc(t(`r.${it.rarity}`))}</small></li>`;
-  });
-  return { win: won, kicker, amount, detail: lines.map(esc).join(' '), items: items.length ? `<p class="eyebrow">${esc(t('dx.res.items'))}</p><ul class="dx-items">${items.join('')}</ul>` : '' };
+  const items = rewardCards(d.items ?? [], { only: t('rw.onlyOp', { o: t(`op.${d.op}.name`) }) });
+  return { win: won, kicker, amount, detail: lines.map(esc).join(' '), items: items ? `<p class="eyebrow">${esc(t('dx.res.items'))}</p>${items}` : '' };
 }
 
 export const rtl = () => getLang() === 'ar';
