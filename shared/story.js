@@ -38,7 +38,7 @@ export const OPS = {
     n: 1,
     stages: [
       { obj: 'reach', theme: 'city', lvl: 3 },
-      { obj: 'escort', theme: 'metro', lvl: 5, survivors: 6 },
+      { obj: 'escort', theme: 'metro', lvl: 5, survivors: 2 },
       { obj: 'hold', theme: 'metro', lvl: 7 },
       { obj: 'boss', theme: 'metro', lvl: 9, boss: 'dispatcher' },
     ],
@@ -53,13 +53,21 @@ export const OP_BOSSES = [
   { id: 'dispatcher', hp: 0.8, speed: 100, skills: ['summon', 'charge', 'volley'], color: '#3f3f46', eye: '#facc15' },
 ];
 
+// who takes the empty seats: 'ai' the story's companions, 'solo' nobody (you alone, harder),
+// 'friends' nobody either, and the ready room waits for a second runner (or Start)
+export const SQUADS = ['ai', 'solo', 'friends'];
 export const RETRIES = { easy: 2, hard: 1, hardcore: 0 }; // stage restarts after the squad goes down
 export const CHECKPOINT_SECONDS = 25; // the camp between stages
 export const INTRO_FIRST = 40; // the opening film: the stage starts when everyone saw it (or skipped)
 export const INTRO_NEXT = 6; // the card before every other stage
 export const GOAL_R = 150;
 export const DOOR_SECONDS = { easy: 22, hard: 26, hardcore: 30 }; // the chase's shut door, held open
-export const WIPE = { speed: 64, dps: 34, lead: 520 }; // the wipe: how fast, how much it hurts, how far behind it starts
+// the escort: once a runner stands at the train with everyone they brought aboard, it leaves after
+// this long (whoever still hides is left behind), so a squad is never stuck waiting for the last few
+export const DEPART_SECONDS = 8;
+// the wipe: how fast it sweeps (px/s; a runner does 230, so stopping to fight costs ground), how
+// much it hurts, how far behind the squad it starts, how often its damage lands (seconds)
+export const WIPE = { speed: { easy: 120, hard: 138, hardcore: 156 }, dps: 34, lead: 430, every: 0.5 };
 // the companions' share: their rounds hit softer, the dead bite them softer, survivors softer still
 export const ALLY_DMG = 0.55;
 export const ALLY_HURT = 0.6;
@@ -112,9 +120,16 @@ export function opMap(seed, op, n) {
   map.op = O.id;
   map.stage = n;
   map.start = freeNear(map, 300, map.h / 2, 60);
-  // the escort: the survivors wait on the far side, the train is back west, up north
+  // the escort: the survivors hide apart on the far side (north and south), the train is back west, up north
   map.goal = S.obj === 'escort' ? freeNear(map, 340, 360, 80) : freeNear(map, map.w - 300, map.h / 2, 80);
-  if (S.obj === 'escort') map.camp = freeNear(map, map.w - 420, map.h / 2 + 120, 80);
+  if (S.obj === 'escort') {
+    map.hideouts = [
+      [map.w - 520, map.h * 0.24],
+      [map.w - 600, map.h * 0.78],
+      [map.w - 360, map.h / 2 + 120],
+    ].map(([x, y]) => freeNear(map, x, y, 80));
+    map.camp = map.hideouts[0];
+  }
   const gates = [];
   const edge = 70;
   for (let x = 200; x < map.w - 100; x += 260) gates.push({ x, y: edge }, { x, y: map.h - edge });
@@ -316,7 +331,7 @@ export class SurvivorBrain extends Walker {
       w.emit({ k: 'found', name: p.name, x: Math.round(p.x), y: Math.round(p.y) });
     }
     if (p.found && lead && dist(lead, p) < 900) {
-      if (G && dist(G, p) < 520 && dist(lead, p) < 520) move = this.goTo(G.x, G.y);
+      if (G && ((dist(G, p) < 520 && dist(lead, p) < 520) || dist(lead, G) < GOAL_R * 1.6)) move = this.goTo(G.x, G.y);
       else if (dist(lead, p) > 90) move = this.goTo(lead.x + Math.cos(this.slot) * 60, lead.y + Math.sin(this.slot) * 60);
     }
     const z = this.nearestZed(80);
@@ -396,7 +411,7 @@ export class Operation extends Descent {
   join() {
     const w = this.w;
     const humans = this.humans(false);
-    const free = Math.max(0, 4 - humans.length);
+    const free = w.squad === 'ai' ? Math.max(0, 4 - humans.length) : 0; // solo or friends: no companions
     const taken = new Set(humans.map((p) => p.dClass));
     const pick = [...COMPANIONS.filter((c) => !taken.has(c.cls)), ...COMPANIONS.filter((c) => taken.has(c.cls))].slice(0, free);
     for (const c of pick) {
@@ -466,12 +481,13 @@ export class Operation extends Descent {
     this.surviveT = SURVIVE_SECONDS;
     this.savedStage = 0;
     this.lostStage = 0;
+    this.depart = null;
     this.holdAt = S.obj === 'hold' ? this.sealSpot() : null;
     if (S.obj === 'reach') {
       this.wipeX = (w.map.start?.x ?? 300) - WIPE.lead;
       this.door = null;
     }
-    if (S.obj === 'escort') this.spawnSurvivors(S.survivors ?? 6);
+    if (S.obj === 'escort') this.spawnSurvivors(S.survivors ?? 2);
     if (plan.boss) this.spawn('boss');
     const G = w.map.goal;
     w.emit({ k: 'floor', n: this.floor, of: this.stages, obj: S.obj, op: this.op, count: plan.count, ...(plan.boss ? { boss: plan.boss.id } : {}), ...(this.holdAt ? { hx: Math.round(this.holdAt.x), hy: Math.round(this.holdAt.y) } : {}), ...(G && (S.obj === 'reach' || S.obj === 'escort') ? { gx: Math.round(G.x), gy: Math.round(G.y) } : {}) });
@@ -487,12 +503,28 @@ export class Operation extends Descent {
       p.w = 0; // empty-handed but for a knife they never use
       p.w2 = null;
       delete p.dClass;
-      const c = w.map.camp ?? { x: s.x + 160, y: s.y };
-      const spot = freeNear(w.map, c.x + Math.cos(i * 1.1) * 70, c.y + Math.sin(i * 1.1) * 70, CFG.PLAYER_R + 4);
+      const spots = w.map.hideouts ?? [w.map.camp ?? { x: s.x + 160, y: s.y }];
+      const c = spots[i % spots.length];
+      const spot = freeNear(w.map, c.x + Math.cos(i * 1.1) * 60, c.y + Math.sin(i * 1.1) * 60, CFG.PLAYER_R + 4);
       p.x = spot.x;
       p.y = spot.y;
       w.brains.set(p.id, new SurvivorBrain(w, p, this));
     }
+  }
+
+  // the escort's marker for a runner: the nearest spot where survivors still hide (none once all are found)
+  hideoutFor(me) {
+    let best = null;
+    let bd = Infinity;
+    for (const p of this.survivorsLeft()) {
+      if (p.found) continue;
+      const d = me ? dist(me, p) : 0;
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    return best ? { cx: Math.round(best.x), cy: Math.round(best.y) } : {};
   }
 
   survivorsLeft() {
@@ -542,25 +574,58 @@ export class Operation extends Descent {
       p.endedAt = w.time;
       this.saved++;
       this.savedStage++;
-      w.emit({ k: 'saved', name: p.name, n: this.savedStage, of: this.S.survivors ?? 6, x: Math.round(p.x), y: Math.round(p.y) });
+      w.emit({ k: 'saved', name: p.name, n: this.savedStage, of: this.S.survivors ?? 2, x: Math.round(p.x), y: Math.round(p.y) });
       this.radio('mid');
     }
     if (!this.survivorsLeft().length) {
       if (this.savedStage > 0) return this.endFloor(true);
       if (!this.wiped()) this.w.end(); // nobody made it: the stage is lost
+      return;
     }
+    // the train leaves once a runner is aboard with everyone who came along: nobody found is
+    // still on their way to it (a survivor far from every runner has stopped following)
+    const at = this.humans().some((p) => dist(p, G) < GOAL_R);
+    const coming = this.survivorsLeft().some((p) => p.found && this.humans().some((q) => dist(q, p) < 900));
+    if (at && !coming && this.savedStage > 0) {
+      if (this.depart === null) {
+        this.depart = 0;
+        w.emit({ k: 'depart', x: Math.round(G.x), y: Math.round(G.y), secs: DEPART_SECONDS, left: this.survivorsLeft().length });
+      }
+      this.depart = Math.min(1, this.depart + dt / DEPART_SECONDS);
+      if (this.depart >= 1) {
+        // the ones still hiding are left behind
+        for (const p of this.survivorsLeft()) {
+          p.status = 'mia';
+          w.brains.delete(p.id);
+        }
+        return this.endFloor(true);
+      }
+    } else if (this.depart !== null) this.depart = Math.max(0, this.depart - dt / 20);
   }
 
   // the wipe: a wall of erasure sweeping east. Anything behind it is rubbed out.
   stepWipe(dt) {
     const w = this.w;
-    this.wipeX += WIPE.speed * (DIFFS[this.diff]?.dmg > 1.5 ? 1.15 : 1) * dt;
+    this.wipeX += (WIPE.speed[this.diff] ?? WIPE.speed.easy) * dt;
     // it stops at the door's step: close enough to feel, not close enough to take the ones holding it
     const G = w.map.goal;
     if (G) this.wipeX = Math.min(this.wipeX, G.x - GOAL_R - 160);
+    // its damage builds up and lands twice a second, like the storm's: one hit, one sound, one
+    // number, not thirty a second
     for (const p of w.players.values()) {
-      if (p.status !== 'alive' || p.x > this.wipeX) continue;
-      w.damage(p, null, WIPE.dps * dt * (p.isBot ? 3 : 1), 'storm');
+      p.inWipe = p.status === 'alive' && p.x <= this.wipeX;
+      if (!p.inWipe) {
+        p.wipeAcc = 0;
+        p.wipeT = 0;
+        continue;
+      }
+      p.wipeAcc = (p.wipeAcc ?? 0) + WIPE.dps * dt * (p.isBot ? 3 : 1);
+      p.wipeT = (p.wipeT ?? 0) - dt;
+      if (p.wipeT > 0) continue;
+      p.wipeT = WIPE.every;
+      const d = p.wipeAcc;
+      p.wipeAcc = 0;
+      w.damage(p, null, d, 'storm');
     }
     for (const z of [...this.zombies.values()]) {
       if (z.x > this.wipeX || z.type === 'boss') continue;
@@ -669,8 +734,9 @@ export class Operation extends Descent {
       rt: this.retries,
       ...(goal ? { gx: Math.round(G.x), gy: Math.round(G.y) } : {}),
       ...(this.state === 'fight' && this.obj === 'reach' && Number.isFinite(this.wipeX) ? { wx: Math.round(this.wipeX), ...(this.door !== null ? { dr: Math.round(this.door * 100) } : {}) } : {}),
-      ...(this.state === 'fight' && this.obj === 'escort' && this.w.map.camp ? { cx: Math.round(this.w.map.camp.x), cy: Math.round(this.w.map.camp.y) } : {}),
-      ...(this.state === 'fight' && this.obj === 'escort' ? { sv: this.survivorsLeft().length, ss: this.savedStage, st0: this.S.survivors ?? 6 } : {}),
+      ...(this.state === 'fight' && this.obj === 'escort' && this.depart !== null ? { dr: Math.round(this.depart * 100) } : {}),
+      ...(this.state === 'fight' && this.obj === 'escort' ? this.hideoutFor(me) : {}),
+      ...(this.state === 'fight' && this.obj === 'escort' ? { sv: this.survivorsLeft().length, ss: this.savedStage, st0: this.S.survivors ?? 2 } : {}),
       sa: this.saved,
       ...(this.state === 'camp' ? { ch: this.choice.get(me?.id) ?? null, wait: this.humans().filter((p) => !this.choice.has(p.id)).length } : {}),
     };

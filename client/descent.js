@@ -9,7 +9,7 @@ import { DIFFS, DIFF_IDS, CLASSES, CLASS_IDS, PISTOLS, GEAR, FLOORS, MILESTONE, 
 import { OUTFIT, WSKIN, RARITIES } from '../shared/cosmetics.js';
 import { STYLE } from '../shared/style.js';
 import { MODE } from '../shared/modes.js';
-import { OPS } from '../shared/story.js';
+import { OPS, SQUADS } from '../shared/story.js';
 import { Cinema, Radio, stageFilm } from './story.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -89,18 +89,23 @@ export function renderDxBoard(el, m) {
 // ---------------------------------------------------------- ready room
 
 // your class and your pistol (each with what it does), and who is taking what in the squad
-export function renderDxPick(box, { show, me, slots, send, sfx }) {
+export function renderDxPick(box, { show, me, slots, send, sfx, op = false }) {
   if (!box) return;
   box.hidden = !show;
   if (!show) return;
   const cls = me?.cls ?? store.get('darkbags.dxClass', 'assault');
   const pistol = me?.pistol ?? store.get('darkbags.dxPistol', 'pistol');
+  const mate = op ? me?.squad ?? opSquad() : null;
   const squad = (slots ?? []).filter((s) => s.cls).map((s) => s.cls);
-  const key = `${cls}|${pistol}|${squad.join()}|${t('dx.class.assault')}`;
+  const key = `${cls}|${pistol}|${mate}|${squad.join()}|${t('dx.class.assault')}`;
   if (box.dataset.key === key) return;
   box.dataset.key = key;
   const wname = (id) => t(`w.${WEAPONS.find((w) => w.id === id)?.name}`);
-  box.innerHTML = `<p class="eyebrow">${esc(t('dx.classH'))}</p><div class="dx-classes">${CLASS_IDS.map((c) => {
+  // a story operation: who takes the empty seats
+  const squadPick = op
+    ? `<p class="eyebrow">${esc(t('op.squadH'))}</p><div class="op-squad">${SQUADS.map((s) => `<button type="button" class="op-sq${s === mate ? ' on' : ''}" data-s="${s}" aria-pressed="${s === mate}"><span>${SQUAD_ICON[s]}</span><b>${esc(t(`op.squad.${s}`))}</b><small>${esc(t(`op.squad.${s}.d`))}</small></button>`).join('')}</div>`
+    : '';
+  box.innerHTML = `${squadPick}<p class="eyebrow">${esc(t('dx.classH'))}</p><div class="dx-classes">${CLASS_IDS.map((c) => {
     const C = CLASSES[c];
     const n = squad.filter((x) => x === c).length;
     return `<button type="button" class="dx-cls${c === cls ? ' on' : ''}" data-c="${c}" aria-pressed="${c === cls}" style="--cc:${C.color}"><span class="dx-cls-ico">${C.icon}</span><b>${esc(t(`dx.class.${c}`))}</b><small>${esc(wname(C.weapon))}</small><em>${esc(t(`dx.class.${c}.d`))}</em>${n ? `<i class="dx-taken">👥 ${n}</i>` : ''}</button>`;
@@ -117,7 +122,21 @@ export function renderDxPick(box, { show, me, slots, send, sfx }) {
   };
   for (const b of box.querySelectorAll('.dx-cls')) b.addEventListener('click', () => pick({ cls: b.dataset.c }));
   for (const b of box.querySelectorAll('.dx-pst')) b.addEventListener('click', () => pick({ pistol: b.dataset.p }));
+  for (const b of box.querySelectorAll('.op-sq'))
+    b.addEventListener('click', () => {
+      store.set('darkbags.opSquad', b.dataset.s);
+      send({ t: 'pick', squad: b.dataset.s });
+      sfx?.play('reload', { secs: 0.5 });
+      box.dataset.key = '';
+    });
 }
+
+const SQUAD_ICON = { ai: '🤖', solo: '👤', friends: '👥' };
+// a story operation's squad choice, kept between runs
+export const opSquad = () => {
+  const s = store.get('darkbags.opSquad', 'ai');
+  return SQUADS.includes(s) ? s : 'ai';
+};
 
 // ------------------------------------------------------------- results
 
@@ -710,6 +729,10 @@ export class DescentHud {
       case 'door':
         g.banner(t('op.door'), 'warn', 2200);
         g.fx.ring(ev.x, ev.y, '#fb923c');
+        return true;
+      case 'depart':
+        g.banner(t(ev.left ? 'op.departLeft' : 'op.depart', { s: ev.secs, n: ev.left }), 'gold', 2600);
+        g.fx.ring(ev.x, ev.y, '#4ade80');
         return true;
       case 'found':
         g.feed(t('op.found', { name: `<b>${esc(ev.name)}</b>` }), 'me');

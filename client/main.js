@@ -53,7 +53,7 @@ import { createCoinImport } from './coins.js';
 captureRef();
 import { settings, setSetting, onSetting, QUALITY } from './settings.js';
 import { MODE, MODES, ZOMBIE_WEAPONS } from '../shared/modes.js';
-import { renderDxPanel, renderDxBoard, renderDxPick, dxResult, isDx, isDxOnly, DX_MODE, diffOfMode } from './descent.js';
+import { renderDxPanel, renderDxBoard, renderDxPick, dxResult, isDx, isDxOnly, DX_MODE, diffOfMode, opSquad } from './descent.js';
 import { renderOpPanel, opResult, isOp, opMode, opPicked, OP_CARD } from './story.js';
 import { DIFFS } from '../shared/descent.js';
 import { t, applyI18n, setLang, getLang, onLang, LANGS, langChosen } from './i18n.js';
@@ -603,7 +603,10 @@ function showScreen(name) {
     if (!attract.world) attract.start();
     sfx.music?.set({ mode: name === 'prep' ? 'prep' : 'lobby', intensity: 0, bpm: name === 'prep' ? 124 : 96 });
   }
-  if (name === 'result') el.hud.hidden = true;
+  if (name === 'result') {
+    el.hud.hidden = true;
+    game.dx?.radio.clear(); // a story's radio never talks over the result card
+  }
   if (name === 'lobby') renderLobby();
   if (name === 'prep') renderPrep();
 }
@@ -1322,7 +1325,7 @@ function renderPrep() {
     status.textContent = p.me?.ready ? t(p.min > 1 ? 'prep.waitingPeople' : 'prep.waitingMe', { n: p.slots.length, of: p.slotsTotal, min: p.min }) : t('prep.waitingJoin', { n: p.slots.length, of: p.slotsTotal });
   } else if (p.count === null) {
     count.textContent = t('prep.readyUp');
-    status.textContent = t(p.waiting ? 'prep.firstWait' : 'prep.first');
+    status.textContent = p.waiting && MODE[app.gameMode]?.op ? t('op.squad.friends.wait') : t(p.waiting ? 'prep.firstWait' : 'prep.first');
   } else {
     const n = Math.ceil(p.count);
     if (count.textContent !== String(n)) {
@@ -1332,7 +1335,8 @@ function renderPrep() {
       count.classList.add('tick');
       if (n <= 5 && n > 0) sfx.play('beep', { f: n <= 3 ? 990 : 740 });
     }
-    status.textContent = p.min > 1 ? t('prep.people') : p.slots.length > 1 ? t('prep.many') : t('prep.bots');
+    const op = MODE[app.gameMode]?.op;
+    status.textContent = op ? t(`op.squad.${p.me?.squad ?? opSquad()}.wait`) : p.min > 1 ? t('prep.people') : p.slots.length > 1 ? t('prep.many') : t('prep.bots');
     sfx.music?.set({ mode: 'prep', intensity: 0, bpm: 124 + Math.max(0, 20 - p.count) * 1.5 });
   }
 
@@ -1368,7 +1372,7 @@ function renderPrep() {
   $('pot-mine').hidden = !!fixedMode;
   if (!fixedMode) $('pot-mine').textContent = t('prep.mine', { v: money(p.me?.stake ?? app.stake) });
   renderZPick(!dxDiff && MODE[app.gameMode]?.pick && p.state !== 'live', p.me?.weapon);
-  renderDxPick($('dxpick'), { show: !!dxDiff && p.state !== 'live', me: p.me, slots: p.slots, send, sfx });
+  renderDxPick($('dxpick'), { show: !!dxDiff && p.state !== 'live', me: p.me, slots: p.slots, send, sfx, op: !!MODE[app.gameMode]?.op });
   if (p.me?.tk) app.dx = p.me.tk;
   // the map vote: every mode but the ones with arenas of their own (zombies, gold rush)
   const kind = MODE[app.gameMode]?.kind;
@@ -1890,7 +1894,7 @@ function goToTable() {
 function toggleReady() {
   sfx.unlock();
   if (app.prep?.me?.ready) send({ t: 'unready' });
-  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote, cls: store.get('darkbags.dxClass', 'assault'), pistol: store.get('darkbags.dxPistol', 'pistol') });
+  else send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote, cls: store.get('darkbags.dxClass', 'assault'), pistol: store.get('darkbags.dxPistol', 'pistol'), squad: opSquad() });
 }
 
 // the rank card opens the ranks window too
@@ -1966,7 +1970,7 @@ $('res-share').addEventListener('click', () => {
 });
 $('res-again').addEventListener('click', () => {
   sfx.unlock();
-  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote, cls: store.get('darkbags.dxClass', 'assault'), pistol: store.get('darkbags.dxPistol', 'pistol') });
+  send({ t: 'ready', name: app.name || 'runner', skin: app.skin, asset: app.asset, weapon: app.zweapon, map: app.mapVote, cls: store.get('darkbags.dxClass', 'assault'), pistol: store.get('darkbags.dxPistol', 'pistol'), squad: opSquad() });
   showScreen('prep');
 });
 $('res-tables').addEventListener('click', () => {
