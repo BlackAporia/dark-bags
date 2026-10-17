@@ -3237,6 +3237,10 @@ body.touch-on .fps-chip { bottom: auto; top: calc(14px + 150px + 6px + var(--saf
 .cm-btn { white-space: nowrap; padding: 10px 14px; text-decoration: none; }
 .cm-done { color: #3ddc97; font-weight: 800; white-space: nowrap; }
 .cm-hint { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--dust); }
+.cm-tabs { display: grid; grid-template-columns: 1fr 1fr; justify-self: start; width: min(320px, 100%); border: 1px solid var(--line); border-radius: 8px; padding: 3px; background: var(--tarp); }
+.cm-doc { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px 16px; align-items: start; padding: 20px; border-radius: 18px; border: 1px solid rgba(247, 147, 26, 0.4); background: radial-gradient(90% 140% at 100% 0%, rgba(247, 147, 26, 0.16), transparent 60%), linear-gradient(135deg, #15121a, #0a0c12); }
+.cm-doc .cm-acts { grid-column: 1 / -1; justify-content: flex-start; }
+.cm-docico { color: var(--loot); border-color: rgba(247, 147, 26, 0.45); }
 @media (max-width: 640px) {
   .cm-card { grid-template-columns: auto minmax(0, 1fr); }
   .cm-acts { grid-column: 1 / -1; justify-content: stretch; }

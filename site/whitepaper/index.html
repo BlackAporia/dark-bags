@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DARK BAGS White Paper</title>
+<meta name="description" content="DARK BAGS player white paper: every mode, the Descent, weapons, maps, progress, skins, stakes, fair play, controls and safety, with screenshots from the game.">
+<meta property="og:title" content="DARK BAGS White Paper">
+<meta property="og:description" content="Everything about DARK BAGS, the browser extraction shooter: 17 modes, a 50-floor co-op dungeon, 20 maps, ranked seasons and more.">
+<meta property="og:image" content="https://dark-bags.com/site/whitepaper/img/why0.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;800&family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column on the game's night ground; screenshots break out wider, like a field manual with photos. */
+:root {
+  --night: #07090f;
+  --tarp: #0f131c;
+  --tarp-2: #161b27;
+  --line: #283042;
+  --paper: #ebe5d6;
+  --dust: #8d93a6;
+  --loot: #f7931a;
+  --exit: #3ddc97;
+  --blood: #ff4d5e;
+  --gold: #ffd166;
+  --pve: #b49cff;
+  --f-display: 'Big Shoulders Stencil Display', Impact, 'Arial Narrow Bold', sans-serif;
+  --f-ui: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
+  --f-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  padding-block: env(safe-area-inset-top, 0px) env(safe-area-inset-bottom, 0px);
+  background: var(--night);
+  color: var(--paper);
+  font: 400 16px/1.65 var(--f-body);
+  margin: 0;
+}
+.wrap {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.col { max-width: 720px; }
+a { color: var(--loot); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--loot); outline-offset: 2px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h2 {
+  font: 800 clamp(34px, 6vw, 52px)/1 var(--f-display);
+  text-transform: uppercase;
+  letter-spacing: .01em;
+}
+h3 { font: 700 19px/1.3 var(--f-ui); letter-spacing: .02em; }
+p { margin: 0; }
+.eyebrow {
+  font: 600 12px/1 var(--f-num);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--loot);
+}
+.muted { color: var(--dust); }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+kbd {
+  font: 600 12px/1 var(--f-num);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 3px 6px;
+  background: var(--tarp-2);
+  color: var(--paper);
+  white-space: nowrap;
+}
+
+/* cover */
+.cover { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+.cover img.bg {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: .42; filter: saturate(1.1);
+}
+.cover::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(7,9,15,.35) 0%, rgba(7,9,15,.6) 55%, var(--night) 100%);
+}
+.cover .wrap { position: relative; z-index: 1; padding-block: 72px 48px; display: grid; gap: 22px; }
+.logo { font: 800 clamp(64px, 14vw, 140px)/.85 var(--f-display); letter-spacing: .01em; }
+.logo span { color: var(--loot); }
+.cover .lede { font: 500 clamp(18px, 2.4vw, 22px)/1.5 var(--f-ui); max-width: 640px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.4 var(--f-num); color: var(--dust); }
+.meta b { color: var(--paper); font-weight: 600; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 600 12px/1 var(--f-num); letter-spacing: .08em; text-transform: uppercase;
+  border: 1px solid var(--exit); color: var(--exit); border-radius: 999px; padding: 6px 10px; justify-self: start;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--exit); }
+
+/* contents */
+.toc { padding-block: 40px 8px; }
+.toc ol {
+  list-style: none; margin: 16px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 2px 24px;
+  counter-reset: s;
+}
+.toc li { counter-increment: s; border-top: 1px solid var(--line); }
+.toc a {
+  display: flex; gap: 12px; padding: 10px 0; text-decoration: none; color: var(--paper);
+  font: 600 15px/1.3 var(--f-ui);
+}
+.toc a::before { content: counter(s, decimal-leading-zero); font: 400 13px/1.5 var(--f-num); color: var(--loot); }
+.toc a:hover { color: var(--loot); }
+
+/* sections */
+section { padding-block: 56px 8px; scroll-margin-top: 12px; }
+.head { display: grid; gap: 10px; margin-bottom: 22px; }
+.flow { display: grid; gap: 16px; }
+.flow ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.flow li::marker { color: var(--loot); }
+.note {
+  border: 1px solid var(--line); background: var(--tarp); border-radius: 10px; padding: 14px 16px;
+  color: var(--dust); font-size: 15px;
+}
+.note strong { color: var(--paper); }
+.warn { border-color: rgba(255,77,94,.55); }
+.warn strong { color: var(--blood); }
+
+figure { margin: 26px 0 0; }
+figure img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }
+figcaption { margin-top: 8px; font: 400 13px/1.5 var(--f-num); color: var(--dust); }
+.duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-top: 26px; }
+.duo figure { margin: 0; }
+.tri { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 26px; }
+.tri figure { margin: 0; }
+.phone-row { display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 26px; }
+.phone-row figure { margin: 0; }
+@media (max-width: 640px) { .phone-row { grid-template-columns: 1fr; } .phone-row figure:first-child { max-width: 260px; } }
+
+/* a match, step by step */
+.steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 0; counter-reset: st; }
+.steps li {
+  counter-increment: st; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 14px;
+  padding: 14px 0; border-top: 1px solid var(--line);
+}
+.steps li::before {
+  content: counter(st); grid-row: span 2;
+  font: 800 30px/1 var(--f-display); color: var(--loot);
+}
+.steps b { font: 700 16px/1.3 var(--f-ui); }
+.steps span { color: var(--dust); }
+
+/* modes */
+.modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 8px; }
+.mode { border: 1px solid var(--line); background: var(--tarp); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.mode h3 { font-size: 17px; }
+.mode .tag { font: 600 11px/1 var(--f-num); letter-spacing: .1em; text-transform: uppercase; color: var(--dust); }
+.mode p { font-size: 14.5px; color: var(--dust); }
+.mode.pve { border-color: rgba(180,156,255,.45); }
+.mode.pve .tag { color: var(--pve); }
+.mode.solo .tag::after { content: " · solo ok"; color: var(--exit); }
+.group { font: 600 12px/1 var(--f-num); letter-spacing: .14em; text-transform: uppercase; color: var(--loot); margin-top: 28px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 11px/1.2 var(--f-num); letter-spacing: .12em; text-transform: uppercase; color: var(--dust); background: var(--tarp); }
+td.num, th.num { text-align: right; white-space: nowrap; }
+td:first-child { font-family: var(--f-ui); font-weight: 600; white-space: nowrap; }
+
+/* arms race ladder */
+.ladder { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.ladder span { font: 600 13px/1 var(--f-num); border: 1px solid var(--line); background: var(--tarp-2); border-radius: 6px; padding: 7px 9px; }
+.ladder i { color: var(--loot); font-style: normal; }
+.ladder span.hot { border-color: var(--blood); color: var(--blood); }
+
+.divs { display: flex; flex-wrap: wrap; gap: 6px; }
+.divs span { font: 600 13px/1 var(--f-ui); border-radius: 6px; padding: 7px 10px; border: 1px solid currentColor; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span { font: 400 13px/1 var(--f-num); color: var(--paper); background: var(--tarp-2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; }
+
+.links { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.links a { display: grid; gap: 4px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--tarp); text-decoration: none; color: var(--paper); }
+.links a b { font: 700 17px/1.2 var(--f-ui); color: var(--loot); }
+.links a span { font: 400 13px/1.4 var(--f-num); color: var(--dust); }
+
+footer { padding-block: 56px 72px; color: var(--dust); font: 400 13px/1.6 var(--f-num); }
+footer .wrap { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 24px; }
+
+@media print {
+  .cover img.bg { opacity: .3; }
+  section { break-inside: auto; }
+  figure, .mode, .steps li, tr { break-inside: avoid; }
+  .toc a::after { content: none; }
+}
+</style>
+</head>
+<body>
+<header class="cover">
+  <img class="bg" src="img/why0.jpg" alt="">
+  <div class="wrap">
+    <span class="pill">Open beta</span>
+    <div class="logo">DARK <span>BAGS</span></div>
+    <p class="lede">A fast top-down extraction shooter that runs in your browser. Drop in with a knife, climb the arsenal with every kill, grab the loot and get out before the storm closes. Nobody can see what's in your bag.</p>
+    <div class="meta">
+      <span>Player white paper · <b>v1.0</b></span>
+      <span>October 2026</span>
+      <span>Phone · tablet · PC</span>
+      <span><a href="DARK-BAGS-White-Paper.pdf" download>Download PDF</a></span>
+      <span><b>dark-bags.com</b></span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc wrap" aria-label="Contents">
+  <p class="eyebrow">Contents</p>
+  <ol>
+    <li><a href="#what">What DARK BAGS is</a></li>
+    <li><a href="#start">Getting started</a></li>
+    <li><a href="#match">How a match works</a></li>
+    <li><a href="#modes">17 game modes</a></li>
+    <li><a href="#descent">The Descent</a></li>
+    <li><a href="#arsenal">Weapons</a></li>
+    <li><a href="#maps">Maps</a></li>
+    <li><a href="#progress">Progress and seasons</a></li>
+    <li><a href="#looks">Skins and style</a></li>
+    <li><a href="#social">Friends and guilds</a></li>
+    <li><a href="#stakes">Stakes and your wallet</a></li>
+    <li><a href="#fair">Fair play and privacy</a></li>
+    <li><a href="#controls">Controls and settings</a></li>
+    <li><a href="#sound">Sound and music</a></li>
+    <li><a href="#safety">Stay safe</a></li>
+    <li><a href="#faq">Questions</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="what" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">The game</p>
+    <h2>What DARK BAGS is</h2>
+  </div>
+  <div class="flow col">
+    <p>DARK BAGS mixes three things shooter players already love: the extraction of Escape from Tarkov, the Arms Race of Counter-Strike and the shrinking storm of a battle royale. Everyone enters equal, with a knife and 100 health. Every kill hands you the next gun. Loot glows orange on the floor. Exits close as the storm moves in, and you only keep what you carry out.</p>
+    <p>The twist is the bag. Other players never see what you carry. A rich runner and an empty bluffer look the same, and you choose how big your own bag looks. So nobody knows who the real target is.</p>
+    <ul>
+      <li><strong>Nothing to install.</strong> Open the site in any modern browser, on a phone or a computer.</li>
+      <li><strong>Free to play.</strong> Practice against bots needs no account and no money, in every mode.</li>
+      <li><strong>Short matches.</strong> Most rounds last 90 seconds to 4 minutes.</li>
+      <li><strong>17 modes, 20 maps</strong> and a 50-floor co-op dungeon called the Descent.</li>
+      <li><strong>11 languages</strong>: English, 中文, हिन्दी, Español, Français, العربية, Português, Українська, Русский, Türkçe and Kiswahili.</li>
+    </ul>
+  </div>
+  <div class="duo">
+    <figure><img src="img/raid_a.jpg" alt="A raid: first blood, the pistol unlocked"><figcaption>First blood in a raid. The kill unlocks the pistol.</figcaption></figure>
+    <figure><img src="img/loot.jpg" alt="Opening a dropped bag"><figcaption>A fallen runner's bag. Only the one who opens it learns what was inside.</figcaption></figure>
+  </div>
+</section>
+
+<section id="start" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">First minutes</p>
+    <h2>Getting started</h2>
+  </div>
+  <div class="flow col">
+    <p>Open <a href="https://dark-bags.com" target="_blank" rel="noopener">dark-bags.com</a> and press Play. Pick a name and a server region (Europe, US or Asia; the closest one is chosen for you). The language follows your country, and you can change it any time.</p>
+    <p><strong>Nyx</strong>, your guide, walks you through the menus and then plays your first match with you. You can replay her tour from Settings. Your first raids also show short hints: how to move, what loot is and when to head for the exit.</p>
+    <p>The Play screen has three switches:</p>
+    <ul>
+      <li><strong>Practice vs bots</strong>: free, offline-friendly, runs entirely in your browser. You choose bot difficulty (easy, normal, hard), 2 to 20 runners and a match length of 1 to 10 minutes.</li>
+      <li><strong>PvE</strong>: the co-op modes, Zombies and the Descent, alone or with up to 3 friends.</li>
+      <li><strong>PvP</strong>: real players only. A match starts when at least two players are ready. Bots never play in online PvP.</li>
+    </ul>
+    <p>To play online and keep your progress on every device, sign in. You can use Google or Discord (through Cartridge), a Cartridge passkey, or a Starknet wallet: Ready, Braavos, Xverse, OKX, Keplr or MetaMask. Your rank, skins and stats follow your account.</p>
+  </div>
+  <div class="phone-row">
+    <figure><img src="img/phone-menu.jpg" alt="The Play screen on a phone"><figcaption>The Play screen on a phone.</figcaption></figure>
+    <figure><img src="img/signin.jpg" alt="The sign-in window"><figcaption>Sign in with Google, Discord, a passkey or any Starknet wallet.</figcaption></figure>
+  </div>
+  <figure><img src="img/ui_modes.jpg" alt="The game mode grid on desktop"><figcaption>Desktop menu: pick a mode, then press Play.</figcaption></figure>
+</section>
+
+<section id="match" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">The core loop</p>
+    <h2>How a match works</h2>
+  </div>
+  <ol class="steps col">
+    <li><b>Ready room</b><span>Pick a mode and press Play. Your icon lights up and a countdown starts. While you wait, vote for the map. Change your mind before the start and you leave with nothing lost. Nobody joins once the match is running.</span></li>
+    <li><b>Arms race</b><span>Everyone starts with a knife and 100 health. Each kill moves you one gun up the ladder. Damage and loot add a little progress too. After the laser sniper you go round again.</span></li>
+    <li><b>Storm</b><span>The safe circle shrinks in stages and finally closes on one last exit. Outside it you lose health every second, more at every stage. New loot only lands inside the next circle.</span></li>
+    <li><b>Loot</b><span>Orange dust, stacks and chests. Chests only appear inside walled vaults. A runner who dies drops their whole bag on the floor, marked with a <span class="num">?</span>.</span></li>
+    <li><b>Bluff</b><span>Press <kbd>Q</kbd> to make your bag look small, medium or fat. It is only a look. Look broke and slip out, or look rich and bait a fight.</span></li>
+    <li><b>Extract</b><span>Stand in an open exit for a few seconds. Any hit restarts the count. Get out and you keep everything you carry. Still inside when the clock hits zero, and the bag is lost.</span></li>
+  </ol>
+  <div class="flow col" style="margin-top:18px">
+    <p>You see about 52 metres around you and never through walls. Runners behind cover are not even sent to your screen. Chain kills within 4 seconds for a double kill, triple kill, rampage and godlike, each with its own medal and announcer line. When you go down you can watch the survivors until the match ends.</p>
+  </div>
+  <div class="duo">
+    <figure><img src="img/ui_room.jpg" alt="The ready room with a map vote"><figcaption>The ready room: who is in, the countdown and the map vote.</figcaption></figure>
+    <figure><img src="img/exit.jpg" alt="Holding the exit"><figcaption>Holding the exit. A hit restarts the count, and everyone nearby knows you're there.</figcaption></figure>
+  </div>
+  <div class="duo">
+    <figure><img src="img/ui_drop.jpg" alt="Dropping into a battle royale"><figcaption>The drop: last one standing takes the pot.</figcaption></figure>
+    <figure><img src="img/ui_result.jpg" alt="The result card"><figcaption>The result card after a win, with rank XP and a share card for X.</figcaption></figure>
+  </div>
+</section>
+
+<section id="modes" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Pick your fight</p>
+    <h2>17 game modes</h2>
+    <p class="muted">Every mode runs on the same engine. Every PvP mode also plays against bots in Practice. Modes marked “solo ok” play online alone.</p>
+  </div>
+
+  <p class="group">Classic</p>
+  <div class="modes">
+    <div class="mode"><span class="tag">10 runners · 3:00</span><h3>Raid</h3><p>The original. Loot, fight, then hold an exit for a few seconds. Keep what you carry out.</p></div>
+    <div class="mode"><span class="tag">up to 20 · 3:00</span><h3>Battle Royale</h3><p>The storm closes in. The last runner standing takes the whole pot.</p></div>
+    <div class="mode"><span class="tag">1 v 1 · 1:30</span><h3>Duel</h3><p>One on one. The winner takes both stakes.</p></div>
+    <div class="mode"><span class="tag">12 · 3:00</span><h3>Deathmatch</h3><p>Everyone for themselves. Back in 3 seconds after every death, no storm. Most kills at the whistle wins.</p></div>
+    <div class="mode"><span class="tag">12 · 4:00</span><h3>Guns + Lasers</h3><p>Deathmatch with a buy menu. Kills pay credits for a medkit, a sentry turret or a laser tripmine. Keys <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>.</p></div>
+    <div class="mode"><span class="tag">12 runners</span><h3>Hardcore</h3><p>Battle royale on one hit point. Any hit is a kill.</p></div>
+  </div>
+
+  <p class="group">Weapons only</p>
+  <div class="modes">
+    <div class="mode"><span class="tag">12 runners</span><h3>Knives · Pistols · Shotguns · Rifles · Snipers</h3><p>Five battle royales with one weapon type for everyone, the whole match. Pure aim and movement.</p></div>
+  </div>
+
+  <p class="group">Teams and ranked</p>
+  <div class="modes">
+    <div class="mode"><span class="tag">4 / 8 / 16 runners</span><h3>Team 2 v 2 · 4 v 4 · 8 v 8</h3><p>The last team standing wins and splits the pot equally, fallen teammates included. No friendly fire. Enemies get a red outline, teammates green.</p></div>
+    <div class="mode"><span class="tag">10 runners</span><h3>Ranked</h3><p>Battle royale for your season rating. Climb from Bronze to Neon Legend. Top finishes win a bonus spin.</p></div>
+  </div>
+
+  <p class="group">Events and co-op</p>
+  <div class="modes">
+    <div class="mode"><span class="tag">8 · 2:30 · $0.10 entry</span><h3>Gold Rush</h3><p>Bags of gold drop all over the quarry. Random guns, quick respawns. Most bags takes the pot as shop credit.</p></div>
+    <div class="mode pve solo"><span class="tag">co-op 1–4 · $0.10 entry</span><h3>Zombies</h3><p>20 waves of the dead from every side, each harder than the last, with bosses on waves 10 and 20. No clock. Kills pay credits for turrets, mines and medkits.</p></div>
+    <div class="mode pve solo"><span class="tag">co-op 1–4 · tickets</span><h3>The Descent</h3><p>A 50-floor dungeon with missions, ten bosses and rewards that exist nowhere else. Three difficulties. See the next section.</p></div>
+  </div>
+
+  <div class="tri">
+    <figure><img src="img/br_a.jpg" alt="Battle royale"><figcaption>Battle Royale</figcaption></figure>
+    <figure><img src="img/duel.jpg" alt="Duel"><figcaption>Duel</figcaption></figure>
+    <figure><img src="img/gl_a.jpg" alt="Guns + Lasers"><figcaption>Guns + Lasers: a double kill pays +300 credits.</figcaption></figure>
+    <figure><img src="img/hc.jpg" alt="Hardcore"><figcaption>Hardcore</figcaption></figure>
+    <figure><img src="img/snipers.jpg" alt="Snipers only"><figcaption>Snipers only: the laser gives you away.</figcaption></figure>
+    <figure><img src="img/team4.jpg" alt="Team 4 v 4"><figcaption>Team 4 v 4</figcaption></figure>
+    <figure><img src="img/gold_a.jpg" alt="Gold Rush"><figcaption>Gold Rush</figcaption></figure>
+    <figure><img src="img/zom_a.jpg" alt="Zombies"><figcaption>Zombies</figcaption></figure>
+    <figure><img src="img/dm_a.jpg" alt="Deathmatch"><figcaption>Deathmatch</figcaption></figure>
+  </div>
+</section>
+
+<section id="descent" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Co-op PvE</p>
+    <h2>The Descent</h2>
+  </div>
+  <div class="flow col">
+    <p>A co-op dungeon for 1 to 4 runners, 50 floors deep. Every floor is a mission: <strong>clear</strong> the room, <strong>burn</strong> the nests, <strong>hold</strong> the seal or <strong>survive</strong> the clock. Every 5th floor is a boss, ten in all, with slams, charges, acid volleys, summons and stone skin. Each floor opens with a short animated story scene. Chapters change every 10 floors: Crypt, Ember Halls, Frozen Deep, Void, Throne.</p>
+  </div>
+  <div class="tbl col">
+    <table>
+      <thead><tr><th>Class</th><th>Weapon</th><th>Gear</th></tr></thead>
+      <tbody>
+        <tr><td>Assault</td><td>Carbine</td><td>Stims</td></tr>
+        <tr><td>Engineer</td><td>SMG</td><td>Turrets, mines</td></tr>
+        <tr><td>Medic</td><td>Shotgun</td><td>Field aid, revives</td></tr>
+        <tr><td>Sniper</td><td>Sniper rifle</td><td>Piercing rounds</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="flow col" style="margin-top:18px">
+    <ul>
+      <li><strong>Coins and gear.</strong> Kills pay dungeon coins. Keys <kbd>1</kbd>–<kbd>6</kbd> buy gun upgrades, armour, medkits and class gear. Every class also carries a pistol of your choice (<kbd>E</kbd> swaps).</li>
+      <li><strong>Camp.</strong> Between floors you get 45 seconds to buy gear, then the squad votes: go deeper, or get out with the rewards.</li>
+      <li><strong>Rewards.</strong> Every 5 floors: weapon skins, banners, kill effects, frames, name effects and armour outfits. A full clear of floor 50 brings the crown frame, the crown name effect and a title. None of these items exist in cases, the shop or trials. You keep them only if you get out alive.</li>
+      <li><strong>Difficulty.</strong> Easy, Hard and Hardcore (one life). Harder runs hit harder, pay more coins and drop rarer items.</li>
+      <li><strong>Tickets.</strong> Easy costs 1 ticket, Hard 3, Hardcore 5. Every account gets one free ticket per day (UTC), which does not stack. More tickets cost $0.10 each. Practice runs are free but keep nothing.</li>
+    </ul>
+  </div>
+  <div class="duo">
+    <figure><img src="img/dx_a.jpg" alt="Descent floor 1 story scene"><figcaption>Floor 1 of 50: the story scene before the fight.</figcaption></figure>
+    <figure><img src="img/dx_c.jpg" alt="Descent boss floor"><figcaption>Floor 5: the first boss.</figcaption></figure>
+  </div>
+</section>
+
+<section id="arsenal" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Arms race</p>
+    <h2>Weapons</h2>
+  </div>
+  <div class="flow col">
+    <p>The ladder climbs one weapon per kill. In respawn modes every death costs one step. Every gun has a magazine and reloads by itself, on PC and phone alike: right away when it runs dry, or after a short pause in shooting when it is half empty. You can't shoot while reloading.</p>
+    <div class="ladder" aria-label="The arms race ladder">
+      <span>Knife</span><i>→</i><span>Pistols</span><i>→</i><span>Shotguns</span><i>→</i><span>SMGs</span><i>→</i><span>Rifles</span><i>→</i><span>Machine gun</span><i>→</i><span class="hot">Snipers</span>
+    </div>
+  </div>
+  <div class="tbl col" style="margin-top:18px">
+    <table>
+      <thead><tr><th>Weapon</th><th class="num">Damage</th><th class="num">Magazine</th><th>Feel</th></tr></thead>
+      <tbody>
+        <tr><td>Knife</td><td class="num">50</td><td class="num">–</td><td>Two hits. Only at the start of a match.</td></tr>
+        <tr><td>Pistol</td><td class="num">24</td><td class="num">15</td><td>Shortest range, quick</td></tr>
+        <tr><td>Hand Cannon</td><td class="num">46</td><td class="num">7</td><td>Heavy, slow, hits hard</td></tr>
+        <tr><td>Shotgun</td><td class="num">7 × 13</td><td class="num">6</td><td>Seven pellets, close range</td></tr>
+        <tr><td>Auto Shotgun</td><td class="num">6 × 10</td><td class="num">7</td><td>Fast pump, wide spread</td></tr>
+        <tr><td>SMG</td><td class="num">11</td><td class="num">30</td><td>Very fast fire</td></tr>
+        <tr><td>PDW</td><td class="num">9</td><td class="num">50</td><td>Fastest fire, big magazine</td></tr>
+        <tr><td>Rifle</td><td class="num">18</td><td class="num">30</td><td>All-rounder, mid range</td></tr>
+        <tr><td>Carbine</td><td class="num">15</td><td class="num">30</td><td>Tighter, longer reach</td></tr>
+        <tr><td>Scout</td><td class="num">70</td><td class="num">10</td><td>Light sniper</td></tr>
+        <tr><td>Machine Gun</td><td class="num">14</td><td class="num">100</td><td>Long reload</td></tr>
+        <tr><td>Magnum Sniper</td><td class="num">100</td><td class="num">5</td><td>One shot from full health</td></tr>
+        <tr><td>Laser Sniper</td><td class="num">95</td><td class="num">6</td><td>Longest range; others see its laser</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="maps" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Where you fight</p>
+    <h2>Maps</h2>
+  </div>
+  <div class="flow col">
+    <p>20 map styles, each with its own layout, all set at night. Every match generates a fresh layout with walled vaults, cover and a few exits, so no two raids play the same. The room votes for the style before the drop.</p>
+    <div class="chips">
+      <span>Night Docks</span><span>Blockchain</span><span>Brick Town</span><span>Red Dunes</span><span>Frostbite</span><span>Lava Forge</span><span>Downtown</span><span>Neon Arcade</span><span>Blackout</span><span>Dragon Keep</span><span>Toon Town</span><span>Gravity Track</span><span>Night Speedway</span><span>Skatepark</span><span>Metro</span><span>Factory</span><span>Jungle Temple</span><span>Junkyard</span><span>Moon Base</span><span>Casino</span>
+    </div>
+  </div>
+</section>
+
+<section id="progress" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Keep coming back</p>
+    <h2>Progress and seasons</h2>
+  </div>
+  <div class="flow col">
+    <p><strong>Career rank.</strong> Every match pays rank XP, win or lose: for showing up, kills, damage, time alive, first blood, multi-kills, a full lap of the arsenal and getting out. There are 90 ranks, from Lance Corporal I to Legend, each with its own insignia on your name tag.</p>
+    <p><strong>Achievements.</strong> Over 100 achievements for raids, extractions, kills, multi-kills, time played, wins, ranks and your collection. Each one pays XP once and unlocks its name as a title you can show over your name.</p>
+    <p><strong>Ranked seasons.</strong> One season per calendar month. Ranked matches move your rating through seven divisions, and reaching a division pays its prize once a season:</p>
+    <div class="divs">
+      <span style="color:#cd7f32">Bronze</span><span style="color:#c0c7d1">Silver</span><span style="color:#ffd166">Gold</span><span style="color:#67e8f9">Platinum</span><span style="color:#9fe8ff">Diamond</span><span style="color:#c084fc">Master</span><span style="color:#ff2dd4">Neon Legend</span>
+    </div>
+    <p><strong>Battle pass.</strong> Each month has its own theme and items: three armour sets that change a runner's whole silhouette, two weapon finishes and two turret skins. When the month ends they are gone for good; owners keep them. Every season has 50 tiers that fill with XP from every match. The free track rewards everyone; the premium track ($9.99) adds a reward on every tier.</p>
+    <p><strong>Daily play.</strong> A daily calendar, daily and weekly tasks, and the fortune wheel with free spins.</p>
+  </div>
+  <div class="duo">
+    <figure><img src="img/p-achievements.jpg" alt="Achievements page"><figcaption>Achievements, each with XP and a title.</figcaption></figure>
+    <figure><img src="img/ui_spin.jpg" alt="Bonus spin"><figcaption>A bonus spin after a top finish.</figcaption></figure>
+  </div>
+</section>
+
+<section id="looks" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Locker</p>
+    <h2>Skins and style</h2>
+  </div>
+  <div class="flow col">
+    <p>Your runner is a stick figure in the spirit of Gravity Defied, and can be him or her. Dress it in outfits across six rarities, Common, Rare, Epic, Legendary, Mythic and Exotic: crypto memes, comic heroes, cartoon animals, sci-fi and multiverse gods, all original. Add headgear, capes, auras and particles.</p>
+    <p>Weapon skins come in 24 finishes on every weapon, from camo to galaxy, plasma and prism. The rarer the finish, the wilder the model: a knife can become a katana, scythe or energy sword, and a rifle a plasma rifle or railgun. From Rare up, a skin also paints its tracers, muzzle flash and laser sight. Style items add animated frames, banners, kill effects and name effects.</p>
+    <div class="note"><strong>Looks only.</strong> No skin, outfit or style item changes damage, speed, health or anything else in a fight.</div>
+    <p>Skins come from cases, the daily featured store, the battle pass, ranked prizes and the Descent. Every case shows its exact odds before you open it, and the roll happens on the server. Pity guarantees a better drop after a run of bad luck, and you get items you don't own yet while that rarity still has any left. A few Exotics are limited editions, numbered as they drop (for example #12/100). Opening is a show: the reel spins, glows through the rarities and bursts in the colour of your best drop.</p>
+  </div>
+</section>
+
+<section id="social" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Play together</p>
+    <h2>Friends and guilds</h2>
+  </div>
+  <div class="flow col">
+    <ul>
+      <li><strong>Friends and messages.</strong> Add players, see who is online, send direct messages and invite friends straight into your room.</li>
+      <li><strong>Guilds.</strong> Create or join a guild with its own chat.</li>
+      <li><strong>Lobby chat.</strong> One public channel for everyone.</li>
+      <li><strong>Voice chat.</strong> Hear the players in your match; in team modes, only your team. <kbd>K</kbd> turns your microphone on and off.</li>
+      <li><strong>Scoreboard.</strong> Hold <kbd>Tab</kbd> in a match.</li>
+      <li><strong>Share cards.</strong> A ready-made image for X after a win, an extraction, a rank-up or a case drop.</li>
+      <li><strong>Invites.</strong> Share your invite link. A friend who joins through it gets a welcome bag after their first staked match, and you get a bonus bag when they finish a few matches.</li>
+      <li><strong>Community.</strong> Join us on X and Telegram for a free spin and the Community Member title.</li>
+    </ul>
+    <p>While you wait, the menus show where people are playing, so you can join a room that is about to start.</p>
+  </div>
+</section>
+
+<section id="stakes" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Optional</p>
+    <h2>Stakes and your wallet</h2>
+  </div>
+  <div class="flow col">
+    <p>Stakes are optional. Practice vs bots in every mode, your free daily Descent ticket and every progression system work without them. Online matches are played for a stake, from <span class="num">$0.10</span>.</p>
+    <ul>
+      <li><strong>Everything is shown in dollars.</strong> You can stake with USDC, USDT, STRK, ETH, Bitcoin on Starknet (WBTC and other BTC tokens) or STACHE. The dollar stake is converted at the moment you press Ready, and winnings come back in the same coin at that same rate, so price moves during a match change nothing.</li>
+      <li><strong>Your stake is private.</strong> Only you see your own stake. The ready room shows only the total pot.</li>
+      <li><strong>Where the stake goes.</strong> In a Raid, part of it rides in your bag and part is scattered on the map as loot. In pot modes, the stakes form one prize pot. A 5% fee is taken from every stake; part of it funds bonus “golden” rounds at that table.</li>
+      <li><strong>Deposits and cash-outs.</strong> Deposit from your wallet and cash out at any time. Cash-outs only ever go to the address you signed in with.</li>
+      <li><strong>Private mode (Shadow Account).</strong> With Ready or Xverse you can deposit and cash out through Starknet's STRK20 privacy pool. Observers on the chain see an encrypted note, not who paid or how much. In-game swaps between coins never touch the chain.</li>
+    </ul>
+    <div class="note warn"><strong>Read this first.</strong> Staking is for adults, 18+, and only where it is legal for you. Only stake what you are fine losing. A stake can be lost in any match. DARK BAGS is a game, not a way to earn money.</div>
+  </div>
+  <div class="duo">
+    <figure><img src="img/ui_stake.jpg" alt="Choosing a coin and a stake"><figcaption>Pick a coin and a stake. Practice needs neither.</figcaption></figure>
+    <figure><img src="img/starknet.jpg" alt="The Starknet page"><figcaption>The Starknet page: private deposits, stakes, swaps and cash-outs.</figcaption></figure>
+  </div>
+</section>
+
+<section id="fair" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Trust</p>
+    <h2>Fair play and privacy</h2>
+  </div>
+  <div class="flow col">
+    <ul>
+      <li><strong>The server decides.</strong> Every hit, pickup, drop and payout is decided on the game server, not in your browser, and every match's books balance to a tenth of a cent.</li>
+      <li><strong>Your bag stays yours.</strong> The server never sends another runner's bag to your screen. The public kill feed says who dropped whom, never amounts.</li>
+      <li><strong>No wallhacks.</strong> The server only sends you runners you could actually see, by distance and line of sight. A modified client has nothing hidden to reveal.</li>
+      <li><strong>Humans only online.</strong> Bots play only in Practice, in your own browser. The house never puts a player of its own into an online match.</li>
+      <li><strong>Fair bots.</strong> In Practice, bots leave you alone for the first seconds, never gang up on one player and hit softer than a human would.</li>
+      <li><strong>Published odds.</strong> Every case shows its odds and is rolled on the server, with pity on every case.</li>
+    </ul>
+    <div class="note">What privacy means here: other players can't see your bag or your stake, and private-mode transfers keep amounts and counterparties off the public chain. The game server itself runs the match and sees its state.</div>
+  </div>
+</section>
+
+<section id="controls" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Hands on</p>
+    <h2>Controls and settings</h2>
+  </div>
+  <div class="tbl col">
+    <table>
+      <thead><tr><th>Action</th><th>PC</th><th>Phone</th></tr></thead>
+      <tbody>
+        <tr><td>Move</td><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></td><td>Left thumb</td></tr>
+        <tr><td>Aim and attack</td><td>Mouse, click</td><td>Right thumb, FIRE</td></tr>
+        <tr><td>Dash</td><td><kbd>Space</kbd></td><td>DASH</td></tr>
+        <tr><td>Bag look</td><td><kbd>Q</kbd></td><td>BAG</td></tr><tr><td>Reload now</td><td>Automatic</td><td>↻</td></tr>
+        <tr><td>Buy menu</td><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> (Descent <kbd>1</kbd>–<kbd>6</kbd>)</td><td>Buttons</td></tr>
+        <tr><td>Swap pistol (Descent)</td><td><kbd>E</kbd></td><td>Button</td></tr>
+        <tr><td>Scoreboard</td><td><kbd>Tab</kbd></td><td>☰ button</td></tr>
+        <tr><td>Voice chat</td><td><kbd>K</kbd></td><td>Settings</td></tr>
+        <tr><td>Sound · music</td><td><kbd>M</kbd> · <kbd>N</kbd></td><td>Settings</td></tr>
+        <tr><td>Pause menu</td><td><kbd>Esc</kbd></td><td>❚❚ button</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="flow col" style="margin-top:18px">
+    <p>Settings cover graphics quality (Auto lowers detail when frames get slow), screen shake, whose skins to draw, names and titles over runners, touch stick size, a left-handed layout, separate volumes for effects and music, the announcer, voice chat and language.</p>
+    <p><strong>On phones</strong>, play sideways. If the browser inside your wallet app won't rotate, tap “Can't rotate? Turn the game” or switch on <em>Turned layout</em> in Settings, and the game turns sideways inside the page.</p>
+  </div>
+  <figure><img src="img/phone-match.jpg" alt="A battle royale on a phone held sideways"><figcaption>Battle royale on a phone: move on the left, DASH and FIRE on the right, the minimap and kill feed at the top.</figcaption></figure>
+  <figure><img src="img/settings.jpg" alt="The settings page"><figcaption>Settings.</figcaption></figure>
+</section>
+
+<section id="sound" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Ears on</p>
+    <h2>Sound and music</h2>
+  </div>
+  <div class="flow col">
+    <p>The soundtrack is pixel-style chiptune generated live in your browser: 5 menu tracks and 8 match tracks. Pick your favourite for the menu and for matches separately in Settings, or let them take turns. In a match the music builds with each storm stage and hits harder when enemies are close or you are extracting.</p>
+    <p>Gunshots, hits, ricochets, footsteps, coins and the storm are all synthesised, placed in stereo by where they happen. A recorded announcer calls first blood, multi-kills, victory, extraction and the final circle in English, Ukrainian, Spanish, French or Portuguese, and the music ducks under it.</p>
+  </div>
+</section>
+
+<section id="safety" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Read this</p>
+    <h2>Stay safe</h2>
+  </div>
+  <div class="flow col">
+    <div class="note warn"><strong>DARK BAGS has no token.</strong> There is no DARK BAGS coin, presale or airdrop. Anyone offering one is running a scam. Official news only comes from the links below.</div>
+    <ul>
+      <li>We will never ask for your seed phrase, private key or password. Nobody from the team will DM you first about money.</li>
+      <li>Cash-outs only go to the address you signed in with. Nobody can send them anywhere else.</li>
+      <li>The game is in <strong>open beta</strong>. Expect changes, balance updates and the occasional bug. Report anything strange in Telegram.</li>
+      <li>Stakes are 18+ and only where legal. Play for fun, set your own limits, and take breaks.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="faq" class="wrap">
+  <div class="head col">
+    <p class="eyebrow">Short answers</p>
+    <h2>Questions</h2>
+  </div>
+  <div class="flow col">
+    <p><strong>Is it free?</strong> Yes. Practice vs bots in every mode, one Descent ticket a day and every progression system are free. Online stakes, cases and the premium pass are optional.</p>
+    <p><strong>Do I need a wallet?</strong> No. Practice needs nothing. To play online you can sign in with Google, Discord or a passkey through Cartridge.</p>
+    <p><strong>Nobody is online. What can I play?</strong> Practice vs bots in any mode starts right away. Zombies and the Descent also start online with just you.</p>
+    <p><strong>Does my progress carry over between phone and PC?</strong> Yes, when you sign in with the same account.</p>
+    <p><strong>Do skins make me stronger?</strong> No. They are looks only.</p>
+    <p><strong>It lags. What can I do?</strong> Pick the server with the lowest ping (Europe, US or Asia), set Quality to Auto and close other heavy tabs.</p>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="links">
+    <a href="https://dark-bags.com" target="_blank" rel="noopener"><b>Play</b><span>dark-bags.com</span></a>
+    <a href="https://t.me/dark_bags_starknet" target="_blank" rel="noopener"><b>Telegram</b><span>t.me/dark_bags_starknet</span></a>
+    <a href="https://x.com/play_dark_bags" target="_blank" rel="noopener"><b>X</b><span>@play_dark_bags</span></a>
+    <a href="DARK-BAGS-White-Paper.pdf" download><b>PDF</b><span>Download this paper</span></a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>DARK BAGS · player white paper v1.0 · October 2026 · open beta. Every screenshot is from the game itself; match shots come from practice matches. Features and numbers can change during the beta.</p>
+    <p>Stakes are optional, 18+, and only where legal. DARK BAGS has no token.</p>
+  </div>
+</footer>
+
+</body>
+</html>
