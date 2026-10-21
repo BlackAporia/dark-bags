@@ -34,7 +34,7 @@ export function deviceId() {
   return d;
 }
 
-export function createInvite({ app, send, toast, sfx }) {
+export function createInvite({ app, send, toast, sfx, goOnline = null }) {
   let info = null;
   let asked = 0;
   let fetched = 0;
@@ -81,7 +81,12 @@ export function createInvite({ app, send, toast, sfx }) {
     const root = $('invite-root');
     if (!root) return;
     if (!online()) {
-      root.innerHTML = `<div class="ref-card"><h2 class="ref-title">${t('ref.title')}</h2><p class="muted">${t('ref.online')}</p></div>`;
+      // practice runs offline in the page: one button takes you online, right here
+      root.innerHTML = `<div class="ref-card"><h2 class="ref-title">${t('ref.title')}</h2><p class="muted">${t('ref.online')}</p>${goOnline ? `<button type="button" class="cta ref-go">${t('ref.goOnline')}</button>` : ''}</div>`;
+      root.querySelector('.ref-go')?.addEventListener('click', () => {
+        goOnline();
+        render();
+      });
       return;
     }
     // fresh numbers each time the page opens (the reply renders again, within the window)
