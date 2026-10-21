@@ -5,6 +5,16 @@ import { VOICE } from './voice-data.js';
 // Synthesized, spatial sound effects. No audio files: every sound is built from
 // oscillators and noise, then placed in stereo by where it happens on screen and
 // sent through a generated room reverb.
+
+// A crowded fight (an AI squad and a horde all shooting) would start hundreds of voices a
+// second: the audio thread falls behind (the sound drops out) and the garbage stalls frames.
+// So at most MAX_VOICES sound at once, one sound at most once per SAME_GAP seconds, and far
+// ones go first; the sounds that tell you something about yourself always play.
+const MAX_VOICES = 28;
+const SAME_GAP = 0.04;
+const ALWAYS = new Set(['hurt', 'heart', 'death', 'extract', 'level', 'ready', 'beep', 'storm', 'reload', 'dry', 'coin', 'bag', 'headshot', 'dash']);
+const LONG = { shotgun: 0.5, sniper: 0.6, boom: 1.2, extract: 1.3, level: 1.2, grave: 0.8, death: 0.9 };
+
 export class Sfx {
   constructor() {
     this.ctx = null;
@@ -13,6 +23,23 @@ export class Sfx {
     this.listener = { x: 0, y: 0 };
     this.music = null;
     this.stormLevel = 0;
+    this.live = []; // when each sounding voice ends (audio clock)
+    this.lastAt = new Map(); // sound -> when it last started
+  }
+
+  // may this sound start now? (see MAX_VOICES)
+  room(name, o) {
+    const now = this.ctx.currentTime;
+    if (this.live.length) this.live = this.live.filter((t) => t > now);
+    if (!ALWAYS.has(name)) {
+      if (now - (this.lastAt.get(name) ?? -1) < SAME_GAP) return false;
+      if (this.live.length >= MAX_VOICES) return false;
+      const far = o.x !== undefined && Math.hypot(o.x - this.listener.x, o.y - this.listener.y) > 1000;
+      if (far && this.live.length >= MAX_VOICES / 2) return false;
+    }
+    this.lastAt.set(name, now);
+    this.live.push(now + (LONG[name] ?? 0.35));
+    return true;
   }
 
   unlock() {
@@ -30,6 +57,11 @@ export class Sfx {
         comp.attack.value = 0.003;
         comp.release.value = 0.2;
         this.master.connect(comp).connect(c.destination);
+        // the browser may pause the sound (another app took the device, a long stall): take it back
+        c.onstatechange = () => {
+          if (c.state !== 'running' && c.state !== 'closed' && !document.hidden) c.resume?.().catch(() => {});
+        };
+        document.addEventListener('visibilitychange', () => !document.hidden && c.state !== 'running' && c.state !== 'closed' && c.resume?.().catch(() => {}));
         this.bus = c.createGain();
         this.bus.gain.value = 0.8;
         this.bus.connect(this.master);
@@ -168,6 +200,7 @@ export class Sfx {
 
   play(name, o = {}) {
     if (!this.ctx || this.muted) return;
+    if (!this.room(name, o)) return;
     const r = (1 + (Math.random() - 0.5) * 0.08) * (o.pitch ?? 1); // tiny pitch variation so repeats don't drone; o.pitch: each gun its own voice
     switch (name) {
       case 'knife': {
