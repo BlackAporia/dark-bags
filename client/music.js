@@ -648,12 +648,15 @@ export class Music {
   }
 
   // taking a hit: the music drops out for a moment, like your ears ringing
+  // (at most every 1.5 s, so a horde chewing on you does not keep the music under water)
   muffle() {
     const f = this.filter.frequency;
     const t = this.ctx.currentTime;
+    if (t - (this.muffledAt ?? -9) < 1.5) return;
+    this.muffledAt = t;
     f.cancelScheduledValues(t);
-    f.setValueAtTime(650, t);
-    f.exponentialRampToValueAtTime(TOP, t + 0.9);
+    f.setValueAtTime(1100, t);
+    f.exponentialRampToValueAtTime(TOP, t + 0.7);
   }
 
   // the result: a level-clear fanfare on a win, a game-over phrase on a loss

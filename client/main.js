@@ -371,7 +371,7 @@ const news = createNews();
 document.addEventListener('darkbags:news', () => news.open());
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m), openBox: (id) => shop.open(id) });
 const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id), profile: (id) => social.profile(id) });
-const invite = createInvite({ app, send, sfx, toast: (m) => toast(m) });
+const invite = createInvite({ app, send, sfx, toast: (m) => toast(m), goOnline: () => app.mode !== 'online' && setMode('online') });
 // X and Telegram, and the reward for following them
 const community = createCommunity({ app, send, sfx, toast: (m) => toast(m), hasAccount: () => hasAccount(), signIn: () => $('connect')?.click() });
 function communityBadge() {

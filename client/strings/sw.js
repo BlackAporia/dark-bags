@@ -2082,4 +2082,6 @@ export default {
   "op.tunnels.v.outro.3": "Lakini ufutaji haukusimama kwenye mpaka wa jiji.",
   "op.tunnels.v.outro.4": "Kuna bandari upande wa kusini. Meli, watu, na kitu ambacho Wafutaji wanakitaka.",
   "op.tunnels.v.outro.5": "Operesheni 2, Bandari: inakuja hivi karibuni.",
+  'ref.online': "Mialiko inafanya kazi mtandaoni tu. Sasa uko kwenye Mazoezi dhidi ya roboti, yanayoendeshwa nje ya mtandao kwenye kivinjari chako.",
+  'ref.goOnline': "Nenda mtandaoni",
 };

@@ -30,6 +30,7 @@ const INTERP_MS = 110;
 const INTERP_MAX = 260;
 const SNAP_MS = 1000 / 15;
 const EXTRAP_MS = 120;
+const EXTRAP_Z_MS = 220; // the dead walk straight at you: they may coast longer through a late packet
 const BLUFF = ['small', 'medium', 'fat'];
 const STREAKS = {
   1: { title: 'First blood', voice: 'First blood', cls: 's1' },
@@ -1066,13 +1067,14 @@ export class GameClient {
     }
     const span = b.time - a.time;
     const k = span > 0 ? Math.min(1 + Math.min(EXTRAP_MS, span * 2) / span, Math.max(0, (rt - a.time) / span)) : 1;
+    const kz = span > 0 ? Math.min(1 + Math.min(EXTRAP_Z_MS, span * 4) / span, Math.max(0, (rt - a.time) / span)) : 1;
     const pa = new Map(a.players.map((p) => [p.i, p]));
     const figures = [];
     const zombies = [];
     for (const p of b.players) {
       const q = pa.get(p.i);
       // coasting past the last snapshot only for a runner who walked there (never across a respawn)
-      const kk = k > 1 && q && Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 120 ? 1 : k;
+      const kk = (p.zb ? kz : k) > 1 && q && Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 120 ? 1 : p.zb ? kz : k;
       const x = q ? lerp(q.x, p.x, kk) : p.x;
       const y = q ? lerp(q.y, p.y, kk) : p.y;
       const aim = q ? lerpAngle(q.a, p.a, Math.min(1, k)) : p.a;
