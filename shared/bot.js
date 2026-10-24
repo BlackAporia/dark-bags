@@ -35,7 +35,12 @@ export class BotBrain {
     this.ffa = !!world.practice || world.dm || world.goldRush; // practice, deathmatch, gold rush: every bot for itself
     this.shopT = 1 + rnd() * 2; // guns + lasers: when to think about buying next
     this.easy = diff === 'easy';
-    this.skill = this.easy ? 0.05 + rnd() * 0.3 : diff === 'hard' ? 0.5 + rnd() * 0.45 : 0.15 + rnd() * 0.4; // online: a new player survives first contact more often than not
+    this.skill = this.easy ? 0.05 + rnd() * 0.3 : diff === 'hard' ? 0.5 + rnd() * 0.45 : world.practice ? 0.25 + rnd() * 0.4 : 0.15 + rnd() * 0.4; // online: a new player survives first contact more often than not
+    // normal and hard bots think: they remember where a foe was, turn on a shot from the dark,
+    // and back off to reload
+    this.smart = !this.easy;
+    this.memory = null; // { x, y, t }: where a foe was last seen (or heard)
+    this.chaseFor = diff === 'hard' ? 5 : 3;
     this.burstT = 0; // practice: bots fire in bursts with pauses in between
     this.burstOn = true;
     this.target = null; // who this bot is fighting right now (id)
@@ -67,6 +72,7 @@ export class BotBrain {
     this.lootTarget = null;
     this.seenFoe.clear();
     this.aimErr = 0;
+    this.memory = null;
   }
 
   // Guns + Lasers: patch up when hurt, put a turret down when there's cash and a quiet
@@ -251,6 +257,12 @@ export class BotBrain {
       }
     }
     this.target = foe?.id ?? null;
+    if (foe) this.memory = { x: foe.x, y: foe.y, t: w.time };
+    else if (this.smart && p.hurtAt != null && w.time - p.hurtAt < 0.8 && p.lastAttacker) {
+      // shot by someone out of sight: the shot gives them away
+      const a = w.players.get(p.lastAttacker);
+      if (a && a.status === 'alive') this.memory = { x: a.x, y: a.y, t: w.time };
+    }
     if (w.shop) this.shopping(dt, foe);
     for (const id of this.seenFoe.keys()) if (!foes.some((f) => f.id === id)) this.seenFoe.delete(id);
     if (foe && !this.seenFoe.has(foe.id)) this.seenFoe.set(foe.id, w.time);
@@ -292,6 +304,8 @@ export class BotBrain {
       if (seenFor > reaction && fd < reach && (!this.easy || this.burstOn)) inp.f = true;
 
       const lowHp = p.hp < 25 + this.brave * 25;
+      const dry = !wp.melee && (p.reloadT > 0 || p.ammo <= 0);
+      if (dry && p.ammo <= 0) inp.r = true;
       if (stormBound) {
         // keep running inward, shooting on the move
       } else if (lowHp && !inZone) {
@@ -304,6 +318,12 @@ export class BotBrain {
           move = this.goTo(p.x + (dx / d) * 260, p.y + (dy / d) * 260);
         }
         if (p.dashCd <= 0 && this.rnd() < 0.08) inp.d = true;
+      } else if (this.smart && dry && !inZone) {
+        // reloading: give ground, sideways, instead of standing in the open
+        const dx = p.x - foe.x;
+        const dy = p.y - foe.y;
+        const d = Math.hypot(dx, dy) || 1;
+        move = this.goTo(p.x + (dx / d) * 160 - (dy / d) * 120 * this.strafe, p.y + (dy / d) * 160 + (dx / d) * 120 * this.strafe);
       } else if (!inZone) {
         this.strafeT -= dt;
         if (this.strafeT <= 0) {
@@ -329,6 +349,10 @@ export class BotBrain {
       }
     } else if (stormBound) {
       // already moving inward
+    } else if (this.smart && !wantOut && this.memory && w.time - this.memory.t < this.chaseFor && p.hp > 35 && dist(this.memory, p) > 50) {
+      // lost sight: check where they were, gun up
+      move = this.goTo(this.memory.x, this.memory.y);
+      aim = Math.atan2(this.memory.y - p.y, this.memory.x - p.x);
     } else if (wantOut && exit) {
       move = inZone ? { mx: 0, my: 0 } : this.goTo(exit.x, exit.y);
     } else {

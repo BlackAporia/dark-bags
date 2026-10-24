@@ -99,7 +99,7 @@ export class World {
     this.leaderId = null;
     this.pot = 0; // pot modes: every net stake, paid to the winners at the end
     this.sides = 0; // how many sides (players, or teams) entered
-    this.difficulty = practice ? difficulty ?? 'easy' : 'normal';
+    this.difficulty = practice ? difficulty ?? 'normal' : 'normal';
     this.botFill = botFill;
     // practice (offline, vs bots): every bot for itself, softer bots, and the raid
     // ends the moment the last human is out (dead or extracted)
@@ -769,6 +769,7 @@ export class World {
       const k = shooter.isBot && v.isBot ? XP.botOnBotDamage : 1;
       this.addXp(shooter, Math.min(amount, Math.max(0, v.hp)) * XP.damage * k);
       v.lastAttacker = shooter.id;
+      v.hurtAt = this.time; // bots: shot at, maybe from the dark
     }
     const full = v.hp >= this.maxHp;
     const dealt = Math.max(1, Math.round(Math.min(amount, Math.max(0, v.hp)) * (CFG.HP / this.maxHp))); // shown over the target

@@ -1107,7 +1107,8 @@ function renderLobby() {
 
 // ------------------------------------------------------- practice settings
 const pcfg = {
-  difficulty: ['easy', 'normal', 'hard'].includes(store.get('darkbags.pdiff', 'easy')) ? store.get('darkbags.pdiff', 'easy') : 'easy',
+  // normal by default: bots that fight back; easy stays for the guided first raid and on request
+  difficulty: ['easy', 'normal', 'hard'].includes(store.get('darkbags.pdiff', 'normal')) ? store.get('darkbags.pdiff', 'normal') : 'normal',
   runners: Math.min(16, Math.max(2, Number(store.get('darkbags.prunners', CFG.BOT_FILL)) || CFG.BOT_FILL)),
   seconds: Math.min(600, Math.max(60, Number(store.get('darkbags.ptime', CFG.ROUND_SECONDS)) || CFG.ROUND_SECONDS)),
 };
