@@ -70,14 +70,17 @@ test('practice bots fight each other from the start; online bots keep their truc
 });
 
 test('in practice the raid ends when the human is out, and bots hit softer', () => {
-  const w = new World({ stake: 1000, seed: 9, practice: true });
+  // practice is normal unless asked otherwise: bots hit at 75%; easy at 50%
+  const n = new World({ stake: 1000, seed: 9, practice: true });
+  assert.equal(n.difficulty, 'normal');
+  const w = new World({ stake: 1000, seed: 9, practice: true, difficulty: 'easy' });
   const me = w.addPlayer({ name: 'me', skin: '#fff', rank: 12 });
   w.step();
   assert.equal(w.phase, 'live');
   const bot = [...w.players.values()].find((p) => p.isBot);
   me.shield = 0;
   w.damage(me, bot, 50);
-  assert.equal(me.hp, 75, 'a 50 damage knife hit lands for 25 in practice');
+  assert.equal(me.hp, 75, 'a 50 damage knife hit lands for 25 in easy practice');
   assert.equal(w.snapshotFor(bot.id).players.find((p) => p.i === me.id)?.rk ?? 12, 12);
   w.kill(me, bot);
   w.step();
@@ -214,4 +217,24 @@ test('K/D: PvP kills over deaths (zombies apart), a board of every PvP player, a
   rb.rankedResult('steady', { place: 2, size: 10, kills: 3, deaths: 1 });
   assert.equal(rb.leaderboard()[0].deaths, 1);
   assert.equal(rb.leaderboard()[0].kd, 3);
+});
+
+test('practice bots that think: a shot from the dark gives the shooter away, and they go look', () => {
+  const w = new World({ stake: 1000, seed: 4, practice: true, difficulty: 'normal' });
+  const me = w.addPlayer({ name: 'me', skin: '#fff' });
+  w.step();
+  const bot = [...w.players.values()].find((p) => p.isBot && p.status === 'alive');
+  const brain = w.brains.get(bot.id);
+  assert.ok(brain.smart, 'normal bots think');
+  const e = new World({ stake: 1000, seed: 4, practice: true, difficulty: 'easy' });
+  e.addPlayer({ name: 'me', skin: '#fff' });
+  e.step();
+  assert.ok([...e.brains.values()].every((x) => !x.smart), 'easy bots stay simple');
+  bot.shield = 0;
+  w.damage(bot, me, 10);
+  assert.equal(bot.lastAttacker, me.id);
+  assert.equal(bot.hurtAt, w.time);
+  brain.think(1 / 30);
+  assert.ok(brain.memory, 'it heard where the shot came from');
+  assert.ok(Math.abs(brain.memory.x - me.x) < 1 && Math.abs(brain.memory.y - me.y) < 1);
 });
