@@ -1524,6 +1524,7 @@ export default {
   'ref.apply': "Valider",
   'ref.online': "Les invitations ne marchent qu'en ligne. Tu es en Entraînement contre des bots, qui tourne hors ligne dans ton navigateur.",
   'ref.goOnline': "Passer en ligne",
+  'tg.noWallet': "Les portefeuilles et les retraits ne sont pas disponibles dans Telegram. Ouvre dark-bags.com dans ton navigateur pour les utiliser.",
   'ref.signin': "Connecte-toi pour obtenir ton lien.",
   'ref.claimedToast': "Code validé : ton sac de bienvenue arrive après ton premier match",
   'ref.err.already': "Tu as déjà un parrain",

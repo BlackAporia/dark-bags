@@ -1532,6 +1532,7 @@ export default {
   'ref.apply': "Apply",
   'ref.online': "Invites work only in online play. You're in Practice vs bots now, which runs offline in your browser.",
   'ref.goOnline': "Switch to online",
+  'tg.noWallet': "Wallets and cash-outs aren't available inside Telegram. Open dark-bags.com in your browser to use them.",
   'ref.signin': "Sign in to get your invite link.",
   'ref.claimedToast': "Code applied: your welcome bag comes after your first match",
   'ref.err.already': "You already have an inviter",

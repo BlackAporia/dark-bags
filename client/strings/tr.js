@@ -1524,6 +1524,7 @@ export default {
   'ref.apply': "Uygula",
   'ref.online': "Davetler yalnızca çevrimiçi oyunda çalışır. Şu an tarayıcında çevrimdışı çalışan Botlara karşı antrenmandasın.",
   'ref.goOnline': "Çevrimiçine geç",
+  'tg.noWallet': "Cüzdanlar ve para çekme Telegram içinde kullanılamaz. Bunlar için dark-bags.com'u tarayıcında aç.",
   'ref.signin': "Davet bağlantını almak için giriş yap.",
   'ref.claimedToast': "Kod uygulandı: hoş geldin çantan ilk maçından sonra gelir",
   'ref.err.already': "Zaten bir davet edenin var",

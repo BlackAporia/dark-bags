@@ -1524,6 +1524,7 @@ export default {
   'ref.apply': "使用",
   'ref.online': "邀请只在在线游戏中可用。你现在处于人机练习模式，它在浏览器里离线运行。",
   'ref.goOnline': "切换到在线",
+  'tg.noWallet': "在 Telegram 内无法使用钱包和提现。请在浏览器中打开 dark-bags.com 使用。",
   'ref.signin': "登录后获取你的邀请链接。",
   'ref.claimedToast': "邀请码已使用：第一场比赛后获得欢迎袋",
   'ref.err.already': "你已经有邀请人了",

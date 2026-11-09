@@ -323,6 +323,12 @@ Netcode: 30 Hz authoritative simulation, 15 Hz snapshots (~0.5 KB each), client-
 
 **Railway (the live server).** `railway.json` builds the Dockerfile, health-checks `/healthz` and keeps one replica (the journal lives on one volume). New Project → Deploy from GitHub repo, region EU West, a volume at `/data`, and a generated domain (a custom one later: CNAME and TXT records at the registrar, as Railway shows them). The image starts as root only to hand the mounted volume to the `node` user, then drops privileges. The Pages build plays on `wss://dark-bags-production.up.railway.app`. Vercel suits the static site only: no long-lived WebSocket server or disk.
 
+**Telegram Mini App.** The same page runs inside Telegram (`client/telegram.js`, `server/telegram.js`). It goes full screen on phones (landscape too), keeps Telegram's swipe-to-close out of the raid, follows Telegram's safe areas, back button and language, and uses Telegram haptics. The player signs in with the launch data Telegram signs, so the same Telegram account gets the same runner on every device. Telegram allows only TON for crypto inside Mini Apps and Stars for digital goods, so inside Telegram the Starknet sign-in, the cashier and the Starknet page are hidden. On a real-token server that leaves practice; for the full online game in Telegram, point the Mini App at a play-money service (the same repo with `CHAIN` unset, a volume at `/data` and `WALLET_FILE=/data/test-wallet.json`).
+
+1. In [@BotFather](https://t.me/BotFather): `/newbot`, then `/newapp` for that bot with the game's URL and a short name (for example `play`). Optionally `/setmenubutton` with the same URL.
+2. In the server's variables (never in the repository or a chat): `TELEGRAM_BOT_TOKEN` (from BotFather), plus the public `TELEGRAM_BOT_USERNAME` and `TELEGRAM_APP_NAME` for the `t.me/<bot>/<app>` links the game shares. Invite links inside Telegram carry the referral code as `?startapp=ref_<CODE>`.
+3. Telegram user ids map to game tokens in `/data/<network>-telegram.json` (ids and tokens only). The tokens are random, so a new bot token keeps everyone's progress. The admin page counts players who came from Telegram.
+
 **Docker (any VPS).**
 
 ```bash

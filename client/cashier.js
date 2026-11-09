@@ -9,6 +9,7 @@ const tr = t; // where a local `t` (a token) shadows it
 import { createBridgeUi } from './bridge.js';
 import { backups } from './backups.js';
 import { adoptParentWallets } from './land.js';
+import { TG } from './telegram.js';
 
 const $ = (id) => document.getElementById(id);
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '');
@@ -186,7 +187,15 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
 
   // --------------------------------------------------------------- sign in
 
+  // inside Telegram crypto stays out (Telegram allows only TON there): no wallets, no cashier
+  const tgBlocked = () => {
+    if (!TG.active) return false;
+    toast(t('tg.noWallet'));
+    return true;
+  };
+
   async function openConnect() {
+    if (tgBlocked()) return;
     const d = $('dlg-connect');
     $('login-cartridge').hidden = !cs.chain.login.cartridge;
     $('login-privy').hidden = !cs.chain.login.privy;
@@ -553,6 +562,7 @@ export function createCashierUi({ app, send, toast, onChange, base }) {
   // ---------------------------------------------------------------- cashier
 
   function openCashier(tab = cs.tab) {
+    if (tgBlocked()) return;
     $('cash-acct').textContent = `${short(cs.account)} · ${kindLabel()} · house ${short(cs.chain.house)}`;
     fillTokens('dep-token');
     fillTokens('wd-token');

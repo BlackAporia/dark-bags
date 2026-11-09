@@ -3517,3 +3517,13 @@ body.touch-on .mchat-list li { align-self: center; font-size: 12px; }
   body.touch-on .mchat-list li { font-size: 11px; padding: 2px 7px; }
   body.touch-on .mchat-form input, body.touch-on .mchat-send { height: 32px; }
 }
+
+/* Telegram Mini App (client/telegram.js): Telegram allows only TON for crypto inside it, so the
+   Starknet sign-in, the cashier and the Starknet page stay out; the game, the ranks and the
+   locker stay in */
+.tg #cashier,
+.tg #tb-acct,
+.tg #acct-pop,
+.tg .nav-starknet,
+.tg .menu-nav [data-page="starknet"],
+.tg .more-tile[data-page="starknet"] { display: none !important; }

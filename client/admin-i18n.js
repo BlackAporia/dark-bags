@@ -199,6 +199,8 @@ const D = {
   'виплата на': ['pays out at', 'выплата на'],
   'Ціни монет': ['Coin prices', 'Цены монет'],
   'З гаманцем': ['With a wallet', 'С кошельком'],
+  'З Telegram': ['From Telegram', 'Из Telegram'],
+  'відкрили гру в Telegram': ['opened the game in Telegram', 'открыли игру в Telegram'],
   'з гаманцем': ['with a wallet', 'с кошельком'],
   'Рейтингова': ['Ranked', 'Рейтинговая'],
   'запрошувачів': ['inviters', 'пригласивших'],

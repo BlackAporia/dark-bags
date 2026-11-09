@@ -229,6 +229,7 @@ function players() {
   <section><h2>Гравці</h2><div class="tiles">
     ${tile('З гаманцем', num(p.wallets), 'увійшли на мейнеті', true)}
     ${tile('Людей', num(p.people ?? p.visitors), 'гаманці й пристрої, що ще не входили')}
+    ${tile('З Telegram', num(p.telegram ?? 0), 'відкрили гру в Telegram')}
     ${tile('Профілі', num(p.profiles), 'у списку гравців')}
     ${tile('З рангом', num(p.ranked), 'зіграли хоч раз')}
     ${tile('Активні 24 год / 7 д / 30 д', `${num(p.active.d1)} / ${num(p.active.d7)} / ${num(p.active.d30)}`)}

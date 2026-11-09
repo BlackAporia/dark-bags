@@ -44,8 +44,9 @@ export { STAKE_MIN as CUSTOM_MIN, STAKE_MAX as CUSTOM_MAX } from './stakes.js';
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ promo = new PromoBook(), descent = new DescentBook(), pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ promo = new PromoBook(), descent = new DescentBook(), pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1, telegram = null }) {
     this.social = social; // players, friends, private messages, guilds
+    this.telegram = telegram; // Telegram Mini App sign-in (server/telegram.js), or null
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
     this.netReports = []; // how the last matches ran on players' devices and links, newest first
@@ -240,7 +241,11 @@ export class Lobby {
 
     if (msg.t === 'hello') {
       s.dev = this.guard.dev(msg.dev);
-      if (typeof msg.token === 'string' && /^[a-z0-9]{8,64}$/.test(msg.token)) s.token = msg.token;
+      // inside Telegram: the launch data Telegram signed names the player, on every device
+      const tg = msg.tg && this.telegram?.on ? this.telegram.signIn(msg.tg) : null;
+      s.tg = !!tg;
+      if (tg) s.token = tg.token;
+      else if (typeof msg.token === 'string' && /^[a-z0-9]{8,64}$/.test(msg.token)) s.token = msg.token;
       else if (this.cashier || this.guard.allow('new', s.net, GUARD.newPerIpDay)) s.token = this.newToken();
       else return this.send(cid, { t: 'err', code: 'guard_new', msg: 'Too many new accounts from your network today. Come back tomorrow.' });
       s.name = cleanName(msg.name);
@@ -251,7 +256,7 @@ export class Lobby {
       // what this server lost of the account comes back from the browser's signed copy (server/backup.js)
       if (this.key(s) && Array.isArray(msg.backups)) this.backups?.restore(this.key(s), msg.backups);
       const fresh = this.adoptProfile(s);
-      this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account, device: s.token });
+      this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account, device: s.token, tg: s.tg });
       this.send(cid, {
         t: 'welcome',
         token: s.token,
@@ -280,6 +285,7 @@ export class Lobby {
         regions: this.regionList?.() ?? null,
         admin: !!s.account && this.isAdmin(s.account),
         privy: this.cashier?.privyFor(s.token) ?? null,
+        tg: this.telegram?.info() ?? null,
         cfg: {
           ROUND_SECONDS: this.roundSeconds,
           RAKE: CFG.RAKE,

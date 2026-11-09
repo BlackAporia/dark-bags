@@ -129,7 +129,11 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
 
     // ----- players
     let wallets = 0;
-    for (const p of stats.players.values()) if (p.w) wallets++;
+    let telegram = 0;
+    for (const p of stats.players.values()) {
+      if (p.w) wallets++;
+      if (p.tg) telegram++;
+    }
     const rankDist = {};
     const career = {};
     const top = [];
@@ -205,6 +209,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
         visitors: stats.players.size,
         people: stats.people?.() ?? stats.players.size,
         wallets,
+        telegram,
         profiles: social.players.size,
         active: { d1: stats.activeWithin(DAY), d7: stats.activeWithin(7 * DAY), d30: stats.activeWithin(30 * DAY) },
         fresh: { d1: Object.values(series).slice(-1)[0].fresh, d7: Object.values(series).slice(-7).reduce((n, d) => n + d.fresh, 0) },
@@ -263,7 +268,11 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
     const DAY = 86_400_000;
     const totals = Object.values(stats.modes).reduce((a, m) => ({ matches: a.matches + (m.raids ?? 0), entries: a.entries + (m.humans ?? 0), staked: a.staked + (m.stakes ?? 0), paid: a.paid + (m.paid ?? 0), rake: a.rake + (m.rake ?? 0), seconds: a.seconds + (m.seconds ?? 0) }), { matches: 0, entries: 0, staked: 0, paid: 0, rake: 0, seconds: 0 });
     let wallets = 0;
-    for (const p of stats.players.values()) if (p.w) wallets++;
+    let telegram = 0;
+    for (const p of stats.players.values()) {
+      if (p.w) wallets++;
+      if (p.tg) telegram++;
+    }
     const days = [];
     for (let i = 29; i >= 0; i--) {
       const k = dayOf(t - i * DAY);
@@ -296,7 +305,7 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       at: t,
       since: Date.parse(env.GAME_LAUNCH_AT || GAME_BORN) || Date.parse(GAME_BORN),
       network,
-      players: { total: stats.players.size, wallets, d1: stats.activeWithin(DAY), d7: stats.activeWithin(7 * DAY), d30: stats.activeWithin(30 * DAY), online: sockets.size, peak: stats.peak?.n ?? 0 },
+      players: { total: stats.players.size, wallets, telegram, d1: stats.activeWithin(DAY), d7: stats.activeWithin(7 * DAY), d30: stats.activeWithin(30 * DAY), online: sockets.size, peak: stats.peak?.n ?? 0 },
       matches: { total: totals.matches, entries: totals.entries, hours: Math.round(totals.seconds / 3600), staked: totals.staked, paid: totals.paid },
       privacy: { privateStakes: true, stakesPrivate: totals.entries, privateDeposits: chain?.deposits.private ?? 0, privateCashouts: chain?.cashouts.private ?? 0 },
       chain,

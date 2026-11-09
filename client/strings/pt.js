@@ -1524,6 +1524,7 @@ export default {
   'ref.apply': "Aplicar",
   'ref.online': "Convites só funcionam no jogo online. Agora você está no Treino contra bots, que roda offline no navegador.",
   'ref.goOnline': "Ir para o online",
+  'tg.noWallet': "Carteiras e saques não estão disponíveis dentro do Telegram. Abra dark-bags.com no navegador para usá-los.",
   'ref.signin': "Entre para pegar seu link de convite.",
   'ref.claimedToast': "Código aplicado: sua bolsa de boas-vindas chega após a primeira partida",
   'ref.err.already': "Você já tem quem te convidou",

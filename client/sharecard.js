@@ -9,6 +9,7 @@ import { OUTFIT, RARITIES, usd } from '../shared/cosmetics.js';
 import { usdText } from '../shared/assets.js';
 import { RANKS } from '../shared/ranks.js';
 import { OPS } from '../shared/story.js';
+import { TG } from './telegram.js';
 
 const W = 1200;
 const H = 675;
@@ -425,7 +426,8 @@ export function wireShare() {
     if (!current) return;
     const copied = await copyImage();
     const u = pageUrl();
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(current.text)}${u ? `&url=${encodeURIComponent(u)}` : ''}`, '_blank', 'noopener');
+    const x = `https://twitter.com/intent/tweet?text=${encodeURIComponent(current.text)}${u ? `&url=${encodeURIComponent(u)}` : ''}`;
+    if (!TG.open(x)) window.open(x, '_blank', 'noopener'); // inside Telegram: out through Telegram
     $('share-status').textContent = copied ? 'Card copied. Paste it into the post (Ctrl/⌘ V).' : 'Save the card and attach it to the post.';
   });
   $('share-copy').addEventListener('click', async () => {

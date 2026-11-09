@@ -1,6 +1,7 @@
 import './polyfills.js'; // first: older phone browsers need it before anything draws
 import './move.js'; // second: the profile carried over from the old address, before anything reads it
 import './epoch.js'; // third: a new data epoch wipes old progress before anything reads it
+import { TG } from './telegram.js'; // inside Telegram: the launch data, before anything touches the address
 import { canvasMode } from './canvasmode.js'; // fourth: GPU or CPU canvases, before any canvas exists
 import { createSocial } from './social.js';
 import { CFG, SKINS } from '../shared/config.js';
@@ -167,7 +168,7 @@ const app = {
   _stake: validStake(store.get('darkbags.stake', 1000)) ? store.get('darkbags.stake', 1000) : 1000,
   mapVote: MAP_THEMES.includes(store.get('darkbags.mapVote', null)) ? store.get('darkbags.mapVote', null) : null,
   zweapon: ZOMBIE_WEAPONS.includes(store.get('darkbags.zweapon', 'rifle')) ? store.get('darkbags.zweapon', 'rifle') : 'rifle',
-  name: store.get('darkbags.name', ''),
+  name: store.get('darkbags.name', '') || TG.name, // inside Telegram: the Telegram name to start with
   skin: SKINS.includes(store.get('darkbags.skin', '')) ? store.get('darkbags.skin') : SKINS[Math.floor(Math.random() * SKINS.length)],
   gore: settings.gore,
   gameMode: store.get('darkbags.gmode', 'raid'),
@@ -336,6 +337,8 @@ function adoptAccount(m) {
 // a new player's language: the one of their country (by IP); when the country is unknown (VPN,
 // no server), the browser's own language if we have it; English otherwise
 const browserLang = () => (navigator.languages ?? [navigator.language]).map((x) => String(x ?? '').slice(0, 2).toLowerCase()).find((x) => LANGS.some((l) => l.id === x)) ?? null;
+// inside Telegram the player's Telegram language wins (when the game speaks it)
+if (TG.active && !langChosen() && LANGS.some((l) => l.id === TG.lang)) setLang(TG.lang);
 const geoReady = langChosen()
   ? Promise.resolve()
   : (SERVER ? fetch(`${SERVER.replace(/^ws/, 'http').replace(/\/ws\/?$/, '')}/api/geo`, { signal: AbortSignal.timeout(2500) }).then((r) => r.json()) : Promise.resolve(null))
@@ -402,7 +405,7 @@ document.addEventListener('darkbags:mode', () => {
   renderLobby();
 });
 function go(page, extra) {
-  if (!document.querySelector(`.page[data-page="${page}"]`)) page = 'play';
+  if (!document.querySelector(`.page[data-page="${page}"]`) || (TG.active && page === 'starknet')) page = 'play';
   app.page = page;
   store.set('darkbags.page', page);
   for (const p of document.querySelectorAll('.page')) p.hidden = p.dataset.page !== page;
@@ -470,6 +473,8 @@ setInterval(syncMore, 1000);
 // the side menu (wide screens): groups, a coloured tile per page, a live line under each name
 // (pass tier, the store's countdown, tasks ready, boxes to open…) and you at the bottom. Phones
 // keep the bottom tab bar: the extras are hidden there by CSS.
+// inside Telegram the Starknet page stays out (Telegram allows only TON for crypto there)
+if (TG.active) document.querySelector('#menu-nav .nav-btn[data-page="starknet"]')?.remove();
 const NAV_GROUPS = [
   ['play', ['play', 'ranked', 'pass']],
   ['store', ['starknet', 'shop', 'inventory', 'swap']],
@@ -1485,7 +1490,7 @@ function onStatus(st) {
   if (st === 'open') {
     app.everOpen = true;
     const token = app.mode === 'online' ? store.get('darkbags.token', null) : 'practice';
-    send({ t: 'hello', token, name: app.name, dev: deviceId(), ...(app.mode === 'online' ? { backups: backups() } : {}) });
+    send({ t: 'hello', token, name: app.name, dev: deviceId(), ...(app.mode === 'online' ? { backups: backups(), ...(TG.initData ? { tg: TG.initData } : {}) } : {}) });
     sendPracticeCfg();
     intro.mark('connect');
   } else if (wasOpen && app.screen !== 'lobby') {
@@ -1556,6 +1561,7 @@ function handleMessage(m) {
       app.rank = m.rank ?? null;
       app.chain = m.chain ?? null; // real-token server, or null for play money
       app.dx = m.descent ?? null;
+      TG.link = m.tg?.link ?? null; // the t.me link that opens the game in Telegram
       renderLobby();
       break;
     case 'dx':
@@ -1783,6 +1789,35 @@ addEventListener('keydown', (e) => {
   chat.openMatch();
 });
 $('chat-chip').addEventListener('click', () => chat.openMatch());
+
+// Inside Telegram: its back button closes what is open (a window, the pause menu in a raid, a
+// page of the menu, the ready room), closing the window asks first while a raid or a ready room
+// is on, and your own hits, kills of note, the way out and the fall buzz with its haptics.
+if (TG.active) {
+  const BUZZ = { hurt: 'light', headshot: 'medium', level: 'rigid', extract: 'success', death: 'error' };
+  const play = sfx.play.bind(sfx);
+  sfx.play = (name, o) => {
+    if (BUZZ[name]) TG.buzz(BUZZ[name]);
+    return play(name, o);
+  };
+  const openDialog = () => [...document.querySelectorAll('dialog[open]')].pop() ?? null;
+  const canBack = () => !!openDialog() || app.screen === 'game' || app.screen === 'prep' || app.screen === 'result' || (app.screen === 'lobby' && app.page !== 'play');
+  TG.onBack(() => {
+    const d = openDialog();
+    if (d) {
+      const x = d.querySelector('[data-close], .x');
+      return x ? x.click() : d.close();
+    }
+    if (app.screen === 'game') return dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }));
+    if (app.screen === 'prep') return $('prep-back')?.click();
+    if (app.screen === 'result') return $('res-tables')?.click();
+    if (app.page !== 'play') go('play');
+  });
+  setInterval(() => {
+    TG.back(canBack());
+    TG.confirmClose(app.screen === 'game' || app.screen === 'prep');
+  }, 300);
+}
 $('pause-btn').addEventListener('click', openPause);
 $('pause-resume').addEventListener('click', closePause);
 $('pause-leave').addEventListener('click', leaveMatch);

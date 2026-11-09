@@ -28,6 +28,7 @@ import { MailBook, cleanGift } from '../shared/mail.js';
 import { FortuneBook } from '../shared/fortune.js';
 import { langForCountry } from '../shared/geo.js';
 import { StatsBook } from '../shared/stats.js';
+import { TelegramBook } from './telegram.js';
 import { createAnalytics, adminSet } from './analytics.js';
 import { track, note, stalls, watchStalls } from './stall.js';
 import { createRegionMain, createRegionEdge, parseRegions, journaled } from './regions.js';
@@ -88,6 +89,7 @@ const SOCIAL_FILE = process.env.SOCIAL_FILE || (DATA ? `${DATA}/${NET}-social.js
 const PROMO_FILE = process.env.PROMO_FILE || (DATA ? `${DATA}/${NET}-promo.json` : '');
 const DESCENT_FILE = process.env.DESCENT_FILE || (DATA ? `${DATA}/${NET}-descent.json` : '');
 const STATS_FILE = process.env.STATS_FILE || (DATA ? `${DATA}/${NET}-stats.json` : '');
+const TELEGRAM_FILE = process.env.TELEGRAM_FILE || (DATA ? `${DATA}/${NET}-telegram.json` : '');
 // Ranks and players used to be one file for every network, so Sepolia test wallets showed up in the
 // mainnet leaderboard and player list. Each network has its own files now; the old shared ones move
 // out of the game once (to <data>/archive/shared-<time>/), so every network starts clean.
@@ -373,6 +375,28 @@ const send = (cid, msg) => {
   // one message for everyone (a chat line to the whole lobby) comes already written: see shared()
   s.ws.send(msg[WIRE] ?? JSON.stringify(msg));
 };
+// ---------------------------------------------------------------- telegram
+// The Telegram Mini App (server/telegram.js): TELEGRAM_BOT_TOKEN (host variables only) checks the
+// launch data Telegram signs; each Telegram user keeps one game token, on a persistent disk.
+// TELEGRAM_BOT_USERNAME and TELEGRAM_APP_NAME (public) build the t.me links the game shares.
+let telegramTimer = null;
+const telegram = EDGE
+  ? null
+  : new TelegramBook({
+      botToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
+      bot: process.env.TELEGRAM_BOT_USERNAME ?? '',
+      app: process.env.TELEGRAM_APP_NAME ?? '',
+      data: TELEGRAM_FILE && existsSync(TELEGRAM_FILE) ? JSON.parse(readFileSync(TELEGRAM_FILE, 'utf8')) : {},
+      onChange: (tb) => {
+        if (!TELEGRAM_FILE || telegramTimer) return;
+        telegramTimer = setTimeout(async () => {
+          telegramTimer = null;
+          await saveJSON(TELEGRAM_FILE, () => tb.toJSON()).catch((e) => console.error('telegram save failed', e));
+        }, SAVE_SOON);
+      },
+    });
+if (telegram?.on && !TELEGRAM_FILE) console.warn('TELEGRAM_BOT_TOKEN is set but there is no persistent disk: Telegram players get new runners after a restart (mount /data or set TELEGRAM_FILE)');
+
 // a match server journals what its matches write to these books, for the main server to replay
 const journal = [];
 const J = (name, book) => (EDGE ? journaled(name, book, journal) : book);
@@ -407,6 +431,7 @@ const lobby = new Lobby({
   // online rooms wait for the players (no timer) until someone presses Start or it fills up
   waitForStart: process.env.WAIT_FOR_START !== '0',
   newToken: () => crypto.randomBytes(16).toString('hex'),
+  telegram,
 });
 // the early STACHE gifts that were granted without a letter: their letter now, once
 lobby.resendStacheGifts();
@@ -891,6 +916,7 @@ const shutdown = async (code = 0) => {
   if (STATS_FILE) await saveJSON(STATS_FILE, () => stats.toJSON()).catch(() => {});
   if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, () => social.toJSON()).catch(() => {});
   if (PROMO_FILE) await saveJSON(PROMO_FILE, () => promo.toJSON()).catch(() => {});
+  if (TELEGRAM_FILE && telegram) await saveJSON(TELEGRAM_FILE, () => telegram.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await saveJSON(WALLET_FILE, () => wallet.toJSON()).catch(() => {});
   process.exit(code);
