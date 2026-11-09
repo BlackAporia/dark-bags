@@ -1525,7 +1525,7 @@ function onMessage(m) {
   if ((m.t === 'daily' || m.t === 'locker' || m.t === 'fortune') && app.page === 'play') renderGoals();
   if (m.t === 'vc') voice.onMessage(m);
   if (m.t === 'daily' && m.career) ach.renderProfile();
-  if (m.t === 'locker' || m.t === 'err') shop.onMessage(m);
+  if (m.t === 'locker' || m.t === 'err' || m.t === 'stars_invoice') shop.onMessage(m);
   if (m.t === 'locker') pass.onMessage(m);
   if (m.t === 'locker') offers.onMessage(m);
   if (m.t === 'leaderboard' || m.t === 'career' || m.t === 'result') ranked.onMessage(m);
@@ -1562,6 +1562,8 @@ function handleMessage(m) {
       app.chain = m.chain ?? null; // real-token server, or null for play money
       app.dx = m.descent ?? null;
       TG.link = m.tg?.link ?? null; // the t.me link that opens the game in Telegram
+      app.tgStars = m.tg?.stars ?? null; // shop $ packs for Telegram Stars: { packId: stars }
+      app.shopPay = m.shopPay !== false; // false: test USDC/USDT no longer pay in the shop
       renderLobby();
       break;
     case 'dx':

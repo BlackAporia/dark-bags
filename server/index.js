@@ -28,7 +28,8 @@ import { MailBook, cleanGift } from '../shared/mail.js';
 import { FortuneBook } from '../shared/fortune.js';
 import { langForCountry } from '../shared/geo.js';
 import { StatsBook } from '../shared/stats.js';
-import { TelegramBook } from './telegram.js';
+import { TelegramBook, createTelegramBot, starPrices } from './telegram.js';
+import { PACKS } from '../shared/cosmetics.js';
 import { createAnalytics, adminSet } from './analytics.js';
 import { track, note, stalls, watchStalls } from './stall.js';
 import { createRegionMain, createRegionEdge, parseRegions, journaled } from './regions.js';
@@ -432,7 +433,29 @@ const lobby = new Lobby({
   waitForStart: process.env.WAIT_FOR_START !== '0',
   newToken: () => crypto.randomBytes(16).toString('hex'),
   telegram,
+  // SHOP_TEST_PAY=0 (a play-money server that sells shop $ for Telegram Stars): test USDC/USDT
+  // no longer pay in the shop, only shop $ does
+  stableShop: !!real || process.env.SHOP_TEST_PAY !== '0',
 });
+// The Telegram bot (server/telegram.js): /start, /paysupport, /terms and shop $ packs for Stars.
+// TELEGRAM_POLL=0 on every server but the one that reads the bot's updates; TELEGRAM_STARS=0
+// sells nothing; STARS_PER_USD sets the price (50 Stars a dollar by default).
+const tgBot =
+  telegram?.on && process.env.TELEGRAM_POLL !== '0'
+    ? createTelegramBot({
+        book: telegram,
+        prices: process.env.TELEGRAM_STARS === '0' ? {} : starPrices(PACKS, Number(process.env.STARS_PER_USD || 50)),
+        support: String(process.env.TELEGRAM_SUPPORT ?? '').slice(0, 64),
+        appUrl: String(process.env.TELEGRAM_APP_URL ?? ''),
+        onPaid: (order) => {
+          const r = lobby.starsPaid(order);
+          if (r) telegram.credited(order.id, r.added);
+          console.log(`telegram: ${order.stars} Stars paid for ${order.pack}${r ? '' : ' (not credited: check the order)'}`);
+        },
+      })
+    : null;
+if (tgBot && Object.keys(tgBot.prices).length) lobby.stars = tgBot;
+tgBot?.start();
 // the early STACHE gifts that were granted without a letter: their letter now, once
 lobby.resendStacheGifts();
 
@@ -550,7 +573,7 @@ function dataInfo() {
     epochAt: EPOCH_AT || null,
   };
 }
-const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE, data: dataInfo });
+const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE, data: dataInfo, telegram });
 
 // ------------------------------------------------------------------ static
 const gzipAsync = promisify(gzip);
@@ -751,6 +774,34 @@ function httpHandle(req, res) {
       for (const [cid, x] of lobby.sessions) if (lobby.key(x) && (!to || lobby.key(x) === to)) send(cid, { t: 'mailbox', unread: mail.unread(lobby.key(x)), news: { k: 'mail' } });
       console.log(`mail: "${m.title}" to ${to ?? 'everyone'}${m.gift ? ` with ${JSON.stringify(m.gift)}` : ''}`);
       reply(200, { ok: true, id: m.id });
+    });
+    return;
+  }
+  // a Telegram Stars refund: POST /api/admin/stars_refund with header x-admin-key: ADMIN_KEY and
+  // { charge: '<telegram_payment_charge_id>' }. The Stars go back to the player; the shop $ they
+  // bought are taken back as far as the player still has them.
+  if (pathOnly === '/api/admin/stars_refund' && req.method === 'POST') {
+    const reply = (code, body) => res.writeHead(code, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+    const key = process.env.ADMIN_KEY;
+    const given = String(req.headers['x-admin-key'] ?? '');
+    if (!key || key.length < 16 || given.length !== key.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(key))) return reply(403, { error: 'forbidden' });
+    if (!tgBot) return reply(404, { error: 'telegram bot off' });
+    let raw = '';
+    req.on('data', (c) => {
+      raw += c;
+      if (raw.length > 2000) req.destroy();
+    });
+    req.on('end', async () => {
+      try {
+        const o = await tgBot.refund(JSON.parse(raw || '{}').charge);
+        const price = PACKS.find((p) => p.id === o.pack)?.price ?? 0;
+        const took = inventory.takeCredit(o.key, o.added ?? price, price);
+        for (const [c, x] of lobby.sessions) if (lobby.key(x) === o.key) send(c, { t: 'locker', op: 'refund', locker: inventory.view(o.key) });
+        console.log(`telegram: refunded ${o.stars} Stars (${o.pack}), took back ${took} shop $ cents`);
+        reply(200, { ok: true, stars: o.stars, tookBack: took });
+      } catch (e) {
+        reply(400, { error: e?.user ? e.message : String(e?.message ?? e).slice(0, 200) });
+      }
     });
     return;
   }

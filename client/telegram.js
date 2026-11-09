@@ -118,6 +118,7 @@ let lastBuzz = 0;
 let backShown = null;
 let closeAsk = null;
 let backFn = null;
+const invoices = new Map(); // slug → done(status)
 
 export const TG = {
   active: !!launch,
@@ -172,6 +173,21 @@ export const TG = {
   share(url, text = '') {
     return this.open(`https://t.me/share/url?url=${encodeURIComponent(url)}${text ? `&text=${encodeURIComponent(text)}` : ''}`);
   },
+  // Telegram's payment sheet for an invoice link (t.me/$slug or t.me/invoice/slug); done(status)
+  // hears paid, cancelled, failed or pending
+  openInvoice(link, done = () => {}) {
+    if (!launch || !verAtLeast('6.1')) return false;
+    let slug = '';
+    try {
+      const u = new URL(link);
+      const path = u.pathname.replace(/^\//, '');
+      slug = path.startsWith('$') ? path.slice(1) : path.startsWith('invoice/') ? path.slice('invoice/'.length) : '';
+    } catch {}
+    if (!slug) return false;
+    invoices.set(slug, done);
+    post('web_app_open_invoice', { slug });
+    return true;
+  },
   // the link that opens the game in Telegram with a start parameter (letters, digits, _ and -)
   startLink(param) {
     if (!this.link) return null;
@@ -183,6 +199,11 @@ export const TG = {
 if (launch) {
   document.documentElement.classList.add('tg', `tg-${launch.platform}`);
   on('back_button_pressed', () => backFn?.());
+  on('invoice_closed', (d) => {
+    const done = invoices.get(d.slug);
+    invoices.delete(d.slug);
+    done?.(d.status);
+  });
   on('safe_area_changed', (d) => {
     insets.s = { ...insets.s, ...d };
     applyInsets();

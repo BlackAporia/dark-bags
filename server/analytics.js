@@ -23,7 +23,7 @@ export function adminSet(env = process.env) {
   return new Set((list.length ? list : DEFAULT_ADMINS).map(norm).filter(Boolean));
 }
 
-export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inventory, social, referrals, mail, fortune, guard, network = 'test', stalls = [], regions = null, storage = null, data = () => null, env = process.env, now = () => Date.now(), startedAt = Date.now() }) {
+export function createAnalytics({ telegram = null, stats, lobby, sockets, real = null, ranks, inventory, social, referrals, mail, fortune, guard, network = 'test', stalls = [], regions = null, storage = null, data = () => null, env = process.env, now = () => Date.now(), startedAt = Date.now() }) {
   const admins = adminSet(env);
   const isAdmin = (account) => !!account && admins.has(norm(account));
   const prices = lobby.prices;
@@ -233,6 +233,9 @@ export function createAnalytics({ stats, lobby, sockets, real = null, ranks, inv
       storage,
       data: data(),
       regions: regions ? { health: regions.health?.() ?? {}, list: regions.list(), pots: Object.fromEntries(Object.entries(regions.pots()).map(([r, m]) => [r, basket(m)])), pending: regions.pending() } : null,
+      // the Telegram Mini App: Stars sold and refunded, and what players wrote to the bot (with
+      // their game key, for a letter through the admin mail)
+      telegram: telegram?.on ? { ...telegram.totals(), support: telegram.support.slice(0, 50).map((m) => ({ ...m, key: telegram.tokenOf(m.tg) })) } : null,
       clientErrors: lobby.clientErrors?.slice(0, 30) ?? [],
       netReports: lobby.netReports?.slice(0, 60) ?? [],
     };
