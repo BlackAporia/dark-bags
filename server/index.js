@@ -748,6 +748,30 @@ function httpHandle(req, res) {
       return;
     }
   }
+  // the Telegram Mini App says who opened it (the launch data Telegram signs) and whether they
+  // went on to the full game on the site: POST /api/telegram/seen { initData, go } → { link }
+  if (pathOnly === '/api/telegram/seen' && req.method === 'POST') {
+    const reply = (code, body) => res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body));
+    if (!telegram?.on) return reply(200, { link: null });
+    let raw = '';
+    req.on('data', (c) => {
+      raw += c;
+      if (raw.length > 10000) req.destroy();
+    });
+    req.on('end', () => {
+      let b = {};
+      try {
+        b = JSON.parse(raw || '{}');
+      } catch {}
+      const r = telegram.signIn(b?.initData);
+      if (r) {
+        stats.seen(r.token, { tg: true });
+        if (b.go) stats.tgSite(r.user.id);
+      }
+      reply(200, { link: telegram.link });
+    });
+    return;
+  }
   // the team's mail to players: POST /api/admin/mail with header x-admin-key: ADMIN_KEY and
   // { to: 'all' | '<account or token>', title, body, gift?: { k: 'credit', v: cents } | { k: 'box', id } | { k: 'spin', n } | { k: 'trial'|'wtrial', id } }
   if (pathOnly === '/api/admin/mail' && req.method === 'POST') {

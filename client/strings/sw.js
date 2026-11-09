@@ -2088,4 +2088,10 @@ export default {
   'tg.paid': "Malipo yamepokelewa. $ ya duka yako inakuja.",
   'tg.payFailed': "Malipo hayakufanikiwa. Jaribu tena.",
   'tg.starsNote': "Inalipwa kwa Telegram Stars (vifurushi vikubwa vina bonasi). $ ya duka hutumika hapa tu na haiwezi kutolewa.",
+  'tg.ctaT': "Unacheza mazoezi ndani ya Telegram.",
+  'tg.ctaB': "PvP na PvE mtandaoni, vyeo, zawadi na mchezo kamili viko kwenye tovuti.",
+  'tg.ctaGo': "Fungua dark-bags.com ↗",
+  'tg.resGo': "Cheza mtandaoni kwenye dark-bags.com ↗",
+  'tg.share': "Shiriki mchezo kwenye Telegram",
+  'tg.shareText': "DARK BAGS: mchezo wa bure wa risasi na kutoroka. Shuka, chukua nyara na utoke hai 🎒",
 };
