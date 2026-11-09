@@ -18,7 +18,7 @@ import { recoverArchives, recoveryLog } from './recover.js';
 import { createBackups } from './backup.js';
 import { Inventory } from '../shared/cosmetics.js';
 import { SocialBook } from '../shared/social.js';
-import { ReferralBook } from '../shared/referrals.js';
+import { ReferralBook, cleanCode } from '../shared/referrals.js';
 import { DailyBook } from '../shared/daily.js';
 import { DescentBook } from '../shared/descent.js';
 import { PromoBook } from '../shared/promo.js';
@@ -798,6 +798,42 @@ function httpHandle(req, res) {
       for (const [cid, x] of lobby.sessions) if (lobby.key(x) && (!to || lobby.key(x) === to)) send(cid, { t: 'mailbox', unread: mail.unread(lobby.key(x)), news: { k: 'mail' } });
       console.log(`mail: "${m.title}" to ${to ?? 'everyone'}${m.gift ? ` with ${JSON.stringify(m.gift)}` : ''}`);
       reply(200, { ok: true, id: m.id });
+    });
+    return;
+  }
+  // the creator program (shared/referrals.js), header x-admin-key: ADMIN_KEY:
+  //   POST /api/admin/creator       { code | key, vanity }  name a creator with their own code
+  //                                 { code | key, off: true } take it back
+  //   POST /api/admin/creator_paid  { code, cents }          the team paid them out (cents of $)
+  if ((pathOnly === '/api/admin/creator' || pathOnly === '/api/admin/creator_paid') && req.method === 'POST') {
+    const reply = (code, body) => res.writeHead(code, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+    const key = process.env.ADMIN_KEY;
+    const given = String(req.headers['x-admin-key'] ?? '');
+    if (!key || key.length < 16 || given.length !== key.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(key))) return reply(403, { error: 'forbidden' });
+    let raw = '';
+    req.on('data', (c) => {
+      raw += c;
+      if (raw.length > 2000) req.destroy();
+    });
+    req.on('end', () => {
+      let b = {};
+      try {
+        b = JSON.parse(raw || '{}');
+      } catch {
+        return reply(400, { error: 'json' });
+      }
+      const who = b.key ? String(b.key) : referrals.codes.get(cleanCode(b.code));
+      const acct = who && real && /^0x[0-9a-f]+$/i.test(who) ? `0x${BigInt(who).toString(16).padStart(64, '0')}` : who;
+      if (!acct || !referrals.users.has(acct)) return reply(404, { error: 'no such player (code or key)' });
+      if (pathOnly === '/api/admin/creator_paid') {
+        const paid = referrals.markPaid(acct, Number(b.cents));
+        console.log(`creator ${referrals.users.get(acct)?.creator?.code ?? acct}: marked ${paid} cents paid`);
+        return reply(200, { ok: true, paid, view: referrals.view(acct).creator });
+      }
+      if (b.off) return reply(200, { ok: referrals.dropCreator(acct) });
+      const r = referrals.makeCreator(acct, b.vanity ?? b.code);
+      if (r.ok) console.log(`creator: ${acct.slice(0, 12)}… is now ${r.code}`);
+      reply(r.ok ? 200 : 400, r.ok ? { ok: true, code: r.code, view: referrals.view(acct).creator } : { error: r.error });
     });
     return;
   }

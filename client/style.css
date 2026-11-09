@@ -3533,3 +3533,12 @@ body.touch-on .mchat-list li { align-self: center; font-size: 12px; }
 .tg-cta b { color: var(--paper); }
 .tg-cta .cta { width: 100%; }
 .ref-card .ref-tg { margin: 4px 0 12px; }
+/* the invite page: share buttons, rewards in two columns, the creator dashboard */
+.ref-nets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ref-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.ref-list { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.ref-next { margin: 12px 0 0; font-size: 14px; color: var(--paper); }
+.ref-cr .cr-tier { color: var(--loot); }
+.cr-bar { height: 8px; border-radius: 99px; background: var(--tarp-2); overflow: hidden; margin: 10px 0 4px; }
+.cr-bar i { display: block; height: 100%; background: var(--loot); }
+.chat-cr { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 4px; border-radius: 50%; background: var(--loot); color: #111; font-size: 11px; font-weight: 700; vertical-align: 1px; }

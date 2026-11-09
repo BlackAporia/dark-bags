@@ -117,6 +117,11 @@ export const ACHIEVEMENTS = [
   { id: 'taskmaster', stat: 'tasksDone', goal: 500, xp: 5000 },
   // premium: the welcome bonus of a first top-up or deposit, worn in animated gold
   { id: 'founder', stat: 'deposits', goal: 1, xp: 500, premium: true },
+  // friends: bring in players who keep playing (shared/referrals.js REF.active matches each)
+  { id: 'first_recruit', stat: 'recruits', goal: 1, xp: 200 },
+  { id: 'recruiter', stat: 'recruits', goal: 3, xp: 600 },
+  { id: 'squad_leader', stat: 'recruits', goal: 10, xp: 1500 },
+  { id: 'general', stat: 'recruits', goal: 25, xp: 4000 },
   // the Descent: go down, bring it back up, break its bosses, and clear all fifty floors
   { id: 'dx_first_steps', stat: 'dxRuns', goal: 1, xp: 80 },
   { id: 'dx_deep_dive', stat: 'dxBest', goal: 10, xp: 400 },

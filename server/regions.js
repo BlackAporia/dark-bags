@@ -108,6 +108,12 @@ export function createRegionMain({ lobby, secret, regions, self = 'eu', file = '
       ranks: lobby.ranks.recs.get(key) ?? null,
       inventory: lobby.inventory.data.get(key) ?? null,
       referrals: lobby.referrals.users.get(key) ?? null,
+      // the player's inviter, when a creator: the match server must not pay them in shop $
+      refUp: (() => {
+        const by = lobby.referrals.users.get(key)?.by;
+        const up = by ? lobby.referrals.users.get(by) : null;
+        return up?.creator ? { key: by, creator: up.creator } : null;
+      })(),
       daily: lobby.daily?.users.get(key) ?? null,
       name: lobby.social.get?.(key)?.name ?? null,
     };
@@ -353,6 +359,7 @@ export function createRegionEdge({ lobby, secret, region, mainUrl, journal, file
     else lobby.ranks.recs.delete(key);
     if (s.inventory) lobby.inventory.data.set(key, structuredClone(s.inventory));
     if (s.referrals) lobby.referrals.users.set(key, structuredClone(s.referrals));
+    if (s.refUp?.key) lobby.referrals.rec(s.refUp.key).creator = structuredClone(s.refUp.creator);
     if (s.daily && lobby.daily) lobby.daily.users.set(key, structuredClone(s.daily));
   }
 

@@ -23,7 +23,7 @@ export function createChat({ app, send, isOpen, release = () => {} }) {
   function line(m) {
     const title = m.tt ? titleHtml(m.tt, 'chat-tt') : '';
     const time = new Date(m.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `<li class="${m.n === (app.name || 'runner') ? 'me' : ''}${m.bot ? ' bot' : ''}">${rankBadgeSvg(m.rk ?? 1, 18)}<div><p class="chat-who"><b>${esc(m.n)}</b>${title}<time>${time}</time></p><p class="chat-text">${esc(m.text)}</p></div></li>`;
+    return `<li class="${m.n === (app.name || 'runner') ? 'me' : ''}${m.bot ? ' bot' : ''}">${rankBadgeSvg(m.rk ?? 1, 18)}<div><p class="chat-who"><b>${esc(m.n)}</b>${m.cr ? `<span class="chat-cr" title="${esc(t('cr.badge'))}">✓</span>` : ''}${title}<time>${time}</time></p><p class="chat-text">${esc(m.text)}</p></div></li>`;
   }
 
   function render() {
