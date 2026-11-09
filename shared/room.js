@@ -440,7 +440,8 @@ export class RoomCore {
       if (!this.practice && !this.tickets && !this.guard?.flagged(c.token)) {
         const rake = MODE[this.mode].kind === 'zombie' ? stake : Math.floor(stake * CFG.RAKE);
         const paid = this.referrals?.onStake(c.token, rake);
-        if (paid) this.inventory.give(paid.to, { k: 'credit', v: paid.cents });
+        // a friend's inviter: shop $; a creator's real share stays in the referral book until paid out
+        if (paid && !paid.real) this.inventory.give(paid.to, { k: 'credit', v: paid.cents });
       }
       this.jackpot += Math.floor(stake * CFG.RAKE * CFG.JACKPOT_SHARE);
       this.send(c.cid, {
@@ -809,8 +810,16 @@ export class RoomCore {
         // fair play: the aim numbers of this match go on the account's record
         this.guard?.aim(c.token, p.ac);
         const bonus = this.referrals?.onMatch(c.token);
-        if (bonus?.welcome) this.inventory.give(bonus.welcome, { k: 'box', id: 'vault', cap: 1 });
-        if (bonus?.to && !this.guard?.flagged(c.token)) this.inventory.give(bonus.to, { k: 'box', id: 'vault', cap: 1 });
+        // the welcome bag (two when a creator brought them), the inviter's gifts on the ladder,
+        // and a recruit for the inviter's titles: none of it from a flagged account
+        if (bonus?.welcome) this.inventory.give(bonus.welcome, { k: 'box', id: 'vault', cap: 1, n: bonus.fan ? 2 : 1 });
+        if (bonus && !this.guard?.flagged(c.token)) {
+          for (const g of bonus.gifts ?? []) this.inventory.give(g.to, g.gift);
+          if (bonus.recruit) {
+            const done = this.ranks.progress(bonus.recruit, { recruits: 1 });
+            if (done.length) this.ranks.add(bonus.recruit, done.reduce((n, a) => n + (a.xp ?? 0), 0));
+          }
+        }
       }
       // career rank: every raid pays, win or lose
       // practice pays nothing: no XP, ranks, achievements, pass or bags (it is free, so it must not farm)

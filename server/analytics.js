@@ -233,6 +233,8 @@ export function createAnalytics({ telegram = null, stats, lobby, sockets, real =
       storage,
       data: data(),
       regions: regions ? { health: regions.health?.() ?? {}, list: regions.list(), pots: Object.fromEntries(Object.entries(regions.pots()).map(([r, m]) => [r, basket(m)])), pending: regions.pending() } : null,
+      // the creator program: each creator's code, tier, players and what is owed / paid
+      creators: referrals?.creators?.() ?? [],
       // the Telegram Mini App: Stars sold and refunded, and what players wrote to the bot (with
       // their game key, for a letter through the admin mail)
       telegram: telegram?.on ? { ...telegram.totals(), support: telegram.support.slice(0, 50).map((m) => ({ ...m, key: telegram.tokenOf(m.tg) })) } : null,

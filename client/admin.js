@@ -247,6 +247,7 @@ function players() {
     ${card('Ранги гравців', ranks.length ? hbars(ranks) : '<p class="mut">Поки порожньо</p>')}
   </div></section>
   <section>${card('Кар’єра всіх гравців разом', `<div class="tiles">${CAREER.map(([k, l, f]) => tile(l, f ? f(p.career[k] ?? 0) : num(p.career[k] ?? 0))).join('')}</div>`)}</section>
+  ${(D.creators ?? []).length ? `<section><h2>Креатори</h2>${card('Креатори та їхні гравці', table(['Код', 'Рівень', 'Запрошено', 'Грають', 'Підтримують', 'До виплати', 'Виплачено'], D.creators.map((c) => `<tr><td class="mono">${esc(c.code)}</td><td>${esc(c.tier)}</td><td>${num(c.invited)}</td><td>${num(c.recruits)}</td><td>${num(c.supporters)}</td><td>${cents(c.owed)}</td><td>${cents(c.paid)}</td></tr>`)))}</section>` : ''}
   ${D.telegram ? `<section><h2>Telegram</h2><div class="tiles">
     ${tile('Продано за Stars', `⭐ ${num(D.telegram.stars)}`, `${num(D.telegram.orders)} покупок · ${num(D.telegram.refunds)} повернень`, true)}
     ${tile('Гравців з Telegram', num(D.telegram.players), 'відкрили гру в Telegram')}

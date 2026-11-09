@@ -488,6 +488,14 @@ export class Lobby {
         if (!this.key(s)) return this.send(cid, { t: 'ref', signedOut: true });
         this.send(cid, { t: 'ref', ...this.referrals.view(this.key(s)) });
         return;
+      case 'ref_support': {
+        // support-a-creator: a creator's code (or '' to stop); they get a share of your shop spend
+        const key = this.key(s);
+        if (!key) return this.send(cid, { t: 'ref', signedOut: true });
+        const r = this.referrals.support(key, String(msg.code ?? ''));
+        this.send(cid, { t: 'ref', supported: r.ok, supportError: r.error ?? null, ...this.referrals.view(key) });
+        return;
+      }
       case 'ref_claim': {
         // only before your first match; a welcome bag for coming in through an invite
         const key = this.key(s);
@@ -660,7 +668,7 @@ export class Lobby {
     s.lastChat = now;
     const key = this.key(s);
     const pid = key ? this.social.get(key)?.id : null; // so a later rename reaches this line too
-    const m = { n: cleanName(msg.name || s.name), text, at: now, rk: key ? this.ranks.get(key).rank : 1, tt: key ? this.ranks.title(key) : null, ...(pid ? { id: pid } : {}) };
+    const m = { n: cleanName(msg.name || s.name), text, at: now, rk: key ? this.ranks.get(key).rank : 1, tt: key ? this.ranks.title(key) : null, ...(pid ? { id: pid } : {}), ...(key && this.referrals.isCreator(key) ? { cr: 1 } : {}) };
     this.chat.push(m);
     if (this.chat.length > CFG.CHAT_KEEP) this.chat.splice(0, this.chat.length - CFG.CHAT_KEEP);
     // to everyone a moment later, with whatever else was said meanwhile: a busy chat (a stream's
@@ -717,6 +725,12 @@ export class Lobby {
       const kind = { pass_buy: 'pass', pass_tiers: 'pass', store_buy: 'store', card_buy: 'card', starter_buy: 'starter' }[msg.t] ?? 'box';
       // what was paid with real money now (USDC/USDT or a coin) and what with shop $
       if ((now.spent ?? 0) > was.spent) this.stats.buy(kind, now.spent - was.spent, kind === 'box' ? id : msg.t, (now.paid ?? 0) - was.paid);
+    }
+    // the creator this player supports gets their share of real money spent (top-ups and paid buys)
+    if (!this.practice) {
+      const now = inv.rec(key);
+      const real = Math.max(0, (now.bought ?? 0) - was.bought) + Math.max(0, (now.paid ?? 0) - was.paid);
+      if (real > 0) this.referrals.onShop(key, real);
     }
     this.send(cid, { t: 'locker', op: msg.t, result: r, locker: inv.view(key), balances: this.balances(s) });
     if (msg.t === 'topup' && !this.practice) this.welcome(key); // the first top-up earns the welcome bonus (its toast comes last)
@@ -819,6 +833,7 @@ export class Lobby {
     if (!r.ok) return null;
     this.social.markPurchase?.(order.key);
     this.stats?.buy('topup', pack.price, `stars:${pack.id}`);
+    this.referrals.onShop(order.key, pack.price);
     for (const [c, x] of this.sessions) if (this.key(x) === order.key) this.send(c, { t: 'locker', op: 'topup', result: r, locker: this.inventory.view(order.key), balances: this.balances(x) });
     this.welcome(order.key);
     return r;

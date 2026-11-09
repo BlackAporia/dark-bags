@@ -201,6 +201,28 @@ stakes + jackpot bonus + rollover in  ==  rake + payouts + rollover out + money 
 
 All tuning lives in [`shared/config.js`](shared/config.js).
 
+## Invites and creators
+
+`shared/referrals.js`, the Invite page (`client/invite.js`):
+
+- **Friends.** Every account has a code and a link. A friend who comes in through it gets a welcome bag after their first match, or two if a creator's code brought them. The inviter gets:
+  - 20% of the house's cut from the friend's stakes for 90 days, as shop $;
+  - a fortune spin on the friend's 1st match, a Vault bag on the 5th and a Golden bag on the 20th;
+  - a recruit for every friend who finishes 3 matches. Recruits unlock the titles First Recruit, Recruiter, Squad Leader and General.
+- **Creators** (streamers, posters, community leads), named by the team:
+  - their own code (`NYXTV`); the random one keeps working;
+  - a share of the house's cut from their players' stakes for a year, by recruits: Creator 30%, Partner 40% from 25, Elite 50% from 100;
+  - support-a-creator: any player can enter a creator's code, and the creator gets 5% of that player's real-money shop spend. A creator's own players support them from the start;
+  - a ✓ next to their name in chat;
+  - a dashboard on the Invite page.
+
+  Creator earnings are owed in $, never shop $. The team checks them for fair play and pays them out, then records the payout.
+- **Admin calls** (header `x-admin-key`):
+  - `POST /api/admin/creator` with `{ code, vanity }` names a creator, and `{ code, off: true }` takes it back;
+  - `POST /api/admin/creator_paid` with `{ code, cents }` records a payout.
+  - The admin page lists every creator with their players, supporters, what is owed and what is paid.
+- **Fair play** is the same as before: no accounts on the inviter's network or device, a daily limit, and nothing from flagged accounts.
+
 ## Privacy model
 
 What "private" means in this build:
