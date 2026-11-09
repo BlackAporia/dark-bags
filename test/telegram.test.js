@@ -216,3 +216,14 @@ test('stars: the lobby sells packs inside Telegram only and credits the paid one
   assert.equal(inventory.takeCredit(key, 1500, 500), 1000);
   assert.equal(inventory.rec(key).credit, 0);
 });
+
+test('telegram: a tap through to the site counts once a day per player', () => {
+  let t = NOW;
+  const sb = new StatsBook({ now: () => t });
+  assert.equal(sb.tgSite(4242), true);
+  assert.equal(sb.tgSite(4242), false);
+  assert.equal(sb.tgSite(777), true);
+  t += 86400000;
+  assert.equal(sb.tgSite(4242), true);
+  assert.deepEqual([sb.days['2026-11-09'].tgSite, sb.days['2026-11-10'].tgSite], [2, 1]);
+});

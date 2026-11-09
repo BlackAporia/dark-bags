@@ -200,6 +200,8 @@ const D = {
   'Ціни монет': ['Coin prices', 'Цены монет'],
   'З гаманцем': ['With a wallet', 'С кошельком'],
   'З Telegram': ['From Telegram', 'Из Telegram'],
+  'З Telegram на сайт': ['From Telegram to the site', 'Из Telegram на сайт'],
+  'перейшли до повної гри за 30 днів': ['went on to the full game in 30 days', 'перешли к полной игре за 30 дней'],
   'Продано за Stars': ['Sold for Stars', 'Продано за Stars'],
   'Гравців з Telegram': ['Players from Telegram', 'Игроков из Telegram'],
   'Повідомлення боту': ['Messages to the bot', 'Сообщения боту'],

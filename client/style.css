@@ -3527,3 +3527,9 @@ body.touch-on .mchat-list li { align-self: center; font-size: 12px; }
 .tg .nav-starknet,
 .tg .menu-nav [data-page="starknet"],
 .tg .more-tile[data-page="starknet"] { display: none !important; }
+/* inside Telegram: practice there, the full game one tap away on the site */
+.tg-cta { margin: 12px 0 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--loot) 45%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--loot) 8%, var(--tarp)); }
+.tg-cta p { margin: 0 0 10px; font-size: 14px; line-height: 1.4; color: var(--dust); }
+.tg-cta b { color: var(--paper); }
+.tg-cta .cta { width: 100%; }
+.ref-card .ref-tg { margin: 4px 0 12px; }

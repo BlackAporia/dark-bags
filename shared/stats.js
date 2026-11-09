@@ -64,6 +64,19 @@ export class StatsBook {
   // the session token behind a wallet sign-in. The device was seen on its own before the sign-in;
   // it is the same person, so it is marked as theirs (a: 1) and never counted twice: not as a
   // visitor, not as a new player that day, not as a second active one.
+  // a Telegram player tapped through to the full game on the site (once a day each)
+  tgSite(id) {
+    const d = this.day();
+    const k = `${dayOf(this.now())}:${id}`;
+    this.tgSiteSeen ??= new Set();
+    if (this.tgSiteSeen.has(k)) return false;
+    if (this.tgSiteSeen.size > 50000) this.tgSiteSeen.clear();
+    this.tgSiteSeen.add(k);
+    d.tgSite = (d.tgSite ?? 0) + 1;
+    this.changed?.();
+    return true;
+  }
+
   seen(key, { wallet = false, device = null, tg = false } = {}) {
     if (!key) return;
     const t = this.now();

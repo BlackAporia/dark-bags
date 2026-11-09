@@ -214,15 +214,16 @@ export function starPrices(packs, perUsd = 50) {
 }
 
 const TEXT = {
-  start: '🎒 DARK BAGS: a free extraction shooter. Drop in, grab the loot, get out alive. Nobody sees what is in your bag.\n\nTap Play to start.',
+  start: '🎒 DARK BAGS: a free extraction shooter. Drop in, grab the loot, get out alive. Nobody sees what is in your bag.\n\nTap Play to practice right here. Online PvP and PvE, ranks and rewards are on the website.',
   play: '▶ Play',
+  site: '🌐 dark-bags.com',
   support: (who) => `Problem with a payment? Write it here in one message: the date, how many Stars, and what you bought. The team reads every message${who ? ` and answers through ${who}` : ''}. Payments are refunded as Telegram's terms for Stars say (telegram.org/tos/stars).`,
   terms: 'Purchases in DARK BAGS: Telegram Stars buy shop $, the in-game currency for bags, crates, skins and the pass. Shop $ has no cash value, cannot be withdrawn or traded, and stays with your Telegram account. Purchases are final, except where Telegram\'s terms for Stars give a refund (telegram.org/tos/stars). Help: /paysupport',
   noted: 'Thanks, the team got your message.',
   expired: 'This order is no longer open. Open the shop in the game and try again.',
 };
 
-export function createTelegramBot({ book, prices = {}, onPaid = () => {}, support = '', appUrl = '', fetchImpl = fetch, log = console, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
+export function createTelegramBot({ book, prices = {}, onPaid = () => {}, support = '', appUrl = '', siteUrl = 'https://dark-bags.com/', fetchImpl = fetch, log = console, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   if (!book?.on) return null;
   const token = book.botToken;
   async function api(method, params = {}) {
@@ -290,8 +291,8 @@ export function createTelegramBot({ book, prices = {}, onPaid = () => {}, suppor
     const reply = (t, extra = {}) => api('sendMessage', { chat_id: m.chat.id, text: t, ...extra });
     const [cmd, arg = ''] = text.split(/\s+/, 2);
     if (cmd === '/start' || cmd.startsWith('/start@')) {
-      const b = playButton(arg);
-      return reply(TEXT.start, b ? { reply_markup: { inline_keyboard: [[b]] } } : {});
+      const rows = [playButton(arg), siteUrl ? { text: TEXT.site, url: siteUrl } : null].filter(Boolean).map((b) => [b]);
+      return reply(TEXT.start, rows.length ? { reply_markup: { inline_keyboard: rows } } : {});
     }
     if (cmd === '/paysupport' || cmd.startsWith('/paysupport@')) return reply(TEXT.support(support));
     if (cmd === '/terms' || cmd.startsWith('/terms@')) return reply(TEXT.terms);

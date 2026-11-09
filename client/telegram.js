@@ -1,8 +1,9 @@
-// The Telegram Mini App. Opened from the bot, the game runs inside Telegram's own window: it
+// The Telegram Mini App. Opened from the bot, the game runs inside Telegram's own window as
+// practice (the full game, online and on Starknet, is on the site: one tap opens it). It
 // says when it is ready, takes the whole screen on phones (landscape too), keeps the raid out of
 // the swipe that would close the window, follows Telegram's safe areas and back button, buzzes
-// with Telegram's haptics, and signs the player in with the launch data Telegram signs (the
-// server checks it, server/telegram.js).
+// with Telegram's haptics, and tells the server who opened it with the launch data Telegram
+// signs (the server checks it, server/telegram.js).
 //
 // No script from telegram.org: the launch data comes in the address fragment and the window
 // talks through Telegram's documented bridge (core.telegram.org/api/web-events). Outside
@@ -168,6 +169,23 @@ export const TG = {
     if (/^(t\.me|telegram\.me)$/.test(u.hostname) && verAtLeast('6.1')) post('web_app_open_tg_link', { path_full: u.pathname + u.search });
     else post('web_app_open_link', { url: u.href });
     return true;
+  },
+  // our own site in the phone's browser (the full game lives there, outside Telegram)
+  site(url) {
+    if (!launch) return false;
+    post('web_app_open_link', { url: new URL(url, location.href).href });
+    return true;
+  },
+  // tell the server Telegram opened the game (and whether the player went on to the site); the
+  // answer carries the t.me link to share
+  seen(go = false) {
+    if (!launch || !this.initData) return;
+    fetch('/api/telegram/seen', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ initData: this.initData, go: !!go }), keepalive: true })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.link) this.link = j.link;
+      })
+      .catch(() => {});
   },
   // Telegram's share sheet: pick a chat, the link and the text go there
   share(url, text = '') {

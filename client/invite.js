@@ -87,7 +87,10 @@ export function createInvite({ app, send, toast, sfx, goOnline = null }) {
     if (!root) return;
     if (!online()) {
       // practice runs offline in the page: one button takes you online, right here
-      root.innerHTML = `<div class="ref-card"><h2 class="ref-title">${t('ref.title')}</h2><p class="muted">${t('ref.online')}</p>${goOnline ? `<button type="button" class="cta ref-go">${t('ref.goOnline')}</button>` : ''}</div>`;
+      // inside Telegram: share the game with friends there, and the invite code lives on the site
+      const tgShare = TG.active && TG.link ? `<button type="button" class="cta ref-tg">${t('tg.share')}</button>` : '';
+      root.innerHTML = `<div class="ref-card"><h2 class="ref-title">${t('ref.title')}</h2>${tgShare}<p class="muted">${t('ref.online')}</p>${goOnline ? `<button type="button" class="${tgShare ? 'ghost' : 'cta'} ref-go">${t(TG.active ? 'tg.ctaGo' : 'ref.goOnline')}</button>` : ''}</div>`;
+      root.querySelector('.ref-tg')?.addEventListener('click', () => TG.share(TG.link, t('tg.shareText')));
       root.querySelector('.ref-go')?.addEventListener('click', () => {
         goOnline();
         render();

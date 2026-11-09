@@ -230,6 +230,7 @@ function players() {
     ${tile('З гаманцем', num(p.wallets), 'увійшли на мейнеті', true)}
     ${tile('Людей', num(p.people ?? p.visitors), 'гаманці й пристрої, що ще не входили')}
     ${tile('З Telegram', num(p.telegram ?? 0), 'відкрили гру в Telegram')}
+    ${tile('З Telegram на сайт', num((D.days ?? []).slice(-30).reduce((n, d) => n + (d.tgSite ?? 0), 0)), 'перейшли до повної гри за 30 днів')}
     ${tile('Профілі', num(p.profiles), 'у списку гравців')}
     ${tile('З рангом', num(p.ranked), 'зіграли хоч раз')}
     ${tile('Активні 24 год / 7 д / 30 д', `${num(p.active.d1)} / ${num(p.active.d7)} / ${num(p.active.d30)}`)}

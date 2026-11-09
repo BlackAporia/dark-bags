@@ -374,7 +374,7 @@ const news = createNews();
 document.addEventListener('darkbags:news', () => news.open());
 const pass = createPass({ app, send, sfx, toast: (m) => toast(m), openBox: (id) => shop.open(id) });
 const ranked = createRanked({ app, send, sfx, toast: (m) => toast(m), go: (p) => go(p), openBox: (id) => shop.open(id), profile: (id) => social.profile(id) });
-const invite = createInvite({ app, send, sfx, toast: (m) => toast(m), goOnline: () => app.mode !== 'online' && setMode('online') });
+const invite = createInvite({ app, send, sfx, toast: (m) => toast(m), goOnline: () => (TG.active ? openSite() : app.mode !== 'online' && setMode('online')) });
 // X and Telegram, and the reward for following them
 const community = createCommunity({ app, send, sfx, toast: (m) => toast(m), hasAccount: () => hasAccount(), signIn: () => $('connect')?.click() });
 function communityBadge() {
@@ -1461,6 +1461,7 @@ function renderZPick(show, current) {
 // ------------------------------------------------------------- transport
 function setMode(mode) {
   if (mode === 'online' && !SERVER) mode = 'practice';
+  if (TG.active) mode = 'practice'; // inside Telegram: practice; the full game opens on the site
   regions.closeEdge();
   if (app.transport) app.transport.close();
   app.mode = mode;
@@ -1820,6 +1821,23 @@ if (TG.active) {
     TG.confirmClose(app.screen === 'game' || app.screen === 'prep');
   }, 300);
 }
+
+// Telegram is the way in: practice right there, and one tap to the full game on the site (online,
+// ranks, rewards, Starknet), in the phone's browser, with the friend's invite code along
+function openSite() {
+  const u = new URL('/', location.origin);
+  const ref = store.get('darkbags.ref', null);
+  if (typeof ref === 'string' && /^[A-Z0-9]{1,12}$/.test(ref)) u.searchParams.set('ref', ref);
+  TG.seen(true);
+  TG.site(u.href);
+}
+if (TG.active) {
+  TG.seen();
+  $('tg-cta').hidden = false;
+  $('res-site').hidden = false;
+  $('tg-cta-go').addEventListener('click', openSite);
+  $('res-site').addEventListener('click', openSite);
+}
 $('pause-btn').addEventListener('click', openPause);
 $('pause-resume').addEventListener('click', closePause);
 $('pause-leave').addEventListener('click', leaveMatch);
@@ -2006,6 +2024,7 @@ for (const k of ['quality', 'sound', 'music', 'track', 'menuTrack', 'voice', 'go
 $('faucet').addEventListener('click', () => send({ t: 'faucet' }));
 // Online and PvE share the server: the tab only picks which modes are on the board
 function pickTab(pve) {
+  if (TG.active) return openSite(); // PvP and PvE are on the site
   if (app.inRoom) return;
   app.pve = pve;
   store.set('darkbags.pve', pve);
