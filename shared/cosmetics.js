@@ -665,6 +665,17 @@ export class Inventory {
     return { ok: true, pack: p.id, added: p.price + p.bonus + first + vip, first, vip };
   }
 
+  // a refunded top-up: its shop $ back, as far as the player still has them (never below zero),
+  // and its price off what they bought (VIP levels follow purchases)
+  takeCredit(key, cents, price = cents) {
+    const r = this.rec(key);
+    const took = Math.max(0, Math.min(r.credit ?? 0, Math.floor(cents)));
+    r.credit = (r.credit ?? 0) - took;
+    r.bought = Math.max(0, (r.bought ?? 0) - Math.max(0, Math.floor(price)));
+    this.changed();
+    return took;
+  }
+
   // rank-ups: one 1-hour trial outfit per rank gained, nothing else
   rankUp(key, fromRank, toRank) {
     const r = this.rec(key);

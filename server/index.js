@@ -28,6 +28,8 @@ import { MailBook, cleanGift } from '../shared/mail.js';
 import { FortuneBook } from '../shared/fortune.js';
 import { langForCountry } from '../shared/geo.js';
 import { StatsBook } from '../shared/stats.js';
+import { TelegramBook, createTelegramBot, starPrices } from './telegram.js';
+import { PACKS } from '../shared/cosmetics.js';
 import { createAnalytics, adminSet } from './analytics.js';
 import { track, note, stalls, watchStalls } from './stall.js';
 import { createRegionMain, createRegionEdge, parseRegions, journaled } from './regions.js';
@@ -88,6 +90,7 @@ const SOCIAL_FILE = process.env.SOCIAL_FILE || (DATA ? `${DATA}/${NET}-social.js
 const PROMO_FILE = process.env.PROMO_FILE || (DATA ? `${DATA}/${NET}-promo.json` : '');
 const DESCENT_FILE = process.env.DESCENT_FILE || (DATA ? `${DATA}/${NET}-descent.json` : '');
 const STATS_FILE = process.env.STATS_FILE || (DATA ? `${DATA}/${NET}-stats.json` : '');
+const TELEGRAM_FILE = process.env.TELEGRAM_FILE || (DATA ? `${DATA}/${NET}-telegram.json` : '');
 // Ranks and players used to be one file for every network, so Sepolia test wallets showed up in the
 // mainnet leaderboard and player list. Each network has its own files now; the old shared ones move
 // out of the game once (to <data>/archive/shared-<time>/), so every network starts clean.
@@ -373,6 +376,28 @@ const send = (cid, msg) => {
   // one message for everyone (a chat line to the whole lobby) comes already written: see shared()
   s.ws.send(msg[WIRE] ?? JSON.stringify(msg));
 };
+// ---------------------------------------------------------------- telegram
+// The Telegram Mini App (server/telegram.js): TELEGRAM_BOT_TOKEN (host variables only) checks the
+// launch data Telegram signs; each Telegram user keeps one game token, on a persistent disk.
+// TELEGRAM_BOT_USERNAME and TELEGRAM_APP_NAME (public) build the t.me links the game shares.
+let telegramTimer = null;
+const telegram = EDGE
+  ? null
+  : new TelegramBook({
+      botToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
+      bot: process.env.TELEGRAM_BOT_USERNAME ?? '',
+      app: process.env.TELEGRAM_APP_NAME ?? '',
+      data: TELEGRAM_FILE && existsSync(TELEGRAM_FILE) ? JSON.parse(readFileSync(TELEGRAM_FILE, 'utf8')) : {},
+      onChange: (tb) => {
+        if (!TELEGRAM_FILE || telegramTimer) return;
+        telegramTimer = setTimeout(async () => {
+          telegramTimer = null;
+          await saveJSON(TELEGRAM_FILE, () => tb.toJSON()).catch((e) => console.error('telegram save failed', e));
+        }, SAVE_SOON);
+      },
+    });
+if (telegram?.on && !TELEGRAM_FILE) console.warn('TELEGRAM_BOT_TOKEN is set but there is no persistent disk: Telegram players get new runners after a restart (mount /data or set TELEGRAM_FILE)');
+
 // a match server journals what its matches write to these books, for the main server to replay
 const journal = [];
 const J = (name, book) => (EDGE ? journaled(name, book, journal) : book);
@@ -407,7 +432,30 @@ const lobby = new Lobby({
   // online rooms wait for the players (no timer) until someone presses Start or it fills up
   waitForStart: process.env.WAIT_FOR_START !== '0',
   newToken: () => crypto.randomBytes(16).toString('hex'),
+  telegram,
+  // SHOP_TEST_PAY=0 (a play-money server that sells shop $ for Telegram Stars): test USDC/USDT
+  // no longer pay in the shop, only shop $ does
+  stableShop: !!real || process.env.SHOP_TEST_PAY !== '0',
 });
+// The Telegram bot (server/telegram.js): /start, /paysupport, /terms and shop $ packs for Stars.
+// TELEGRAM_POLL=0 on every server but the one that reads the bot's updates; TELEGRAM_STARS=0
+// sells nothing; STARS_PER_USD sets the price (50 Stars a dollar by default).
+const tgBot =
+  telegram?.on && process.env.TELEGRAM_POLL !== '0'
+    ? createTelegramBot({
+        book: telegram,
+        prices: process.env.TELEGRAM_STARS === '0' ? {} : starPrices(PACKS, Number(process.env.STARS_PER_USD || 50)),
+        support: String(process.env.TELEGRAM_SUPPORT ?? '').slice(0, 64),
+        appUrl: String(process.env.TELEGRAM_APP_URL ?? ''),
+        onPaid: (order) => {
+          const r = lobby.starsPaid(order);
+          if (r) telegram.credited(order.id, r.added);
+          console.log(`telegram: ${order.stars} Stars paid for ${order.pack}${r ? '' : ' (not credited: check the order)'}`);
+        },
+      })
+    : null;
+if (tgBot && Object.keys(tgBot.prices).length) lobby.stars = tgBot;
+tgBot?.start();
 // the early STACHE gifts that were granted without a letter: their letter now, once
 lobby.resendStacheGifts();
 
@@ -525,7 +573,7 @@ function dataInfo() {
     epochAt: EPOCH_AT || null,
   };
 }
-const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE, data: dataInfo });
+const analytics = createAnalytics({ stats, lobby, sockets, real, ranks, inventory, social, referrals, mail, fortune, guard, network: NET, stalls, regions: regionMain, storage: STORAGE, data: dataInfo, telegram });
 
 // ------------------------------------------------------------------ static
 const gzipAsync = promisify(gzip);
@@ -729,6 +777,34 @@ function httpHandle(req, res) {
     });
     return;
   }
+  // a Telegram Stars refund: POST /api/admin/stars_refund with header x-admin-key: ADMIN_KEY and
+  // { charge: '<telegram_payment_charge_id>' }. The Stars go back to the player; the shop $ they
+  // bought are taken back as far as the player still has them.
+  if (pathOnly === '/api/admin/stars_refund' && req.method === 'POST') {
+    const reply = (code, body) => res.writeHead(code, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+    const key = process.env.ADMIN_KEY;
+    const given = String(req.headers['x-admin-key'] ?? '');
+    if (!key || key.length < 16 || given.length !== key.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(key))) return reply(403, { error: 'forbidden' });
+    if (!tgBot) return reply(404, { error: 'telegram bot off' });
+    let raw = '';
+    req.on('data', (c) => {
+      raw += c;
+      if (raw.length > 2000) req.destroy();
+    });
+    req.on('end', async () => {
+      try {
+        const o = await tgBot.refund(JSON.parse(raw || '{}').charge);
+        const price = PACKS.find((p) => p.id === o.pack)?.price ?? 0;
+        const took = inventory.takeCredit(o.key, o.added ?? price, price);
+        for (const [c, x] of lobby.sessions) if (lobby.key(x) === o.key) send(c, { t: 'locker', op: 'refund', locker: inventory.view(o.key) });
+        console.log(`telegram: refunded ${o.stars} Stars (${o.pack}), took back ${took} shop $ cents`);
+        reply(200, { ok: true, stars: o.stars, tookBack: took });
+      } catch (e) {
+        reply(400, { error: e?.user ? e.message : String(e?.message ?? e).slice(0, 200) });
+      }
+    });
+    return;
+  }
   // the team's analytics page (client/admin.html): admin wallets or ADMIN_KEY only
   if (pathOnly === '/api/admin/stats' && req.method === 'GET') {
     analytics.handle(req, res).catch((e) => {
@@ -891,6 +967,7 @@ const shutdown = async (code = 0) => {
   if (STATS_FILE) await saveJSON(STATS_FILE, () => stats.toJSON()).catch(() => {});
   if (SOCIAL_FILE) await saveJSON(SOCIAL_FILE, () => social.toJSON()).catch(() => {});
   if (PROMO_FILE) await saveJSON(PROMO_FILE, () => promo.toJSON()).catch(() => {});
+  if (TELEGRAM_FILE && telegram) await saveJSON(TELEGRAM_FILE, () => telegram.toJSON()).catch(() => {});
   if (real) await real.stop().catch(() => {});
   else if (WALLET_FILE) await saveJSON(WALLET_FILE, () => wallet.toJSON()).catch(() => {});
   process.exit(code);

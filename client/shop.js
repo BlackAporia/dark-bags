@@ -14,6 +14,7 @@ import { t } from './i18n.js';
 import { STYLE } from '../shared/style.js';
 import { styleStill } from './flair.js';
 import { settings } from './settings.js';
+import { TG } from './telegram.js';
 
 const $ = (id) => document.getElementById(id);
 const rn = (k) => t(`r.${k}`);
@@ -25,6 +26,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
   const L = () => app.locker;
   // USDC/USDT the player can top shop $ up from, in cents
   const stableCents = () => {
+    if (app.shopPay === false) return 0; // this server sells shop $ for Stars only
     let c = 0n;
     for (const a of app.assets ?? []) {
       if (!isStable(a) || a.decimals < 2) continue;
@@ -33,6 +35,8 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     return Number(c);
   };
   const reach = () => (L()?.credit ?? 0) + stableCents();
+  // inside Telegram, on a server that sells for Stars: { packId: stars }
+  const stars = () => (TG.active && app.tgStars ? app.tgStars : null);
   // a case sold for a coin (the Stache Case: STACHE): what it costs in that coin right now, and
   // how many cents of it the player holds
   const coinAsset = (coin) => (app.assets ?? []).find((a) => (coin === 'STACHE' ? isStache(a.id) : a.symbol === coin) && !a.custom);
@@ -70,16 +74,17 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
     root.innerHTML = `
       <header class="shop-head">
         <h2 class="sec-h">${t('nav.shop')}</h2>
-        <p class="shop-bal"><span>${t('lk.shopUsd')}</span> <b class="num">${usd(L().credit)}</b> <small>${t('lk.topupFrom', { v: usd(stableCents()) })}</small></p>
+        <p class="shop-bal"><span>${t('lk.shopUsd')}</span> <b class="num">${usd(L().credit)}</b> ${stars() ? '' : `<small>${t('lk.topupFrom', { v: usd(stableCents()) })}</small>`}</p>
       </header>
       <section class="packs-wrap">
         <p class="eyebrow">${t('shop.topup')}</p>
         ${L().firstTopup ? `<p class="first-topup">🎁 ${t('shop.firstTopup', { v: usd(FIRST_TOPUP_MAX) })}</p>` : ''}
-        <div class="lk-packs">${PACKS.map((p) => {
+        <div class="lk-packs">${PACKS.filter((p) => !stars() || stars()[p.id]).map((p) => {
           const extra = L().firstTopup ? firstBonus(p.price) : 0;
-          return `<button type="button" class="lk-pack${p.bonus || extra ? ' bonus' : ''}" data-pack="${p.id}" ${stableCents() < p.price ? 'disabled' : ''}><b>${usd(p.price + p.bonus + extra)}</b><span>${p.bonus || extra ? t('lk.bonus', { n: Math.round(((p.bonus + extra) / p.price) * 100) }) : t('lk.shopUsd')}</span><small>${t('lk.pay', { v: usd(p.price) })}</small></button>`;
+          const n = stars()?.[p.id];
+          return `<button type="button" class="lk-pack${p.bonus || extra ? ' bonus' : ''}${n ? ' stars' : ''}" data-pack="${p.id}" ${!n && stableCents() < p.price ? 'disabled' : ''}><b>${usd(p.price + p.bonus + extra)}</b><span>${p.bonus || extra ? t('lk.bonus', { n: Math.round(((p.bonus + extra) / p.price) * 100) }) : t('lk.shopUsd')}</span><small>${n ? `⭐ ${n}` : t('lk.pay', { v: usd(p.price) })}</small></button>`;
         }).join('')}</div>
-        <p class="fine">${t('lk.shopNote')}</p>
+        <p class="fine">${t(stars() ? 'tg.starsNote' : 'lk.shopNote')}</p>
       </section>
       ${partner.length ? `<section class="box-group partner"><p class="eyebrow">${t('shop.g.partner')}</p><div class="box-grid">${partner.map(boxCard).join('')}</div></section>` : ''}
       <div class="mode shop-tabs" role="tablist">
@@ -93,7 +98,7 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
         return list.length ? `<section class="box-group"><p class="eyebrow">${t(g === 'style' ? 'shop.style' : `shop.g.${g}`)}</p><div class="box-grid">${list.map(boxCard).join('')}</div></section>` : '';
       }).join('')}
       ${limited.length ? `<section class="limited"><p class="eyebrow">${t('shop.limited')}</p><div class="lim-row">${limited.map(limCard).join('')}</div></section>` : ''}`;
-    for (const b of root.querySelectorAll('[data-pack]')) b.addEventListener('click', () => (demoOnly() ? toast(t('err.online_only')) : send({ t: 'topup', id: b.dataset.pack })));
+    for (const b of root.querySelectorAll('[data-pack]')) b.addEventListener('click', () => (demoOnly() ? toast(t('err.online_only')) : send({ t: stars()?.[b.dataset.pack] ? 'stars_buy' : 'topup', id: b.dataset.pack })));
     for (const b of root.querySelectorAll('[data-fam]'))
       b.addEventListener('click', () => {
         st.family = b.dataset.fam;
@@ -456,6 +461,15 @@ export function createShop({ app, send, sfx, toast, share, equip, onRender = () 
 
   // --------------------------------------------------------------- messages
   function onMessage(m) {
+    // a Stars invoice: Telegram's payment sheet; the shop $ arrive with the server's 'locker'
+    if (m.t === 'stars_invoice') {
+      const opened = TG.openInvoice(m.link, (status) => {
+        if (status === 'paid') toast(t('tg.paid'));
+        else if (status === 'failed') toast(t('tg.payFailed'));
+      });
+      if (!opened) toast(t('tg.payFailed'));
+      return;
+    }
     if (m.t === 'err' && st.busy) {
       st.busy = false;
       close();

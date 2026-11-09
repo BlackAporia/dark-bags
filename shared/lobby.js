@@ -5,7 +5,7 @@ import { PriceBook, isStable } from './assets.js';
 import { RankBook } from './ranks.js';
 import { validStake, bandOf } from './stakes.js';
 import { MODES, MODE } from './modes.js';
-import { Inventory, OUTFITS, BOXES, BOX, RARITIES, PITY, PACKS, FINISHES, MAX_OPEN } from './cosmetics.js';
+import { Inventory, OUTFITS, BOXES, BOX, RARITIES, PITY, PACKS, PACK, FINISHES, MAX_OPEN } from './cosmetics.js';
 import { isStache, STACHE_GIFT_CASES, STACHE_CASE_ID, STACHE_TITLE, FOREVER_TITLES } from './stache.js';
 import { PromoBook } from './promo.js';
 import { COMMUNITY_IDS, COMMUNITY_TITLE, COMMUNITY_SPINS } from './community.js';
@@ -44,8 +44,11 @@ export { STAKE_MIN as CUSTOM_MIN, STAKE_MAX as CUSTOM_MAX } from './stakes.js';
 export const REF_GIFT = 'vault';
 
 export class Lobby {
-  constructor({ promo = new PromoBook(), descent = new DescentBook(), pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1 }) {
+  constructor({ promo = new PromoBook(), descent = new DescentBook(), pots = null, edge = false, stats = null, isAdmin = () => false, coins = null, fortune = new FortuneBook(), daily = new DailyBook(), mail = new MailBook(), guard = new Guard(), referrals = new ReferralBook(), wallet, send, newToken, cashier = null, prices = new PriceBook(), ranks = new RankBook(), inventory = new Inventory(), practice = false, bots = true, roundSeconds = CFG.ROUND_SECONDS, prepSeconds = CFG.PREP_SECONDS, tiers = CFG.TIERS, swap = !cashier, now = () => Date.now(), waitForStart = false, social = new SocialBook(), minPlayers = 1, telegram = null, stableShop = true }) {
     this.social = social; // players, friends, private messages, guilds
+    this.telegram = telegram; // Telegram Mini App sign-in (server/telegram.js), or null
+    this.stars = null; // the Telegram bot selling shop $ for Stars (server/telegram.js), set by the server
+    this.stableShop = stableShop; // false: test USDC/USDT no longer pay in the shop (a server that sells for Stars)
     this.stats = stats; // the team's analytics (server only)
     this.clientErrors = []; // errors players' devices reported, newest first
     this.netReports = []; // how the last matches ran on players' devices and links, newest first
@@ -240,7 +243,12 @@ export class Lobby {
 
     if (msg.t === 'hello') {
       s.dev = this.guard.dev(msg.dev);
-      if (typeof msg.token === 'string' && /^[a-z0-9]{8,64}$/.test(msg.token)) s.token = msg.token;
+      // inside Telegram: the launch data Telegram signed names the player, on every device
+      const tg = msg.tg && this.telegram?.on ? this.telegram.signIn(msg.tg) : null;
+      s.tg = !!tg;
+      s.tgId = tg?.user.id ?? null;
+      if (tg) s.token = tg.token;
+      else if (typeof msg.token === 'string' && /^[a-z0-9]{8,64}$/.test(msg.token)) s.token = msg.token;
       else if (this.cashier || this.guard.allow('new', s.net, GUARD.newPerIpDay)) s.token = this.newToken();
       else return this.send(cid, { t: 'err', code: 'guard_new', msg: 'Too many new accounts from your network today. Come back tomorrow.' });
       s.name = cleanName(msg.name);
@@ -251,7 +259,7 @@ export class Lobby {
       // what this server lost of the account comes back from the browser's signed copy (server/backup.js)
       if (this.key(s) && Array.isArray(msg.backups)) this.backups?.restore(this.key(s), msg.backups);
       const fresh = this.adoptProfile(s);
-      this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account, device: s.token });
+      this.stats?.seen(this.key(s) ?? s.token, { wallet: !!s.account, device: s.token, tg: s.tg });
       this.send(cid, {
         t: 'welcome',
         token: s.token,
@@ -280,6 +288,8 @@ export class Lobby {
         regions: this.regionList?.() ?? null,
         admin: !!s.account && this.isAdmin(s.account),
         privy: this.cashier?.privyFor(s.token) ?? null,
+        tg: this.tgInfo(s),
+        shopPay: !!this.stableShop || !!this.cashier,
         cfg: {
           ROUND_SECONDS: this.roundSeconds,
           RAKE: CFG.RAKE,
@@ -419,6 +429,8 @@ export class Lobby {
         this.wallet.faucet(s.token);
         this.send(cid, { t: 'balance', balances: this.balances(s) });
         return;
+      case 'stars_buy':
+        return this.starsBuy(cid, s, msg);
       case 'equip':
       case 'wequip':
       case 'body':
@@ -774,6 +786,44 @@ export class Lobby {
 
   // The welcome bonus, once per account: the premium Founder title (worn at once if no other title
   // is on) and a letter in the mailbox with a spin of the fortune wheel.
+  // ------------------------------------------------------------ Telegram Stars
+  // what a client learns about Telegram: the t.me link, and inside Telegram the Stars prices
+  tgInfo(s) {
+    const info = this.telegram?.info() ?? {};
+    const stars = this.stars && s.tg && this.key(s) && !this.practice ? this.stars.prices : null;
+    return info.link || stars ? { ...info, ...(stars ? { stars } : {}) } : null;
+  }
+
+  // a shop $ pack for Telegram Stars: an invoice link the client opens in Telegram
+  starsBuy(cid, s, msg) {
+    const key = this.key(s);
+    const pack = PACK[String(msg.id ?? '')];
+    if (!this.stars || !s.tg || this.practice) return this.send(cid, { t: 'err', msg: 'Stars work inside Telegram only.' });
+    if (!key) return this.send(cid, { t: 'err', msg: 'Sign in first.' });
+    if (!pack || !this.stars.prices[pack.id]) return this.send(cid, { t: 'err', msg: 'This pack is not sold for Stars.' });
+    if (this.cashier?.paused()) return this.send(cid, { t: 'err', msg: 'Paused for maintenance: purchases are off for a moment.' });
+    if (!this.guard.allow('stars', key, 30)) return this.send(cid, { t: 'err', msg: 'Too many orders today.' });
+    const alive = () => this.sessions.get(cid) === s;
+    this.stars
+      .invoice({ key, pack: pack.id, price: pack.price, tg: s.tgId ?? null })
+      .then((r) => alive() && this.send(cid, { t: 'stars_invoice', link: r.link, pack: pack.id, stars: r.stars }))
+      .catch((e) => alive() && this.send(cid, { t: 'err', msg: e?.user ? e.message : 'Telegram did not answer. Try again in a minute.' }));
+  }
+
+  // Telegram says an order is paid: the pack's shop $ (with the first top-up and VIP bonuses),
+  // the welcome bonus, the books, and every open session of the player hears it
+  starsPaid(order) {
+    const pack = PACK[order?.pack];
+    if (!pack || !order.key) return null;
+    const r = this.inventory.topUp(order.key, pack.id, () => true);
+    if (!r.ok) return null;
+    this.social.markPurchase?.(order.key);
+    this.stats?.buy('topup', pack.price, `stars:${pack.id}`);
+    for (const [c, x] of this.sessions) if (this.key(x) === order.key) this.send(c, { t: 'locker', op: 'topup', result: r, locker: this.inventory.view(order.key), balances: this.balances(x) });
+    this.welcome(order.key);
+    return r;
+  }
+
   welcome(key) {
     if (!key || !this.inventory.welcome(key)) return false;
     const done = this.ranks.progress(key, { deposits: 1 });
@@ -973,6 +1023,7 @@ export class Lobby {
 
   // Shop $ is bought 1:1 with USDC or USDT (play-money test tokens without a cashier)
   stablePay(key) {
+    if (!this.stableShop && !this.cashier) return () => false; // the shop takes shop $ only (sold for Stars)
     return (cents) => {
       for (const a of this.prices.list()) {
         if (!isStable(a) || a.decimals < 2) continue;

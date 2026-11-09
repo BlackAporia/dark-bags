@@ -64,7 +64,7 @@ export class StatsBook {
   // the session token behind a wallet sign-in. The device was seen on its own before the sign-in;
   // it is the same person, so it is marked as theirs (a: 1) and never counted twice: not as a
   // visitor, not as a new player that day, not as a second active one.
-  seen(key, { wallet = false, device = null } = {}) {
+  seen(key, { wallet = false, device = null, tg = false } = {}) {
     if (!key) return;
     const t = this.now();
     const today = dayOf(t);
@@ -85,6 +85,10 @@ export class StatsBook {
     if (wallet && !p.w) {
       p.w = 1;
       d.wallets++;
+    }
+    if (tg && !p.tg) {
+      p.tg = 1; // came in through the Telegram Mini App
+      d.tg = (d.tg ?? 0) + 1;
     }
     p.l = t;
     p.v++;

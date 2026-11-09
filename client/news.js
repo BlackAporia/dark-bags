@@ -3,6 +3,7 @@
 import { getLang, t } from './i18n.js';
 import { store } from './store.js';
 import { esc } from './game.js';
+import { TG } from './telegram.js';
 
 const $ = (id) => document.getElementById(id);
 const SEEN = 'darkbags.news.seen';
@@ -303,7 +304,21 @@ export const NEWS = [
   },
 ];
 
+// inside Telegram (only TON may be used for crypto there) the notes about wallets, deposits,
+// bridges and the like stay out: a line goes when its English text names one of them
+const CRYPTO = /starknet|strk|deposit|cash.?out|cashier|wallet|crypto|bridge|bitcoin|\bbtc\b|usdc|usdt|stache|token|withdraw|avnu|privy|cartridge|on.?chain|mainnet|sepolia|vault|swap/i;
+export function newsFor(tg = TG.active) {
+  if (!tg) return NEWS;
+  return NEWS.map((n) => {
+    const keep = (n.items.en ?? []).map((x) => !CRYPTO.test(x));
+    const en = n.items.en.filter((_, i) => keep[i]);
+    // a language whose lines do not line up with the English ones shows the English that stays
+    return { ...n, items: Object.fromEntries(Object.entries(n.items).map(([l, list]) => [l, list.length === keep.length ? list.filter((_, i) => keep[i]) : en])) };
+  }).filter((n) => n.items.en.length);
+}
+
 export function createNews() {
+  const NEWS = newsFor();
   function render() {
     const lang = getLang();
     const fmt = (iso) => new Date(iso).toLocaleString(lang, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });

@@ -5,12 +5,16 @@ import { usd } from '../shared/cosmetics.js';
 import { esc } from './game.js';
 import { store } from './store.js';
 import { t } from './i18n.js';
+import { TG } from './telegram.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'darkbags.ref';
 
-// a link with ?ref= remembers its code (and leaves the address bar clean)
+// a link with ?ref= remembers its code (and leaves the address bar clean); inside Telegram the
+// code rides in the start parameter (t.me/<bot>/<app>?startapp=ref_CODE)
 export function captureRef() {
+  const tg = /^ref_([A-Za-z0-9]{1,12})$/.exec(TG.startParam ?? '');
+  if (tg) store.set(KEY, tg[1].toUpperCase());
   try {
     const u = new URL(location.href);
     const code = (u.searchParams.get('ref') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
@@ -42,7 +46,8 @@ export function createInvite({ app, send, toast, sfx, goOnline = null }) {
   const online = () => app.mode === 'online';
   const signedIn = () => online() && (app.chain ? !!account : !!app.token);
 
-  const link = () => (info?.code ? `${location.origin}${location.pathname}?ref=${info.code}` : '');
+  // inside Telegram the friend gets a link that opens the game in Telegram
+  const link = () => (info?.code ? (TG.active && TG.startLink(`ref_${info.code}`)) || `${location.origin}${location.pathname}?ref=${info.code}` : '');
 
   // once in: a code from a link is claimed (only works before the first match)
   function maybeClaim() {
@@ -149,6 +154,7 @@ export function createInvite({ app, send, toast, sfx, goOnline = null }) {
     });
     $('ref-share')?.addEventListener('click', async () => {
       const text = t('ref.shareText', { c: info.code });
+      if (TG.share(link(), text)) return; // Telegram's own share sheet: pick a chat
       if (navigator.share) {
         try {
           await navigator.share({ title: 'DARK BAGS', text, url: link() });

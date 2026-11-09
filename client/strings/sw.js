@@ -2084,4 +2084,8 @@ export default {
   "op.tunnels.v.outro.5": "Operesheni 2, Bandari: inakuja hivi karibuni.",
   'ref.online': "Mialiko inafanya kazi mtandaoni tu. Sasa uko kwenye Mazoezi dhidi ya roboti, yanayoendeshwa nje ya mtandao kwenye kivinjari chako.",
   'ref.goOnline': "Nenda mtandaoni",
+  'tg.noWallet': "Pochi na kutoa pesa hazipatikani ndani ya Telegram. Fungua dark-bags.com kwenye kivinjari chako ili kuzitumia.",
+  'tg.paid': "Malipo yamepokelewa. $ ya duka yako inakuja.",
+  'tg.payFailed': "Malipo hayakufanikiwa. Jaribu tena.",
+  'tg.starsNote': "Inalipwa kwa Telegram Stars (vifurushi vikubwa vina bonasi). $ ya duka hutumika hapa tu na haiwezi kutolewa.",
 };

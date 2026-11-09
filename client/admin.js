@@ -229,6 +229,7 @@ function players() {
   <section><h2>Гравці</h2><div class="tiles">
     ${tile('З гаманцем', num(p.wallets), 'увійшли на мейнеті', true)}
     ${tile('Людей', num(p.people ?? p.visitors), 'гаманці й пристрої, що ще не входили')}
+    ${tile('З Telegram', num(p.telegram ?? 0), 'відкрили гру в Telegram')}
     ${tile('Профілі', num(p.profiles), 'у списку гравців')}
     ${tile('З рангом', num(p.ranked), 'зіграли хоч раз')}
     ${tile('Активні 24 год / 7 д / 30 д', `${num(p.active.d1)} / ${num(p.active.d7)} / ${num(p.active.d30)}`)}
@@ -245,6 +246,10 @@ function players() {
     ${card('Ранги гравців', ranks.length ? hbars(ranks) : '<p class="mut">Поки порожньо</p>')}
   </div></section>
   <section>${card('Кар’єра всіх гравців разом', `<div class="tiles">${CAREER.map(([k, l, f]) => tile(l, f ? f(p.career[k] ?? 0) : num(p.career[k] ?? 0))).join('')}</div>`)}</section>
+  ${D.telegram ? `<section><h2>Telegram</h2><div class="tiles">
+    ${tile('Продано за Stars', `⭐ ${num(D.telegram.stars)}`, `${num(D.telegram.orders)} покупок · ${num(D.telegram.refunds)} повернень`, true)}
+    ${tile('Гравців з Telegram', num(D.telegram.players), 'відкрили гру в Telegram')}
+  </div>${D.telegram.support.length ? card('Повідомлення боту', table(['Коли', 'Хто', 'Ключ гравця', 'Текст'], D.telegram.support.map((m) => `<tr><td>${dt(m.at)}</td><td>${esc(m.user)}</td><td class="mono">${esc(m.key ?? '—')}</td><td>${esc(m.text)}</td></tr>`))) : ''}</section>` : ''}
   ${p.flagged.length ? `<section>${card('Fair play: на перевірці', table(['Гравець', 'Акаунт', 'Причина', 'Коли'], p.flagged.map((f) => `<tr><td>${esc(f.name)}</td><td class="mono">${esc(short(f.key))}</td><td>${esc(f.why)}</td><td>${dt(f.at)}</td></tr>`)))}</section>` : ''}`;
 }
 
