@@ -104,8 +104,9 @@ export async function createStarknetChain({ cfg, starkzap, log = console }) {
     info: () => ({
       network: cfg.network,
       chainId: cfg.chainId,
-      rpcUrl: cfg.clientRpcUrl || networks[cfg.network].rpcUrl,
-      rpcUrls: [...new Set([cfg.clientRpcUrl || networks[cfg.network].rpcUrl, ...(cfg.rpcFallbacks ?? [])])],
+      // the browser starts on the node the server found answering (not a preset that may refuse)
+      rpcUrl: cfg.clientRpcUrl || rpcUrl,
+      rpcUrls: [...new Set([cfg.clientRpcUrl || rpcUrl, ...nodes])],
       house,
       // where private transfers go (the same as house unless PRIVATE_HOUSE_* is set)
       privateHouse: privHouse,

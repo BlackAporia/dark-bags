@@ -39,9 +39,11 @@ export const STRK20_PROVER = {
   sepolia: 'https://transaction-prover.alpha-sepolia.sw-dev.io',
 };
 // spare nodes, tried after RPC_URL / the preset when they do not answer
+// (more than one each: a single public node that starts refusing, as Cartridge's did with
+// "Unauthorized", must not keep the whole server from starting)
 export const RPC_SPARES = {
-  mainnet: ['https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10'],
-  sepolia: [],
+  mainnet: ['https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10', 'https://starknet-rpc.publicnode.com', 'https://rpc.starknet.lava.build'],
+  sepolia: ['https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_10', 'https://starknet-sepolia-rpc.publicnode.com'],
 };
 // nodes for transactions that carry a STRK20 proof, tried in turn: a node that does not know
 // proof_facts checks the account signature against a hash without them ('invalid owner sig')

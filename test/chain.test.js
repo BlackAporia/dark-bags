@@ -143,7 +143,11 @@ test('the cashier takes the first Starknet node that answers on the right chain'
   assert.equal(await pickNode(['https://down'], 'SN_SEPOLIA', quiet, fakeFetch), null);
   // the spare mainnet node is always in the list, after RPC_URL and RPC_FALLBACKS
   const cfg = readConfig({ CHAIN: 'mainnet', RPC_FALLBACKS: 'https://a,https://b' });
-  assert.deepEqual(cfg.rpcFallbacks, ['https://a', 'https://b', 'https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10']);
+  assert.deepEqual(cfg.rpcFallbacks, ['https://a', 'https://b', 'https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_10', 'https://starknet-rpc.publicnode.com', 'https://rpc.starknet.lava.build']);
+  // a node that starts refusing ("Unauthorized", not JSON) is passed over for the next spare
+  const refusing = async (url) => (url.includes('cartridge') ? { json: async () => JSON.parse('Unauthorized\n') } : { json: async () => ({ result: '0x534e5f4d41494e' }) });
+  assert.equal(await pickNode(cfg.rpcFallbacks.slice(2), 'SN_MAIN', quiet, refusing), 'https://starknet-rpc.publicnode.com');
+  assert.ok(readConfig({ CHAIN: 'sepolia' }).rpcFallbacks.length >= 2, 'sepolia has spares too');
 });
 
 test('coin lists: AVNU and Ekubo shapes parse into one tidy list', async () => {
